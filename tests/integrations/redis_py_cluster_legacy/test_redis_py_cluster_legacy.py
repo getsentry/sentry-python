@@ -5,8 +5,8 @@ import rediscluster
 
 from sentry_sdk import capture_message
 from sentry_sdk.api import start_transaction
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import ApproxDict
 
 

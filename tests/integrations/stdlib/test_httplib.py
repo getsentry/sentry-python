@@ -7,10 +7,9 @@ from unittest import mock
 import pytest
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import MATCH_ALL
+from sentry_sdk.consts import ATTRS, MATCH_ALL
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from tests.conftest import ApproxDict, create_mock_http_server
 

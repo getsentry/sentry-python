@@ -3,11 +3,10 @@ from typing import Any, Callable, List, Optional
 
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 
 try:

@@ -10,8 +10,7 @@ import sentry_sdk.logger
 from sentry_sdk import get_client
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.types import Log
-from sentry_sdk.consts import VERSION
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
+from sentry_sdk.consts import ATTRS, VERSION
 
 minimum_python_37 = pytest.mark.skipif(
     sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"

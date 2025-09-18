@@ -7,12 +7,11 @@ from django import VERSION as DJANGO_VERSION
 from django.core.cache import CacheHandler
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 if TYPE_CHECKING:
     from typing import Any

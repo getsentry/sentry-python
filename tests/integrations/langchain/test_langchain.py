@@ -4,8 +4,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
-
 try:
     # Langchain >= 0.2
     from langchain_openai import ChatOpenAI
@@ -20,6 +18,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from sentry_sdk import start_transaction
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,

@@ -5,13 +5,12 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
 from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import _get_value
 from sentry_sdk.utils import logger, capture_internal_exceptions
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

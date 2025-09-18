@@ -41,14 +41,13 @@ except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
 from sentry_sdk import start_transaction, start_span
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
     _set_output_data,
     _collect_ai_data,
 )
 from sentry_sdk.utils import package_version
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 ANTHROPIC_VERSION = package_version("anthropic")
 

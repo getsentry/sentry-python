@@ -1,6 +1,5 @@
 import sentry_sdk
-from sentry_sdk.consts import OP
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
+from sentry_sdk.consts import ATTRS, OP
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (

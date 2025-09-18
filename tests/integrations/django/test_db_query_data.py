@@ -15,9 +15,9 @@ except ImportError:
 from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.utils import pytest_mark_django_db_decorator

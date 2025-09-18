@@ -1,4 +1,4 @@
-from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.consts import ATTRS, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
@@ -6,7 +6,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     parse_version,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
+
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore

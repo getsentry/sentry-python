@@ -27,6 +27,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY310
 from sentry_sdk import capture_message, capture_exception
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.django import (
     DjangoIntegration,
     DjangoRequestExtractor,
@@ -36,7 +37,6 @@ from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.profiler.utils import get_frame_name
 from sentry_sdk.tracing import Span
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.myapp.signals import myapp_custom_signal_silenced

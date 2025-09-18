@@ -5,7 +5,7 @@ import weakref
 from importlib import import_module
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
@@ -29,7 +29,6 @@ from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 try:
     from django import VERSION as DJANGO_VERSION

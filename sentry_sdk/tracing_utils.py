@@ -11,7 +11,7 @@ from urllib.parse import quote, unquote
 import uuid
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANTEMPLATE, ATTRS
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     filename_for_module,
@@ -27,7 +27,6 @@ from sentry_sdk.utils import (
     _is_in_project_root,
     _module_in_list,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

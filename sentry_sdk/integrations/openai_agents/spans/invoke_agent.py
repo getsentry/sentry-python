@@ -1,9 +1,8 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data

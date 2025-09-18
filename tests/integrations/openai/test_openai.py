@@ -1,7 +1,5 @@
 import pytest
 
-from sentry_sdk.utils import package_version
-
 try:
     from openai import NOT_GIVEN
 except ImportError:
@@ -34,11 +32,12 @@ except ImportError:
     SKIP_RESPONSES_TESTS = True
 
 from sentry_sdk import start_transaction
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
+from sentry_sdk.utils import package_version
 
 from unittest import mock  # python 3.3 and above
 

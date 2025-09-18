@@ -11,7 +11,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     safe_serialize,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -179,21 +178,23 @@ def _set_input_data(span, kwargs, operation, integration):
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        set_data_normalized(span, ATTRS.GEN_AI_REQUEST_MESSAGES, messages, unpack=False)
+        set_data_normalized(
+            span, consts.ATTRS.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+        )
 
     # Input attributes: Common
-    set_data_normalized(span, ATTRS.GEN_AI_SYSTEM, "openai")
-    set_data_normalized(span, ATTRS.GEN_AI_OPERATION_NAME, operation)
+    set_data_normalized(span, consts.ATTRS.GEN_AI_SYSTEM, "openai")
+    set_data_normalized(span, consts.ATTRS.GEN_AI_OPERATION_NAME, operation)
 
     # Input attributes: Optional
     kwargs_keys_to_attributes = {
-        "model": ATTRS.GEN_AI_REQUEST_MODEL,
-        "stream": ATTRS.GEN_AI_RESPONSE_STREAMING,
-        "max_tokens": ATTRS.GEN_AI_REQUEST_MAX_TOKENS,
-        "presence_penalty": ATTRS.GEN_AI_REQUEST_PRESENCE_PENALTY,
-        "frequency_penalty": ATTRS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-        "temperature": ATTRS.GEN_AI_REQUEST_TEMPERATURE,
-        "top_p": ATTRS.GEN_AI_REQUEST_TOP_P,
+        "model": consts.ATTRS.GEN_AI_REQUEST_MODEL,
+        "stream": consts.ATTRS.GEN_AI_RESPONSE_STREAMING,
+        "max_tokens": consts.ATTRS.GEN_AI_REQUEST_MAX_TOKENS,
+        "presence_penalty": consts.ATTRS.GEN_AI_REQUEST_PRESENCE_PENALTY,
+        "frequency_penalty": consts.ATTRS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+        "temperature": consts.ATTRS.GEN_AI_REQUEST_TEMPERATURE,
+        "top_p": consts.ATTRS.GEN_AI_REQUEST_TOP_P,
     }
     for key, attribute in kwargs_keys_to_attributes.items():
         value = kwargs.get(key)
@@ -205,14 +206,14 @@ def _set_input_data(span, kwargs, operation, integration):
     tools = kwargs.get("tools")
     if tools is not NOT_GIVEN and tools is not None and len(tools) > 0:
         set_data_normalized(
-            span, ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            span, consts.ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
         )
 
 
 def _set_output_data(span, response, kwargs, integration, finish_span=True):
     # type: (Span, Any, dict[str, Any], OpenAIIntegration, bool) -> None
     if hasattr(response, "model"):
-        set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_MODEL, response.model)
+        set_data_normalized(span, consts.ATTRS.GEN_AI_RESPONSE_MODEL, response.model)
 
     # Input messages (the prompt or data sent to the model)
     # used for the token usage calculation
@@ -227,7 +228,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
         if should_send_default_pii() and integration.include_prompts:
             response_text = [choice.message.dict() for choice in response.choices]
             if len(response_text) > 0:
-                set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_TEXT, response_text)
+                set_data_normalized(
+                    span, consts.ATTRS.GEN_AI_RESPONSE_TEXT, response_text
+                )
 
         _calculate_token_usage(messages, response, span, None, integration.count_tokens)
 
@@ -255,14 +258,14 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
             if len(output_messages["tool"]) > 0:
                 set_data_normalized(
                     span,
-                    ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
+                    consts.ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
                     output_messages["tool"],
                     unpack=False,
                 )
 
             if len(output_messages["response"]) > 0:
                 set_data_normalized(
-                    span, ATTRS.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+                    span, consts.ATTRS.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                 )
 
         _calculate_token_usage(messages, response, span, None, integration.count_tokens)
@@ -316,7 +319,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
                         set_data_normalized(
-                            span, ATTRS.GEN_AI_RESPONSE_TEXT, all_responses
+                            span, consts.ATTRS.GEN_AI_RESPONSE_TEXT, all_responses
                         )
                     if count_tokens_manually:
                         _calculate_token_usage(
@@ -371,7 +374,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
                         set_data_normalized(
-                            span, ATTRS.GEN_AI_RESPONSE_TEXT, all_responses
+                            span, consts.ATTRS.GEN_AI_RESPONSE_TEXT, all_responses
                         )
                     if count_tokens_manually:
                         _calculate_token_usage(

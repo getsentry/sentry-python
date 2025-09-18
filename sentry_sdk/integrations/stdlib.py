@@ -5,7 +5,7 @@ import platform
 from http.client import HTTPConnection
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
@@ -18,7 +18,6 @@ from sentry_sdk.utils import (
     safe_repr,
     parse_url,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

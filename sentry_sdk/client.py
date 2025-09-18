@@ -30,6 +30,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
+    ATTRS,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -48,7 +49,6 @@ from sentry_sdk.profiler.transaction_profiler import (
 )
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 if TYPE_CHECKING:
     from typing import Any

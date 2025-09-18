@@ -1,9 +1,9 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception, safe_serialize
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

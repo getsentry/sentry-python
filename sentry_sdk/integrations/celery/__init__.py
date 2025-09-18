@@ -5,7 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.consts import ATTRS, OP, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -22,7 +22,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     reraise,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

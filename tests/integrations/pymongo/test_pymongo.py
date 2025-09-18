@@ -1,6 +1,6 @@
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from mockupdb import MockupDB, OpQuery
 from pymongo import MongoClient

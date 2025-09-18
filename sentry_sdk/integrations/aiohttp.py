@@ -4,7 +4,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.consts import ATTRS, OP, SPANSTATUS
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     _check_minimum_version,
@@ -37,7 +37,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
+
 
 try:
     import asyncio

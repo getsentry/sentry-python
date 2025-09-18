@@ -3,7 +3,7 @@ import contextlib
 from typing import Any, TypeVar, Callable, Awaitable, Iterator
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
@@ -12,7 +12,6 @@ from sentry_sdk.utils import (
     parse_version,
     capture_internal_exceptions,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 try:
     import asyncpg  # type: ignore[import-not-found]

@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import Baggage, should_propagate_trace
@@ -10,7 +10,6 @@ from sentry_sdk.utils import (
     logger,
     parse_url,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

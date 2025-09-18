@@ -6,7 +6,7 @@ import requests
 
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
+from sentry_sdk.consts import ATTRS
 from tests.conftest import ApproxDict, create_mock_http_server
 
 PORT = create_mock_http_server()

@@ -5,8 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import OP
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
+from sentry_sdk.consts import ATTRS, OP
 
 
 def mock_langgraph_imports():

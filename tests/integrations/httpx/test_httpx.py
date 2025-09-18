@@ -6,9 +6,8 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import MATCH_ALL
+from sentry_sdk.consts import ATTRS, MATCH_ALL
 from sentry_sdk.integrations.httpx import HttpxIntegration
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import ApproxDict
 
 

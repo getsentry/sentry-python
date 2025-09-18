@@ -4,7 +4,7 @@ import pytest
 from fakeredis import FakeStrictRedis
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.redis import RedisIntegration
 
 

@@ -1,7 +1,7 @@
 from functools import partial
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import (
@@ -10,7 +10,6 @@ from sentry_sdk.utils import (
     parse_url,
     parse_version,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

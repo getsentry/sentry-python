@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANTEMPLATE
+from sentry_sdk.consts import ATTRS, INSTRUMENTER, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -14,7 +14,6 @@ from sentry_sdk.utils import (
     nanosecond_time,
     should_be_treated_as_error,
 )
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

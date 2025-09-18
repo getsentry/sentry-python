@@ -2,6 +2,8 @@ import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS  # noqa: F401
+
 # up top to prevent circular import due to integration import
 # This is more or less an arbitrary large-ish value for now, so that we allow
 # pretty long strings (like LLM prompts), but still have *some* upper limit

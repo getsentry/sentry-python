@@ -20,9 +20,9 @@ import pytest_asyncio
 from asyncpg import connect, Connection
 
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import ApproxDict
 
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")

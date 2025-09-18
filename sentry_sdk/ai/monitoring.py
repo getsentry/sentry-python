@@ -3,9 +3,9 @@ from functools import wraps
 
 import sentry_sdk.utils
 from sentry_sdk import start_span
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import ContextVar
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 

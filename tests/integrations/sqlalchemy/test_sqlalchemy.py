@@ -11,12 +11,11 @@ from sqlalchemy import text
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.consts import ATTRS, DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 
 def test_orm_queries(sentry_init, capture_events):

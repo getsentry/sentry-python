@@ -1,7 +1,6 @@
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.consts import ATTRS, OP, SPANSTATUS
 from sentry_sdk.scope import should_send_default_pii
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data

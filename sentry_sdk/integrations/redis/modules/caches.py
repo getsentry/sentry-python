@@ -2,10 +2,9 @@
 Code used for the Caches module in Sentry
 """
 
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import capture_internal_exceptions
-from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 GET_COMMANDS = ("get", "mget")
 SET_COMMANDS = ("set", "setex")
