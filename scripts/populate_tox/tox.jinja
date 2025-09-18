@@ -54,10 +54,6 @@ envlist =
     # OpenTelemetry Experimental (POTel)
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
 
-    # Ray
-    {py3.10,py3.11}-ray-v{2.34}
-    {py3.10,py3.11}-ray-latest
-
     # Redis
     {py3.6,py3.8}-redis-v{3}
     {py3.7,py3.8,py3.11}-redis-v{4}
@@ -139,10 +135,6 @@ deps =
 
     # OpenTelemetry Experimental (POTel)
     potel: -e .[opentelemetry-experimental]
-
-    # Ray
-    ray-v2.34: ray~=2.34.0
-    ray-latest: ray
 
     # Redis
     redis: fakeredis!=1.7.4
