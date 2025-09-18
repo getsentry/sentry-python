@@ -71,7 +71,6 @@ IGNORE = {
     # of these from the IGNORE list
     "redis",
     "requests",
-    "rq",
 }
 
 
