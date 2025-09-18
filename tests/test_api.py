@@ -137,13 +137,16 @@ def test_get_client():
     assert not client.is_active()
 
 
-def raise_and_capture():
+def raise_and_capture(message):
     """Raise an exception and capture it.
 
     This is a utility function for test_set_tags.
     """
     try:
-        1 / 0
+        if message:
+            raise ZeroDivisionError(message)
+        else:
+            1 / 0
     except ZeroDivisionError:
         capture_exception()
 
@@ -153,13 +156,13 @@ def test_set_tags(sentry_init, capture_events):
     events = capture_events()
 
     set_tags({"tag1": "value1", "tag2": "value2"})
-    raise_and_capture()
+    raise_and_capture("one")
 
     (*_, event) = events
     assert event["tags"] == {"tag1": "value1", "tag2": "value2"}, "Setting tags failed"
 
     set_tags({"tag2": "updated", "tag3": "new"})
-    raise_and_capture()
+    raise_and_capture("two")
 
     (*_, event) = events
     assert event["tags"] == {
@@ -169,7 +172,7 @@ def test_set_tags(sentry_init, capture_events):
     }, "Updating tags failed"
 
     set_tags({})
-    raise_and_capture()
+    raise_and_capture("three")
 
     (*_, event) = events
     assert event["tags"] == {
