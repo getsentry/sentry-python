@@ -150,6 +150,25 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.7",
     },
+    "httpx": {
+        "package": "httpx",
+        "deps": {
+            "*": ["anyio<4.0.0"],
+            ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
+            ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
+            ">=0.19,<0.21": ["pytest-httpx==0.14.0"],
+            ">=0.21,<0.23": ["pytest-httpx==0.19.0"],
+            ">=0.23,<0.24": ["pytest-httpx==0.21.0"],
+            ">=0.24,<0.25": ["pytest-httpx==0.22.0"],
+            ">=0.25,<0.26": ["pytest-httpx==0.25.0"],
+            ">=0.26,<0.27": ["pytest-httpx==0.28.0"],
+            ">=0.27,<0.28": ["pytest-httpx==0.30.0"],
+            ">=0.28,<0.29": ["pytest-httpx==0.35.0"],
+        },
+        "python": {
+            ">=0.28": ">=3.9",
+        },
+    },
     "huey": {
         "package": "huey",
     },
@@ -224,6 +243,9 @@ TEST_SUITE_CONFIG = {
     "openfeature": {
         "package": "openfeature-sdk",
     },
+    "pure_eval": {
+        "package": "pure_eval",
+    },
     "pymongo": {
         "package": "pymongo",
         "deps": {
@@ -250,11 +272,26 @@ TEST_SUITE_CONFIG = {
             "py3.8": ["taskgroup==0.0.0a4"],
         },
     },
+    "ray": {
+        "package": "ray",
+        "python": ">=3.9",
+        "num_versions": 2,
+    },
     "redis_py_cluster_legacy": {
         "package": "redis-py-cluster",
     },
     "requests": {
         "package": "requests",
+    },
+    "sanic": {
+        "package": "sanic",
+        "deps": {
+            "*": ["websockets<11.0", "aiohttp"],
+            ">=22": ["sanic-testing"],
+            "py3.6": ["aiocontextvars==0.2.1"],
+            "py3.8": ["tracerite<1.1.2"],
+        },
+        "num_versions": 4,
     },
     "spark": {
         "package": "pyspark",
