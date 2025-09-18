@@ -63,7 +63,7 @@ class DedupeIntegration(Integration):
                 return event
 
             fingerprint = integration._create_exception_fingerprint(exc_info)
-            last_fingerprint = integration._last_fingerprint.get()
+            last_fingerprint = integration._last_seen.get()
 
             if fingerprint == last_fingerprint:
                 logger.info(
