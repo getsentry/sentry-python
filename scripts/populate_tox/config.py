@@ -267,7 +267,7 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars==0.2.1"],
             "py3.8": ["tracerite<1.1.2"],
         },
-        "versions_to_test": 4,
+        "num_versions": 4,
     },
     "spark": {
         "package": "pyspark",

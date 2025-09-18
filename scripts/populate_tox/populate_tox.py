@@ -266,12 +266,12 @@ def pick_releases_to_test(
     # in between.
     #
     # If there is a relevant prerelease, also test that in addition to the above.
-    versions_to_test = TEST_SUITE_CONFIG[integration].get("versions_to_test")
-    if versions_to_test is not None and (
-        not isinstance(versions_to_test, int) or versions_to_test < 2
+    num_versions = TEST_SUITE_CONFIG[integration].get("num_versions")
+    if num_versions is not None and (
+        not isinstance(num_versions, int) or num_versions < 2
     ):
-        print("  Integration has invalid `versions_to_test`: must be an int >= 2")
-        versions_to_test = None
+        print("  Integration has invalid `num_versions`: must be an int >= 2")
+        num_versions = None
 
     has_majors = len({v.major for v in releases}) > 1
     filtered_releases = set()
@@ -293,14 +293,12 @@ def pick_releases_to_test(
         for max_version in releases_by_major.values():
             filtered_releases.add(max_version)
 
-        # If versions_to_test was provided, slim down the selection
-        if versions_to_test is not None:
-            filtered_releases = _pick_releases(
-                sorted(filtered_releases), versions_to_test
-            )
+        # If num_versions was provided, slim down the selection
+        if num_versions is not None:
+            filtered_releases = _pick_releases(sorted(filtered_releases), num_versions)
 
     else:
-        filtered_releases = _pick_releases(releases, versions_to_test)
+        filtered_releases = _pick_releases(releases, num_versions)
 
     filtered_releases = sorted(filtered_releases)
     if last_prerelease is not None:
@@ -310,18 +308,18 @@ def pick_releases_to_test(
 
 
 def _pick_releases(
-    releases: list[Version], versions_to_test: Optional[int]
+    releases: list[Version], num_versions: Optional[int]
 ) -> set[Version]:
-    versions_to_test = versions_to_test or 4
+    num_versions = num_versions or 4
 
     versions = {
         releases[0],  # oldest version supported
         releases[-1],  # latest
     }
 
-    for i in range(1, versions_to_test - 1):
+    for i in range(1, num_versions - 1):
         try:
-            versions.add(releases[len(releases) // (versions_to_test - 1) * i])
+            versions.add(releases[len(releases) // (num_versions - 1) * i])
         except IndexError:
             pass
 

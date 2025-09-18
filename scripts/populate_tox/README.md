@@ -46,7 +46,7 @@ integration_name: {
      "python": python_version_specifier,
      "include": package_version_specifier,
      "integration_name": integration_name,
-     "versions_to_test": int,
+     "num_versions": int,
 }
 ```
 
@@ -162,9 +162,9 @@ of which are actually testing the `openai` integration. If this is the case, you
 
 Linking an integration to a test suite allows the script to access integration configuration like for example the minimum version defined in `sentry_sdk/integrations/__init__.py`.
 
-### `versions_to_test`
+### `num_versions`
 
-With this option you can override the default version picking behavior by specifying how many package versions should be tested. It accepts an integer equal to or greater than 2, as the oldest and latest supported versions will always be picked. Additionally, if there is a recent prerelease, it'll also always be picked (this doesn't count towards `versions_to_test`).
+With this option you can tweak the default version picking behavior by specifying how many package versions should be tested. It accepts an integer equal to or greater than 2, as the oldest and latest supported versions will always be picked. Additionally, if there is a recent prerelease, it'll also always be picked (this doesn't count towards `num_versions`).
 
 
 ## How-Tos
