@@ -1,11 +1,11 @@
 import inspect
 from functools import wraps
 
-from sentry_sdk.consts import SPANDATA
 import sentry_sdk.utils
 from sentry_sdk import start_span
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import ContextVar
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -42,7 +42,7 @@ def ai_track(description, **span_kwargs):
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_data(k, v)
                 if curr_pipeline:
-                    span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_data(ATTRS.GEN_AI_PIPELINE_NAME, curr_pipeline)
                     return f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -71,7 +71,7 @@ def ai_track(description, **span_kwargs):
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_data(k, v)
                 if curr_pipeline:
-                    span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_data(ATTRS.GEN_AI_PIPELINE_NAME, curr_pipeline)
                     return await f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -110,23 +110,23 @@ def record_token_usage(
     # TODO: move pipeline name elsewhere
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
-        span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, ai_pipeline_name)
+        span.set_data(ATTRS.GEN_AI_PIPELINE_NAME, ai_pipeline_name)
 
     if input_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+        span.set_data(ATTRS.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
     if input_tokens_cached is not None:
         span.set_data(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+            ATTRS.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
             input_tokens_cached,
         )
 
     if output_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+        span.set_data(ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
     if output_tokens_reasoning is not None:
         span.set_data(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
             output_tokens_reasoning,
         )
 
@@ -134,4 +134,4 @@ def record_token_usage(
         total_tokens = input_tokens + output_tokens
 
     if total_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+        span.set_data(ATTRS.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)

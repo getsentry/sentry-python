@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import Baggage, should_propagate_trace
@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     logger,
     parse_url,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -61,11 +62,11 @@ def _install_httpx_client():
             ),
             origin=HttpxIntegration.origin,
         ) as span:
-            span.set_data(SPANDATA.HTTP_METHOD, request.method)
+            span.set_data(ATTRS.HTTP_METHOD, request.method)
             if parsed_url is not None:
                 span.set_data("url", parsed_url.url)
-                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                span.set_data(ATTRS.HTTP_QUERY, parsed_url.query)
+                span.set_data(ATTRS.HTTP_FRAGMENT, parsed_url.fragment)
 
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
@@ -115,11 +116,11 @@ def _install_httpx_async_client():
             ),
             origin=HttpxIntegration.origin,
         ) as span:
-            span.set_data(SPANDATA.HTTP_METHOD, request.method)
+            span.set_data(ATTRS.HTTP_METHOD, request.method)
             if parsed_url is not None:
                 span.set_data("url", parsed_url.url)
-                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                span.set_data(ATTRS.HTTP_QUERY, parsed_url.query)
+                span.set_data(ATTRS.HTTP_FRAGMENT, parsed_url.fragment)
 
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (

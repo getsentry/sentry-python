@@ -5,7 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -22,6 +22,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     reraise,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -355,7 +356,7 @@ def _set_messaging_destination_name(task, span):
             if delivery_info.get("exchange") == "" and routing_key is not None:
                 # Empty exchange indicates the default exchange, meaning the tasks
                 # are sent to the queue with the same name as the routing key.
-                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+                span.set_data(ATTRS.MESSAGING_DESTINATION_NAME, routing_key)
 
 
 def _wrap_task_call(task, f):
@@ -392,19 +393,19 @@ def _wrap_task_call(task, f):
 
                 if latency is not None:
                     latency *= 1000  # milliseconds
-                    span.set_data(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
+                    span.set_data(ATTRS.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
 
                 with capture_internal_exceptions():
-                    span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+                    span.set_data(ATTRS.MESSAGING_MESSAGE_ID, task.request.id)
 
                 with capture_internal_exceptions():
                     span.set_data(
-                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
+                        ATTRS.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
                     )
 
                 with capture_internal_exceptions():
                     span.set_data(
-                        SPANDATA.MESSAGING_SYSTEM,
+                        ATTRS.MESSAGING_SYSTEM,
                         task.app.connection().transport.driver_type,
                     )
 
@@ -509,19 +510,19 @@ def _patch_producer_publish():
             origin=CeleryIntegration.origin,
         ) as span:
             if task_id is not None:
-                span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
+                span.set_data(ATTRS.MESSAGING_MESSAGE_ID, task_id)
 
             if exchange == "" and routing_key is not None:
                 # Empty exchange indicates the default exchange, meaning messages are
                 # routed to the queue with the same name as the routing key.
-                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+                span.set_data(ATTRS.MESSAGING_DESTINATION_NAME, routing_key)
 
             if retries is not None:
-                span.set_data(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
+                span.set_data(ATTRS.MESSAGING_MESSAGE_RETRY_COUNT, retries)
 
             with capture_internal_exceptions():
                 span.set_data(
-                    SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
+                    ATTRS.MESSAGING_SYSTEM, self.connection.transport.driver_type
                 )
 
             return original_publish(self, *args, **kwargs)

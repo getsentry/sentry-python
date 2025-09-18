@@ -5,8 +5,8 @@ import rediscluster
 
 from sentry_sdk import capture_message
 from sentry_sdk.api import start_transaction
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import ApproxDict
 
 
@@ -101,10 +101,10 @@ def test_rediscluster_pipeline(
                 "count": 3,
                 "first_ten": expected_first_ten,
             },
-            SPANDATA.DB_SYSTEM: "redis",
-            SPANDATA.DB_NAME: "1",
-            SPANDATA.SERVER_ADDRESS: "localhost",
-            SPANDATA.SERVER_PORT: 63791,
+            ATTRS.DB_SYSTEM: "redis",
+            ATTRS.DB_NAME: "1",
+            ATTRS.SERVER_ADDRESS: "localhost",
+            ATTRS.SERVER_PORT: 63791,
         }
     )
     assert span["tags"] == {
@@ -130,10 +130,10 @@ def test_db_connection_attributes_client(sentry_init, capture_events, redisclust
 
     assert span["data"] == ApproxDict(
         {
-            SPANDATA.DB_SYSTEM: "redis",
-            SPANDATA.DB_NAME: "1",
-            SPANDATA.SERVER_ADDRESS: "localhost",
-            SPANDATA.SERVER_PORT: 63791,
+            ATTRS.DB_SYSTEM: "redis",
+            ATTRS.DB_NAME: "1",
+            ATTRS.SERVER_ADDRESS: "localhost",
+            ATTRS.SERVER_PORT: 63791,
         }
     )
 
@@ -164,9 +164,9 @@ def test_db_connection_attributes_pipeline(
                 "count": 1,
                 "first_ten": ["GET 'foo'"],
             },
-            SPANDATA.DB_SYSTEM: "redis",
-            SPANDATA.DB_NAME: "1",
-            SPANDATA.SERVER_ADDRESS: "localhost",
-            SPANDATA.SERVER_PORT: 63791,
+            ATTRS.DB_SYSTEM: "redis",
+            ATTRS.DB_NAME: "1",
+            ATTRS.SERVER_ADDRESS: "localhost",
+            ATTRS.SERVER_PORT: 63791,
         }
     )

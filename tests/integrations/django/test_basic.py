@@ -27,7 +27,6 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY310
 from sentry_sdk import capture_message, capture_exception
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import (
     DjangoIntegration,
     DjangoRequestExtractor,
@@ -37,6 +36,7 @@ from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.profiler.utils import get_frame_name
 from sentry_sdk.tracing import Span
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.myapp.signals import myapp_custom_signal_silenced
@@ -594,7 +594,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
     for span in event["spans"]:
         if span.get("op") == "db":
             data = span.get("data")
-            assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
+            assert data.get(ATTRS.DB_SYSTEM) == "postgresql"
 
     assert '- op="db": description="connect"' in render_span_tree(event)
 
@@ -663,16 +663,16 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
     for span in event["spans"]:
         if span.get("op") == "db":
             data = span.get("data")
-            assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
+            assert data.get(ATTRS.DB_SYSTEM) == "postgresql"
             conn_params = connections["postgres"].get_connection_params()
-            assert data.get(SPANDATA.DB_NAME) is not None
-            assert data.get(SPANDATA.DB_NAME) == conn_params.get(
+            assert data.get(ATTRS.DB_NAME) is not None
+            assert data.get(ATTRS.DB_NAME) == conn_params.get(
                 "database"
             ) or conn_params.get("dbname")
-            assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
+            assert data.get(ATTRS.SERVER_ADDRESS) == os.environ.get(
                 "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
             )
-            assert data.get(SPANDATA.SERVER_PORT) == os.environ.get(
+            assert data.get(ATTRS.SERVER_PORT) == os.environ.get(
                 "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
             )
 

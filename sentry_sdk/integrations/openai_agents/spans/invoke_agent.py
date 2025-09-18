@@ -1,8 +1,9 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
@@ -24,7 +25,7 @@ def invoke_agent_span(context, agent, kwargs):
     )
     span.__enter__()
 
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+    span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "invoke_agent")
 
     if should_send_default_pii():
         messages = []
@@ -57,7 +58,7 @@ def invoke_agent_span(context, agent, kwargs):
 
         if len(messages) > 0:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+                span, ATTRS.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
             )
 
     _set_agent_data(span, agent)
@@ -71,8 +72,6 @@ def update_invoke_agent_span(context, agent, output):
 
     if span:
         if should_send_default_pii():
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
-            )
+            set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_TEXT, output, unpack=False)
 
         span.__exit__(None, None, None)

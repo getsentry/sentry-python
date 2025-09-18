@@ -41,6 +41,7 @@ setup(
     install_requires=[
         "urllib3>=1.26.11",
         "certifi",
+        "sentry-conventions>=0.1.1",
     ],
     extras_require={
         "aiohttp": ["aiohttp>=3.5"],

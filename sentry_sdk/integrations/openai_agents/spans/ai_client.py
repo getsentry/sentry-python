@@ -1,5 +1,6 @@
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
@@ -26,7 +27,7 @@ def ai_client_span(agent, get_response_kwargs):
         origin=SPAN_ORIGIN,
     )
     # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "chat")
 
     return span
 

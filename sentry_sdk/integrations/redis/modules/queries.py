@@ -2,9 +2,10 @@
 Code used for the Queries module in Sentry
 """
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis.utils import _get_safe_command
 from sentry_sdk.utils import capture_internal_exceptions
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -45,19 +46,19 @@ def _get_db_span_description(integration, command_name, args):
 
 def _set_db_data_on_span(span, connection_params):
     # type: (Span, dict[str, Any]) -> None
-    span.set_data(SPANDATA.DB_SYSTEM, "redis")
+    span.set_data(ATTRS.DB_SYSTEM, "redis")
 
     db = connection_params.get("db")
     if db is not None:
-        span.set_data(SPANDATA.DB_NAME, str(db))
+        span.set_data(ATTRS.DB_NAME, str(db))
 
     host = connection_params.get("host")
     if host is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, host)
+        span.set_data(ATTRS.SERVER_ADDRESS, host)
 
     port = connection_params.get("port")
     if port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, port)
+        span.set_data(ATTRS.SERVER_PORT, port)
 
 
 def _set_db_data(span, redis_instance):

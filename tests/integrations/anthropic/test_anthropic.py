@@ -41,14 +41,14 @@ except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
 from sentry_sdk import start_transaction, start_span
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
     _set_output_data,
     _collect_ai_data,
 )
 from sentry_sdk.utils import package_version
-
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 ANTHROPIC_VERSION = package_version("anthropic")
 
@@ -117,22 +117,22 @@ def test_nonstreaming_create_message(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["data"][ATTRS.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
         assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
+        assert span["data"][ATTRS.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][ATTRS.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][ATTRS.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][ATTRS.GEN_AI_RESPONSE_STREAMING] is False
 
 
 @pytest.mark.asyncio
@@ -186,22 +186,22 @@ async def test_nonstreaming_create_message_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["data"][ATTRS.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
         assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
+        assert span["data"][ATTRS.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][ATTRS.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][ATTRS.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][ATTRS.GEN_AI_RESPONSE_STREAMING] is False
 
 
 @pytest.mark.parametrize(
@@ -286,23 +286,23 @@ def test_streaming_create_message(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["data"][ATTRS.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
         assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+        assert span["data"][ATTRS.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 30
-    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 40
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][ATTRS.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS] == 30
+    assert span["data"][ATTRS.GEN_AI_USAGE_TOTAL_TOKENS] == 40
+    assert span["data"][ATTRS.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -390,23 +390,23 @@ async def test_streaming_create_message_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["data"][ATTRS.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
         assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+        assert span["data"][ATTRS.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 30
-    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 40
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][ATTRS.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS] == 30
+    assert span["data"][ATTRS.GEN_AI_USAGE_TOTAL_TOKENS] == 40
+    assert span["data"][ATTRS.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.skipif(
@@ -521,25 +521,25 @@ def test_streaming_create_message_with_input_json_delta(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["data"][ATTRS.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
         assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
         )
         assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            span["data"][ATTRS.GEN_AI_RESPONSE_TEXT]
             == "{'location': 'San Francisco, CA'}"
         )
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 51
-    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 417
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][ATTRS.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["data"][ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS] == 51
+    assert span["data"][ATTRS.GEN_AI_USAGE_TOTAL_TOKENS] == 417
+    assert span["data"][ATTRS.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -661,26 +661,26 @@ async def test_streaming_create_message_with_input_json_delta_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span["data"][ATTRS.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
         assert (
-            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
         )
         assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            span["data"][ATTRS.GEN_AI_RESPONSE_TEXT]
             == "{'location': 'San Francisco, CA'}"
         )
 
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 51
-    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 417
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][ATTRS.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["data"][ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS] == 51
+    assert span["data"][ATTRS.GEN_AI_USAGE_TOTAL_TOKENS] == 417
+    assert span["data"][ATTRS.GEN_AI_RESPONSE_STREAMING] is True
 
 
 def test_exception_message_create(sentry_init, capture_events):
@@ -825,9 +825,9 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         )
 
         assert (
-            span._data.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
+            span._data.get(ATTRS.GEN_AI_RESPONSE_TEXT)
             == "{'test': 'data','more': 'json'}"
         )
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
+        assert span._data.get(ATTRS.GEN_AI_USAGE_INPUT_TOKENS) == 10
+        assert span._data.get(ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
+        assert span._data.get(ATTRS.GEN_AI_USAGE_TOTAL_TOKENS) == 30

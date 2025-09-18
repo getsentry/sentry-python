@@ -1,4 +1,3 @@
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,
     _MAX_NUM_ARGS,
@@ -8,6 +7,7 @@ from sentry_sdk.integrations.redis.consts import (
 )
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -138,7 +138,7 @@ def _set_client_data(span, is_cluster, name, *args):
     span.set_tag("redis.is_cluster", is_cluster)
     if name:
         span.set_tag("redis.command", name)
-        span.set_tag(SPANDATA.DB_OPERATION, name)
+        span.set_tag(ATTRS.DB_OPERATION, name)
 
     if name and args:
         name_low = name.lower()

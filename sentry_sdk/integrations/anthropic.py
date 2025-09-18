@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     package_version,
     safe_serialize,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 try:
     try:
@@ -138,19 +139,19 @@ def _set_input_data(span, kwargs, integration):
                 normalized_messages.append(message)
 
         set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, normalized_messages, unpack=False
+            span, ATTRS.GEN_AI_REQUEST_MESSAGES, normalized_messages, unpack=False
         )
 
     set_data_normalized(
-        span, SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False)
+        span, ATTRS.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False)
     )
 
     kwargs_keys_to_attributes = {
-        "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-        "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-        "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-        "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
-        "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+        "max_tokens": ATTRS.GEN_AI_REQUEST_MAX_TOKENS,
+        "model": ATTRS.GEN_AI_REQUEST_MODEL,
+        "temperature": ATTRS.GEN_AI_REQUEST_TEMPERATURE,
+        "top_k": ATTRS.GEN_AI_REQUEST_TOP_K,
+        "top_p": ATTRS.GEN_AI_REQUEST_TOP_P,
     }
     for key, attribute in kwargs_keys_to_attributes.items():
         value = kwargs.get(key)
@@ -161,7 +162,7 @@ def _set_input_data(span, kwargs, integration):
     tools = kwargs.get("tools")
     if tools is not NOT_GIVEN and tools is not None and len(tools) > 0:
         set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            span, ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
         )
 
 
@@ -177,7 +178,7 @@ def _set_output_data(
     # type: (Span, AnthropicIntegration, str | None, int | None, int | None, list[Any], bool) -> None
     """
     Set output data for the span based on the AI response."""
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    span.set_data(ATTRS.GEN_AI_RESPONSE_MODEL, model)
     if should_send_default_pii() and integration.include_prompts:
         output_messages = {
             "response": [],
@@ -193,14 +194,14 @@ def _set_output_data(
         if len(output_messages["tool"]) > 0:
             set_data_normalized(
                 span,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
                 output_messages["tool"],
                 unpack=False,
             )
 
         if len(output_messages["response"]) > 0:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+                span, ATTRS.GEN_AI_RESPONSE_TEXT, output_messages["response"]
             )
 
     record_token_usage(

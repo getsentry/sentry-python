@@ -3,7 +3,7 @@ import contextlib
 from typing import Any, TypeVar, Callable, Awaitable, Iterator
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     parse_version,
     capture_internal_exceptions,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 try:
     import asyncpg  # type: ignore[import-not-found]
@@ -166,16 +167,16 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
             name="connect",
             origin=AsyncPGIntegration.origin,
         ) as span:
-            span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+            span.set_data(ATTRS.DB_SYSTEM, "postgresql")
             addr = kwargs.get("addr")
             if addr:
                 try:
-                    span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-                    span.set_data(SPANDATA.SERVER_PORT, addr[1])
+                    span.set_data(ATTRS.SERVER_ADDRESS, addr[0])
+                    span.set_data(ATTRS.SERVER_PORT, addr[1])
                 except IndexError:
                     pass
-            span.set_data(SPANDATA.DB_NAME, database)
-            span.set_data(SPANDATA.DB_USER, user)
+            span.set_data(ATTRS.DB_NAME, database)
+            span.set_data(ATTRS.DB_USER, user)
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
@@ -189,20 +190,20 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
 
 
 def _set_db_data(span: Span, conn: Any) -> None:
-    span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+    span.set_data(ATTRS.DB_SYSTEM, "postgresql")
 
     addr = conn._addr
     if addr:
         try:
-            span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-            span.set_data(SPANDATA.SERVER_PORT, addr[1])
+            span.set_data(ATTRS.SERVER_ADDRESS, addr[0])
+            span.set_data(ATTRS.SERVER_PORT, addr[1])
         except IndexError:
             pass
 
     database = conn._params.database
     if database:
-        span.set_data(SPANDATA.DB_NAME, database)
+        span.set_data(ATTRS.DB_NAME, database)
 
     user = conn._params.user
     if user:
-        span.set_data(SPANDATA.DB_USER, user)
+        span.set_data(ATTRS.DB_USER, user)

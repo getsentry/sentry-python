@@ -1,9 +1,10 @@
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING, TypeVar
 
@@ -170,8 +171,8 @@ def _wrap_send_data() -> None:
 def _set_db_data(
     span: Span, connection: clickhouse_driver.connection.Connection
 ) -> None:
-    span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
-    span.set_data(SPANDATA.SERVER_ADDRESS, connection.host)
-    span.set_data(SPANDATA.SERVER_PORT, connection.port)
-    span.set_data(SPANDATA.DB_NAME, connection.database)
-    span.set_data(SPANDATA.DB_USER, connection.user)
+    span.set_data(ATTRS.DB_SYSTEM, "clickhouse")
+    span.set_data(ATTRS.SERVER_ADDRESS, connection.host)
+    span.set_data(ATTRS.SERVER_PORT, connection.port)
+    span.set_data(ATTRS.DB_NAME, connection.database)
+    span.set_data(ATTRS.DB_USER, connection.user)

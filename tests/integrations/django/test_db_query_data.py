@@ -15,9 +15,9 @@ except ImportError:
 from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
@@ -58,10 +58,10 @@ def test_query_source_disabled(sentry_init, client, capture_events):
         if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO not in data
-            assert SPANDATA.CODE_NAMESPACE not in data
-            assert SPANDATA.CODE_FILEPATH not in data
-            assert SPANDATA.CODE_FUNCTION not in data
+            assert ATTRS.CODE_LINENO not in data
+            assert ATTRS.CODE_NAMESPACE not in data
+            assert ATTRS.CODE_FILEPATH not in data
+            assert ATTRS.CODE_FUNCTION not in data
             break
     else:
         raise AssertionError("No db span found")
@@ -101,10 +101,10 @@ def test_query_source_enabled(
         if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
             break
     else:
@@ -138,26 +138,26 @@ def test_query_source(sentry_init, client, capture_events):
         if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert type(data.get(ATTRS.CODE_LINENO)) == int
+            assert data.get(ATTRS.CODE_LINENO) > 0
 
             assert (
-                data.get(SPANDATA.CODE_NAMESPACE)
+                data.get(ATTRS.CODE_NAMESPACE)
                 == "tests.integrations.django.myapp.views"
             )
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+            assert data.get(ATTRS.CODE_FILEPATH).endswith(
                 "tests/integrations/django/myapp/views.py"
             )
 
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
 
-            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+            assert data.get(ATTRS.CODE_FUNCTION) == "postgres_select_orm"
 
             break
     else:
@@ -198,20 +198,20 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
         if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
-            assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
-            assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
+            assert type(data.get(ATTRS.CODE_LINENO)) == int
+            assert data.get(ATTRS.CODE_LINENO) > 0
+            assert data.get(ATTRS.CODE_NAMESPACE) == "django_helpers.views"
+            assert data.get(ATTRS.CODE_FILEPATH) == "django_helpers/views.py"
 
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
 
-            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+            assert data.get(ATTRS.CODE_FUNCTION) == "postgres_select_orm"
 
             break
     else:
@@ -246,33 +246,33 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
         if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert type(data.get(ATTRS.CODE_LINENO)) == int
+            assert data.get(ATTRS.CODE_LINENO) > 0
 
             if DJANGO_VERSION >= (1, 11):
                 assert (
-                    data.get(SPANDATA.CODE_NAMESPACE)
+                    data.get(ATTRS.CODE_NAMESPACE)
                     == "tests.integrations.django.myapp.settings"
                 )
-                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                assert data.get(ATTRS.CODE_FILEPATH).endswith(
                     "tests/integrations/django/myapp/settings.py"
                 )
-                assert data.get(SPANDATA.CODE_FUNCTION) == "middleware"
+                assert data.get(ATTRS.CODE_FUNCTION) == "middleware"
             else:
                 assert (
-                    data.get(SPANDATA.CODE_NAMESPACE)
+                    data.get(ATTRS.CODE_NAMESPACE)
                     == "tests.integrations.django.test_db_query_data"
                 )
-                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                assert data.get(ATTRS.CODE_FILEPATH).endswith(
                     "tests/integrations/django/test_db_query_data.py"
                 )
                 assert (
-                    data.get(SPANDATA.CODE_FUNCTION)
+                    data.get(ATTRS.CODE_FUNCTION)
                     == "test_query_source_with_in_app_exclude"
                 )
 
@@ -309,19 +309,19 @@ def test_query_source_with_in_app_include(sentry_init, client, capture_events):
         if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert type(data.get(ATTRS.CODE_LINENO)) == int
+            assert data.get(ATTRS.CODE_LINENO) > 0
 
-            assert data.get(SPANDATA.CODE_NAMESPACE) == "django.db.models.sql.compiler"
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+            assert data.get(ATTRS.CODE_NAMESPACE) == "django.db.models.sql.compiler"
+            assert data.get(ATTRS.CODE_FILEPATH).endswith(
                 "django/db/models/sql/compiler.py"
             )
-            assert data.get(SPANDATA.CODE_FUNCTION) == "execute_sql"
+            assert data.get(ATTRS.CODE_FUNCTION) == "execute_sql"
             break
     else:
         raise AssertionError("No db span found")
@@ -375,10 +375,10 @@ def test_no_query_source_if_duration_too_short(sentry_init, client, capture_even
         if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO not in data
-            assert SPANDATA.CODE_NAMESPACE not in data
-            assert SPANDATA.CODE_FILEPATH not in data
-            assert SPANDATA.CODE_FUNCTION not in data
+            assert ATTRS.CODE_LINENO not in data
+            assert ATTRS.CODE_NAMESPACE not in data
+            assert ATTRS.CODE_FILEPATH not in data
+            assert ATTRS.CODE_FUNCTION not in data
 
             break
     else:
@@ -433,26 +433,26 @@ def test_query_source_if_duration_over_threshold(sentry_init, client, capture_ev
         if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert type(data.get(ATTRS.CODE_LINENO)) == int
+            assert data.get(ATTRS.CODE_LINENO) > 0
 
             assert (
-                data.get(SPANDATA.CODE_NAMESPACE)
+                data.get(ATTRS.CODE_NAMESPACE)
                 == "tests.integrations.django.myapp.views"
             )
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+            assert data.get(ATTRS.CODE_FILEPATH).endswith(
                 "tests/integrations/django/myapp/views.py"
             )
 
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
 
-            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+            assert data.get(ATTRS.CODE_FUNCTION) == "postgres_select_orm"
             break
     else:
         raise AssertionError("No db span found")

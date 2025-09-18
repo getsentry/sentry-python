@@ -34,11 +34,11 @@ except ImportError:
     SKIP_RESPONSES_TESTS = True
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from unittest import mock  # python 3.3 and above
 
@@ -152,11 +152,11 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "hello" in span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][ATTRS.GEN_AI_RESPONSE_TEXT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
@@ -194,11 +194,11 @@ async def test_nonstreaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "hello" in span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][ATTRS.GEN_AI_RESPONSE_TEXT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
@@ -287,11 +287,11 @@ def test_streaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "hello" in span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
+        assert "hello world" in span["data"][ATTRS.GEN_AI_RESPONSE_TEXT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
@@ -383,11 +383,11 @@ async def test_streaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "hello" in span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
+        assert "hello world" in span["data"][ATTRS.GEN_AI_RESPONSE_TEXT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
@@ -473,9 +473,9 @@ def test_embeddings_create(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello" in span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
@@ -521,9 +521,9 @@ async def test_embeddings_create_async(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello" in span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
@@ -1332,11 +1332,11 @@ def test_streaming_responses_api(
     assert span["op"] == "gen_ai.responses"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+        assert span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+        assert span["data"][ATTRS.GEN_AI_RESPONSE_TEXT] == "hello world"
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
@@ -1387,11 +1387,11 @@ async def test_streaming_responses_api_async(
     assert span["op"] == "gen_ai.responses"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+        assert span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+        assert span["data"][ATTRS.GEN_AI_RESPONSE_TEXT] == "hello world"
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.output_tokens"] == 10

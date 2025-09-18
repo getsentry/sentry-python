@@ -3,10 +3,11 @@ from typing import Any, Callable, List, Optional
 
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 
 try:
@@ -114,8 +115,8 @@ def _wrap_state_graph_compile(f):
             compiled_graph = f(self, *args, **kwargs)
 
             compiled_graph_name = getattr(compiled_graph, "name", None)
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
-            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, compiled_graph_name)
+            span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "create_agent")
+            span.set_data(ATTRS.GEN_AI_AGENT_NAME, compiled_graph_name)
 
             if compiled_graph_name:
                 span.description = f"create_agent {compiled_graph_name}"
@@ -123,7 +124,7 @@ def _wrap_state_graph_compile(f):
                 span.description = "create_agent"
 
             if kwargs.get("model", None) is not None:
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
+                span.set_data(ATTRS.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
 
             tools = None
             get_graph = getattr(compiled_graph, "get_graph", None)
@@ -138,7 +139,7 @@ def _wrap_state_graph_compile(f):
                             tools = list(data.tools_by_name.keys())
 
             if tools is not None:
-                span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
+                span.set_data(ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
 
             return compiled_graph
 
@@ -166,10 +167,10 @@ def _wrap_pregel_invoke(f):
             origin=LanggraphIntegration.origin,
         ) as span:
             if graph_name:
-                span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
+                span.set_data(ATTRS.GEN_AI_PIPELINE_NAME, graph_name)
+                span.set_data(ATTRS.GEN_AI_AGENT_NAME, graph_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "invoke_agent")
 
             # Store input messages to later compare with output
             input_messages = None
@@ -182,7 +183,7 @@ def _wrap_pregel_invoke(f):
                 if input_messages:
                     set_data_normalized(
                         span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        ATTRS.GEN_AI_REQUEST_MESSAGES,
                         input_messages,
                         unpack=False,
                     )
@@ -217,10 +218,10 @@ def _wrap_pregel_ainvoke(f):
             origin=LanggraphIntegration.origin,
         ) as span:
             if graph_name:
-                span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
+                span.set_data(ATTRS.GEN_AI_PIPELINE_NAME, graph_name)
+                span.set_data(ATTRS.GEN_AI_AGENT_NAME, graph_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "invoke_agent")
 
             input_messages = None
             if (
@@ -232,7 +233,7 @@ def _wrap_pregel_ainvoke(f):
                 if input_messages:
                     set_data_normalized(
                         span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        ATTRS.GEN_AI_REQUEST_MESSAGES,
                         input_messages,
                         unpack=False,
                     )
@@ -305,17 +306,17 @@ def _set_response_attributes(span, input_messages, result, integration):
 
     llm_response_text = _extract_llm_response_text(new_messages)
     if llm_response_text:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
+        set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_TEXT, llm_response_text)
     elif new_messages:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
+        set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_TEXT, new_messages)
     else:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+        set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_TEXT, result)
 
     tool_calls = _extract_tool_calls(new_messages)
     if tool_calls:
         set_data_normalized(
             span,
-            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
             safe_serialize(tool_calls),
             unpack=False,
         )

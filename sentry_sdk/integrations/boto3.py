@@ -1,7 +1,7 @@
 from functools import partial
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import (
@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     parse_url,
     parse_version,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -68,12 +69,12 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     with capture_internal_exceptions():
         parsed_url = parse_url(request.url, sanitize=False)
         span.set_data("aws.request.url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        span.set_data(ATTRS.HTTP_QUERY, parsed_url.query)
+        span.set_data(ATTRS.HTTP_FRAGMENT, parsed_url.fragment)
 
     span.set_tag("aws.service_id", service_id)
     span.set_tag("aws.operation_name", operation_name)
-    span.set_data(SPANDATA.HTTP_METHOD, request.method)
+    span.set_data(ATTRS.HTTP_METHOD, request.method)
 
     # We do it in order for subsequent http calls/retries be
     # attached to this span.

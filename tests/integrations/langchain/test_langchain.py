@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from sentry_sdk.consts import SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 try:
     # Langchain >= 0.2
@@ -211,23 +211,23 @@ def test_langchain_agent(
     if send_default_pii and include_prompts:
         assert (
             "You are very powerful"
-            in chat_spans[0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            in chat_spans[0]["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
         )
-        assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])
+        assert "5" in chat_spans[0]["data"][ATTRS.GEN_AI_RESPONSE_TEXT]
+        assert "word" in tool_exec_span["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
+        assert 5 == int(tool_exec_span["data"][ATTRS.GEN_AI_RESPONSE_TEXT])
         assert (
             "You are very powerful"
-            in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            in chat_spans[1]["data"][ATTRS.GEN_AI_REQUEST_MESSAGES]
         )
-        assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "5" in chat_spans[1]["data"][ATTRS.GEN_AI_RESPONSE_TEXT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in tool_exec_span.get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in tool_exec_span.get("data", {})
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
+        assert ATTRS.GEN_AI_REQUEST_MESSAGES not in tool_exec_span.get("data", {})
+        assert ATTRS.GEN_AI_RESPONSE_TEXT not in tool_exec_span.get("data", {})
 
 
 def test_langchain_error(sentry_init, capture_events):
@@ -642,9 +642,9 @@ def test_tools_integration_in_spans(sentry_init, capture_events):
         tools_found = False
         for span in spans:
             span_data = span.get("data", {})
-            if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
+            if ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
                 tools_found = True
-                tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+                tools_data = span_data[ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS]
                 # Verify tools are in the expected format
                 assert isinstance(tools_data, (str, list))  # Could be serialized
                 if isinstance(tools_data, str):

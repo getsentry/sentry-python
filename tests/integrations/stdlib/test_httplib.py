@@ -7,9 +7,10 @@ from unittest import mock
 import pytest
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import MATCH_ALL, SPANDATA
+from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from tests.conftest import ApproxDict, create_mock_http_server
 
@@ -33,11 +34,11 @@ def test_crumb_capture(sentry_init, capture_events):
     assert crumb["data"] == ApproxDict(
         {
             "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: 200,
+            ATTRS.HTTP_METHOD: "GET",
+            ATTRS.HTTP_STATUS_CODE: 200,
             "reason": "OK",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            ATTRS.HTTP_FRAGMENT: "",
+            ATTRS.HTTP_QUERY: "",
         }
     )
 
@@ -78,10 +79,10 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
     assert crumb["data"] == ApproxDict(
         {
             "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: status_code,
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            ATTRS.HTTP_METHOD: "GET",
+            ATTRS.HTTP_STATUS_CODE: status_code,
+            ATTRS.HTTP_FRAGMENT: "",
+            ATTRS.HTTP_QUERY: "",
         }
     )
 
@@ -106,12 +107,12 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     assert crumb["data"] == ApproxDict(
         {
             "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: 200,
+            ATTRS.HTTP_METHOD: "GET",
+            ATTRS.HTTP_STATUS_CODE: 200,
             "reason": "OK",
             "extra": "foo",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            ATTRS.HTTP_FRAGMENT: "",
+            ATTRS.HTTP_QUERY: "",
         }
     )
 
@@ -166,11 +167,11 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     assert crumb["data"] == ApproxDict(
         {
             "url": "http://localhost:{}/200".format(PORT),
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: 200,
+            ATTRS.HTTP_METHOD: "GET",
+            ATTRS.HTTP_STATUS_CODE: 200,
             "reason": "OK",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            ATTRS.HTTP_FRAGMENT: "",
+            ATTRS.HTTP_QUERY: "",
         }
     )
 

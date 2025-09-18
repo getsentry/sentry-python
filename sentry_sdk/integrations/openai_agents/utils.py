@@ -1,9 +1,9 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception, safe_serialize
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -31,60 +31,58 @@ def _capture_exception(exc):
 def _set_agent_data(span, agent):
     # type: (sentry_sdk.tracing.Span, agents.Agent) -> None
     span.set_data(
-        SPANDATA.GEN_AI_SYSTEM, "openai"
+        ATTRS.GEN_AI_SYSTEM, "openai"
     )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
 
-    span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
+    span.set_data(ATTRS.GEN_AI_AGENT_NAME, agent.name)
 
     if agent.model_settings.max_tokens:
-        span.set_data(
-            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
-        )
+        span.set_data(ATTRS.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens)
 
     if agent.model:
         model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+        span.set_data(ATTRS.GEN_AI_REQUEST_MODEL, model_name)
 
     if agent.model_settings.presence_penalty:
         span.set_data(
-            SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            ATTRS.GEN_AI_REQUEST_PRESENCE_PENALTY,
             agent.model_settings.presence_penalty,
         )
 
     if agent.model_settings.temperature:
         span.set_data(
-            SPANDATA.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
+            ATTRS.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
         )
 
     if agent.model_settings.top_p:
-        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p)
+        span.set_data(ATTRS.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p)
 
     if agent.model_settings.frequency_penalty:
         span.set_data(
-            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            ATTRS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
             agent.model_settings.frequency_penalty,
         )
 
     if len(agent.tools) > 0:
         span.set_data(
-            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             safe_serialize([vars(tool) for tool in agent.tools]),
         )
 
 
 def _set_usage_data(span, usage):
     # type: (sentry_sdk.tracing.Span, Usage) -> None
-    span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
+    span.set_data(ATTRS.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
     span.set_data(
-        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+        ATTRS.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
         usage.input_tokens_details.cached_tokens,
     )
-    span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
+    span.set_data(ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
     span.set_data(
-        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+        ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
         usage.output_tokens_details.reasoning_tokens,
     )
-    span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
+    span.set_data(ATTRS.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
 
 
 def _set_input_data(span, get_response_kwargs):
@@ -119,7 +117,7 @@ def _set_input_data(span, get_response_kwargs):
             request_messages.append({"role": role, "content": messages})
 
     set_data_normalized(
-        span, SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages, unpack=False
+        span, ATTRS.GEN_AI_REQUEST_MESSAGES, request_messages, unpack=False
     )
 
 
@@ -146,10 +144,10 @@ def _set_output_data(span, result):
 
     if len(output_messages["tool"]) > 0:
         span.set_data(
-            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(output_messages["tool"])
+            ATTRS.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(output_messages["tool"])
         )
 
     if len(output_messages["response"]) > 0:
         set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+            span, ATTRS.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )

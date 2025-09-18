@@ -11,11 +11,12 @@ from sqlalchemy import text
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -126,10 +127,10 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     (event,) = events
 
     for span in event["spans"]:
-        assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
-        assert span["data"][SPANDATA.DB_NAME] == ":memory:"
-        assert SPANDATA.SERVER_ADDRESS not in span["data"]
-        assert SPANDATA.SERVER_PORT not in span["data"]
+        assert span["data"][ATTRS.DB_SYSTEM] == "sqlite"
+        assert span["data"][ATTRS.DB_NAME] == ":memory:"
+        assert ATTRS.SERVER_ADDRESS not in span["data"]
+        assert ATTRS.SERVER_PORT not in span["data"]
 
     assert (
         render_span_tree(event)
@@ -200,10 +201,10 @@ def test_transactions_no_engine_url(sentry_init, capture_events):
     (event,) = events
 
     for span in event["spans"]:
-        assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
-        assert SPANDATA.DB_NAME not in span["data"]
-        assert SPANDATA.SERVER_ADDRESS not in span["data"]
-        assert SPANDATA.SERVER_PORT not in span["data"]
+        assert span["data"][ATTRS.DB_SYSTEM] == "sqlite"
+        assert ATTRS.DB_NAME not in span["data"]
+        assert ATTRS.SERVER_ADDRESS not in span["data"]
+        assert ATTRS.SERVER_PORT not in span["data"]
 
 
 def test_long_sql_query_preserved(sentry_init, capture_events):
@@ -339,10 +340,10 @@ def test_query_source_disabled(sentry_init, capture_events):
         ):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO not in data
-            assert SPANDATA.CODE_NAMESPACE not in data
-            assert SPANDATA.CODE_FILEPATH not in data
-            assert SPANDATA.CODE_FUNCTION not in data
+            assert ATTRS.CODE_LINENO not in data
+            assert ATTRS.CODE_NAMESPACE not in data
+            assert ATTRS.CODE_FILEPATH not in data
+            assert ATTRS.CODE_FUNCTION not in data
             break
     else:
         raise AssertionError("No db span found")
@@ -391,10 +392,10 @@ def test_query_source_enabled(sentry_init, capture_events, enable_db_query_sourc
         ):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
             break
     else:
         raise AssertionError("No db span found")
@@ -438,25 +439,25 @@ def test_query_source(sentry_init, capture_events):
         ):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert type(data.get(ATTRS.CODE_LINENO)) == int
+            assert data.get(ATTRS.CODE_LINENO) > 0
             assert (
-                data.get(SPANDATA.CODE_NAMESPACE)
+                data.get(ATTRS.CODE_NAMESPACE)
                 == "tests.integrations.sqlalchemy.test_sqlalchemy"
             )
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+            assert data.get(ATTRS.CODE_FILEPATH).endswith(
                 "tests/integrations/sqlalchemy/test_sqlalchemy.py"
             )
 
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
 
-            assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+            assert data.get(ATTRS.CODE_FUNCTION) == "test_query_source"
             break
     else:
         raise AssertionError("No db span found")
@@ -509,20 +510,20 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
         ):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
-            assert data.get(SPANDATA.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
-            assert data.get(SPANDATA.CODE_FILEPATH) == "sqlalchemy_helpers/helpers.py"
+            assert type(data.get(ATTRS.CODE_LINENO)) == int
+            assert data.get(ATTRS.CODE_LINENO) > 0
+            assert data.get(ATTRS.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
+            assert data.get(ATTRS.CODE_FILEPATH) == "sqlalchemy_helpers/helpers.py"
 
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
 
-            assert data.get(SPANDATA.CODE_FUNCTION) == "query_first_model_from_session"
+            assert data.get(ATTRS.CODE_FUNCTION) == "query_first_model_from_session"
             break
     else:
         raise AssertionError("No db span found")
@@ -584,10 +585,10 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
         ):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO not in data
-            assert SPANDATA.CODE_NAMESPACE not in data
-            assert SPANDATA.CODE_FILEPATH not in data
-            assert SPANDATA.CODE_FUNCTION not in data
+            assert ATTRS.CODE_LINENO not in data
+            assert ATTRS.CODE_NAMESPACE not in data
+            assert ATTRS.CODE_FILEPATH not in data
+            assert ATTRS.CODE_FUNCTION not in data
 
             break
     else:
@@ -650,26 +651,26 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
         ):
             data = span.get("data", {})
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+            assert ATTRS.CODE_LINENO in data
+            assert ATTRS.CODE_NAMESPACE in data
+            assert ATTRS.CODE_FILEPATH in data
+            assert ATTRS.CODE_FUNCTION in data
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert type(data.get(ATTRS.CODE_LINENO)) == int
+            assert data.get(ATTRS.CODE_LINENO) > 0
             assert (
-                data.get(SPANDATA.CODE_NAMESPACE)
+                data.get(ATTRS.CODE_NAMESPACE)
                 == "tests.integrations.sqlalchemy.test_sqlalchemy"
             )
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+            assert data.get(ATTRS.CODE_FILEPATH).endswith(
                 "tests/integrations/sqlalchemy/test_sqlalchemy.py"
             )
 
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
 
             assert (
-                data.get(SPANDATA.CODE_FUNCTION)
+                data.get(ATTRS.CODE_FUNCTION)
                 == "test_query_source_if_duration_over_threshold"
             )
             break

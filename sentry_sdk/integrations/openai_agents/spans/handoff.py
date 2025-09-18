@@ -1,5 +1,6 @@
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from ..consts import SPAN_ORIGIN
 
@@ -16,4 +17,4 @@ def handoff_span(context, from_agent, to_agent_name):
         name=f"handoff from {from_agent.name} to {to_agent_name}",
         origin=SPAN_ORIGIN,
     ) as span:
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "handoff")
+        span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "handoff")

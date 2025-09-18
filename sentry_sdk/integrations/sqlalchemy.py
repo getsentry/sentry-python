@@ -1,4 +1,4 @@
-from sentry_sdk.consts import SPANSTATUS, SPANDATA
+from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
@@ -6,6 +6,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     parse_version,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
@@ -128,19 +129,19 @@ def _set_db_data(span, conn):
     # type: (Span, Any) -> None
     db_system = _get_db_system(conn.engine.name)
     if db_system is not None:
-        span.set_data(SPANDATA.DB_SYSTEM, db_system)
+        span.set_data(ATTRS.DB_SYSTEM, db_system)
 
     if conn.engine.url is None:
         return
 
     db_name = conn.engine.url.database
     if db_name is not None:
-        span.set_data(SPANDATA.DB_NAME, db_name)
+        span.set_data(ATTRS.DB_NAME, db_name)
 
     server_address = conn.engine.url.host
     if server_address is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+        span.set_data(ATTRS.SERVER_ADDRESS, server_address)
 
     server_port = conn.engine.url.port
     if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, server_port)
+        span.set_data(ATTRS.SERVER_PORT, server_port)

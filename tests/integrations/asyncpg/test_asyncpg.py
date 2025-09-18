@@ -21,8 +21,8 @@ from asyncpg import connect, Connection
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import ApproxDict
 
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
@@ -516,10 +516,10 @@ async def test_query_source_disabled(sentry_init, capture_events):
 
     data = span.get("data", {})
 
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert ATTRS.CODE_LINENO not in data
+    assert ATTRS.CODE_NAMESPACE not in data
+    assert ATTRS.CODE_FILEPATH not in data
+    assert ATTRS.CODE_FUNCTION not in data
 
 
 @pytest.mark.asyncio
@@ -555,10 +555,10 @@ async def test_query_source_enabled(
 
     data = span.get("data", {})
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert ATTRS.CODE_LINENO in data
+    assert ATTRS.CODE_NAMESPACE in data
+    assert ATTRS.CODE_FILEPATH in data
+    assert ATTRS.CODE_FUNCTION in data
 
 
 @pytest.mark.asyncio
@@ -588,24 +588,22 @@ async def test_query_source(sentry_init, capture_events):
 
     data = span.get("data", {})
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert ATTRS.CODE_LINENO in data
+    assert ATTRS.CODE_NAMESPACE in data
+    assert ATTRS.CODE_FILEPATH in data
+    assert ATTRS.CODE_FUNCTION in data
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert (
-        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
-    )
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+    assert type(data.get(ATTRS.CODE_LINENO)) == int
+    assert data.get(ATTRS.CODE_LINENO) > 0
+    assert data.get(ATTRS.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
+    assert data.get(ATTRS.CODE_FILEPATH).endswith(
         "tests/integrations/asyncpg/test_asyncpg.py"
     )
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
     assert is_relative_path
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+    assert data.get(ATTRS.CODE_FUNCTION) == "test_query_source"
 
 
 @pytest.mark.asyncio
@@ -641,20 +639,20 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
 
     data = span.get("data", {})
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert ATTRS.CODE_LINENO in data
+    assert ATTRS.CODE_NAMESPACE in data
+    assert ATTRS.CODE_FILEPATH in data
+    assert ATTRS.CODE_FUNCTION in data
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
-    assert data.get(SPANDATA.CODE_FILEPATH) == "asyncpg_helpers/helpers.py"
+    assert type(data.get(ATTRS.CODE_LINENO)) == int
+    assert data.get(ATTRS.CODE_LINENO) > 0
+    assert data.get(ATTRS.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
+    assert data.get(ATTRS.CODE_FILEPATH) == "asyncpg_helpers/helpers.py"
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
     assert is_relative_path
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "execute_query_in_connection"
+    assert data.get(ATTRS.CODE_FUNCTION) == "execute_query_in_connection"
 
 
 @pytest.mark.asyncio
@@ -696,10 +694,10 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 
     data = span.get("data", {})
 
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert ATTRS.CODE_LINENO not in data
+    assert ATTRS.CODE_NAMESPACE not in data
+    assert ATTRS.CODE_FILEPATH not in data
+    assert ATTRS.CODE_FUNCTION not in data
 
 
 @pytest.mark.asyncio
@@ -741,26 +739,23 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
     data = span.get("data", {})
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert ATTRS.CODE_LINENO in data
+    assert ATTRS.CODE_NAMESPACE in data
+    assert ATTRS.CODE_FILEPATH in data
+    assert ATTRS.CODE_FUNCTION in data
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert (
-        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
-    )
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+    assert type(data.get(ATTRS.CODE_LINENO)) == int
+    assert data.get(ATTRS.CODE_LINENO) > 0
+    assert data.get(ATTRS.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
+    assert data.get(ATTRS.CODE_FILEPATH).endswith(
         "tests/integrations/asyncpg/test_asyncpg.py"
     )
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    is_relative_path = data.get(ATTRS.CODE_FILEPATH)[0] != os.sep
     assert is_relative_path
 
     assert (
-        data.get(SPANDATA.CODE_FUNCTION)
-        == "test_query_source_if_duration_over_threshold"
+        data.get(ATTRS.CODE_FUNCTION) == "test_query_source_if_duration_over_threshold"
     )
 
 

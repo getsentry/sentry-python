@@ -5,12 +5,13 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
 from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import _get_value
 from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -49,14 +50,14 @@ except ImportError:
     AgentExecutor = None
 
 DATA_FIELDS = {
-    "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-    "function_call": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-    "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-    "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-    "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-    "tool_calls": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-    "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
-    "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+    "frequency_penalty": ATTRS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+    "function_call": ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
+    "max_tokens": ATTRS.GEN_AI_REQUEST_MAX_TOKENS,
+    "presence_penalty": ATTRS.GEN_AI_REQUEST_PRESENCE_PENALTY,
+    "temperature": ATTRS.GEN_AI_REQUEST_TEMPERATURE,
+    "tool_calls": ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
+    "top_k": ATTRS.GEN_AI_REQUEST_TOP_K,
+    "top_p": ATTRS.GEN_AI_REQUEST_TOP_P,
 }
 
 
@@ -192,15 +193,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             if model:
                 span.set_data(
-                    SPANDATA.GEN_AI_REQUEST_MODEL,
+                    ATTRS.GEN_AI_REQUEST_MODEL,
                     model,
                 )
 
             ai_type = all_params.get("_type", "")
             if "anthropic" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
+                span.set_data(ATTRS.GEN_AI_SYSTEM, "anthropic")
             elif "openai" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+                span.set_data(ATTRS.GEN_AI_SYSTEM, "openai")
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
@@ -210,7 +211,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts, unpack=False
+                    span, ATTRS.GEN_AI_REQUEST_MESSAGES, prompts, unpack=False
                 )
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
@@ -239,15 +240,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
             span = watched_span.span
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "chat")
             if model:
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                span.set_data(ATTRS.GEN_AI_REQUEST_MODEL, model)
 
             ai_type = all_params.get("_type", "")
             if "anthropic" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
+                span.set_data(ATTRS.GEN_AI_SYSTEM, "anthropic")
             elif "openai" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+                span.set_data(ATTRS.GEN_AI_SYSTEM, "openai")
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
@@ -264,7 +265,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         )
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    ATTRS.GEN_AI_REQUEST_MESSAGES,
                     normalized_messages,
                     unpack=False,
                 )
@@ -282,7 +283,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    ATTRS.GEN_AI_RESPONSE_TEXT,
                     [[x.text for x in list_] for list_ in response.generations],
                 )
 
@@ -308,7 +309,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 try:
                     response_model = generation.generation_info.get("model_name")
                     if response_model is not None:
-                        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+                        span.set_data(ATTRS.GEN_AI_RESPONSE_MODEL, response_model)
                 except AttributeError:
                     pass
 
@@ -316,7 +317,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     finish_reason = generation.generation_info.get("finish_reason")
                     if finish_reason is not None:
                         span.set_data(
-                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason
+                            ATTRS.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason
                         )
                 except AttributeError:
                     pass
@@ -326,7 +327,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     if tool_calls is not None and tool_calls != []:
                         set_data_normalized(
                             span,
-                            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                            ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
                             tool_calls,
                             unpack=False,
                         )
@@ -336,7 +337,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    ATTRS.GEN_AI_RESPONSE_TEXT,
                     [[x.text for x in list_] for list_ in response.generations],
                 )
 
@@ -364,7 +365,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, finish.return_values.items()
+                    span, ATTRS.GEN_AI_RESPONSE_TEXT, finish.return_values.items()
                 )
 
             self._exit_span(span_data, run_id)
@@ -387,17 +388,17 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
             span = watched_span.span
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
-            span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
+            span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "execute_tool")
+            span.set_data(ATTRS.GEN_AI_TOOL_NAME, tool_name)
 
             tool_description = serialized.get("description")
             if tool_description is not None:
-                span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
+                span.set_data(ATTRS.GEN_AI_TOOL_DESCRIPTION, tool_description)
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_TOOL_INPUT,
+                    ATTRS.GEN_AI_TOOL_INPUT,
                     kwargs.get("inputs", [input_str]),
                 )
 
@@ -412,7 +413,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span = span_data.span
 
             if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
+                set_data_normalized(span, ATTRS.GEN_AI_TOOL_OUTPUT, output)
 
             self._exit_span(span_data, run_id)
 
@@ -503,13 +504,13 @@ def _record_token_usage(span, response):
         )
 
     if input_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+        span.set_data(ATTRS.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
     if output_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+        span.set_data(ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
     if total_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+        span.set_data(ATTRS.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
 def _get_request_data(obj, args, kwargs):
@@ -615,7 +616,7 @@ def _set_tools_on_span(span, tools):
         if simplified_tools:
             set_data_normalized(
                 span,
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                 simplified_tools,
                 unpack=False,
             )
@@ -724,10 +725,10 @@ def _wrap_agent_executor_invoke(f):
             origin=LangchainIntegration.origin,
         ) as span:
             if agent_name:
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+                span.set_data(ATTRS.GEN_AI_AGENT_NAME, agent_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+            span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "invoke_agent")
+            span.set_data(ATTRS.GEN_AI_RESPONSE_STREAMING, False)
 
             _set_tools_on_span(span, tools)
 
@@ -741,7 +742,7 @@ def _wrap_agent_executor_invoke(f):
                 and integration.include_prompts
             ):
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
+                    span, ATTRS.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
                 )
 
             output = result.get("output")
@@ -750,7 +751,7 @@ def _wrap_agent_executor_invoke(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_TEXT, output)
 
             return result
 
@@ -778,10 +779,10 @@ def _wrap_agent_executor_stream(f):
         span.__enter__()
 
         if agent_name:
-            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+            span.set_data(ATTRS.GEN_AI_AGENT_NAME, agent_name)
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        span.set_data(ATTRS.GEN_AI_OPERATION_NAME, "invoke_agent")
+        span.set_data(ATTRS.GEN_AI_RESPONSE_STREAMING, True)
 
         _set_tools_on_span(span, tools)
 
@@ -792,7 +793,7 @@ def _wrap_agent_executor_stream(f):
             and integration.include_prompts
         ):
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
+                span, ATTRS.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
             )
 
         # Run the agent
@@ -815,7 +816,7 @@ def _wrap_agent_executor_stream(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
 
@@ -834,7 +835,7 @@ def _wrap_agent_executor_stream(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, ATTRS.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
 

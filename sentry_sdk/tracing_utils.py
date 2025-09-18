@@ -11,7 +11,7 @@ from urllib.parse import quote, unquote
 import uuid
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANTEMPLATE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     filename_for_module,
@@ -27,6 +27,7 @@ from sentry_sdk.utils import (
     _is_in_project_root,
     _module_in_list,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -167,7 +168,7 @@ def maybe_create_breadcrumbs_from_span(scope, span):
 
     elif span.op == OP.HTTP_CLIENT:
         level = None
-        status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)
+        status_code = span._data.get(ATTRS.HTTP_STATUS_CODE)
         if status_code:
             if 500 <= status_code <= 599:
                 level = "error"
@@ -281,14 +282,14 @@ def add_query_source(span):
         except Exception:
             lineno = None
         if lineno is not None:
-            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+            span.set_data(ATTRS.CODE_LINENO, frame.f_lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+            span.set_data(ATTRS.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -298,7 +299,7 @@ def add_query_source(span):
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
-            span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+            span.set_data(ATTRS.CODE_FILEPATH, in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -306,7 +307,7 @@ def add_query_source(span):
             code_function = None
 
         if code_function is not None:
-            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            span.set_data(ATTRS.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def extract_sentrytrace_data(header):
@@ -1007,16 +1008,16 @@ def _get_input_attributes(template, send_pii, args, kwargs):
 
     if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
         mapping = {
-            "model": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
-            "model_name": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
-            "agent": (SPANDATA.GEN_AI_AGENT_NAME, str),
-            "agent_name": (SPANDATA.GEN_AI_AGENT_NAME, str),
-            "max_tokens": (SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, int),
-            "frequency_penalty": (SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, float),
-            "presence_penalty": (SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, float),
-            "temperature": (SPANDATA.GEN_AI_REQUEST_TEMPERATURE, float),
-            "top_p": (SPANDATA.GEN_AI_REQUEST_TOP_P, float),
-            "top_k": (SPANDATA.GEN_AI_REQUEST_TOP_K, int),
+            "model": (ATTRS.GEN_AI_REQUEST_MODEL, str),
+            "model_name": (ATTRS.GEN_AI_REQUEST_MODEL, str),
+            "agent": (ATTRS.GEN_AI_AGENT_NAME, str),
+            "agent_name": (ATTRS.GEN_AI_AGENT_NAME, str),
+            "max_tokens": (ATTRS.GEN_AI_REQUEST_MAX_TOKENS, int),
+            "frequency_penalty": (ATTRS.GEN_AI_REQUEST_FREQUENCY_PENALTY, float),
+            "presence_penalty": (ATTRS.GEN_AI_REQUEST_PRESENCE_PENALTY, float),
+            "temperature": (ATTRS.GEN_AI_REQUEST_TEMPERATURE, float),
+            "top_p": (ATTRS.GEN_AI_REQUEST_TOP_P, float),
+            "top_k": (ATTRS.GEN_AI_REQUEST_TOP_K, int),
         }
 
         def _set_from_key(key, value):
@@ -1028,13 +1029,13 @@ def _get_input_attributes(template, send_pii, args, kwargs):
 
         for key, value in list(kwargs.items()):
             if key == "prompt" and isinstance(value, str):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
+                attributes.setdefault(ATTRS.GEN_AI_REQUEST_MESSAGES, []).append(
                     {"role": "user", "content": value}
                 )
                 continue
 
             if key == "system_prompt" and isinstance(value, str):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
+                attributes.setdefault(ATTRS.GEN_AI_REQUEST_MESSAGES, []).append(
                     {"role": "system", "content": value}
                 )
                 continue
@@ -1042,14 +1043,14 @@ def _get_input_attributes(template, send_pii, args, kwargs):
             _set_from_key(key, value)
 
     if template == SPANTEMPLATE.AI_TOOL and send_pii:
-        attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
+        attributes[ATTRS.GEN_AI_TOOL_INPUT] = safe_repr(
             {"args": args, "kwargs": kwargs}
         )
 
     # Coerce to string
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in attributes:
-        attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES] = safe_repr(
-            attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    if ATTRS.GEN_AI_REQUEST_MESSAGES in attributes:
+        attributes[ATTRS.GEN_AI_REQUEST_MESSAGES] = safe_repr(
+            attributes[ATTRS.GEN_AI_REQUEST_MESSAGES]
         )
 
     return attributes
@@ -1070,15 +1071,15 @@ def _get_usage_attributes(usage):
                 attributes[attribute] = value
 
     _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+        ATTRS.GEN_AI_USAGE_INPUT_TOKENS,
         ("prompt_tokens", "input_tokens"),
     )
     _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+        ATTRS.GEN_AI_USAGE_OUTPUT_TOKENS,
         ("completion_tokens", "output_tokens"),
     )
     _set_from_keys(
-        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+        ATTRS.GEN_AI_USAGE_TOTAL_TOKENS,
         ("total_tokens",),
     )
 
@@ -1111,15 +1112,15 @@ def _get_output_attributes(template, send_pii, result):
             # Response model
             model_name = _get_value(result, "model")
             if model_name is not None and isinstance(model_name, str):
-                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = model_name
+                attributes[ATTRS.GEN_AI_RESPONSE_MODEL] = model_name
 
             model_name = _get_value(result, "model_name")
             if model_name is not None and isinstance(model_name, str):
-                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = model_name
+                attributes[ATTRS.GEN_AI_RESPONSE_MODEL] = model_name
 
     # Tool output
     if template == SPANTEMPLATE.AI_TOOL and send_pii:
-        attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
+        attributes[ATTRS.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
 
     return attributes
 
@@ -1140,22 +1141,22 @@ def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
 
     if template == SPANTEMPLATE.AI_AGENT:
         attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            SPANDATA.GEN_AI_AGENT_NAME: name,
+            ATTRS.GEN_AI_OPERATION_NAME: "invoke_agent",
+            ATTRS.GEN_AI_AGENT_NAME: name,
         }
     elif template == SPANTEMPLATE.AI_CHAT:
         attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+            ATTRS.GEN_AI_OPERATION_NAME: "chat",
         }
     elif template == SPANTEMPLATE.AI_TOOL:
         attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
-            SPANDATA.GEN_AI_TOOL_NAME: name,
+            ATTRS.GEN_AI_OPERATION_NAME: "execute_tool",
+            ATTRS.GEN_AI_TOOL_NAME: name,
         }
 
         docstring = f.__doc__
         if docstring is not None:
-            attributes[SPANDATA.GEN_AI_TOOL_DESCRIPTION] = docstring
+            attributes[ATTRS.GEN_AI_TOOL_DESCRIPTION] = docstring
 
     attributes.update(_get_input_attributes(template, send_pii, args, kwargs))
     span.update_data(attributes or {})

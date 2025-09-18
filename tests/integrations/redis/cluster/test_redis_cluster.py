@@ -1,8 +1,8 @@
 import pytest
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.api import start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import ApproxDict
 
 import redis
@@ -85,10 +85,10 @@ def test_rediscluster_basic(sentry_init, capture_events, send_default_pii, descr
     assert span["description"] == description
     assert span["data"] == ApproxDict(
         {
-            SPANDATA.DB_SYSTEM: "redis",
+            ATTRS.DB_SYSTEM: "redis",
             # ClusterNode converts localhost to 127.0.0.1
-            SPANDATA.SERVER_ADDRESS: "127.0.0.1",
-            SPANDATA.SERVER_PORT: 6379,
+            ATTRS.SERVER_ADDRESS: "127.0.0.1",
+            ATTRS.SERVER_PORT: 6379,
         }
     )
     assert span["tags"] == {
@@ -134,10 +134,10 @@ def test_rediscluster_pipeline(
                 "count": 3,
                 "first_ten": expected_first_ten,
             },
-            SPANDATA.DB_SYSTEM: "redis",
+            ATTRS.DB_SYSTEM: "redis",
             # ClusterNode converts localhost to 127.0.0.1
-            SPANDATA.SERVER_ADDRESS: "127.0.0.1",
-            SPANDATA.SERVER_PORT: 6379,
+            ATTRS.SERVER_ADDRESS: "127.0.0.1",
+            ATTRS.SERVER_PORT: 6379,
         }
     )
     assert span["tags"] == {

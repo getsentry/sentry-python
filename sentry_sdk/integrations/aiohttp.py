@@ -4,7 +4,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     _check_minimum_version,
@@ -37,6 +37,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 try:
     import asyncio
@@ -239,11 +240,11 @@ def create_trace_config():
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin=AioHttpIntegration.origin,
         )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
+        span.set_data(ATTRS.HTTP_METHOD, method)
         if parsed_url is not None:
             span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            span.set_data(ATTRS.HTTP_QUERY, parsed_url.query)
+            span.set_data(ATTRS.HTTP_FRAGMENT, parsed_url.fragment)
 
         client = sentry_sdk.get_client()
 

@@ -30,7 +30,6 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
-    SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -49,6 +48,7 @@ from sentry_sdk.profiler.transaction_profiler import (
 )
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 if TYPE_CHECKING:
     from typing import Any
@@ -914,8 +914,8 @@ class _Client(BaseClient):
         log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
 
         server_name = self.options.get("server_name")
-        if server_name is not None and SPANDATA.SERVER_ADDRESS not in log["attributes"]:
-            log["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
+        if server_name is not None and ATTRS.SERVER_ADDRESS not in log["attributes"]:
+            log["attributes"][ATTRS.SERVER_ADDRESS] = server_name
 
         environment = self.options.get("environment")
         if environment is not None and "sentry.environment" not in log["attributes"]:

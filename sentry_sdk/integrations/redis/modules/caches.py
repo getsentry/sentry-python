@@ -2,9 +2,10 @@
 Code used for the Caches module in Sentry
 """
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import capture_internal_exceptions
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 GET_COMMANDS = ("get", "mget")
 SET_COMMANDS = ("set", "setex")
@@ -78,19 +79,19 @@ def _get_cache_span_description(redis_command, args, kwargs, integration):
 def _set_cache_data(span, redis_client, properties, return_value):
     # type: (Span, Any, dict[str, Any], Optional[Any]) -> None
     with capture_internal_exceptions():
-        span.set_data(SPANDATA.CACHE_KEY, properties["key"])
+        span.set_data(ATTRS.CACHE_KEY, properties["key"])
 
         if properties["redis_command"] in GET_COMMANDS:
             if return_value is not None:
-                span.set_data(SPANDATA.CACHE_HIT, True)
+                span.set_data(ATTRS.CACHE_HIT, True)
                 size = (
                     len(str(return_value).encode("utf-8"))
                     if not isinstance(return_value, bytes)
                     else len(return_value)
                 )
-                span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+                span.set_data(ATTRS.CACHE_ITEM_SIZE, size)
             else:
-                span.set_data(SPANDATA.CACHE_HIT, False)
+                span.set_data(ATTRS.CACHE_HIT, False)
 
         elif properties["redis_command"] in SET_COMMANDS:
             if properties["value"] is not None:
@@ -99,7 +100,7 @@ def _set_cache_data(span, redis_client, properties, return_value):
                     if not isinstance(properties["value"], bytes)
                     else len(properties["value"])
                 )
-                span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+                span.set_data(ATTRS.CACHE_ITEM_SIZE, size)
 
         try:
             connection_params = redis_client.connection_pool.connection_kwargs
@@ -114,8 +115,8 @@ def _set_cache_data(span, redis_client, properties, return_value):
 
         host = connection_params.get("host")
         if host is not None:
-            span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, host)
+            span.set_data(ATTRS.NETWORK_PEER_ADDRESS, host)
 
         port = connection_params.get("port")
         if port is not None:
-            span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
+            span.set_data(ATTRS.NETWORK_PEER_PORT, port)

@@ -4,7 +4,7 @@ import pytest
 from fakeredis import FakeStrictRedis
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import SPANDATA
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from sentry_sdk.integrations.redis import RedisIntegration
 
 
@@ -71,7 +71,7 @@ def test_redis_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
-    assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
+    assert span["data"][ATTRS.DB_SYSTEM] == "redis"
     assert span["data"]["redis.commands"] == {
         "count": 3,
         "first_ten": expected_first_ten,
@@ -263,10 +263,10 @@ def test_db_connection_attributes_client(sentry_init, capture_events):
 
     assert span["op"] == "db.redis"
     assert span["description"] == "GET 'foobar'"
-    assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
-    assert span["data"][SPANDATA.DB_NAME] == "1"
-    assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
-    assert span["data"][SPANDATA.SERVER_PORT] == 63791
+    assert span["data"][ATTRS.DB_SYSTEM] == "redis"
+    assert span["data"][ATTRS.DB_NAME] == "1"
+    assert span["data"][ATTRS.SERVER_ADDRESS] == "localhost"
+    assert span["data"][ATTRS.SERVER_PORT] == 63791
 
 
 def test_db_connection_attributes_pipeline(sentry_init, capture_events):
@@ -289,10 +289,10 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_events):
 
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
-    assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
-    assert span["data"][SPANDATA.DB_NAME] == "1"
-    assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
-    assert span["data"][SPANDATA.SERVER_PORT] == 63791
+    assert span["data"][ATTRS.DB_SYSTEM] == "redis"
+    assert span["data"][ATTRS.DB_NAME] == "1"
+    assert span["data"][ATTRS.SERVER_ADDRESS] == "localhost"
+    assert span["data"][ATTRS.SERVER_PORT] == 63791
 
 
 def test_span_origin(sentry_init, capture_events):

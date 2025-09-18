@@ -2,11 +2,12 @@ import copy
 import json
 
 import sentry_sdk
-from sentry_sdk.consts import SPANSTATUS, SPANDATA, OP
+from sentry_sdk.consts import SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 try:
     from pymongo import monitoring
@@ -89,19 +90,19 @@ def _get_db_data(event):
     # type: (Any) -> Dict[str, Any]
     data = {}
 
-    data[SPANDATA.DB_SYSTEM] = "mongodb"
+    data[ATTRS.DB_SYSTEM] = "mongodb"
 
     db_name = event.database_name
     if db_name is not None:
-        data[SPANDATA.DB_NAME] = db_name
+        data[ATTRS.DB_NAME] = db_name
 
     server_address = event.connection_id[0]
     if server_address is not None:
-        data[SPANDATA.SERVER_ADDRESS] = server_address
+        data[ATTRS.SERVER_ADDRESS] = server_address
 
     server_port = event.connection_id[1]
     if server_port is not None:
-        data[SPANDATA.SERVER_PORT] = server_port
+        data[ATTRS.SERVER_PORT] = server_port
 
     return data
 
@@ -129,9 +130,9 @@ class CommandTracer(monitoring.CommandListener):
 
             tags = {
                 "db.name": event.database_name,
-                SPANDATA.DB_SYSTEM: "mongodb",
-                SPANDATA.DB_OPERATION: event.command_name,
-                SPANDATA.DB_MONGODB_COLLECTION: command.get(event.command_name),
+                ATTRS.DB_SYSTEM: "mongodb",
+                ATTRS.DB_OPERATION: event.command_name,
+                ATTRS.DB_MONGODB_COLLECTION: command.get(event.command_name),
             }
 
             try:

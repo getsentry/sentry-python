@@ -5,8 +5,8 @@ import pytest
 import requests
 
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 from tests.conftest import ApproxDict, create_mock_http_server
 
 PORT = create_mock_http_server()
@@ -27,10 +27,10 @@ def test_crumb_capture(sentry_init, capture_events):
     assert crumb["data"] == ApproxDict(
         {
             "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
-            SPANDATA.HTTP_STATUS_CODE: response.status_code,
+            ATTRS.HTTP_METHOD: "GET",
+            ATTRS.HTTP_FRAGMENT: "",
+            ATTRS.HTTP_QUERY: "",
+            ATTRS.HTTP_STATUS_CODE: response.status_code,
             "reason": response.reason,
         }
     )
@@ -75,10 +75,10 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
     assert crumb["data"] == ApproxDict(
         {
             "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
-            SPANDATA.HTTP_STATUS_CODE: response.status_code,
+            ATTRS.HTTP_METHOD: "GET",
+            ATTRS.HTTP_FRAGMENT: "",
+            ATTRS.HTTP_QUERY: "",
+            ATTRS.HTTP_STATUS_CODE: response.status_code,
             "reason": response.reason,
         }
     )
@@ -103,12 +103,12 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     (event,) = events
     assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
         {
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: response.status_code,
+            ATTRS.HTTP_METHOD: "GET",
+            ATTRS.HTTP_STATUS_CODE: response.status_code,
             "reason": response.reason,
             # no url related data
         }
     )
     assert "url" not in event["breadcrumbs"]["values"][0]["data"]
-    assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
-    assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
+    assert ATTRS.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
+    assert ATTRS.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]

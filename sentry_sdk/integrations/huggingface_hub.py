@@ -4,13 +4,14 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -93,26 +94,26 @@ def _wrap_huggingface_task(f, op):
         )
         span.__enter__()
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
+        span.set_data(ATTRS.GEN_AI_OPERATION_NAME, operation_name)
 
         if model:
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+            span.set_data(ATTRS.GEN_AI_REQUEST_MODEL, model)
 
         # Input attributes
         if should_send_default_pii() and integration.include_prompts:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
+                span, ATTRS.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
             )
 
         attribute_mapping = {
-            "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-            "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
-            "stream": SPANDATA.GEN_AI_RESPONSE_STREAMING,
+            "tools": ATTRS.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            "frequency_penalty": ATTRS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            "max_tokens": ATTRS.GEN_AI_REQUEST_MAX_TOKENS,
+            "presence_penalty": ATTRS.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            "temperature": ATTRS.GEN_AI_REQUEST_TEMPERATURE,
+            "top_p": ATTRS.GEN_AI_REQUEST_TOP_P,
+            "top_k": ATTRS.GEN_AI_REQUEST_TOP_K,
+            "stream": ATTRS.GEN_AI_RESPONSE_STREAMING,
         }
 
         for attribute, span_attribute in attribute_mapping.items():
@@ -180,12 +181,12 @@ def _wrap_huggingface_task(f, op):
                         response_text_buffer.append(choice.message.content)
 
             if response_model is not None:
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+                span.set_data(ATTRS.GEN_AI_RESPONSE_MODEL, response_model)
 
             if finish_reason is not None:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                    ATTRS.GEN_AI_RESPONSE_FINISH_REASONS,
                     finish_reason,
                 )
 
@@ -193,7 +194,7 @@ def _wrap_huggingface_task(f, op):
                 if tool_calls is not None and len(tool_calls) > 0:
                     set_data_normalized(
                         span,
-                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                        ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
                         tool_calls,
                         unpack=False,
                     )
@@ -203,7 +204,7 @@ def _wrap_huggingface_task(f, op):
                     if text_response:
                         set_data_normalized(
                             span,
-                            SPANDATA.GEN_AI_RESPONSE_TEXT,
+                            ATTRS.GEN_AI_RESPONSE_TEXT,
                             text_response,
                         )
 
@@ -260,7 +261,7 @@ def _wrap_huggingface_task(f, op):
                         if finish_reason is not None:
                             set_data_normalized(
                                 span,
-                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                ATTRS.GEN_AI_RESPONSE_FINISH_REASONS,
                                 finish_reason,
                             )
 
@@ -270,7 +271,7 @@ def _wrap_huggingface_task(f, op):
                                 if text_response:
                                     set_data_normalized(
                                         span,
-                                        SPANDATA.GEN_AI_RESPONSE_TEXT,
+                                        ATTRS.GEN_AI_RESPONSE_TEXT,
                                         text_response,
                                     )
 
@@ -333,14 +334,12 @@ def _wrap_huggingface_task(f, op):
                             yield chunk
 
                         if response_model is not None:
-                            span.set_data(
-                                SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
-                            )
+                            span.set_data(ATTRS.GEN_AI_RESPONSE_MODEL, response_model)
 
                         if finish_reason is not None:
                             set_data_normalized(
                                 span,
-                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                ATTRS.GEN_AI_RESPONSE_FINISH_REASONS,
                                 finish_reason,
                             )
 
@@ -348,7 +347,7 @@ def _wrap_huggingface_task(f, op):
                             if tool_calls is not None and len(tool_calls) > 0:
                                 set_data_normalized(
                                     span,
-                                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                                    ATTRS.GEN_AI_RESPONSE_TOOL_CALLS,
                                     tool_calls,
                                     unpack=False,
                                 )
@@ -358,7 +357,7 @@ def _wrap_huggingface_task(f, op):
                                 if text_response:
                                     set_data_normalized(
                                         span,
-                                        SPANDATA.GEN_AI_RESPONSE_TEXT,
+                                        ATTRS.GEN_AI_RESPONSE_TEXT,
                                         text_response,
                                     )
 

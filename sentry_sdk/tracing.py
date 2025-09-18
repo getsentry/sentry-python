@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA, SPANTEMPLATE
+from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     nanosecond_time,
     should_be_treated_as_error,
 )
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -660,22 +661,22 @@ class Span:
         # type: (Optional[int], Optional[str]) -> None
 
         if thread_id is not None:
-            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
+            self.set_data(ATTRS.THREAD_ID, str(thread_id))
 
             if thread_name is not None:
-                self.set_data(SPANDATA.THREAD_NAME, thread_name)
+                self.set_data(ATTRS.THREAD_NAME, thread_name)
 
     def set_profiler_id(self, profiler_id):
         # type: (Optional[str]) -> None
         if profiler_id is not None:
-            self.set_data(SPANDATA.PROFILER_ID, profiler_id)
+            self.set_data(ATTRS.PROFILER_ID, profiler_id)
 
     def set_http_status(self, http_status):
         # type: (int) -> None
         self.set_tag(
             "http.status_code", str(http_status)
         )  # we keep this for backwards compatibility
-        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
+        self.set_data(ATTRS.HTTP_STATUS_CODE, http_status)
         self.set_status(get_span_status_from_http_code(http_status))
 
     def is_success(self):
@@ -779,11 +780,11 @@ class Span:
 
         data = {}
 
-        thread_id = self._data.get(SPANDATA.THREAD_ID)
+        thread_id = self._data.get(ATTRS.THREAD_ID)
         if thread_id is not None:
             data["thread.id"] = thread_id
 
-        thread_name = self._data.get(SPANDATA.THREAD_NAME)
+        thread_name = self._data.get(ATTRS.THREAD_NAME)
         if thread_name is not None:
             data["thread.name"] = thread_name
 
@@ -794,7 +795,7 @@ class Span:
 
     def get_profile_context(self):
         # type: () -> Optional[ProfileContext]
-        profiler_id = self._data.get(SPANDATA.PROFILER_ID)
+        profiler_id = self._data.get(ATTRS.PROFILER_ID)
         if profiler_id is None:
             return None
 

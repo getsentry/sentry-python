@@ -2,8 +2,8 @@ from functools import wraps
 
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized
+from sentry_conventions.attributes import ATTRIBUTE_NAMES as ATTRS
 
 from typing import TYPE_CHECKING
 
@@ -37,32 +37,32 @@ except ImportError:
 
 
 COLLECTED_CHAT_PARAMS = {
-    "model": SPANDATA.AI_MODEL_ID,
-    "k": SPANDATA.AI_TOP_K,
-    "p": SPANDATA.AI_TOP_P,
-    "seed": SPANDATA.AI_SEED,
-    "frequency_penalty": SPANDATA.AI_FREQUENCY_PENALTY,
-    "presence_penalty": SPANDATA.AI_PRESENCE_PENALTY,
-    "raw_prompting": SPANDATA.AI_RAW_PROMPTING,
+    "model": ATTRS.AI_MODEL_ID,
+    "k": ATTRS.AI_TOP_K,
+    "p": ATTRS.AI_TOP_P,
+    "seed": ATTRS.AI_SEED,
+    "frequency_penalty": ATTRS.AI_FREQUENCY_PENALTY,
+    "presence_penalty": ATTRS.AI_PRESENCE_PENALTY,
+    "raw_prompting": ATTRS.AI_RAW_PROMPTING,
 }
 
 COLLECTED_PII_CHAT_PARAMS = {
-    "tools": SPANDATA.AI_TOOLS,
-    "preamble": SPANDATA.AI_PREAMBLE,
+    "tools": ATTRS.AI_TOOLS,
+    "preamble": ATTRS.AI_PREAMBLE,
 }
 
 COLLECTED_CHAT_RESP_ATTRS = {
-    "generation_id": SPANDATA.AI_GENERATION_ID,
-    "is_search_required": SPANDATA.AI_SEARCH_REQUIRED,
-    "finish_reason": SPANDATA.AI_FINISH_REASON,
+    "generation_id": ATTRS.AI_GENERATION_ID,
+    "is_search_required": ATTRS.AI_SEARCH_REQUIRED,
+    "finish_reason": ATTRS.AI_FINISH_REASON,
 }
 
 COLLECTED_PII_CHAT_RESP_ATTRS = {
-    "citations": SPANDATA.AI_CITATIONS,
-    "documents": SPANDATA.AI_DOCUMENTS,
-    "search_queries": SPANDATA.AI_SEARCH_QUERIES,
-    "search_results": SPANDATA.AI_SEARCH_RESULTS,
-    "tool_calls": SPANDATA.AI_TOOL_CALLS,
+    "citations": ATTRS.AI_CITATIONS,
+    "documents": ATTRS.AI_DOCUMENTS,
+    "search_queries": ATTRS.AI_SEARCH_QUERIES,
+    "search_results": ATTRS.AI_SEARCH_RESULTS,
+    "tool_calls": ATTRS.AI_TOOL_CALLS,
 }
 
 
@@ -101,7 +101,7 @@ def _wrap_chat(f, streaming):
             if hasattr(res, "text"):
                 set_data_normalized(
                     span,
-                    SPANDATA.AI_RESPONSES,
+                    ATTRS.AI_RESPONSES,
                     [res.text],
                 )
             for pii_attr in COLLECTED_PII_CHAT_RESP_ATTRS:
@@ -127,7 +127,7 @@ def _wrap_chat(f, streaming):
                 )
 
             if hasattr(res.meta, "warnings"):
-                set_data_normalized(span, SPANDATA.AI_WARNINGS, res.meta.warnings)
+                set_data_normalized(span, ATTRS.AI_WARNINGS, res.meta.warnings)
 
     @wraps(f)
     def new_chat(*args, **kwargs):
@@ -160,7 +160,7 @@ def _wrap_chat(f, streaming):
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(
                     span,
-                    SPANDATA.AI_INPUT_MESSAGES,
+                    ATTRS.AI_INPUT_MESSAGES,
                     list(
                         map(
                             lambda x: {
@@ -179,7 +179,7 @@ def _wrap_chat(f, streaming):
             for k, v in COLLECTED_CHAT_PARAMS.items():
                 if k in kwargs:
                     set_data_normalized(span, v, kwargs[k])
-            set_data_normalized(span, SPANDATA.AI_STREAMING, False)
+            set_data_normalized(span, ATTRS.AI_STREAMING, False)
 
             if streaming:
                 old_iterator = res
@@ -238,18 +238,16 @@ def _wrap_embed(f):
                 should_send_default_pii() and integration.include_prompts
             ):
                 if isinstance(kwargs["texts"], str):
-                    set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])
+                    set_data_normalized(span, ATTRS.AI_TEXTS, [kwargs["texts"]])
                 elif (
                     isinstance(kwargs["texts"], list)
                     and len(kwargs["texts"]) > 0
                     and isinstance(kwargs["texts"][0], str)
                 ):
-                    set_data_normalized(
-                        span, SPANDATA.AI_INPUT_MESSAGES, kwargs["texts"]
-                    )
+                    set_data_normalized(span, ATTRS.AI_INPUT_MESSAGES, kwargs["texts"])
 
             if "model" in kwargs:
-                set_data_normalized(span, SPANDATA.AI_MODEL_ID, kwargs["model"])
+                set_data_normalized(span, ATTRS.AI_MODEL_ID, kwargs["model"])
             try:
                 res = f(*args, **kwargs)
             except Exception as e:
