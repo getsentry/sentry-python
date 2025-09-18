@@ -107,9 +107,14 @@ This key is optional.
 ### `python`
 
 Sometimes, the whole test suite should only run on specific Python versions.
-This can be achieved via the `python` key, which expects a version specifier.
+This can be achieved via the `python` key.
 
-For example, if you want AIOHTTP tests to only run on Python 3.7+, you can say:
+There are two variants how to define the Python versions to run the test suite
+on.
+
+If you want the test suite to only be run on specific Python versions, you can
+set `python` to a version specifier. For example, if you want AIOHTTP tests to
+only run on Python 3.7+, you can say:
 
 ```python
 "aiohttp": {
@@ -118,12 +123,27 @@ For example, if you want AIOHTTP tests to only run on Python 3.7+, you can say:
 }
 ```
 
+If the Python version to use is dependent on the version of the package under
+test, you can use the more expressive dictionary variant. For instance, while
+HTTPX v0.28 supports Python 3.8, a test dependency of ours, `pytest-httpx`,
+doesn't. If you want to specify that HTTPX test suite should not be run on
+a Python version older than 3.9 if the HTTPX version is 0.28 or higher, you can
+say:
+
+```python
+"httpx": {
+    "python": {
+        # run the test suite for httpx v0.28+ on Python 3.9+ only
+        ">=0.28": ">=3.9",
+    },
+}
+```
+
 The `python` key is optional, and when possible, it should be omitted. The script
-should automatically detect which Python versions the package supports.
-However, if a package has broken
-metadata or the SDK is explicitly not supporting some packages on specific
-Python versions (because of, for example, broken context vars), the `python`
-key can be used.
+should automatically detect which Python versions the package supports. However,
+if a package has broken metadata or the SDK is explicitly not supporting some
+packages on specific Python versions (because of, for example, broken context
+vars), the `python` key can be used.
 
 ### `include`
 
