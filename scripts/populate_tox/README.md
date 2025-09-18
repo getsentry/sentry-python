@@ -18,8 +18,7 @@ then determining which versions make sense to test to get good coverage.
 
 The lowest supported and latest version of a framework are always tested, with
 a number of releases in between:
-- If the package has majors, we pick the highest version of each major. For the
-  latest major, we also pick the lowest version in that major.
+- If the package has majors, we pick the highest version of each major.
 - If the package doesn't have multiple majors, we pick two versions in between
   lowest and highest.
 
@@ -46,6 +45,8 @@ integration_name: {
      },
      "python": python_version_specifier,
      "include": package_version_specifier,
+     "integration_name": integration_name,
+     "num_versions": int,
 }
 ```
 
@@ -180,6 +181,10 @@ For example, we have the `openai_base` and `openai_notiktoken` test suites, both
 of which are actually testing the `openai` integration. If this is the case, you can use the `integration_name` key to define the name of the integration. If not provided, it will default to the name of the test suite.
 
 Linking an integration to a test suite allows the script to access integration configuration like for example the minimum version defined in `sentry_sdk/integrations/__init__.py`.
+
+### `num_versions`
+
+With this option you can tweak the default version picking behavior by specifying how many package versions should be tested. It accepts an integer equal to or greater than 2, as the oldest and latest supported versions will always be picked. Additionally, if there is a recent prerelease, it'll also always be picked (this doesn't count towards `num_versions`).
 
 
 ## How-Tos

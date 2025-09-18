@@ -243,6 +243,9 @@ TEST_SUITE_CONFIG = {
     "openfeature": {
         "package": "openfeature-sdk",
     },
+    "pure_eval": {
+        "package": "pure_eval",
+    },
     "pymongo": {
         "package": "pymongo",
         "deps": {
@@ -274,6 +277,16 @@ TEST_SUITE_CONFIG = {
     },
     "requests": {
         "package": "requests",
+    },
+    "sanic": {
+        "package": "sanic",
+        "deps": {
+            "*": ["websockets<11.0", "aiohttp"],
+            ">=22": ["sanic-testing"],
+            "py3.6": ["aiocontextvars==0.2.1"],
+            "py3.8": ["tracerite<1.1.2"],
+        },
+        "num_versions": 4,
     },
     "spark": {
         "package": "pyspark",
