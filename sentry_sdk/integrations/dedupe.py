@@ -48,13 +48,6 @@ class DedupeIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(DedupeIntegration)
-        if integration is not None:
-            integration.in_app_include = client.options.get("in_app_include") or []
-            integration.in_app_exclude = client.options.get("in_app_exclude") or []
-            integration.project_root = client.options.get("project_root") or None
-
         @add_global_event_processor
         def processor(event, hint):
             # type: (Event, Optional[Hint]) -> Optional[Event]
