@@ -35,7 +35,7 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import get_sdk_name
+from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
 
 
@@ -762,15 +762,14 @@ def test_dedupe_event_processor_drop_records_client_report(
     events = capture_events()
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    for x in range(3):
+    try:
+        raise ValueError("aha!")
+    except Exception:
         try:
-            if x < 2:
-                div = x  # fails for x = 0
-            else:
-                div = x - 2  # fails for x = 2
-            1 / div  # fails twice in the loop
-        except Exception as e:
-            capture_exception(e)
+            capture_exception()
+            reraise(*sys.exc_info())
+        except Exception:
+            capture_exception()
 
     (event,) = events
     (lost_event_call,) = record_lost_event_calls
