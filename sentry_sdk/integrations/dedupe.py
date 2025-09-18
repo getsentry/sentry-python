@@ -62,9 +62,11 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            fingerprint = integration._create_exception_fingerprint(exc_info)
             last_fingerprint = integration._last_seen.get()
+            if not last_fingerprint:
+                return event
 
+            fingerprint = integration._create_exception_fingerprint(exc_info)
             if fingerprint == last_fingerprint:
                 logger.info(
                     "DedupeIntegration dropped duplicated error event with fingerprint %s",
