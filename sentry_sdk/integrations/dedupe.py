@@ -81,9 +81,6 @@ class DedupeIntegration(Integration):
         # type: () -> None
         """
         Resets the deduplication state, clearing the last seen exception fingerprint.
-
-        This maintains the existing public API while working with the new
-        fingerprint-based implementation.
         """
         integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
         if integration is None:
