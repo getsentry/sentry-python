@@ -5,7 +5,7 @@ import platform
 from http.client import HTTPConnection
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import ATTRS, OP
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
@@ -94,11 +94,11 @@ def _install_httplib():
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin="auto.http.stdlib.httplib",
         )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
+        span.set_data(ATTRS.HTTP_METHOD, method)
         if parsed_url is not None:
             span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            span.set_data(ATTRS.HTTP_QUERY, parsed_url.query)
+            span.set_data(ATTRS.HTTP_FRAGMENT, parsed_url.fragment)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 

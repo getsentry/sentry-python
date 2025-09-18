@@ -1,7 +1,7 @@
 import pytest
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import ATTRS
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
 
@@ -71,12 +71,12 @@ async def test_async_redis_pipeline(
                 "count": 3,
                 "first_ten": expected_first_ten,
             },
-            SPANDATA.DB_SYSTEM: "redis",
-            SPANDATA.DB_NAME: "0",
-            SPANDATA.SERVER_ADDRESS: connection.connection_pool.connection_kwargs.get(
+            ATTRS.DB_SYSTEM: "redis",
+            ATTRS.DB_NAME: "0",
+            ATTRS.SERVER_ADDRESS: connection.connection_pool.connection_kwargs.get(
                 "host"
             ),
-            SPANDATA.SERVER_PORT: 6379,
+            ATTRS.SERVER_PORT: 6379,
         }
     )
     assert span["tags"] == {
