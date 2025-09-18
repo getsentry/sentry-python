@@ -322,7 +322,7 @@ def _pick_releases(
 
     for i in range(1, versions_to_test - 1):
         try:
-            versions.add(releases[(len(releases) - 2) // (versions_to_test - 1) * i])
+            versions.add(releases[len(releases) // (versions_to_test - 1) * i])
         except IndexError:
             pass
 
