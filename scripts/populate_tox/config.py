@@ -224,6 +224,9 @@ TEST_SUITE_CONFIG = {
     "openfeature": {
         "package": "openfeature-sdk",
     },
+    "pure_eval": {
+        "package": "pure_eval",
+    },
     "pymongo": {
         "package": "pymongo",
         "deps": {

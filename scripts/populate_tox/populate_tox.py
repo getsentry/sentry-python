@@ -70,7 +70,6 @@ IGNORE = {
     # of these from the IGNORE list
     "gcp",
     "httpx",
-    "pure_eval",
     "ray",
     "redis",
     "requests",
@@ -460,7 +459,7 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
             for dep in deps:
                 rendered.append(f"{{{constraint}}}-{integration}: {dep}")
         else:
-            restriction = SpecifierSet(constraint)
+            restriction = SpecifierSet(constraint, prereleases=True)
             for release in releases:
                 if release in restriction:
                     for dep in deps:
