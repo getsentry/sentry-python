@@ -290,7 +290,7 @@ TEST_SUITE_CONFIG = {
             # https://github.com/cunla/fakeredis-py/issues/341
             "*": ["fakeredis<2.28.0"],
             "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
-            # ">=0.7,<1.11": ["fakeredis>=1.0,<1.7.4"],
+            ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
             "py3.6,py3.7": ["fakeredis!=2.26.0"],
         },
     },
