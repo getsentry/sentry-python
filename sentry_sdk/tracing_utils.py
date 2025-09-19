@@ -882,15 +882,6 @@ def create_span_decorator(
     return span_decorator
 
 
-def set_span_errored(span=None):
-    # type: (Optional[Span]) -> None
-    span = span or get_current_span()
-    if span is not None:
-        span.set_status(SPANSTATUS.ERROR)
-        if span.containing_transaction is not None:
-            span.containing_transaction.set_status(SPANSTATUS.ERROR)
-
-
 def get_current_span(scope=None):
     # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
     """
@@ -899,6 +890,19 @@ def get_current_span(scope=None):
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
+
+
+def set_span_errored(span=None):
+    # type: (Optional[Span]) -> None
+    """
+    Set the status of the current or given span to ERROR.
+    Also sets the status of the transaction (root span) to ERROR.
+    """
+    span = span or get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.ERROR)
+        if span.containing_transaction is not None:
+            span.containing_transaction.set_status(SPANSTATUS.ERROR)
 
 
 def _generate_sample_rand(
