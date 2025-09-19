@@ -11,7 +11,7 @@ from urllib.parse import quote, unquote
 import uuid
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     filename_for_module,
@@ -880,6 +880,15 @@ def create_span_decorator(
             return sync_wrapper
 
     return span_decorator
+
+
+def set_span_errored(span=None):
+    # type: (Optional[Span]) -> None
+    span = span or get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.ERROR)
+        if span.containing_transaction is not None:
+            span.containing_transaction.set_status(SPANSTATUS.ERROR)
 
 
 def get_current_span(scope=None):

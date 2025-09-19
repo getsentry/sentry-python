@@ -1,8 +1,9 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import SPANDATA, SPANSTATUS
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 from typing import TYPE_CHECKING
@@ -20,11 +21,7 @@ except ImportError:
 
 def _capture_exception(exc):
     # type: (Any) -> None
-    span = sentry_sdk.get_current_span()
-    if span is not None:
-        span.set_status(SPANSTATUS.ERROR)
-        if span.containing_transaction is not None:
-            span.containing_transaction.set_status(SPANSTATUS.ERROR)
+    set_span_errored()
 
     event, hint = event_from_exception(
         exc,
