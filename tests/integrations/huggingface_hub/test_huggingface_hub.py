@@ -654,6 +654,25 @@ def test_chat_completion_api_error(
     assert span["data"] == expected_data
 
 
+def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors):
+    # type: (Any, Any, Any) -> None
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    client = InferenceClient(model="test-model")
+
+    with sentry_sdk.start_transaction(name="test"):
+        with pytest.raises(HfHubHTTPError):
+            client.chat_completion(
+                messages=[{"role": "user", "content": "Hello!"}],
+            )
+
+    error, transaction = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+
+
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_with_tools(
