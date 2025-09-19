@@ -667,7 +667,7 @@ def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors)
                 messages=[{"role": "user", "content": "Hello!"}],
             )
 
-    error, transaction = events
+    (error, transaction) = events
     assert error["level"] == "error"
     assert transaction["spans"][0]["tags"]["status"] == "error"
     assert transaction["contexts"]["trace"]["status"] == "error"
