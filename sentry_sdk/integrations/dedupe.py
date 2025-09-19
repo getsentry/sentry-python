@@ -1,12 +1,18 @@
+import hashlib
 import sentry_sdk
-from sentry_sdk.utils import ContextVar, logger
+from sentry_sdk.utils import (
+    ContextVar,
+    logger,
+    get_type_name,
+    get_type_module,
+)
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Any, Optional
 
     from sentry_sdk._types import Event, Hint
 
@@ -16,7 +22,28 @@ class DedupeIntegration(Integration):
 
     def __init__(self):
         # type: () -> None
-        self._last_seen = ContextVar("last-seen")
+        self._last_seen = ContextVar("last-seen", default=None)
+
+    def _create_exception_fingerprint(self, exc_info):
+        # type: (Any) -> str
+        """
+        Creates a unique fingerprint for an exception based on type, message, and object id.
+        """
+        exc_type, exc_value, tb = exc_info
+
+        if exc_type is None or exc_value is None:
+            return ""
+
+        type_module = get_type_module(exc_type) or ""
+        type_name = get_type_name(exc_type) or ""
+        exception_id = str(id(exc_value))
+
+        fingerprint_parts = [type_module, type_name, exception_id]
+        fingerprint_data = "||".join(fingerprint_parts).encode(
+            "utf-8", errors="replace"
+        )
+
+        return hashlib.sha256(fingerprint_data).hexdigest()
 
     @staticmethod
     def setup_once():
@@ -35,17 +62,27 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            exc = exc_info[1]
-            if integration._last_seen.get(None) is exc:
-                logger.info("DedupeIntegration dropped duplicated error event %s", exc)
+            last_fingerprint = integration._last_seen.get()
+            if not last_fingerprint:
+                return event
+
+            fingerprint = integration._create_exception_fingerprint(exc_info)
+            if fingerprint == last_fingerprint:
+                logger.info(
+                    "DedupeIntegration dropped duplicated error event with fingerprint %s",
+                    fingerprint[:16],
+                )
                 return None
 
-            integration._last_seen.set(exc)
+            integration._last_seen.set(fingerprint)
             return event
 
     @staticmethod
     def reset_last_seen():
         # type: () -> None
+        """
+        Resets the deduplication state, clearing the last seen exception fingerprint.
+        """
         integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
         if integration is None:
             return
