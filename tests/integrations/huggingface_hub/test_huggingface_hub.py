@@ -670,7 +670,7 @@ def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors)
     error, transaction = events
     assert error["level"] == "error"
     assert transaction["spans"][0]["tags"]["status"] == "error"
-    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
