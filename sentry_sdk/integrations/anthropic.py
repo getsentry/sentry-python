@@ -55,6 +55,8 @@ def _capture_exception(exc):
     span = sentry_sdk.get_current_span()
     if span is not None:
         span.set_status(SPANSTATUS.ERROR)
+        if span.containing_transaction is not None:
+            span.containing_transaction.set_status(SPANSTATUS.ERROR)
 
     event, hint = event_from_exception(
         exc,
@@ -62,6 +64,9 @@ def _capture_exception(exc):
         mechanism={"type": "anthropic", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
+
+    if span is not None:
+        span.__exit__(None, None, None)
 
 
 def _get_token_usage(result):
