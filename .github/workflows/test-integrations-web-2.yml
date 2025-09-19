@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-web_2-pinned:
-    name: Web 2 (pinned)
+  test-web_2:
+    name: Web 2
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,46 +50,46 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test aiohttp pinned
+      - name: Test aiohttp
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aiohttp"
-      - name: Test asgi pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aiohttp"
+      - name: Test asgi
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asgi"
-      - name: Test bottle pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-asgi"
+      - name: Test bottle
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-bottle"
-      - name: Test falcon pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-bottle"
+      - name: Test falcon
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-falcon"
-      - name: Test litestar pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-falcon"
+      - name: Test litestar
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-litestar"
-      - name: Test pyramid pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-litestar"
+      - name: Test pyramid
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pyramid"
-      - name: Test quart pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pyramid"
+      - name: Test quart
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-quart"
-      - name: Test sanic pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-quart"
+      - name: Test sanic
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sanic"
-      - name: Test starlite pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-sanic"
+      - name: Test starlite
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlite"
-      - name: Test tornado pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlite"
+      - name: Test tornado
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-tornado"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-tornado"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -119,7 +119,6 @@ jobs:
           verbose: true
   check_required_tests:
     name: All pinned Web 2 tests passed
-    needs: test-web_2-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04

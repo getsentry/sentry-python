@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-graphql-pinned:
-    name: GraphQL (pinned)
+  test-graphql:
+    name: GraphQL
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,22 +50,22 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test ariadne pinned
+      - name: Test ariadne
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-ariadne"
-      - name: Test gql pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-ariadne"
+      - name: Test gql
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gql"
-      - name: Test graphene pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gql"
+      - name: Test graphene
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-graphene"
-      - name: Test strawberry pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-graphene"
+      - name: Test strawberry
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-strawberry"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-strawberry"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -95,7 +95,6 @@ jobs:
           verbose: true
   check_required_tests:
     name: All pinned GraphQL tests passed
-    needs: test-graphql-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04

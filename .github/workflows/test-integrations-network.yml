@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-network-pinned:
-    name: Network (pinned)
+  test-network:
+    name: Network
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,18 +50,18 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test grpc pinned
+      - name: Test grpc
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-grpc"
-      - name: Test httpx pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc"
+      - name: Test httpx
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-httpx"
-      - name: Test requests pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx"
+      - name: Test requests
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-requests"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-requests"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -91,7 +91,6 @@ jobs:
           verbose: true
   check_required_tests:
     name: All pinned Network tests passed
-    needs: test-network-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04

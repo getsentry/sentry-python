@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-dbs-pinned:
-    name: DBs (pinned)
+  test-dbs:
+    name: DBs
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -70,30 +70,30 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test asyncpg pinned
+      - name: Test asyncpg
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg"
-      - name: Test clickhouse_driver pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg"
+      - name: Test clickhouse_driver
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver"
-      - name: Test pymongo pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver"
+      - name: Test pymongo
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo"
-      - name: Test redis pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo"
+      - name: Test redis
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis"
-      - name: Test redis_py_cluster_legacy pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis"
+      - name: Test redis_py_cluster_legacy
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis_py_cluster_legacy"
-      - name: Test sqlalchemy pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy"
+      - name: Test sqlalchemy
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -123,7 +123,6 @@ jobs:
           verbose: true
   check_required_tests:
     name: All pinned DBs tests passed
-    needs: test-dbs-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04

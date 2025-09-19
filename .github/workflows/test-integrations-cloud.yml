@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-cloud-pinned:
-    name: Cloud (pinned)
+  test-cloud:
+    name: Cloud
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -54,26 +54,26 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test aws_lambda pinned
+      - name: Test aws_lambda
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda"
-      - name: Test boto3 pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda"
+      - name: Test boto3
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-boto3"
-      - name: Test chalice pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3"
+      - name: Test chalice
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-chalice"
-      - name: Test cloud_resource_context pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice"
+      - name: Test cloud_resource_context
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cloud_resource_context"
-      - name: Test gcp pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context"
+      - name: Test gcp
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gcp"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -103,7 +103,6 @@ jobs:
           verbose: true
   check_required_tests:
     name: All pinned Cloud tests passed
-    needs: test-cloud-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04

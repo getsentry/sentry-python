@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-tasks-pinned:
-    name: Tasks (pinned)
+  test-tasks:
+    name: Tasks
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -57,38 +57,38 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test arq pinned
+      - name: Test arq
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-arq"
-      - name: Test beam pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-arq"
+      - name: Test beam
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-beam"
-      - name: Test celery pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-beam"
+      - name: Test celery
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery"
-      - name: Test dramatiq pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-celery"
+      - name: Test dramatiq
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-dramatiq"
-      - name: Test huey pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-dramatiq"
+      - name: Test huey
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey"
-      - name: Test ray pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-huey"
+      - name: Test ray
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-ray"
-      - name: Test rq pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-ray"
+      - name: Test rq
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rq"
-      - name: Test spark pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-rq"
+      - name: Test spark
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-spark"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-spark"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -118,7 +118,6 @@ jobs:
           verbose: true
   check_required_tests:
     name: All pinned Tasks tests passed
-    needs: test-tasks-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04

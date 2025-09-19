@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-flags-pinned:
-    name: Flags (pinned)
+  test-flags:
+    name: Flags
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,22 +50,22 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test launchdarkly pinned
+      - name: Test launchdarkly
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-launchdarkly"
-      - name: Test openfeature pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-launchdarkly"
+      - name: Test openfeature
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openfeature"
-      - name: Test statsig pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openfeature"
+      - name: Test statsig
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-statsig"
-      - name: Test unleash pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-statsig"
+      - name: Test unleash
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-unleash"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-unleash"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -95,7 +95,6 @@ jobs:
           verbose: true
   check_required_tests:
     name: All pinned Flags tests passed
-    needs: test-flags-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
