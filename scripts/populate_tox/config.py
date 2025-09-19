@@ -282,6 +282,7 @@ TEST_SUITE_CONFIG = {
     },
     "requests": {
         "package": "requests",
+        "num_versions": 2,
     },
     "sanic": {
         "package": "sanic",

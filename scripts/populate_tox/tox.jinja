@@ -60,9 +60,6 @@ envlist =
     {py3.7,py3.11,py3.12}-redis-v{5}
     {py3.7,py3.12,py3.13}-redis-latest
 
-    # Requests
-    {py3.6,py3.8,py3.12,py3.13}-requests
-
     # RQ (Redis Queue)
     {py3.6}-rq-v{0.6}
     {py3.6,py3.9}-rq-v{0.13,1.0}
@@ -146,9 +143,6 @@ deps =
     redis-v4: fakeredis<2.31.0
     redis-v5: redis~=5.0
     redis-latest: redis
-
-    # Requests
-    requests: requests>=2.0
 
     # RQ (Redis Queue)
     # https://github.com/jamesls/fakeredis/issues/245
