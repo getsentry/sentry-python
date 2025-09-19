@@ -29,7 +29,7 @@ from jinja2 import Environment, FileSystemLoader
 TOXENV_REGEX = re.compile(
     r"""
     {?(?P<py_versions>(py\d+\.\d+,?)+)}?
-    -(?P<framework>[a-z](?:[a-z_]|-(?!v{?\d|latest))*[a-z0-9])
+    -(?P<framework>[a-z](?:[a-z_]|-(?!v{?\d))*[a-z0-9])
     (?:-(
         (v{?(?P<framework_versions>[0-9.]+[0-9a-z,.]*}?))
     ))?
