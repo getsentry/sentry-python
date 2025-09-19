@@ -87,6 +87,8 @@ def _capture_exception(exc):
     span = sentry_sdk.get_current_span()
     if span is not None:
         span.set_status(SPANSTATUS.ERROR)
+        if span.containing_transaction is not None:
+            span.containing_transaction.set_status(SPANSTATUS.ERROR)
 
     event, hint = event_from_exception(
         exc,
