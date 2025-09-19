@@ -54,12 +54,6 @@ envlist =
     # OpenTelemetry Experimental (POTel)
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
 
-    # Redis
-    {py3.6,py3.8}-redis-v{3}
-    {py3.7,py3.8,py3.11}-redis-v{4}
-    {py3.7,py3.11,py3.12}-redis-v{5}
-    {py3.7,py3.12,py3.13}-redis-latest
-
     # Requests
     {py3.6,py3.8,py3.12,py3.13}-requests
 
@@ -128,17 +122,6 @@ deps =
 
     # OpenTelemetry Experimental (POTel)
     potel: -e .[opentelemetry-experimental]
-
-    # Redis
-    redis: fakeredis!=1.7.4
-    redis: pytest<8.0.0
-    {py3.6,py3.7,py3.8}-redis: fakeredis<2.26.0
-    {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-redis: pytest-asyncio
-    redis-v3: redis~=3.0
-    redis-v4: redis~=4.0
-    redis-v4: fakeredis<2.31.0
-    redis-v5: redis~=5.0
-    redis-latest: redis
 
     # Requests
     requests: requests>=2.0
