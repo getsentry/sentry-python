@@ -67,9 +67,6 @@ IGNORE = {
     "gevent",
     "opentelemetry",
     "potel",
-    # Integrations that can be migrated -- we should eventually remove all
-    # of these from the IGNORE list
-    "requests",
 }
 
 

@@ -54,9 +54,6 @@ envlist =
     # OpenTelemetry Experimental (POTel)
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
 
-    # Requests
-    {py3.6,py3.8,py3.12,py3.13}-requests
-
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
     # integration tests there.
@@ -122,9 +119,6 @@ deps =
 
     # OpenTelemetry Experimental (POTel)
     potel: -e .[opentelemetry-experimental]
-
-    # Requests
-    requests: requests>=2.0
 
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
