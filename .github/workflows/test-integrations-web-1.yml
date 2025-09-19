@@ -112,12 +112,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned Web 1 tests passed
+    name: All Web 1 tests passed
+    needs: test-web_1
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-web_1-pinned.result != 'success'
+        if: needs.test-web_1.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

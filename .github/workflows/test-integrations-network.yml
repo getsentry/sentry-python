@@ -90,12 +90,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned Network tests passed
+    name: All Network tests passed
+    needs: test-network
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-network-pinned.result != 'success'
+        if: needs.test-network.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
