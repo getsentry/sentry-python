@@ -91,6 +91,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.flask.FlaskIntegration",
     "sentry_sdk.integrations.gql.GQLIntegration",
     "sentry_sdk.integrations.graphene.GrapheneIntegration",
+    "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration",
     "sentry_sdk.integrations.httpx.HttpxIntegration",
     "sentry_sdk.integrations.huey.HueyIntegration",
     "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration",
@@ -140,6 +141,7 @@ _MIN_VERSIONS = {
     "flask": (1, 1, 4),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
+    "google_genai": (1, 0, 0),  # google-genai
     "grpc": (1, 32, 0),  # grpcio
     "httpx": (0, 16, 0),
     "huggingface_hub": (0, 24, 7),

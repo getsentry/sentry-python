@@ -84,6 +84,7 @@ setup(
         "statsig": ["statsig>=0.55.3"],
         "tornado": ["tornado>=6"],
         "unleash": ["UnleashClient>=6.0.1"],
+        "google-genai": ["google-genai"],
     },
     entry_points={
         "opentelemetry_propagator": [
