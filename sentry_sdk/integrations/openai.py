@@ -85,6 +85,9 @@ def _capture_exception(exc, manual_span_cleanup=True):
     current_span = sentry_sdk.get_current_span()
     if current_span is not None:
         current_span.set_status(SPANSTATUS.ERROR)
+        if current_span.containing_transaction is not None:
+            current_span.containing_transaction.set_status(SPANSTATUS.ERROR)
+
     if manual_span_cleanup and current_span is not None:
         current_span.__exit__(None, None, None)
 
@@ -458,12 +461,18 @@ def _wrap_chat_completion_create(f):
     @wraps(f)
     def _sentry_patched_create_sync(*args, **kwargs):
         # type: (Any, Any) -> Any
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
-        if integration is None or "messages" not in kwargs:
-            # no "messages" means invalid call (in all versions of openai), let it return error
-            return f(*args, **kwargs)
+        try:
+            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+            if integration is None or "messages" not in kwargs:
+                # no "messages" means invalid call (in all versions of openai), let it return error
+                return f(*args, **kwargs)
 
-        return _execute_sync(f, *args, **kwargs)
+            return _execute_sync(f, *args, **kwargs)
+
+        finally:
+            span = sentry_sdk.get_current_span()
+            if span is not None and span.status == SPANSTATUS.ERROR:
+                span.__exit__(None, None, None)
 
     return _sentry_patched_create_sync
 
@@ -493,12 +502,18 @@ def _wrap_async_chat_completion_create(f):
     @wraps(f)
     async def _sentry_patched_create_async(*args, **kwargs):
         # type: (Any, Any) -> Any
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
-        if integration is None or "messages" not in kwargs:
-            # no "messages" means invalid call (in all versions of openai), let it return error
-            return await f(*args, **kwargs)
+        try:
+            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+            if integration is None or "messages" not in kwargs:
+                # no "messages" means invalid call (in all versions of openai), let it return error
+                return await f(*args, **kwargs)
 
-        return await _execute_async(f, *args, **kwargs)
+            return await _execute_async(f, *args, **kwargs)
+        finally:
+
+            span = sentry_sdk.get_current_span()
+            if span is not None and span.status == SPANSTATUS.ERROR:
+                span.__exit__(None, None, None)
 
     return _sentry_patched_create_async
 
@@ -551,11 +566,17 @@ def _wrap_embeddings_create(f):
     @wraps(f)
     def _sentry_patched_create_sync(*args, **kwargs):
         # type: (Any, Any) -> Any
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
-        if integration is None:
-            return f(*args, **kwargs)
+        try:
+            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+            if integration is None:
+                return f(*args, **kwargs)
 
-        return _execute_sync(f, *args, **kwargs)
+            return _execute_sync(f, *args, **kwargs)
+
+        finally:
+            span = sentry_sdk.get_current_span()
+            if span is not None and span.status == SPANSTATUS.ERROR:
+                span.__exit__(None, None, None)
 
     return _sentry_patched_create_sync
 
@@ -585,11 +606,17 @@ def _wrap_async_embeddings_create(f):
     @wraps(f)
     async def _sentry_patched_create_async(*args, **kwargs):
         # type: (Any, Any) -> Any
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
-        if integration is None:
-            return await f(*args, **kwargs)
+        try:
+            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+            if integration is None:
+                return await f(*args, **kwargs)
 
-        return await _execute_async(f, *args, **kwargs)
+            return await _execute_async(f, *args, **kwargs)
+
+        finally:
+            span = sentry_sdk.get_current_span()
+            if span is not None and span.status == SPANSTATUS.ERROR:
+                span.__exit__(None, None, None)
 
     return _sentry_patched_create_async
 
@@ -644,11 +671,17 @@ def _wrap_responses_create(f):
     @wraps(f)
     def _sentry_patched_create_sync(*args, **kwargs):
         # type: (Any, Any) -> Any
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
-        if integration is None:
-            return f(*args, **kwargs)
+        try:
+            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+            if integration is None:
+                return f(*args, **kwargs)
 
-        return _execute_sync(f, *args, **kwargs)
+            return _execute_sync(f, *args, **kwargs)
+
+        finally:
+            span = sentry_sdk.get_current_span()
+            if span is not None and span.status == SPANSTATUS.ERROR:
+                span.__exit__(None, None, None)
 
     return _sentry_patched_create_sync
 
@@ -678,10 +711,16 @@ def _wrap_async_responses_create(f):
     @wraps(f)
     async def _sentry_patched_responses_async(*args, **kwargs):
         # type: (Any, Any) -> Any
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
-        if integration is None:
-            return await f(*args, **kwargs)
+        try:
+            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+            if integration is None:
+                return await f(*args, **kwargs)
 
-        return await _execute_async(f, *args, **kwargs)
+            return await _execute_async(f, *args, **kwargs)
+
+        finally:
+            span = sentry_sdk.get_current_span()
+            if span is not None and span.status == SPANSTATUS.ERROR:
+                span.__exit__(None, None, None)
 
     return _sentry_patched_responses_async
