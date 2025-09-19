@@ -65,9 +65,6 @@ def _capture_exception(exc):
     )
     sentry_sdk.capture_event(event, hint=hint)
 
-    if span is not None:
-        span.__exit__(None, None, None)
-
 
 def _get_token_usage(result):
     # type: (Messages) -> tuple[int, int]
@@ -366,7 +363,12 @@ def _wrap_message_create(f):
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
         kwargs["integration"] = integration
 
-        return _execute_sync(f, *args, **kwargs)
+        try:
+            return _execute_sync(f, *args, **kwargs)
+        finally:
+            span = sentry_sdk.get_current_span()
+            if span is not None and span.status == SPANSTATUS.ERROR:
+                span.__exit__(None, None, None)
 
     return _sentry_patched_create_sync
 
@@ -399,6 +401,11 @@ def _wrap_message_create_async(f):
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
         kwargs["integration"] = integration
 
-        return await _execute_async(f, *args, **kwargs)
+        try:
+            return await _execute_async(f, *args, **kwargs)
+        finally:
+            span = sentry_sdk.get_current_span()
+            if span is not None and span.status == SPANSTATUS.ERROR:
+                span.__exit__(None, None, None)
 
     return _sentry_patched_create_async
