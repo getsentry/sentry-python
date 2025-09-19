@@ -134,6 +134,7 @@ def _wrap_huggingface_task(f, op):
             res = f(*args, **kwargs)
         except Exception as e:
             _capture_exception(e)
+            span.__exit__(None, None, None)
             raise e from None
 
         # Output attributes
