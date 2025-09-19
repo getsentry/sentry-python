@@ -291,6 +291,7 @@ TEST_SUITE_CONFIG = {
     },
     "requests": {
         "package": "requests",
+        "num_versions": 2,
     },
     "rq": {
         "package": "rq",
