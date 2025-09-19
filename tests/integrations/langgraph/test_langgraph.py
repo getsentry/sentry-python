@@ -398,14 +398,19 @@ def test_pregel_invoke_error(sentry_init, capture_events):
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
         wrapped_invoke(pregel, test_state)
 
-    tx = events[0]
+    error_event, tx = events
+    assert error_event["level"] == "error"
+    assert "Graph execution failed" in str(
+        error_event["exception"]["values"][0]["value"]
+    )
+
     invoke_spans = [
         span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
-    assert invoke_span.get("tags", {}).get("status") == "internal_error"
+    assert invoke_span.get("tags", {}).get("status") == "error"
 
 
 def test_pregel_ainvoke_error(sentry_init, capture_events):
@@ -432,14 +437,19 @@ def test_pregel_ainvoke_error(sentry_init, capture_events):
 
     asyncio.run(run_error_test())
 
-    tx = events[0]
+    error_event, tx = events
+    assert error_event["level"] == "error"
+    assert "Async graph execution failed" in str(
+        error_event["exception"]["values"][0]["value"]
+    )
+
     invoke_spans = [
         span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
-    assert invoke_span.get("tags", {}).get("status") == "internal_error"
+    assert invoke_span.get("tags", {}).get("status") == "error"
 
 
 def test_span_origin(sentry_init, capture_events):

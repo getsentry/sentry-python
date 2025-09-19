@@ -1,12 +1,18 @@
 from functools import wraps
-from typing import Any, Callable, List, Optional
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import safe_serialize
+from sentry_sdk.utils import (
+    event_from_exception,
+    safe_serialize,
+)
+
+if TYPE_CHECKING:
+    from typing import Any, Callable, List, Optional
 
 
 try:
@@ -39,6 +45,20 @@ class LanggraphIntegration(Integration):
             Pregel.invoke = _wrap_pregel_invoke(Pregel.invoke)
         if hasattr(Pregel, "ainvoke"):
             Pregel.ainvoke = _wrap_pregel_ainvoke(Pregel.ainvoke)
+
+
+def _capture_exception(exc):
+    # type: (Any) -> None
+    span = sentry_sdk.get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.ERROR)
+
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "langgraph", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _get_graph_name(graph_obj):
@@ -187,7 +207,11 @@ def _wrap_pregel_invoke(f):
                         unpack=False,
                     )
 
-            result = f(self, *args, **kwargs)
+            try:
+                result = f(self, *args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                raise exc from None
 
             _set_response_attributes(span, input_messages, result, integration)
 
@@ -237,7 +261,11 @@ def _wrap_pregel_ainvoke(f):
                         unpack=False,
                     )
 
-            result = await f(self, *args, **kwargs)
+            try:
+                result = await f(self, *args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                raise exc from None
 
             _set_response_attributes(span, input_messages, result, integration)
 
