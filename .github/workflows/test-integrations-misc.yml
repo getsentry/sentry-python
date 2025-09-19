@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-misc-pinned:
-    name: Misc (pinned)
+  test-misc:
+    name: Misc
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,30 +50,30 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test loguru pinned
+      - name: Test loguru
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru"
-      - name: Test opentelemetry pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru"
+      - name: Test opentelemetry
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry"
-      - name: Test potel pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry"
+      - name: Test potel
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-potel"
-      - name: Test pure_eval pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-potel"
+      - name: Test pure_eval
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pure_eval"
-      - name: Test trytond pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval"
+      - name: Test trytond
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond"
-      - name: Test typer pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond"
+      - name: Test typer
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-typer"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-typer"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -102,13 +102,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned Misc tests passed
-    needs: test-misc-pinned
+    name: All Misc tests passed
+    needs: test-misc
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-misc-pinned.result != 'success'
+        if: needs.test-misc.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-ai-pinned:
-    name: AI (pinned)
+  test-ai:
+    name: AI
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,42 +50,42 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test anthropic pinned
+      - name: Test anthropic
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-anthropic"
-      - name: Test cohere pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-anthropic"
+      - name: Test cohere
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cohere"
-      - name: Test langchain-base pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere"
+      - name: Test langchain-base
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain-base"
-      - name: Test langchain-notiktoken pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-base"
+      - name: Test langchain-notiktoken
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain-notiktoken"
-      - name: Test openai-base pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-notiktoken"
+      - name: Test openai-base
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai-base"
-      - name: Test openai-notiktoken pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-base"
+      - name: Test openai-notiktoken
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai-notiktoken"
-      - name: Test langgraph pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-notiktoken"
+      - name: Test langgraph
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langgraph"
-      - name: Test openai_agents pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-langgraph"
+      - name: Test openai_agents
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai_agents"
-      - name: Test huggingface_hub pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai_agents"
+      - name: Test huggingface_hub
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huggingface_hub"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -114,13 +114,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned AI tests passed
-    needs: test-ai-pinned
+    name: All AI tests passed
+    needs: test-ai
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-ai-pinned.result != 'success'
+        if: needs.test-ai.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
