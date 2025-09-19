@@ -363,12 +363,7 @@ def _wrap_message_create(f):
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
         kwargs["integration"] = integration
 
-        try:
-            return _execute_sync(f, *args, **kwargs)
-        finally:
-            span = sentry_sdk.get_current_span()
-            if span is not None and span.status == SPANSTATUS.ERROR:
-                span.__exit__(None, None, None)
+        return _execute_sync(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
 
@@ -401,11 +396,6 @@ def _wrap_message_create_async(f):
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
         kwargs["integration"] = integration
 
-        try:
-            return await _execute_async(f, *args, **kwargs)
-        finally:
-            span = sentry_sdk.get_current_span()
-            if span is not None and span.status == SPANSTATUS.ERROR:
-                span.__exit__(None, None, None)
+        return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_create_async
