@@ -416,7 +416,8 @@ class Span:
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None and should_be_treated_as_error(ty, value):
-            self.set_status(SPANSTATUS.INTERNAL_ERROR)
+            if self.status != SPANSTATUS.ERROR:
+                self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         with capture_internal_exceptions():
             scope, old_span = self._context_manager_state

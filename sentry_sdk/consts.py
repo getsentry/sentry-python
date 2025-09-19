@@ -765,11 +765,12 @@ class SPANSTATUS:
     CANCELLED = "cancelled"
     DATA_LOSS = "data_loss"
     DEADLINE_EXCEEDED = "deadline_exceeded"
+    ERROR = "error"  # OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
     FAILED_PRECONDITION = "failed_precondition"
     INTERNAL_ERROR = "internal_error"
     INVALID_ARGUMENT = "invalid_argument"
     NOT_FOUND = "not_found"
-    OK = "ok"
+    OK = "ok"  # HTTP 200 and OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
     OUT_OF_RANGE = "out_of_range"
     PERMISSION_DENIED = "permission_denied"
     RESOURCE_EXHAUSTED = "resource_exhausted"
@@ -777,6 +778,7 @@ class SPANSTATUS:
     UNAVAILABLE = "unavailable"
     UNIMPLEMENTED = "unimplemented"
     UNKNOWN_ERROR = "unknown_error"
+    UNSET = "unset"  # OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
 
 
 class OP:

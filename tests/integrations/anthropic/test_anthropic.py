@@ -698,8 +698,54 @@ def test_exception_message_create(sentry_init, capture_events):
             max_tokens=1024,
         )
 
-    (event,) = events
+    (event, transaction) = events
     assert event["level"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
+
+
+def test_span_status_error(sentry_init, capture_events):
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="anthropic"):
+        client = Anthropic(api_key="z")
+        client.messages._post = mock.Mock(
+            side_effect=AnthropicError("API rate limit reached")
+        )
+        with pytest.raises(AnthropicError):
+            client.messages.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "I'm throwing an exception"}],
+                max_tokens=1024,
+            )
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_span_status_error_async(sentry_init, capture_events):
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="anthropic"):
+        client = AsyncAnthropic(api_key="z")
+        client.messages._post = AsyncMock(
+            side_effect=AnthropicError("API rate limit reached")
+        )
+        with pytest.raises(AnthropicError):
+            await client.messages.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "I'm throwing an exception"}],
+                max_tokens=1024,
+            )
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
 
 
 @pytest.mark.asyncio
@@ -718,8 +764,9 @@ async def test_exception_message_create_async(sentry_init, capture_events):
             max_tokens=1024,
         )
 
-    (event,) = events
+    (event, transaction) = events
     assert event["level"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
 
 
 def test_span_origin(sentry_init, capture_events):

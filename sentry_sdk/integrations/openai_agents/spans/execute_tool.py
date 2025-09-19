@@ -42,7 +42,7 @@ def update_execute_tool_span(span, agent, tool, result):
     if isinstance(result, str) and result.startswith(
         "An error occurred while running the tool"
     ):
-        span.set_status(SPANSTATUS.INTERNAL_ERROR)
+        span.set_status(SPANSTATUS.ERROR)
 
     if should_send_default_pii():
         span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
