@@ -100,6 +100,9 @@ TEST_SUITE_CONFIG = {
     },
     "dramatiq": {
         "package": "dramatiq",
+        "deps": {
+            "py3.6": ["aiocontextvars"],
+        },
     },
     "falcon": {
         "package": "falcon",
