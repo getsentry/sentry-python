@@ -1,4 +1,4 @@
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.session import Session
 from sentry_sdk import capture_event
 import sentry_sdk.client
@@ -239,3 +239,24 @@ def test_envelope_without_headers():
 
     assert len(items) == 1
     assert items[0].payload.get_bytes() == b'{"started": "2020-02-07T14:16:00Z"}'
+
+
+def test_envelope_item_data_category_mapping():
+    """Test that envelope items map to correct data categories for rate limiting."""
+    test_cases = [
+        ("event", "error"),
+        ("transaction", "transaction"),
+        ("log", "log_item"),
+        ("session", "session"),
+        ("attachment", "attachment"),
+        ("client_report", "internal"),
+        ("profile", "profile"),
+        ("profile_chunk", "profile_chunk"),
+        ("statsd", "metric_bucket"),
+        ("check_in", "monitor"),
+        ("unknown_type", "default"),
+    ]
+
+    for item_type, expected_category in test_cases:
+        item = Item(payload=PayloadRef(json={"test": "data"}), type=item_type)
+        assert item.data_category == expected_category

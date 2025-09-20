@@ -63,19 +63,10 @@ IGNORE = {
     "aws_lambda",
     "cloud_resource_context",
     "common",
+    "gcp",
     "gevent",
     "opentelemetry",
     "potel",
-    # Integrations that can be migrated -- we should eventually remove all
-    # of these from the IGNORE list
-    "gcp",
-    "httpx",
-    "pure_eval",
-    "ray",
-    "redis",
-    "requests",
-    "rq",
-    "sanic",
 }
 
 
@@ -243,9 +234,9 @@ def get_supported_releases(
             sys.exit(1)
 
         py_versions = determine_python_versions(pypi_data)
-        target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-        if target_python_versions:
-            target_python_versions = SpecifierSet(target_python_versions)
+        target_python_versions = _transform_target_python_versions(
+            TEST_SUITE_CONFIG[integration].get("python")
+        )
         return bool(supported_python_versions(py_versions, target_python_versions))
 
     if not _supports_lowest(releases[0]):
@@ -259,47 +250,48 @@ def get_supported_releases(
 
 
 def pick_releases_to_test(
-    releases: list[Version], last_prerelease: Optional[Version]
+    integration: str, releases: list[Version], last_prerelease: Optional[Version]
 ) -> list[Version]:
     """Pick a handful of releases to test from a sorted list of supported releases."""
     # If the package has majors (or major-like releases, even if they don't do
-    # semver), we want to make sure we're testing them all. If not, we just pick
-    # the oldest, the newest, and a couple in between.
+    # semver), we want to make sure we're testing them all (unless there's too
+    # many). If not, we just pick the oldest, the newest, and a couple
+    # in between.
     #
     # If there is a relevant prerelease, also test that in addition to the above.
-    has_majors = len(set([v.major for v in releases])) > 1
+    num_versions = TEST_SUITE_CONFIG[integration].get("num_versions")
+    if num_versions is not None and (
+        not isinstance(num_versions, int) or num_versions < 2
+    ):
+        print("  Integration has invalid `num_versions`: must be an int >= 2")
+        num_versions = None
+
+    has_majors = len({v.major for v in releases}) > 1
     filtered_releases = set()
 
     if has_majors:
         # Always check the very first supported release
         filtered_releases.add(releases[0])
 
-        # Find out the min and max release by each major
+        # Find out the max release by each major
         releases_by_major = {}
         for release in releases:
-            if release.major not in releases_by_major:
-                releases_by_major[release.major] = [release, release]
-            if release < releases_by_major[release.major][0]:
-                releases_by_major[release.major][0] = release
-            if release > releases_by_major[release.major][1]:
-                releases_by_major[release.major][1] = release
+            if (
+                release.major not in releases_by_major
+                or release > releases_by_major[release.major]
+            ):
+                releases_by_major[release.major] = release
 
-        for i, (min_version, max_version) in enumerate(releases_by_major.values()):
+        # Add the highest release in each major
+        for max_version in releases_by_major.values():
             filtered_releases.add(max_version)
-            if i == len(releases_by_major) - 1:
-                # If this is the latest major release, also check the lowest
-                # version of this version
-                filtered_releases.add(min_version)
+
+        # If num_versions was provided, slim down the selection
+        if num_versions is not None:
+            filtered_releases = _pick_releases(sorted(filtered_releases), num_versions)
 
     else:
-        filtered_releases = {
-            releases[0],  # oldest version supported
-            releases[len(releases) // 3],
-            releases[
-                len(releases) // 3 * 2
-            ],  # two releases in between, roughly evenly spaced
-            releases[-1],  # latest
-        }
+        filtered_releases = _pick_releases(releases, num_versions)
 
     filtered_releases = sorted(filtered_releases)
     if last_prerelease is not None:
@@ -308,9 +300,31 @@ def pick_releases_to_test(
     return filtered_releases
 
 
+def _pick_releases(
+    releases: list[Version], num_versions: Optional[int]
+) -> set[Version]:
+    num_versions = num_versions or 4
+
+    versions = {
+        releases[0],  # oldest version supported
+        releases[-1],  # latest
+    }
+
+    for i in range(1, num_versions - 1):
+        try:
+            versions.add(releases[len(releases) // (num_versions - 1) * i])
+        except IndexError:
+            pass
+
+    return versions
+
+
 def supported_python_versions(
     package_python_versions: Union[SpecifierSet, list[Version]],
-    custom_supported_versions: Optional[SpecifierSet] = None,
+    custom_supported_versions: Optional[
+        Union[SpecifierSet, dict[SpecifierSet, SpecifierSet]]
+    ] = None,
+    version: Optional[Version] = None,
 ) -> list[Version]:
     """
     Get the intersection of Python versions supported by the package and the SDK.
@@ -337,8 +351,24 @@ def supported_python_versions(
     curr = MIN_PYTHON_VERSION
     while curr <= MAX_PYTHON_VERSION:
         if curr in package_python_versions:
-            if not custom_supported_versions or curr in custom_supported_versions:
+            if not custom_supported_versions:
                 supported.append(curr)
+
+            else:
+                if isinstance(custom_supported_versions, SpecifierSet):
+                    if curr in custom_supported_versions:
+                        supported.append(curr)
+
+                elif version is not None and isinstance(
+                    custom_supported_versions, dict
+                ):
+                    for v, py in custom_supported_versions.items():
+                        if version in v:
+                            if curr in py:
+                                supported.append(curr)
+                            break
+                    else:
+                        supported.append(curr)
 
         # Construct the next Python version (i.e., bump the minor)
         next = [int(v) for v in str(curr).split(".")]
@@ -439,7 +469,7 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
             for dep in deps:
                 rendered.append(f"{{{constraint}}}-{integration}: {dep}")
         else:
-            restriction = SpecifierSet(constraint)
+            restriction = SpecifierSet(constraint, prereleases=True)
             for release in releases:
                 if release in restriction:
                     for dep in deps:
@@ -518,18 +548,36 @@ def _add_python_versions_to_release(
 
     time.sleep(PYPI_COOLDOWN)  # give PYPI some breathing room
 
-    target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-    if target_python_versions:
-        target_python_versions = SpecifierSet(target_python_versions)
+    target_python_versions = _transform_target_python_versions(
+        TEST_SUITE_CONFIG[integration].get("python")
+    )
 
     release.python_versions = pick_python_versions_to_test(
         supported_python_versions(
             determine_python_versions(release_pypi_data),
             target_python_versions,
+            release,
         )
     )
 
     release.rendered_python_versions = _render_python_versions(release.python_versions)
+
+
+def _transform_target_python_versions(
+    python_versions: Union[str, dict[str, str], None]
+) -> Union[SpecifierSet, dict[SpecifierSet, SpecifierSet], None]:
+    """Wrap the contents of the `python` key in SpecifierSets."""
+    if not python_versions:
+        return None
+
+    if isinstance(python_versions, str):
+        return SpecifierSet(python_versions)
+
+    if isinstance(python_versions, dict):
+        updated = {}
+        for key, value in python_versions.items():
+            updated[SpecifierSet(key)] = SpecifierSet(value)
+        return updated
 
 
 def get_file_hash() -> str:
@@ -632,7 +680,9 @@ def main(fail_on_changes: bool = False) -> None:
             # Pick a handful of the supported releases to actually test against
             # and fetch the PyPI data for each to determine which Python versions
             # to test it on
-            test_releases = pick_releases_to_test(releases, latest_prerelease)
+            test_releases = pick_releases_to_test(
+                integration, releases, latest_prerelease
+            )
 
             for release in test_releases:
                 _add_python_versions_to_release(integration, package, release)
