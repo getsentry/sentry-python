@@ -518,7 +518,7 @@ def test_stream_available_in_handler(sentry_init):
         # Avoid cache by constructing new request
         wrapped_request = Request(request.scope, request.receive)
 
-        assert await wrapped_request.json() == BODY_JSON
+        assert await asyncio.wait_for(wrapped_request.json(), timeout=1.0) == BODY_JSON
 
         return starlette.responses.JSONResponse({"status": "ok"})
 

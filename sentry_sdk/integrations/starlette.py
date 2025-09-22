@@ -668,7 +668,7 @@ class StarletteRequestExtractor:
                 and "sentry_sdk.is_body_cached" in self.request.scope["state"]
                 and self.request.scope["state"]["sentry_sdk.is_body_cached"]
             )
-            if await self.request.is_disconnected() and not is_body_cached:
+            if not is_body_cached:
                 request_info["data"] = (
                     AnnotatedValue.removed_because_body_consumed_and_not_cached()
                 )
