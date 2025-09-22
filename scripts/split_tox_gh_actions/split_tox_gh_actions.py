@@ -29,11 +29,9 @@ from jinja2 import Environment, FileSystemLoader
 TOXENV_REGEX = re.compile(
     r"""
     {?(?P<py_versions>(py\d+\.\d+,?)+)}?
-    -(?P<framework>[a-z](?:[a-z_]|-(?!v{?\d|latest))*[a-z0-9])
+    -(?P<framework>[a-z](?:[a-z_]|-(?!v{?\d))*[a-z0-9])
     (?:-(
         (v{?(?P<framework_versions>[0-9.]+[0-9a-z,.]*}?))
-        |
-        (?P<framework_versions_latest>latest)
     ))?
 """,
     re.VERBOSE,
@@ -167,13 +165,11 @@ def main(fail_on_changes):
         old_hash = get_files_hash()
 
     print("Parsing tox.ini...")
-    py_versions_pinned, py_versions_latest = parse_tox()
+    py_versions = parse_tox()
 
     if fail_on_changes:
         print("Checking if all frameworks belong in a group...")
-        missing_frameworks = find_frameworks_missing_from_groups(
-            py_versions_pinned, py_versions_latest
-        )
+        missing_frameworks = find_frameworks_missing_from_groups(py_versions)
         if missing_frameworks:
             raise RuntimeError(
                 "Please add the following frameworks to the corresponding group "
@@ -183,9 +179,7 @@ def main(fail_on_changes):
 
     print("Rendering templates...")
     for group, frameworks in GROUPS.items():
-        contents = render_template(
-            group, frameworks, py_versions_pinned, py_versions_latest
-        )
+        contents = render_template(group, frameworks, py_versions)
         filename = write_file(contents, group)
         print(f"Created {filename}")
 
@@ -213,8 +207,7 @@ def parse_tox():
         if line.strip() and not line.strip().startswith("#")
     ]
 
-    py_versions_pinned = defaultdict(set)
-    py_versions_latest = defaultdict(set)
+    py_versions = defaultdict(set)
 
     parsed_correctly = True
 
@@ -232,14 +225,10 @@ def parse_tox():
             groups = parsed.groupdict()
             raw_python_versions = groups["py_versions"]
             framework = groups["framework"]
-            framework_versions_latest = groups.get("framework_versions_latest") or False
 
             # collect python versions to test the framework in
             raw_python_versions = set(raw_python_versions.split(","))
-            if framework_versions_latest:
-                py_versions_latest[framework] |= raw_python_versions
-            else:
-                py_versions_pinned[framework] |= raw_python_versions
+            py_versions[framework] |= raw_python_versions
 
         except Exception:
             print(f"ERROR reading line {line}")
@@ -248,15 +237,14 @@ def parse_tox():
     if not parsed_correctly:
         raise RuntimeError("Failed to parse tox.ini")
 
-    py_versions_pinned = _normalize_py_versions(py_versions_pinned)
-    py_versions_latest = _normalize_py_versions(py_versions_latest)
+    py_versions = _normalize_py_versions(py_versions)
 
-    return py_versions_pinned, py_versions_latest
+    return py_versions
 
 
-def find_frameworks_missing_from_groups(py_versions_pinned, py_versions_latest):
+def find_frameworks_missing_from_groups(py_versions):
     frameworks_in_a_group = _union(GROUPS.values())
-    all_frameworks = set(py_versions_pinned.keys()) | set(py_versions_latest.keys())
+    all_frameworks = set(py_versions)
     return all_frameworks - frameworks_in_a_group
 
 
@@ -296,33 +284,26 @@ def _union(seq):
     return reduce(lambda x, y: set(x) | set(y), seq)
 
 
-def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
+def render_template(group, frameworks, py_versions):
     template = ENV.get_template("base.jinja")
 
-    categories = set()
-    py_versions = defaultdict(set)
+    py_versions_final = set()
     for framework in frameworks:
-        if py_versions_pinned[framework]:
-            categories.add("pinned")
-            py_versions["pinned"] |= set(py_versions_pinned[framework])
-        if py_versions_latest[framework]:
-            categories.add("latest")
-            py_versions["latest"] |= set(py_versions_latest[framework])
+        py_versions_final |= set(py_versions[framework])
 
     context = {
         "group": group,
         "frameworks": frameworks,
-        "categories": sorted(categories),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_docker": bool(set(frameworks) & FRAMEWORKS_NEEDING_DOCKER),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
         "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
         "needs_java": bool(set(frameworks) & FRAMEWORKS_NEEDING_JAVA),
-        "py_versions": {
-            category: [f'"{version}"' for version in _normalize_py_versions(versions)]
-            for category, versions in py_versions.items()
-        },
+        "py_versions": [
+            f'"{version}"' for version in _normalize_py_versions(py_versions_final)
+        ],
     }
+
     rendered = template.render(context)
     rendered = postprocess_template(rendered)
     return rendered
