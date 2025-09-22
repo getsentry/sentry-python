@@ -4,6 +4,7 @@ This script populates tox.ini automatically using release data from PyPI.
 
 import functools
 import hashlib
+import json
 import os
 import sys
 import time
@@ -46,6 +47,7 @@ PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
+CACHE = defaultdict(dict)
 
 IGNORE = {
     # Do not try auto-generating the tox entries for these. They will be
@@ -94,9 +96,26 @@ def fetch_package(package: str) -> Optional[dict]:
 
 @functools.cache
 def fetch_release(package: str, version: Version) -> Optional[dict]:
-    """Fetch release metadata from PyPI."""
+    """Fetch release metadata from cache or, failing that, PyPI."""
+    release = _fetch_from_cache(package, version)
+    if release is not None:
+        return release
+
     url = PYPI_VERSION_URL.format(project=package, version=version)
-    return fetch_url(url)
+    release = fetch_url(url)
+    print(json.dumps(release))
+    _save_to_cache(package, version, release)
+    return release
+
+
+def _fetch_from_cache(package: str, version: Version) -> Optional[dict]:
+    if package in CACHE and str(version) in CACHE[package]:
+        return CACHE[package][str(version)]
+    return None
+
+
+def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> None:
+    pass
 
 
 def _prefilter_releases(
@@ -635,6 +654,17 @@ def main(fail_on_changes: bool = False) -> None:
     print(
         f"The SDK supports Python versions {MIN_PYTHON_VERSION} - {MAX_PYTHON_VERSION}."
     )
+
+    # Prepare file cache
+    global CACHE
+
+    # with open("releases.jsonl") as releases_cache:
+    #    for line in releases_cache:
+    #        release = json.loads(line)
+    #        break
+    #        #CACHE[release["info"]["name"]][release["info"]["version"]] = release
+
+    # Process packages
 
     packages = defaultdict(list)
 
