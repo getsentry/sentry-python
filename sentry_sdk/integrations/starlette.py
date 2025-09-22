@@ -678,7 +678,6 @@ class StarletteRequestExtractor:
             json = await self.json()
             if json:
                 request_info["data"] = json
-                print("in fastapi json", request_info)
                 return request_info
 
             # Add form as key/value pairs, if request has form data
