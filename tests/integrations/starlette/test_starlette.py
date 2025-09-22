@@ -26,6 +26,7 @@ from starlette.authentication import (
     AuthenticationError,
     SimpleUser,
 )
+from starlette.requests import Request
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -435,6 +436,7 @@ async def test_starletterequestextractor_extract_request_info(sentry_init):
     side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
     starlette_request._receive = mock.Mock(side_effect=side_effect)
 
+    starlette_request.scope["state"] = {"sentry_sdk.is_body_cached": True}
     extractor = StarletteRequestExtractor(starlette_request)
 
     request_info = await extractor.extract_request_info()
@@ -445,6 +447,37 @@ async def test_starletterequestextractor_extract_request_info(sentry_init):
         "yummy_cookie": "choco",
     }
     assert request_info["data"] == BODY_JSON
+
+
+@pytest.mark.asyncio
+async def test_starletterequestextractor_extract_request_info_not_cached(sentry_init):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    request_info = await extractor.extract_request_info()
+
+    assert request_info
+    assert request_info["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert request_info["data"].metadata == {"rem": [["!consumed", "x"]]}
 
 
 @pytest.mark.asyncio
@@ -466,6 +499,7 @@ async def test_starletterequestextractor_extract_request_info_no_pii(sentry_init
     side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
     starlette_request._receive = mock.Mock(side_effect=side_effect)
 
+    starlette_request.scope["state"] = {"sentry_sdk.is_body_cached": True}
     extractor = StarletteRequestExtractor(starlette_request)
 
     request_info = await extractor.extract_request_info()
@@ -473,6 +507,32 @@ async def test_starletterequestextractor_extract_request_info_no_pii(sentry_init
     assert request_info
     assert "cookies" not in request_info
     assert request_info["data"] == BODY_JSON
+
+
+def test_stream_available_in_handler(sentry_init):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+    )
+
+    async def _consume_stream_body(request):
+        # Avoid cache by constructing new request
+        wrapped_request = Request(request.scope, request.receive)
+
+        assert await wrapped_request.json() == BODY_JSON
+
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/consume", _consume_stream_body, methods=["POST"]),
+        ],
+    )
+
+    client = TestClient(app)
+    client.post(
+        "/consume",
+        json=BODY_JSON,
+    )
 
 
 @pytest.mark.parametrize(
@@ -942,7 +1002,11 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):
-    sentry_init(integrations=[StarletteIntegration()])
+    sentry_init(
+        default_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+    )
 
     events = capture_events()
 
