@@ -678,7 +678,7 @@ def main(fail_on_changes: bool = False) -> None:
         f"The SDK supports Python versions {MIN_PYTHON_VERSION} - {MAX_PYTHON_VERSION}."
     )
 
-    # Prepare file cache
+    # Load file cache
     global CACHE
 
     with open(RELEASES_CACHE_FILE) as releases_cache:
@@ -689,7 +689,6 @@ def main(fail_on_changes: bool = False) -> None:
             ] = release
 
     # Process packages
-
     packages = defaultdict(list)
 
     for group, integrations in GROUPS.items():
@@ -754,6 +753,14 @@ def main(fail_on_changes: bool = False) -> None:
     write_tox_file(
         packages, update_timestamp=not fail_on_changes, last_updated=last_updated
     )
+
+    releases = []
+    with open(RELEASES_CACHE_FILE) as releases_cache:
+        releases = [json.loads(line) for line in releases_cache]
+    releases.sort(key=lambda r: (r["info"]["name"], r["info"]["version"]))
+    with open(RELEASES_CACHE_FILE, "w") as releases_cache:
+        for release in releases:
+            releases_cache.write(json.dumps(release) + "\n")
 
     if fail_on_changes:
         new_file_hash = get_file_hash()
