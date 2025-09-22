@@ -452,9 +452,9 @@ def _patch_request(request):
         restore_original_methods()
         return await _original_form()
 
-    request.body = sentry_body  # type: ignore
-    request.json = sentry_json  # type: ignore
-    request.form = sentry_form  # type: ignore
+    request.body = sentry_body
+    request.json = sentry_json
+    request.form = sentry_form
 
 
 def patch_request_response():
