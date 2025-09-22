@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-    from typing import Any, Dict, Union
+    from typing import Any, Dict, Union, Callable
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult
     from graphql.type import GraphQLSchema
@@ -48,7 +48,7 @@ def _patch_graphql():
     def _sentry_patched_graphql_sync(schema, source, *args, **kwargs):
         # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
         scope = sentry_sdk.get_isolation_scope()
-        scope.add_event_processor(_event_processor)
+        scope.add_event_processor(_make_event_processor(source))
 
         with graphql_span(schema, source, kwargs):
             result = old_graphql_sync(schema, source, *args, **kwargs)
@@ -75,7 +75,7 @@ def _patch_graphql():
             return await old_graphql_async(schema, source, *args, **kwargs)
 
         scope = sentry_sdk.get_isolation_scope()
-        scope.add_event_processor(_event_processor)
+        scope.add_event_processor(_make_event_processor(source))
 
         with graphql_span(schema, source, kwargs):
             result = await old_graphql_async(schema, source, *args, **kwargs)
@@ -99,16 +99,21 @@ def _patch_graphql():
     graphene_schema.graphql = _sentry_patched_graphql_async
 
 
-def _event_processor(event, hint):
-    # type: (Event, Dict[str, Any]) -> Event
-    if should_send_default_pii():
-        request_info = event.setdefault("request", {})
-        request_info["api_target"] = "graphql"
+def _make_event_processor(source):
+    # type: (Any) -> Callable[[Event, dict[str, Any]], Event]
+    def _event_processor(event, hint):
+        # type: (Event, Dict[str, Any]) -> Event
+        if should_send_default_pii():
+            request_info = event.setdefault("request", {})
+            request_info["api_target"] = "graphql"
+            request_info["data"] = {"query": source}
 
-    elif event.get("request", {}).get("data"):
-        del event["request"]["data"]
+        elif event.get("request", {}).get("data"):
+            del event["request"]["data"]
 
-    return event
+        return event
+
+    return _event_processor
 
 
 @contextmanager

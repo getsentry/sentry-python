@@ -423,33 +423,38 @@ def _is_async_callable(obj):
 
 
 def _patch_request(request):
+    # type: (Request) -> None
     _original_body = request.body
     _original_json = request.json
     _original_form = request.form
 
     def restore_original_methods():
+        # type: () -> None
         request.body = _original_body
         request.json = _original_json
         request.form = _original_form
 
     async def sentry_body():
+        # type: () -> bytes
         request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
         restore_original_methods()
         return await _original_body()
 
     async def sentry_json():
+        # type: () -> Any
         request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
         restore_original_methods()
         return await _original_json()
 
     async def sentry_form():
+        # type: () -> Any
         request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
         restore_original_methods()
         return await _original_form()
 
-    request.body = sentry_body
-    request.json = sentry_json
-    request.form = sentry_form
+    request.body = sentry_body  # type: ignore
+    request.json = sentry_json  # type: ignore
+    request.form = sentry_form  # type: ignore
 
 
 def patch_request_response():
@@ -673,6 +678,7 @@ class StarletteRequestExtractor:
             json = await self.json()
             if json:
                 request_info["data"] = json
+                print("in fastapi json", request_info)
                 return request_info
 
             # Add form as key/value pairs, if request has form data
