@@ -35,6 +35,7 @@ CUTOFF = None
 # CUTOFF = datetime.now(tz=timezone.utc) - timedelta(days=365 * 5)
 
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
+RELEASES_CACHE_FILE = Path(__file__).resolve().parent / "releases.jsonl"
 ENV = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent),
     trim_blocks=True,
@@ -103,19 +104,23 @@ def fetch_release(package: str, version: Version) -> Optional[dict]:
 
     url = PYPI_VERSION_URL.format(project=package, version=version)
     release = fetch_url(url)
-    print(json.dumps(release))
     _save_to_cache(package, version, release)
     return release
 
 
 def _fetch_from_cache(package: str, version: Version) -> Optional[dict]:
+    package = _normalize_name(package)
     if package in CACHE and str(version) in CACHE[package]:
         return CACHE[package][str(version)]
+
     return None
 
 
 def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> None:
-    pass
+    with open(RELEASES_CACHE_FILE, "a") as releases_cache:
+        releases_cache.write(json.dumps(_normalize_release(release)) + "\n")
+
+    CACHE[_normalize_name(package)][str(version)] = release
 
 
 def _prefilter_releases(
@@ -619,6 +624,24 @@ def get_last_updated() -> Optional[datetime]:
     return timestamp
 
 
+def _normalize_name(package: str) -> str:
+    return package.lower().replace("-", "_")
+
+
+def _normalize_release(release: dict) -> dict:
+    """Filter out unneeded parts of the release JSON."""
+    normalized = {
+        "info": {
+            "classifiers": release["info"]["classifiers"],
+            "name": release["info"]["name"],
+            "requires_python": release["info"]["requires_python"],
+            "version": release["info"]["version"],
+            "yanked": release["info"]["yanked"],
+        },
+    }
+    return normalized
+
+
 def main(fail_on_changes: bool = False) -> None:
     """
     Generate tox.ini from the tox.jinja template.
@@ -658,11 +681,12 @@ def main(fail_on_changes: bool = False) -> None:
     # Prepare file cache
     global CACHE
 
-    # with open("releases.jsonl") as releases_cache:
-    #    for line in releases_cache:
-    #        release = json.loads(line)
-    #        break
-    #        #CACHE[release["info"]["name"]][release["info"]["version"]] = release
+    with open(RELEASES_CACHE_FILE) as releases_cache:
+        for line in releases_cache:
+            release = json.loads(line)
+            CACHE[_normalize_name(release["info"]["name"])][
+                release["info"]["version"]
+            ] = release
 
     # Process packages
 
