@@ -49,16 +49,8 @@ CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
 IGNORE = {
     # Do not try auto-generating the tox entries for these. They will be
-    # hardcoded in tox.ini.
-    #
-    # This set should be getting smaller over time as we migrate more test
-    # suites over to this script. Some entries will probably stay forever
-    # as they don't fit the mold (e.g. common, asgi, which don't have a 3rd party
-    # pypi package to install in different versions).
-    #
-    # Test suites that will have to remain hardcoded since they don't fit the
-    # toxgen usecase (there is no one package that should be tested in different
-    # versions)
+    # hardcoded in tox.ini since they don't fit the toxgen usecase (there is no
+    # one package that should be tested in different versions).
     "asgi",
     "aws_lambda",
     "cloud_resource_context",
