@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def guardrail_span(guardrail, guardrail_type, args, kwargs):
-    # type: (agents.Guardrail, tuple[Any, ...], dict[str, Any]) -> sentry_sdk.tracing.Span
+    # type: (agents.Guardrail, str, tuple[Any, ...], dict[str, Any]) -> sentry_sdk.tracing.Span
     op = (
         OP.GEN_AI_GUARDRAIL_OUTPUT
         if guardrail_type == "output"
@@ -42,7 +42,7 @@ def guardrail_span(guardrail, guardrail_type, args, kwargs):
 
 
 def update_guardrail_span(span, agent, guardrail, guardrail_type, result):
-    # type: (sentry_sdk.tracing.Span, agents.Agent, agents.Guardrail, Any) -> None
+    # type: (sentry_sdk.tracing.Span, agents.Agent, agents.Guardrail, str, Any) -> None
     if agent.name is not None:
         span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
