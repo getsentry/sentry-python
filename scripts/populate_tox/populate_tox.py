@@ -754,6 +754,7 @@ def main(fail_on_changes: bool = False) -> None:
         packages, update_timestamp=not fail_on_changes, last_updated=last_updated
     )
 
+    # Sort the release cache file
     releases = []
     with open(RELEASES_CACHE_FILE) as releases_cache:
         releases = [json.loads(line) for line in releases_cache]
