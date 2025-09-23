@@ -104,7 +104,8 @@ def fetch_release(package: str, version: Version) -> Optional[dict]:
 
     url = PYPI_VERSION_URL.format(project=package, version=version)
     release = fetch_url(url)
-    _save_to_cache(package, version, release)
+    if release is not None:
+        _save_to_cache(package, version, release)
     return release
 
 
