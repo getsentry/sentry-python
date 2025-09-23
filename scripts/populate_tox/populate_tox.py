@@ -42,7 +42,7 @@ ENV = Environment(
     lstrip_blocks=True,
 )
 
-PYPI_COOLDOWN = 0.1  # seconds to wait between requests to PyPI
+PYPI_COOLDOWN = 0.05  # seconds to wait between requests to PyPI
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
@@ -111,6 +111,7 @@ def fetch_release(package: str, version: Version) -> Optional[dict]:
 def _fetch_from_cache(package: str, version: Version) -> Optional[dict]:
     package = _normalize_name(package)
     if package in CACHE and str(version) in CACHE[package]:
+        CACHE[package][str(version)]["_accessed"] = True
         return CACHE[package][str(version)]
 
     return None
@@ -684,9 +685,12 @@ def main(fail_on_changes: bool = False) -> None:
     with open(RELEASES_CACHE_FILE) as releases_cache:
         for line in releases_cache:
             release = json.loads(line)
-            CACHE[_normalize_name(release["info"]["name"])][
-                release["info"]["version"]
-            ] = release
+            name = _normalize_name(release["info"]["name"])
+            version = release["info"]["version"]
+            CACHE[name][version] = release
+            CACHE[name][version][
+                "_accessed"
+            ] = False  # for cleaning up unused cache entries
 
     # Process packages
     packages = defaultdict(list)
@@ -761,7 +765,13 @@ def main(fail_on_changes: bool = False) -> None:
     releases.sort(key=lambda r: (r["info"]["name"], r["info"]["version"]))
     with open(RELEASES_CACHE_FILE, "w") as releases_cache:
         for release in releases:
-            releases_cache.write(json.dumps(release) + "\n")
+            if (
+                CACHE[_normalize_name(release["info"]["name"])][
+                    release["info"]["version"]
+                ]["_accessed"]
+                is True
+            ):
+                releases_cache.write(json.dumps(release) + "\n")
 
     if fail_on_changes:
         new_file_hash = get_file_hash()
