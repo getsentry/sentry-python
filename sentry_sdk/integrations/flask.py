@@ -17,7 +17,7 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Union
+    from typing import Any, Callable, Dict, Union, List, Optional
 
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.integrations.wsgi import _ScopedResponse
@@ -59,6 +59,7 @@ class FlaskIntegration(Integration):
         self,
         transaction_style="endpoint",  # type: str
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
+        trace_ignore_status_codes=None,  # type: Optional[List[int]]
     ):
         # type: (...) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
@@ -68,6 +69,7 @@ class FlaskIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
+        self.trace_ignore_status_codes = trace_ignore_status_codes or []
 
     @staticmethod
     def setup_once():
@@ -95,10 +97,9 @@ class FlaskIntegration(Integration):
 
         def sentry_patched_wsgi_app(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
-            if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
-                return old_app(self, environ, start_response)
-
             integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+            if integration is None:
+                return old_app(self, environ, start_response)
 
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),
@@ -108,6 +109,7 @@ class FlaskIntegration(Integration):
                     if integration
                     else DEFAULT_HTTP_METHODS_TO_CAPTURE
                 ),
+                trace_ignore_status_codes=integration.trace_ignore_status_codes,
             )
             return middleware(environ, start_response)
 

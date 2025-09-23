@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import TypeVar
     from typing import Protocol
+    from typing import List
 
     from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import Event, EventProcessor
@@ -75,6 +76,7 @@ class SentryWsgiMiddleware:
         "use_x_forwarded_for",
         "span_origin",
         "http_methods_to_capture",
+        "trace_ignore_status_codes",
     )
 
     def __init__(
@@ -83,12 +85,14 @@ class SentryWsgiMiddleware:
         use_x_forwarded_for=False,  # type: bool
         span_origin="manual",  # type: str
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: Tuple[str, ...]
+        trace_ignore_status_codes=None,  # type: Optional[List[int]]
     ):
         # type: (...) -> None
         self.app = app
         self.use_x_forwarded_for = use_x_forwarded_for
         self.span_origin = span_origin
         self.http_methods_to_capture = http_methods_to_capture
+        self.trace_ignore_status_codes = trace_ignore_status_codes or []
 
     def __call__(self, environ, start_response):
         # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
@@ -131,7 +135,10 @@ class SentryWsgiMiddleware:
                             response = self.app(
                                 environ,
                                 partial(
-                                    _sentry_start_response, start_response, transaction
+                                    _sentry_start_response,
+                                    start_response,
+                                    transaction,
+                                    self.trace_ignore_status_codes,
                                 ),
                             )
                         except BaseException:
@@ -145,6 +152,7 @@ class SentryWsgiMiddleware:
 def _sentry_start_response(  # type: ignore
     old_start_response,  # type: StartResponse
     transaction,  # type: Optional[Transaction]
+    trace_ignore_status_codes,  # type: List[int]
     status,  # type: str
     response_headers,  # type: WsgiResponseHeaders
     exc_info=None,  # type: Optional[WsgiExcInfo]
@@ -152,6 +160,8 @@ def _sentry_start_response(  # type: ignore
     # type: (...) -> WsgiResponseIter
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
+        if transaction is not None and status_int in trace_ignore_status_codes:
+            transaction.sampled = False
         if transaction is not None:
             transaction.set_http_status(status_int)
 

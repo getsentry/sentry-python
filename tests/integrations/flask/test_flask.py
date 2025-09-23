@@ -809,6 +809,58 @@ def test_tracing_error(sentry_init, capture_events, app):
     assert exception["type"] == "ZeroDivisionError"
 
 
+def test_tracing_not_found(sentry_init, capture_events, app):
+    sentry_init(traces_sample_rate=1.0, integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.before_request
+    def _():
+        set_tag("before_request", "yes")
+
+    @app.route("/message_tx")
+    def hi_tx():
+        set_tag("view", "yes")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    with app.test_client() as client:
+        response = client.get("/wrong_route")
+        assert response.status_code == 404
+
+    (transaction_event,) = events
+
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "generic WSGI request"
+    assert transaction_event["contexts"]["trace"]["status"] == "not_found"
+    assert transaction_event["tags"]["before_request"] == "yes"
+
+
+def test_tracing_ignore_not_found(sentry_init, capture_events, app):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[flask_sentry.FlaskIntegration(trace_ignore_status_codes=[404])],
+    )
+
+    @app.before_request
+    def _():
+        set_tag("before_request", "yes")
+
+    @app.route("/message_tx")
+    def hi_tx():
+        set_tag("view", "yes")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    with app.test_client() as client:
+        response = client.get("/wrong_route")
+        assert response.status_code == 404
+
+    assert not events
+
+
 def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
