@@ -453,6 +453,26 @@ def iter_stacks(tb):
         tb_ = tb_.tb_next
 
 
+def normalize_context_line(raw_context_line: str) -> str:
+    """
+    Normalize context lines to replace dynamic values with placeholders for better issue grouping.
+    """
+    if not raw_context_line:
+        return raw_context_line
+
+    # Pattern to match multiprocessing.spawn import and spawn_main calls with dynamic parameters
+    # Examples:
+    # from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=12, pipe_handle=28)
+    # from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=34, pipe_handle=56)
+    multiprocessing_pattern = re.compile(
+        r"(from multiprocessing\.spawn import spawn_main; spawn_main\(tracker_fd=)\d+(,\s*pipe_handle=)\d+(\).*)"
+    )
+    normalized_context_line = multiprocessing_pattern.sub(
+        r"\1<tracker_fd>\2<pipe_handle>\3", raw_context_line
+    )
+    return normalized_context_line
+
+
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
@@ -488,7 +508,9 @@ def get_lines_from_file(
             strip_string(line.strip("\r\n"), max_length=max_length)
             for line in source[lower_bound:lineno]
         ]
-        context_line = strip_string(source[lineno].strip("\r\n"), max_length=max_length)
+        raw_context_line = source[lineno].strip("\r\n")
+        normalized_context_line = normalize_context_line(raw_context_line)
+        context_line = strip_string(normalized_context_line, max_length=max_length)
         post_context = [
             strip_string(line.strip("\r\n"), max_length=max_length)
             for line in source[(lineno + 1) : upper_bound]

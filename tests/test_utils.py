@@ -23,6 +23,7 @@ from sentry_sdk.utils import (
     is_valid_sample_rate,
     logger,
     match_regex_list,
+    normalize_context_line,
     parse_url,
     parse_version,
     safe_str,
@@ -1031,6 +1032,34 @@ def test_get_lines_from_file_handle_linecache_errors():
     with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
         result = get_lines_from_file("filename", 10)
         assert result == expected_result
+
+
+def test_normalize_context_line():
+    test_cases = [
+        # (Input, Expected Output)
+        (
+            "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=12, pipe_handle=28)",
+            "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=<tracker_fd>, pipe_handle=<pipe_handle>)",
+        ),
+        (
+            "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=123, pipe_handle=456)",
+            "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=<tracker_fd>, pipe_handle=<pipe_handle>)",
+        ),
+        (
+            "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=12,  pipe_handle=28)",
+            "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=<tracker_fd>,  pipe_handle=<pipe_handle>)",
+        ),
+        ("some_function()", "some_function()"),
+        (
+            "some_function(tracker_fd=12, pipe_handle=28)",
+            "some_function(tracker_fd=12, pipe_handle=28)",
+        ),
+        ("", ""),
+    ]
+
+    for input_line, expected_output in test_cases:
+        result = normalize_context_line(input_line)
+        assert result == expected_output, f"Failed for input: {input_line}"
 
 
 def test_package_version_is_none():
