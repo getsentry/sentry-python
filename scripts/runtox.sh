@@ -13,25 +13,9 @@ else
     TOXPATH=./.venv/bin/tox
 fi
 
-excludelatest=false
-for arg in "$@"
-do
-    if [ "$arg" = "--exclude-latest" ]; then
-        excludelatest=true
-        shift
-        break
-    fi
-done
-
 searchstring="$1"
 
-if $excludelatest; then
-    echo "Excluding latest"
-    ENV="$($TOXPATH -l | grep -- "$searchstring" | grep -v -- '-latest' | tr $'\n' ',')"
-else
-    echo "Including latest"
-    ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
-fi
+ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
 
 if [ -z "${ENV}" ]; then
     echo "No targets found. Skipping."
