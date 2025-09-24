@@ -617,14 +617,13 @@ def get_file_hash() -> str:
 
 
 def get_last_updated() -> Optional[datetime]:
-    timestamp = (
-        subprocess.run(
-            ["git", "log", "-1", "--pretty=%ct", "../tox.ini"],
-            capture_output=True,
-        )
-        .stdout.decode("utf-8")
-        .strip()
+    timestamp = subprocess.run(
+        ["git", "log", "-1", "--pretty=%ct", "../tox.ini"],
+        capture_output=True,
     )
+    print(timestamp)
+    timestamp = timestamp.stdout.decode("utf-8").strip()
+    print(timestamp)
     timestamp = datetime.fromtimestamp(int(timestamp), timezone.utc)
     print(f"Last tox.ini update: {timestamp}")
     return timestamp
