@@ -322,14 +322,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     pass
 
                 try:
-                    tool_calls = getattr(generation.message, "tool_calls", None)
-                    if tool_calls is not None and tool_calls != []:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                            tool_calls,
-                            unpack=False,
-                        )
+                    if should_send_default_pii() and self.include_prompts:
+                        tool_calls = getattr(generation.message, "tool_calls", None)
+                        if tool_calls is not None and tool_calls != []:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                                tool_calls,
+                                unpack=False,
+                            )
                 except AttributeError:
                     pass
 
