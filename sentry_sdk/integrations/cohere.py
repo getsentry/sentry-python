@@ -7,6 +7,8 @@ from sentry_sdk.ai.utils import set_data_normalized
 
 from typing import TYPE_CHECKING
 
+from sentry_sdk.tracing_utils import set_span_errored
+
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
     from sentry_sdk.tracing import Span
@@ -84,6 +86,8 @@ class CohereIntegration(Integration):
 
 def _capture_exception(exc):
     # type: (Any) -> None
+    set_span_errored()
+
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,

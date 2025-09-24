@@ -74,19 +74,37 @@ That's it. You should be ready to make changes, run tests, and make commits! If 
 
 ## Running Tests
 
-You can run all tests with the following command:
+We test against a number of Python language and library versions, which are automatically generated and stored in the [tox.ini](tox.ini) file. The `envlist` defines the environments you can choose from when running tests, and correspond to package versions and environment variables. The `TESTPATH` environment variable, in turn, determines which tests are run.
+
+The tox CLI tool is required to run the tests locally. Follow [the installation instructions](https://tox.wiki/en/latest/installation.html) for tox. Dependencies are installed for you when you run the command below, but _you_ need to bring an appropriate Python interpreter.
+
+[Pyenv](https://github.com/pyenv/pyenv) is a cross-platform utility for managing Python versions. You can also use a conventional package manager, but not all versions may be distributed in the package manager of your choice. For macOS, Versions 3.8 and up can be installed with Homebrew.
+
+An environment consists of the Python major and minor version and the library name and version. The exception to the rule is that you can provide `common` instead of the library information. The environments tied to a specific library usually run the corresponding test suite, while `common` targets all tests but skips those that require uninstalled dependencies.
+
+To run Celery tests for version v5.5.3 of its Python library using a 3.12 interpreter, use
 
 ```bash
-pytest tests/
+tox -p auto -o -e py3.12-celery-v5.5.3
 ```
 
-If you would like to run the tests for a specific integration, use a command similar to the one below:
+or to use the `common` environment, run
 
 ```bash
-pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integration you wish to test
+tox -p auto -o -e py3.12-common
 ```
 
-**Hint:** Tests of integrations need additional dependencies. The switch `-rs` will show you why tests were skipped and what dependencies you need to install for the tests to run. (You can also consult the [tox.ini](tox.ini) file to see what dependencies are installed for each integration)
+To select specific tests, you can forward arguments to `pytest` like so
+
+```bash
+tox -p auto -o -e py3.12-celery-v5.5.3 -- -k test_transaction_events
+```
+
+In general, you use
+
+```bash
+tox -p auto -o -e <tox_env> -- <pytest_args>
+```
 
 ## Adding a New Integration
 
