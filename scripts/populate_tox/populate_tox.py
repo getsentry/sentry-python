@@ -617,13 +617,19 @@ def get_file_hash() -> str:
 
 
 def get_last_updated() -> Optional[datetime]:
-    timestamp = subprocess.run(
-        ["git", "log", "-1", "--pretty=%ct", "../tox.ini"],
+    repo_root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
         capture_output=True,
-    )
-    print(timestamp)
-    timestamp = timestamp.stdout.decode("utf-8").strip()
-    print(timestamp)
+        text=True,
+    ).stdout.strip()
+    tox_ini_path = Path(repo_root) / "tox.ini"
+
+    timestamp = subprocess.run(
+        ["git", "log", "-1", "--pretty=%ct", str(tox_ini_path)],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
     timestamp = datetime.fromtimestamp(int(timestamp), timezone.utc)
     print(f"Last tox.ini update: {timestamp}")
     return timestamp
