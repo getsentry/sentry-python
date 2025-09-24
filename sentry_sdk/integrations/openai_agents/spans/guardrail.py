@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.scope import should_send_default_pii
 
 from ..consts import SPAN_ORIGIN
 
@@ -35,7 +36,7 @@ def guardrail_span(guardrail, guardrail_type, args, kwargs):
     except IndexError:
         input = None
 
-    if input is not None:
+    if should_send_default_pii() and input is not None:
         span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, input)
 
     return span
@@ -47,7 +48,7 @@ def update_guardrail_span(span, agent, guardrail, guardrail_type, result):
         span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
     output = result.output.output_info.get("reason")
-    if output is not None:
+    if should_send_default_pii() and output is not None:
         span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, output)
 
     tripwire_triggered = result.output.tripwire_triggered
