@@ -622,15 +622,7 @@ def get_last_updated() -> Optional[datetime]:
         capture_output=True,
         text=True,
     ).stdout.strip()
-    print(repo_root)
     tox_ini_path = Path(repo_root) / "tox.ini"
-    print(tox_ini_path)
-    a = subprocess.run(
-        ["git", "log", "-1", str(tox_ini_path)],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    print(a)
 
     timestamp = subprocess.run(
         ["git", "log", "-1", "--pretty=%ct", str(tox_ini_path)],
@@ -639,7 +631,7 @@ def get_last_updated() -> Optional[datetime]:
     ).stdout.strip()
 
     timestamp = datetime.fromtimestamp(int(timestamp), timezone.utc)
-    print(f"Last tox.ini update: {timestamp}")
+    print(f"Last committed tox.ini update: {timestamp}")
     return timestamp
 
 
