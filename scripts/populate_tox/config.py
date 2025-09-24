@@ -78,6 +78,7 @@ TEST_SUITE_CONFIG = {
     },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
+        "num_versions": 2,
     },
     "cohere": {
         "package": "cohere",
@@ -222,6 +223,7 @@ TEST_SUITE_CONFIG = {
     },
     "loguru": {
         "package": "loguru",
+        "num_versions": 2,
     },
     "openai-base": {
         "package": "openai",
@@ -281,6 +283,7 @@ TEST_SUITE_CONFIG = {
             ],
             "py3.8": ["taskgroup==0.0.0a4"],
         },
+        "num_versions": 2,
     },
     "ray": {
         "package": "ray",
@@ -298,6 +301,7 @@ TEST_SUITE_CONFIG = {
     },
     "redis_py_cluster_legacy": {
         "package": "redis-py-cluster",
+        "num_versions": 2,
     },
     "requests": {
         "package": "requests",
