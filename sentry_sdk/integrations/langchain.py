@@ -8,8 +8,7 @@ from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import _get_value
+from sentry_sdk.tracing_utils import _get_value, set_span_errored
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
 from typing import TYPE_CHECKING
@@ -26,6 +25,7 @@ if TYPE_CHECKING:
         Union,
     )
     from uuid import UUID
+    from sentry_sdk.tracing import Span
 
 
 try:
@@ -116,7 +116,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span_data = self.span_map[run_id]
             span = span_data.span
-            span.set_status("unknown")
+            set_span_errored(span)
 
             sentry_sdk.capture_exception(error, span.scope)
 
@@ -322,14 +322,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     pass
 
                 try:
-                    tool_calls = getattr(generation.message, "tool_calls", None)
-                    if tool_calls is not None and tool_calls != []:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                            tool_calls,
-                            unpack=False,
-                        )
+                    if should_send_default_pii() and self.include_prompts:
+                        tool_calls = getattr(generation.message, "tool_calls", None)
+                        if tool_calls is not None and tool_calls != []:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                                tool_calls,
+                                unpack=False,
+                            )
                 except AttributeError:
                     pass
 
