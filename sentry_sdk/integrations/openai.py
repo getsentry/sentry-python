@@ -282,9 +282,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
 
         def new_iterator():
             # type: () -> Iterator[ChatCompletionChunk]
-            with capture_internal_exceptions():
-                count_tokens_manually = True
-                for x in old_iterator:
+            count_tokens_manually = True
+            for x in old_iterator:
+                with capture_internal_exceptions():
                     # OpenAI chat completion API
                     if hasattr(x, "choices"):
                         choice_index = 0
@@ -315,8 +315,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         )
                         count_tokens_manually = False
 
-                    yield x
+                yield x
 
+            with capture_internal_exceptions():
                 if len(data_buf) > 0:
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
@@ -337,9 +338,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
 
         async def new_iterator_async():
             # type: () -> AsyncIterator[ChatCompletionChunk]
-            with capture_internal_exceptions():
-                count_tokens_manually = True
-                async for x in old_iterator:
+            count_tokens_manually = True
+            async for x in old_iterator:
+                with capture_internal_exceptions():
                     # OpenAI chat completion API
                     if hasattr(x, "choices"):
                         choice_index = 0
@@ -370,8 +371,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         )
                         count_tokens_manually = False
 
-                    yield x
+                yield x
 
+            with capture_internal_exceptions():
                 if len(data_buf) > 0:
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
