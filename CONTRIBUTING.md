@@ -76,7 +76,9 @@ That's it. You should be ready to make changes, run tests, and make commits! If 
 
 We test against a number of Python language and library versions, which are automatically generated and stored in the [tox.ini](tox.ini) file. The `envlist` defines the environments you can choose from when running tests, and correspond to package versions and environment variables. The `TESTPATH` environment variable, in turn, determines which tests are run.
 
-The tox CLI tool is required to run the tests locally. Follow [the installation instructions](https://tox.wiki/en/latest/installation.html) for tox. Dependencies are installed for you when you run the command below, but _you_ need to bring an appropriate Python interpreter. Versions 3.8 and up can be installed with brew.
+The tox CLI tool is required to run the tests locally. Follow [the installation instructions](https://tox.wiki/en/latest/installation.html) for tox. Dependencies are installed for you when you run the command below, but _you_ need to bring an appropriate Python interpreter.
+
+[Pyenv](https://github.com/pyenv/pyenv) is a cross-platform utility for managing Python versions. You can also use a conventional package manager, but not all versions may be distributed in the package manager of your choice. For macOS, Versions 3.8 and up can be installed with Homebrew.
 
 An environment consists of the Python major and minor version and the library name and version. The exception to the rule is that you can provide `common` instead of the library information. The environments tied to a specific library usually run the corresponding test suite, while `common` targets all tests but skips those that require uninstalled dependencies.
 
