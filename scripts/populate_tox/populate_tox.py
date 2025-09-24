@@ -1,5 +1,7 @@
 """
 This script populates tox.ini automatically using release data from PyPI.
+
+See scripts/populate_tox/README.md for more info.
 """
 
 import functools
@@ -123,6 +125,7 @@ def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> N
         releases_cache.write(json.dumps(_normalize_release(release)) + "\n")
 
     CACHE[_normalize_name(package)][str(version)] = release
+    CACHE[_normalize_name(package)][str(version)]["_accessed"] = True
 
 
 def _prefilter_releases(
@@ -150,7 +153,8 @@ def _prefilter_releases(
         min_supported = Version(".".join(map(str, min_supported)))
     else:
         print(
-            f"  {integration} doesn't have a minimum version defined in sentry_sdk/integrations/__init__.py. Consider defining one"
+            f"  {integration} doesn't have a minimum version defined in "
+            f"sentry_sdk/integrations/__init__.py. Consider defining one"
         )
 
     include_versions = None
@@ -225,7 +229,8 @@ def get_supported_releases(
     Get a list of releases that are currently supported by the SDK.
 
     This takes into account a handful of parameters (Python support, the lowest
-    version we've defined for the framework, the date of the release).
+    supported version we've defined for the framework, optionally the date
+    of the release).
 
     We return the list of supported releases and optionally also the newest
     prerelease, if it should be tested (meaning it's for a version higher than
@@ -272,9 +277,9 @@ def pick_releases_to_test(
 ) -> list[Version]:
     """Pick a handful of releases to test from a sorted list of supported releases."""
     # If the package has majors (or major-like releases, even if they don't do
-    # semver), we want to make sure we're testing them all (unless there's too
-    # many). If not, we just pick the oldest, the newest, and a couple
-    # in between.
+    # semver), we want to make sure we're testing them all. If it doesn't have
+    # multiple majors, we just pick the oldest, the newest, and a couple of
+    # releases in between.
     #
     # If there is a relevant prerelease, also test that in addition to the above.
     num_versions = TEST_SUITE_CONFIG[integration].get("num_versions")
@@ -342,7 +347,7 @@ def supported_python_versions(
     custom_supported_versions: Optional[
         Union[SpecifierSet, dict[SpecifierSet, SpecifierSet]]
     ] = None,
-    version: Optional[Version] = None,
+    release_version: Optional[Version] = None,
 ) -> list[Version]:
     """
     Get the intersection of Python versions supported by the package and the SDK.
@@ -362,6 +367,12 @@ def supported_python_versions(
       on Python 3.7, so we can provide this as `custom_supported_versions`. The
       result of this function will then by the intersection of all three, i.e.,
       [3.7].
+    - The Python SDK supports Python 3.6-3.13. The package supports 3.5-3.8.
+      Additionally, we have a limitation in place to only test this framework on
+      Python 3.5 if the framework version is <2.0. `custom_supported_versions`
+      will contain this restriction, and `release_version` will contain the
+      version of the package we're currently looking at, to determine whether the
+      <2.0 restriction applies in this case.
     """
     supported = []
 
@@ -377,11 +388,11 @@ def supported_python_versions(
                     if curr in custom_supported_versions:
                         supported.append(curr)
 
-                elif version is not None and isinstance(
+                elif release_version is not None and isinstance(
                     custom_supported_versions, dict
                 ):
                     for v, py in custom_supported_versions.items():
-                        if version in v:
+                        if release_version in v:
                             if curr in py:
                                 supported.append(curr)
                             break
@@ -435,8 +446,10 @@ def _parse_python_versions_from_classifiers(classifiers: list[str]) -> list[Vers
 
 def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Version]]:
     """
-    Given data from PyPI's release endpoint, determine the Python versions supported by the package
-    from the Python version classifiers, when present, or from `requires_python` if there are no classifiers.
+    Determine the Python versions supported by the package from PyPI data.
+
+    We're looking at Python version classifiers, if present, and
+    `requires_python` if there are no classifiers.
     """
     try:
         classifiers = pypi_data["info"]["classifiers"]
@@ -453,7 +466,7 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
 
     # We only use `requires_python` if there are no classifiers. This is because
     # `requires_python` doesn't tell us anything about the upper bound, which
-    # depends on when the release first came out
+    # implicitly depends on when the release first came out.
     try:
         requires_python = pypi_data["info"]["requires_python"]
     except (AttributeError, KeyError):
@@ -666,7 +679,8 @@ def main(fail_on_changes: bool = False) -> None:
         # timestamp so that we don't fail CI on a PR just because a new package
         # version was released, leading to unrelated changes in tox.ini.
         print(
-            f"Since we're in fail_on_changes mode, we're only considering releases before the last tox.ini update at {last_updated.isoformat()}."
+            f"Since we're in fail_on_changes mode, we're only considering "
+            f"releases before the last tox.ini update at {last_updated.isoformat()}."
         )
 
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
@@ -789,19 +803,16 @@ def main(fail_on_changes: bool = False) -> None:
 
                 Please don't make manual changes to `tox.ini`. Instead, make the
                 changes to the `tox.jinja` template and/or the `populate_tox.py`
-                script (as applicable) and regenerate the `tox.ini` file with:
-
-                python -m venv toxgen.env
-                . toxgen.env/bin/activate
-                pip install -r scripts/populate_tox/requirements.txt
-                python scripts/populate_tox/populate_tox.py
+                script (as applicable) and regenerate the `tox.ini` file by
+                running scripts/generate-test-files.sh
                 """
                 )
             )
         print("Done checking tox.ini. Looking good!")
     else:
         print(
-            "Done generating tox.ini. Make sure to also update the CI YAML files to reflect the new test targets."
+            "Done generating tox.ini. Make sure to also update the CI YAML "
+            "files to reflect the new test targets."
         )
 
 
