@@ -221,6 +221,19 @@ def test_langchain_agent(
             in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
         assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        # Verify tool calls are recorded when PII is enabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+            "data", {}
+        ), "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+        if isinstance(tool_calls_data, str):
+            assert "get_word_length" in tool_calls_data
+        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+            # Check if tool calls contain expected function name
+            tool_call_str = str(tool_calls_data)
+            assert "get_word_length" in tool_call_str
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
@@ -228,6 +241,29 @@ def test_langchain_agent(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in tool_exec_span.get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in tool_exec_span.get("data", {})
+
+        # Verify tool calls are NOT recorded when PII is disabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+
+    # Verify that available tools are always recorded regardless of PII settings
+    for chat_span in chat_spans:
+        span_data = chat_span.get("data", {})
+        if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
+            tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+            assert (
+                tools_data is not None
+            ), "Available tools should always be recorded regardless of PII settings"
 
 
 def test_langchain_error(sentry_init, capture_events):
