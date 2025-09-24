@@ -1,4 +1,5 @@
 import inspect
+import functools
 import sys
 
 import sentry_sdk
@@ -17,7 +18,6 @@ try:
     import ray  # type: ignore[import-not-found]
 except ImportError:
     raise DidNotEnable("Ray not installed.")
-import functools
 
 from typing import TYPE_CHECKING
 
@@ -54,6 +54,7 @@ def _patch_ray_remote():
 
         def wrapper(user_f):
             # type: (Callable[..., Any]) -> Any
+            @functools.wraps(user_f)
             def new_func(*f_args, _tracing=None, **f_kwargs):
                 # type: (Any, Optional[dict[str, Any]], Any) -> Any
                 _check_sentry_initialized()
@@ -77,6 +78,19 @@ def _patch_ray_remote():
                         reraise(*exc_info)
 
                     return result
+
+            # Patching new_func signature to add the _tracing parameter to it
+            # Ray later inspects the signature and finds the unexpected parameter otherwise
+            signature = inspect.signature(new_func)
+            params = list(signature.parameters.values())
+            params.append(
+                inspect.Parameter(
+                    "_tracing",
+                    kind=inspect.Parameter.KEYWORD_ONLY,
+                    default=None,
+                )
+            )
+            new_func.__signature__ = signature.replace(parameters=params)
 
             if f:
                 rv = old_remote(new_func)
