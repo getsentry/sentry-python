@@ -285,7 +285,7 @@ def test_langchain_error(sentry_init, capture_events):
         ]
     )
     global stream_result_mock
-    stream_result_mock = Mock(side_effect=Exception("API rate limit error"))
+    stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
     llm = MockOpenAI(
         model_name="gpt-3.5-turbo",
         temperature=0,
@@ -295,11 +295,54 @@ def test_langchain_error(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction(), pytest.raises(Exception):
+    with start_transaction(), pytest.raises(ValueError):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     error = events[0]
     assert error["level"] == "error"
+
+
+def test_span_status_error(sentry_init, capture_events):
+    global llm_type
+    llm_type = "acme-llm"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    with start_transaction(name="test"):
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are very powerful assistant, but don't know current events",
+                ),
+                ("user", "{input}"),
+                MessagesPlaceholder(variable_name="agent_scratchpad"),
+            ]
+        )
+        global stream_result_mock
+        stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
+        llm = MockOpenAI(
+            model_name="gpt-3.5-turbo",
+            temperature=0,
+            openai_api_key="badkey",
+        )
+        agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+
+        agent_executor = AgentExecutor(
+            agent=agent, tools=[get_word_length], verbose=True
+        )
+
+        with pytest.raises(ValueError):
+            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
 
 
 def test_span_origin(sentry_init, capture_events):
