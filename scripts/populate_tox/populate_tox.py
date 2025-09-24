@@ -4,6 +4,7 @@ This script populates tox.ini automatically using release data from PyPI.
 
 import functools
 import hashlib
+import json
 import os
 import sys
 import time
@@ -34,18 +35,20 @@ CUTOFF = None
 # CUTOFF = datetime.now(tz=timezone.utc) - timedelta(days=365 * 5)
 
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
+RELEASES_CACHE_FILE = Path(__file__).resolve().parent / "releases.jsonl"
 ENV = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent),
     trim_blocks=True,
     lstrip_blocks=True,
 )
 
-PYPI_COOLDOWN = 0.1  # seconds to wait between requests to PyPI
+PYPI_COOLDOWN = 0.05  # seconds to wait between requests to PyPI
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
+CACHE = defaultdict(dict)
 
 IGNORE = {
     # Do not try auto-generating the tox entries for these. They will be
@@ -94,9 +97,32 @@ def fetch_package(package: str) -> Optional[dict]:
 
 @functools.cache
 def fetch_release(package: str, version: Version) -> Optional[dict]:
-    """Fetch release metadata from PyPI."""
+    """Fetch release metadata from cache or, failing that, PyPI."""
+    release = _fetch_from_cache(package, version)
+    if release is not None:
+        return release
+
     url = PYPI_VERSION_URL.format(project=package, version=version)
-    return fetch_url(url)
+    release = fetch_url(url)
+    if release is not None:
+        _save_to_cache(package, version, release)
+    return release
+
+
+def _fetch_from_cache(package: str, version: Version) -> Optional[dict]:
+    package = _normalize_name(package)
+    if package in CACHE and str(version) in CACHE[package]:
+        CACHE[package][str(version)]["_accessed"] = True
+        return CACHE[package][str(version)]
+
+    return None
+
+
+def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> None:
+    with open(RELEASES_CACHE_FILE, "a") as releases_cache:
+        releases_cache.write(json.dumps(_normalize_release(release)) + "\n")
+
+    CACHE[_normalize_name(package)][str(version)] = release
 
 
 def _prefilter_releases(
@@ -600,6 +626,24 @@ def get_last_updated() -> Optional[datetime]:
     return timestamp
 
 
+def _normalize_name(package: str) -> str:
+    return package.lower().replace("-", "_")
+
+
+def _normalize_release(release: dict) -> dict:
+    """Filter out unneeded parts of the release JSON."""
+    normalized = {
+        "info": {
+            "classifiers": release["info"]["classifiers"],
+            "name": release["info"]["name"],
+            "requires_python": release["info"]["requires_python"],
+            "version": release["info"]["version"],
+            "yanked": release["info"]["yanked"],
+        },
+    }
+    return normalized
+
+
 def main(fail_on_changes: bool = False) -> None:
     """
     Generate tox.ini from the tox.jinja template.
@@ -636,6 +680,20 @@ def main(fail_on_changes: bool = False) -> None:
         f"The SDK supports Python versions {MIN_PYTHON_VERSION} - {MAX_PYTHON_VERSION}."
     )
 
+    # Load file cache
+    global CACHE
+
+    with open(RELEASES_CACHE_FILE) as releases_cache:
+        for line in releases_cache:
+            release = json.loads(line)
+            name = _normalize_name(release["info"]["name"])
+            version = release["info"]["version"]
+            CACHE[name][version] = release
+            CACHE[name][version][
+                "_accessed"
+            ] = False  # for cleaning up unused cache entries
+
+    # Process packages
     packages = defaultdict(list)
 
     for group, integrations in GROUPS.items():
@@ -700,6 +758,21 @@ def main(fail_on_changes: bool = False) -> None:
     write_tox_file(
         packages, update_timestamp=not fail_on_changes, last_updated=last_updated
     )
+
+    # Sort the release cache file
+    releases = []
+    with open(RELEASES_CACHE_FILE) as releases_cache:
+        releases = [json.loads(line) for line in releases_cache]
+    releases.sort(key=lambda r: (r["info"]["name"], r["info"]["version"]))
+    with open(RELEASES_CACHE_FILE, "w") as releases_cache:
+        for release in releases:
+            if (
+                CACHE[_normalize_name(release["info"]["name"])][
+                    release["info"]["version"]
+                ]["_accessed"]
+                is True
+            ):
+                releases_cache.write(json.dumps(release) + "\n")
 
     if fail_on_changes:
         new_file_hash = get_file_hash()
