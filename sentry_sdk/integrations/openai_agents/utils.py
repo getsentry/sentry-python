@@ -3,6 +3,7 @@ from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 from typing import TYPE_CHECKING
@@ -20,6 +21,8 @@ except ImportError:
 
 def _capture_exception(exc):
     # type: (Any) -> None
+    set_span_errored()
+
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,

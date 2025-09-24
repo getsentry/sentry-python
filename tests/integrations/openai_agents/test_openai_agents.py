@@ -658,6 +658,32 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
+async def test_span_status_error(sentry_init, capture_events, test_agent):
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.side_effect = ValueError("Model Error")
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            with pytest.raises(ValueError, match="Model Error"):
+                await agents.Runner.run(
+                    test_agent, "Test input", run_config=test_run_config
+                )
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
+
+
+@pytest.mark.asyncio
 async def test_multiple_agents_asyncio(
     sentry_init, capture_events, test_agent, mock_model_response
 ):
