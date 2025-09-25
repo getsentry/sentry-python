@@ -17,10 +17,6 @@ if TYPE_CHECKING:
 class ConcurrentIntegration(Integration):
     identifier = "concurrent"
 
-    def __init__(self, record_exceptions_on_futures=True):
-        # type: (bool) -> None
-        self.record_exceptions_on_futures = record_exceptions_on_futures
-
     @staticmethod
     def setup_once():
         # type: () -> None
@@ -28,7 +24,7 @@ class ConcurrentIntegration(Integration):
 
 
 def _wrap_submit_call(func):
-    # type: (Any) -> Any
+    # type: (Callable[..., Future[T]]) -> Callable[..., Future[T]]
     """
     Wrap submit call to propagate scopes on task submission.
     """
