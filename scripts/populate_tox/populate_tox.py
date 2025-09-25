@@ -513,7 +513,11 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
 def write_tox_file(packages: dict) -> None:
     template = ENV.get_template("tox.jinja")
 
-    context = {"groups": {}}
+    context = {
+        "groups": {},
+        "testpaths": [],
+    }
+
     for group, integrations in packages.items():
         context["groups"][group] = []
         for integration in integrations:
@@ -528,6 +532,14 @@ def write_tox_file(packages: dict) -> None:
                     ),
                 }
             )
+            context["testpaths"].append(
+                (
+                    integration["name"],
+                    f"tests/integrations/{integration['integration_name']}",
+                )
+            )
+
+    context["testpaths"].sort()
 
     rendered = template.render(context)
 
@@ -759,6 +771,10 @@ def main(fail_on_changes: bool = False) -> None:
                         "package": package,
                         "extra": extra,
                         "releases": test_releases,
+                        "integration_name": TEST_SUITE_CONFIG[integration].get(
+                            "integration_name"
+                        )
+                        or integration,
                     }
                 )
 
