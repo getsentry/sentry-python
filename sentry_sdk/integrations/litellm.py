@@ -199,6 +199,8 @@ def _failure_callback(
     # type: (...) -> None
     """Handle request failure."""
     span = kwargs.get("_sentry_span")
+    if span is None:
+        return
 
     try:
         # Capture the exception
