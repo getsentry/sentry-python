@@ -1,0 +1,111 @@
+name: Update test matrix
+
+on:
+  workflow_dispatch:
+  schedule:
+    # early Monday morning
+    - cron: '23 3 * * 1'
+
+jobs:
+  update-tox:
+    name: Update test matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.13
+
+      - name: Checkout repo
+        uses: actions/checkout@v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Run generate-test-files.sh
+        run: |
+          set -e
+          sh scripts/generate-test-files.sh
+
+      - name: Create branch
+        id: create-branch
+        run: |
+          COMMIT_TITLE="ci: 🤖 Update test matrix with new releases"
+          DATE=`date +%m/%d`
+          BRANCH_NAME="toxgen/update"
+
+          git checkout -B "$BRANCH_NAME"
+          git add --all
+          git commit -m "$COMMIT_TITLE"
+          git push origin "$BRANCH_NAME" --force
+
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "commit_title=$COMMIT_TITLE" >> $GITHUB_OUTPUT
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+
+      - name: Create pull request
+        uses: actions/github-script@v8.0.0
+        with:
+          script: |
+            const branchName = '${{ steps.create-branch.outputs.branch_name }}';
+            const commitTitle = '${{ steps.create-branch.outputs.commit_title }}';
+            const date = '${{ steps.create-branch.outputs.date }}';
+            const prBody = `Update our test matrix with new releases of integrated frameworks and libraries.
+
+            ## How it works
+            - Scan PyPI for all supported releases of all frameworks we have a dedicated test suite for.
+            - Pick a representative sample of releases to run our test suite against. We always test the latest and oldest supported version.
+            - Update [tox.ini](https://github.com/getsentry/sentry-python/blob/master/tox.ini) with the new releases.
+
+            ## Action required
+            - If CI passes on this PR, it's safe to approve and merge. It means our integrations can handle new versions of frameworks that got pulled in.
+            - If CI doesn't pass on this PR, this points to an incompatibility of either our integration or our test setup with a new version of a framework.
+                - Check what the failures look like and either fix them, or update the [test config](https://github.com/getsentry/sentry-python/blob/master/scripts/populate_tox/config.py) and rerun [scripts/generate-test-files.sh](https://github.com/getsentry/sentry-python/blob/master/scripts/generate-test-files.sh). See [scripts/populate_tox/README.md](https://github.com/getsentry/sentry-python/blob/master/scripts/populate_tox/README.md) for what configuration options are available.
+
+             _____________________
+
+            _🤖 This PR was automatically created using [a GitHub action](https://github.com/getsentry/sentry-python/blob/master/.github/workflows/update-tox.yml)._`.replace(/^ {16}/gm, '')
+
+            // Close existing toxgen PRs as they're now obsolete
+
+            const { data: existingPRs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: `${context.repo.owner}:${branchName}`,
+                state: 'open'
+            });
+
+            for (const pr of existingPRs) {
+                await github.rest.pulls.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pr.number,
+                    state: 'closed'
+                })
+            };
+
+            const { data: pr } = await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: commitTitle + ' (' + date + ')',
+                head: branchName,
+                base: '${{ github.ref_name }}',
+                body: prBody,
+            });
+
+            await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['Component: CI', 'Component: Tests']
+            });

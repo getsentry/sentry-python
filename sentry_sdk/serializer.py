@@ -187,6 +187,16 @@ def serialize(event, **kwargs):
 
         return False
 
+    def _is_span_attribute():
+        # type: () -> Optional[bool]
+        try:
+            if path[0] == "spans" and path[2] == "data":
+                return True
+        except IndexError:
+            return None
+
+        return False
+
     def _is_request_body():
         # type: () -> Optional[bool]
         try:
@@ -282,7 +292,8 @@ def serialize(event, **kwargs):
                 )
             return None
 
-        if is_databag and global_repr_processors:
+        is_span_attribute = _is_span_attribute()
+        if (is_databag or is_span_attribute) and global_repr_processors:
             hints = {"memo": memo, "remaining_depth": remaining_depth}
             for processor in global_repr_processors:
                 result = processor(obj, hints)

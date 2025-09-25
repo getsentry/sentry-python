@@ -7,10 +7,8 @@
 # by "scripts/populate_tox/populate_tox.py". Any changes to the file should
 # be made in the template (if you want to change a hardcoded part of the file)
 # or in the script (if you want to change the auto-generated part).
-# The file (and all resulting CI YAMLs) then need to be regenerated via
+# The file (and all resulting CI YAMLs) then needs to be regenerated via
 # "scripts/generate-test-files.sh".
-#
-# Last generated: {{ updated }}
 
 [tox]
 requires =
@@ -24,17 +22,6 @@ envlist =
     {py3.6,py3.8,py3.10,py3.11,py3.12}-gevent
 
     # === Integrations ===
-    # General format is {pythonversion}-{integrationname}-v{frameworkversion}
-    # 1 blank line between different integrations
-    # Each framework version should only be mentioned once. I.e:
-    #   {py3.7,py3.10}-django-v{3.2}
-    #   {py3.10}-django-v{4.0}
-    # instead of:
-    #   {py3.7}-django-v{3.2}
-    #   {py3.7,py3.10}-django-v{3.2,4.0}
-    #
-    # At a minimum, we should test against at least the lowest
-    # and the latest supported version of a framework.
 
     # Asgi
     {py3.7,py3.12,py3.13}-asgi
@@ -48,51 +35,14 @@ envlist =
     # GCP
     {py3.7}-gcp
 
-    # HTTPX
-    {py3.6,py3.9}-httpx-v{0.16,0.18}
-    {py3.6,py3.10}-httpx-v{0.20,0.22}
-    {py3.7,py3.11,py3.12}-httpx-v{0.23,0.24}
-    {py3.9,py3.11,py3.12}-httpx-v{0.25,0.27}
-    {py3.9,py3.12,py3.13}-httpx-latest
-
     # OpenTelemetry (OTel)
     {py3.7,py3.9,py3.12,py3.13}-opentelemetry
 
     # OpenTelemetry Experimental (POTel)
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
 
-    # pure_eval
-    {py3.6,py3.12,py3.13}-pure_eval
-
-    # Ray
-    {py3.10,py3.11}-ray-v{2.34}
-    {py3.10,py3.11}-ray-latest
-
-    # Redis
-    {py3.6,py3.8}-redis-v{3}
-    {py3.7,py3.8,py3.11}-redis-v{4}
-    {py3.7,py3.11,py3.12}-redis-v{5}
-    {py3.7,py3.12,py3.13}-redis-latest
-
-    # Requests
-    {py3.6,py3.8,py3.12,py3.13}-requests
-
-    # RQ (Redis Queue)
-    {py3.6}-rq-v{0.6}
-    {py3.6,py3.9}-rq-v{0.13,1.0}
-    {py3.6,py3.11}-rq-v{1.5,1.10}
-    {py3.7,py3.11,py3.12}-rq-v{1.15,1.16}
-    {py3.7,py3.12,py3.13}-rq-latest
-
-    # Sanic
-    {py3.6,py3.7}-sanic-v{0.8}
-    {py3.6,py3.8}-sanic-v{20}
-    {py3.8,py3.11,py3.12}-sanic-v{24.6}
-    {py3.9,py3.12,py3.13}-sanic-latest
-
     # === Integrations - Auto-generated ===
-    # These come from the populate_tox.py script. Eventually we should move all
-    # integration tests there.
+    # These come from the populate_tox.py script.
 
     {% for group, integrations in groups.items() %}
     # ~~~ {{ group }} ~~~
@@ -134,6 +84,7 @@ deps =
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
     gevent: pytest-asyncio
     {py3.10,py3.11}-gevent: zope.event<5.0.0
+    {py3.10,py3.11}-gevent: zope.interface<8.0
 
     # === Integrations ===
 
@@ -149,87 +100,14 @@ deps =
     aws_lambda: requests
     aws_lambda: uvicorn
 
-    # HTTPX
-    httpx-v0.16: pytest-httpx==0.10.0
-    httpx-v0.18: pytest-httpx==0.12.0
-    httpx-v0.20: pytest-httpx==0.14.0
-    httpx-v0.22: pytest-httpx==0.19.0
-    httpx-v0.23: pytest-httpx==0.21.0
-    httpx-v0.24: pytest-httpx==0.22.0
-    httpx-v0.25: pytest-httpx==0.25.0
-    httpx: pytest-httpx
-    # anyio is a dep of httpx
-    httpx: anyio<4.0.0
-    httpx-v0.16: httpx~=0.16.0
-    httpx-v0.18: httpx~=0.18.0
-    httpx-v0.20: httpx~=0.20.0
-    httpx-v0.22: httpx~=0.22.0
-    httpx-v0.23: httpx~=0.23.0
-    httpx-v0.24: httpx~=0.24.0
-    httpx-v0.25: httpx~=0.25.0
-    httpx-v0.27: httpx~=0.27.0
-    httpx-latest: httpx
-
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
 
     # OpenTelemetry Experimental (POTel)
     potel: -e .[opentelemetry-experimental]
 
-    # pure_eval
-    pure_eval: pure_eval
-
-    # Ray
-    ray-v2.34: ray~=2.34.0
-    ray-latest: ray
-
-    # Redis
-    redis: fakeredis!=1.7.4
-    redis: pytest<8.0.0
-    {py3.6,py3.7,py3.8}-redis: fakeredis<2.26.0
-    {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-redis: pytest-asyncio
-    redis-v3: redis~=3.0
-    redis-v4: redis~=4.0
-    redis-v4: fakeredis<2.31.0
-    redis-v5: redis~=5.0
-    redis-latest: redis
-
-    # Requests
-    requests: requests>=2.0
-
-    # RQ (Redis Queue)
-    # https://github.com/jamesls/fakeredis/issues/245
-    rq-v{0.6}: fakeredis<1.0
-    rq-v{0.6}: redis<3.2.2
-    rq-v{0.13,1.0,1.5,1.10}: fakeredis>=1.0,<1.7.4
-    rq-v{1.15,1.16}: fakeredis<2.28.0
-    {py3.6,py3.7}-rq-v{1.15,1.16}: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
-    rq-latest: fakeredis<2.28.0
-    {py3.6,py3.7}-rq-latest: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
-    rq-v0.6: rq~=0.6.0
-    rq-v0.13: rq~=0.13.0
-    rq-v1.0: rq~=1.0.0
-    rq-v1.5: rq~=1.5.0
-    rq-v1.10: rq~=1.10.0
-    rq-v1.15: rq~=1.15.0
-    rq-v1.16: rq~=1.16.0
-    rq-latest: rq
-
-    # Sanic
-    sanic: websockets<11.0
-    sanic: aiohttp
-    sanic-v{24.6}: sanic_testing
-    sanic-latest: sanic_testing
-    {py3.6}-sanic: aiocontextvars==0.2.1
-    {py3.8}-sanic: tracerite<1.1.2
-    sanic-v0.8: sanic~=0.8.0
-    sanic-v20: sanic~=20.0
-    sanic-v24.6: sanic~=24.6.0
-    sanic-latest: sanic
-
     # === Integrations - Auto-generated ===
-    # These come from the populate_tox.py script. Eventually we should move all
-    # integration tests there.
+    # These come from the populate_tox.py script.
 
     {% for group, integrations in groups.items() %}
     # ~~~ {{ group }} ~~~
@@ -258,68 +136,21 @@ setenv =
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
     spark-v{3.0.3,3.5.6}: JAVA_HOME=/usr/lib/jvm/temurin-11-jdk-amd64
 
+    # TESTPATH definitions for test suites not managed by toxgen
     common: TESTPATH=tests
     gevent: TESTPATH=tests
-    aiohttp: TESTPATH=tests/integrations/aiohttp
-    anthropic: TESTPATH=tests/integrations/anthropic
-    ariadne: TESTPATH=tests/integrations/ariadne
-    arq: TESTPATH=tests/integrations/arq
     asgi: TESTPATH=tests/integrations/asgi
-    asyncpg: TESTPATH=tests/integrations/asyncpg
     aws_lambda: TESTPATH=tests/integrations/aws_lambda
-    beam: TESTPATH=tests/integrations/beam
-    boto3: TESTPATH=tests/integrations/boto3
-    bottle: TESTPATH=tests/integrations/bottle
-    celery: TESTPATH=tests/integrations/celery
-    chalice: TESTPATH=tests/integrations/chalice
-    clickhouse_driver: TESTPATH=tests/integrations/clickhouse_driver
-    cohere: TESTPATH=tests/integrations/cohere
     cloud_resource_context: TESTPATH=tests/integrations/cloud_resource_context
-    django: TESTPATH=tests/integrations/django
-    dramatiq: TESTPATH=tests/integrations/dramatiq
-    falcon: TESTPATH=tests/integrations/falcon
-    fastapi:  TESTPATH=tests/integrations/fastapi
-    flask: TESTPATH=tests/integrations/flask
     gcp: TESTPATH=tests/integrations/gcp
-    gql: TESTPATH=tests/integrations/gql
-    graphene: TESTPATH=tests/integrations/graphene
-    grpc: TESTPATH=tests/integrations/grpc
-    httpx: TESTPATH=tests/integrations/httpx
-    huey: TESTPATH=tests/integrations/huey
-    huggingface_hub: TESTPATH=tests/integrations/huggingface_hub
-    langchain-base: TESTPATH=tests/integrations/langchain
-    langchain-notiktoken: TESTPATH=tests/integrations/langchain
-    langgraph:  TESTPATH=tests/integrations/langgraph
-    launchdarkly: TESTPATH=tests/integrations/launchdarkly
-    litestar: TESTPATH=tests/integrations/litestar
-    loguru: TESTPATH=tests/integrations/loguru
-    openai-base: TESTPATH=tests/integrations/openai
-    openai-notiktoken: TESTPATH=tests/integrations/openai
-    openai_agents: TESTPATH=tests/integrations/openai_agents
-    openfeature: TESTPATH=tests/integrations/openfeature
     opentelemetry: TESTPATH=tests/integrations/opentelemetry
     potel: TESTPATH=tests/integrations/opentelemetry
-    pure_eval: TESTPATH=tests/integrations/pure_eval
-    pymongo: TESTPATH=tests/integrations/pymongo
-    pyramid: TESTPATH=tests/integrations/pyramid
-    quart: TESTPATH=tests/integrations/quart
-    ray: TESTPATH=tests/integrations/ray
-    redis: TESTPATH=tests/integrations/redis
-    redis_py_cluster_legacy: TESTPATH=tests/integrations/redis_py_cluster_legacy
-    requests: TESTPATH=tests/integrations/requests
-    rq: TESTPATH=tests/integrations/rq
-    sanic: TESTPATH=tests/integrations/sanic
-    spark: TESTPATH=tests/integrations/spark
-    sqlalchemy: TESTPATH=tests/integrations/sqlalchemy
-    starlette: TESTPATH=tests/integrations/starlette
-    starlite: TESTPATH=tests/integrations/starlite
-    statsig: TESTPATH=tests/integrations/statsig
-    strawberry: TESTPATH=tests/integrations/strawberry
-    tornado: TESTPATH=tests/integrations/tornado
-    trytond: TESTPATH=tests/integrations/trytond
-    typer: TESTPATH=tests/integrations/typer
-    unleash: TESTPATH=tests/integrations/unleash
     socket: TESTPATH=tests/integrations/socket
+
+    # These TESTPATH definitions are auto-generated by toxgen
+    {% for integration, testpath in testpaths %}
+    {{ integration }}: TESTPATH={{ testpath }}
+    {% endfor %}
 
 passenv =
     SENTRY_PYTHON_TEST_POSTGRES_HOST
