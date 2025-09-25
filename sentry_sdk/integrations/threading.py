@@ -164,6 +164,8 @@ def _wrap_threadpool_executor_submit(func):
                     with use_scope(current_scope):
                         return fn(*args, **kwargs)
 
+            return fn(*args, **kwargs)
+
         return func(self, wrapped_fn, *args, **kwargs)
 
     return sentry_submit
