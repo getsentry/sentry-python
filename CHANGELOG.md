@@ -1,5 +1,42 @@
 # Changelog
 
+## 2.39.0
+
+### Various fixes & improvements
+
+- Fix(AI): Make agents integrations set the span status in case of error (#4820) by @antonpirker
+- Fix(dedupe): Use weakref in dedupe where possible (#4834) by @sl0thentr0py
+- Fix(Django): Avoid evaluating complex Django object in span.data/span.attributes (#4804) by @antonpirker
+- Fix(Langchain): Don't record tool call output if not include_prompt / should_send_default_pii (#4836) by @shellmayr
+- Fix(OpenAI): Don't swallow userland exceptions in openai (#4861) by @sl0thentr0py
+- Docs: Update contributing guidelines with instructions to run tests with tox (#4857) by @alexander-alderman-webb
+- Test(Spark): Improve `test_spark` speed (#4822) by @mgaligniana
+
+Note: This is my last release. So long, and thanks for all the fish! by @antonpirker
+
+
+## 2.38.0
+
+### Various fixes & improvements
+
+- Feat(huggingface_hub): Update HuggingFace Hub integration (#4746) by @antonpirker
+- Feat(Anthropic): Add proper tool calling data to Anthropic integration (#4769) by @antonpirker
+- Feat(openai-agents): Add input and output to `invoke_agent` span. (#4785) by @antonpirker
+- Feat(AI): Create transaction in AI agents framworks, when no transaction is running. (#4758) by @constantinius
+- Feat(GraphQL): Support gql 4.0-style execute (#4779) by @sentrivana
+- Fix(logs): Expect `log_item` as rate limit category (#4798) by @sentrivana
+- Fix: CI for mypy, gevent (#4790) by @sentrivana
+- Fix: Correctly check for a running transaction (#4791) by @antonpirker
+- Fix: Use float for sample rand (#4677) by @sentrivana
+- Fix: Avoid reporting false-positive StopAsyncIteration in the asyncio integration (#4741) by @vmarkovtsev
+- Fix: Add log message when `DedupeIntegration` is dropping an error. (#4788) by @antonpirker
+- Fix(profiling): Re-init continuous profiler (#4772) by @Zylphrex
+- Chore: Reexport module `profiler` (#4535) by @zen-xu
+- Tests: Update tox.ini (#4799) by @sentrivana
+- Build(deps): bump actions/create-github-app-token from 2.1.1 to 2.1.4 (#4795) by @dependabot
+- Build(deps): bump actions/setup-python from 5 to 6 (#4774) by @dependabot
+- Build(deps): bump codecov/codecov-action from 5.5.0 to 5.5.1 (#4773) by @dependabot
+
 ## 2.37.1
 
 ### Various fixes & improvements

@@ -1,10 +1,14 @@
 """
 This script populates tox.ini automatically using release data from PyPI.
+
+See scripts/populate_tox/README.md for more info.
 """
 
 import functools
 import hashlib
+import json
 import os
+import subprocess
 import sys
 import time
 from bisect import bisect_left
@@ -34,48 +38,33 @@ CUTOFF = None
 # CUTOFF = datetime.now(tz=timezone.utc) - timedelta(days=365 * 5)
 
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
+RELEASES_CACHE_FILE = Path(__file__).resolve().parent / "releases.jsonl"
 ENV = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent),
     trim_blocks=True,
     lstrip_blocks=True,
 )
 
-PYPI_COOLDOWN = 0.1  # seconds to wait between requests to PyPI
+PYPI_COOLDOWN = 0.05  # seconds to wait between requests to PyPI
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
+CACHE = defaultdict(dict)
 
 IGNORE = {
     # Do not try auto-generating the tox entries for these. They will be
-    # hardcoded in tox.ini.
-    #
-    # This set should be getting smaller over time as we migrate more test
-    # suites over to this script. Some entries will probably stay forever
-    # as they don't fit the mold (e.g. common, asgi, which don't have a 3rd party
-    # pypi package to install in different versions).
-    #
-    # Test suites that will have to remain hardcoded since they don't fit the
-    # toxgen usecase (there is no one package that should be tested in different
-    # versions)
+    # hardcoded in tox.ini since they don't fit the toxgen usecase (there is no
+    # one package that should be tested in different versions).
     "asgi",
     "aws_lambda",
     "cloud_resource_context",
     "common",
+    "gcp",
     "gevent",
     "opentelemetry",
     "potel",
-    # Integrations that can be migrated -- we should eventually remove all
-    # of these from the IGNORE list
-    "gcp",
-    "httpx",
-    "pure_eval",
-    "ray",
-    "redis",
-    "requests",
-    "rq",
-    "sanic",
 }
 
 
@@ -111,9 +100,33 @@ def fetch_package(package: str) -> Optional[dict]:
 
 @functools.cache
 def fetch_release(package: str, version: Version) -> Optional[dict]:
-    """Fetch release metadata from PyPI."""
+    """Fetch release metadata from cache or, failing that, PyPI."""
+    release = _fetch_from_cache(package, version)
+    if release is not None:
+        return release
+
     url = PYPI_VERSION_URL.format(project=package, version=version)
-    return fetch_url(url)
+    release = fetch_url(url)
+    if release is not None:
+        _save_to_cache(package, version, release)
+    return release
+
+
+def _fetch_from_cache(package: str, version: Version) -> Optional[dict]:
+    package = _normalize_name(package)
+    if package in CACHE and str(version) in CACHE[package]:
+        CACHE[package][str(version)]["_accessed"] = True
+        return CACHE[package][str(version)]
+
+    return None
+
+
+def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> None:
+    with open(RELEASES_CACHE_FILE, "a") as releases_cache:
+        releases_cache.write(json.dumps(_normalize_release(release)) + "\n")
+
+    CACHE[_normalize_name(package)][str(version)] = release
+    CACHE[_normalize_name(package)][str(version)]["_accessed"] = True
 
 
 def _prefilter_releases(
@@ -141,7 +154,8 @@ def _prefilter_releases(
         min_supported = Version(".".join(map(str, min_supported)))
     else:
         print(
-            f"  {integration} doesn't have a minimum version defined in sentry_sdk/integrations/__init__.py. Consider defining one"
+            f"  {integration} doesn't have a minimum version defined in "
+            f"sentry_sdk/integrations/__init__.py. Consider defining one"
         )
 
     include_versions = None
@@ -216,7 +230,8 @@ def get_supported_releases(
     Get a list of releases that are currently supported by the SDK.
 
     This takes into account a handful of parameters (Python support, the lowest
-    version we've defined for the framework, the date of the release).
+    supported version we've defined for the framework, optionally the date
+    of the release).
 
     We return the list of supported releases and optionally also the newest
     prerelease, if it should be tested (meaning it's for a version higher than
@@ -243,9 +258,9 @@ def get_supported_releases(
             sys.exit(1)
 
         py_versions = determine_python_versions(pypi_data)
-        target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-        if target_python_versions:
-            target_python_versions = SpecifierSet(target_python_versions)
+        target_python_versions = _transform_target_python_versions(
+            TEST_SUITE_CONFIG[integration].get("python")
+        )
         return bool(supported_python_versions(py_versions, target_python_versions))
 
     if not _supports_lowest(releases[0]):
@@ -259,47 +274,48 @@ def get_supported_releases(
 
 
 def pick_releases_to_test(
-    releases: list[Version], last_prerelease: Optional[Version]
+    integration: str, releases: list[Version], last_prerelease: Optional[Version]
 ) -> list[Version]:
     """Pick a handful of releases to test from a sorted list of supported releases."""
     # If the package has majors (or major-like releases, even if they don't do
-    # semver), we want to make sure we're testing them all. If not, we just pick
-    # the oldest, the newest, and a couple in between.
+    # semver), we want to make sure we're testing them all. If it doesn't have
+    # multiple majors, we just pick the oldest, the newest, and a couple of
+    # releases in between.
     #
     # If there is a relevant prerelease, also test that in addition to the above.
-    has_majors = len(set([v.major for v in releases])) > 1
+    num_versions = TEST_SUITE_CONFIG[integration].get("num_versions")
+    if num_versions is not None and (
+        not isinstance(num_versions, int) or num_versions < 2
+    ):
+        print("  Integration has invalid `num_versions`: must be an int >= 2")
+        num_versions = None
+
+    has_majors = len({v.major for v in releases}) > 1
     filtered_releases = set()
 
     if has_majors:
         # Always check the very first supported release
         filtered_releases.add(releases[0])
 
-        # Find out the min and max release by each major
+        # Find out the max release by each major
         releases_by_major = {}
         for release in releases:
-            if release.major not in releases_by_major:
-                releases_by_major[release.major] = [release, release]
-            if release < releases_by_major[release.major][0]:
-                releases_by_major[release.major][0] = release
-            if release > releases_by_major[release.major][1]:
-                releases_by_major[release.major][1] = release
+            if (
+                release.major not in releases_by_major
+                or release > releases_by_major[release.major]
+            ):
+                releases_by_major[release.major] = release
 
-        for i, (min_version, max_version) in enumerate(releases_by_major.values()):
+        # Add the highest release in each major
+        for max_version in releases_by_major.values():
             filtered_releases.add(max_version)
-            if i == len(releases_by_major) - 1:
-                # If this is the latest major release, also check the lowest
-                # version of this version
-                filtered_releases.add(min_version)
+
+        # If num_versions was provided, slim down the selection
+        if num_versions is not None:
+            filtered_releases = _pick_releases(sorted(filtered_releases), num_versions)
 
     else:
-        filtered_releases = {
-            releases[0],  # oldest version supported
-            releases[len(releases) // 3],
-            releases[
-                len(releases) // 3 * 2
-            ],  # two releases in between, roughly evenly spaced
-            releases[-1],  # latest
-        }
+        filtered_releases = _pick_releases(releases, num_versions)
 
     filtered_releases = sorted(filtered_releases)
     if last_prerelease is not None:
@@ -308,9 +324,31 @@ def pick_releases_to_test(
     return filtered_releases
 
 
+def _pick_releases(
+    releases: list[Version], num_versions: Optional[int]
+) -> set[Version]:
+    num_versions = num_versions or 4
+
+    versions = {
+        releases[0],  # oldest version supported
+        releases[-1],  # latest
+    }
+
+    for i in range(1, num_versions - 1):
+        try:
+            versions.add(releases[len(releases) // (num_versions - 1) * i])
+        except IndexError:
+            pass
+
+    return versions
+
+
 def supported_python_versions(
     package_python_versions: Union[SpecifierSet, list[Version]],
-    custom_supported_versions: Optional[SpecifierSet] = None,
+    custom_supported_versions: Optional[
+        Union[SpecifierSet, dict[SpecifierSet, SpecifierSet]]
+    ] = None,
+    release_version: Optional[Version] = None,
 ) -> list[Version]:
     """
     Get the intersection of Python versions supported by the package and the SDK.
@@ -330,6 +368,12 @@ def supported_python_versions(
       on Python 3.7, so we can provide this as `custom_supported_versions`. The
       result of this function will then by the intersection of all three, i.e.,
       [3.7].
+    - The Python SDK supports Python 3.6-3.13. The package supports 3.5-3.8.
+      Additionally, we have a limitation in place to only test this framework on
+      Python 3.5 if the framework version is <2.0. `custom_supported_versions`
+      will contain this restriction, and `release_version` will contain the
+      version of the package we're currently looking at, to determine whether the
+      <2.0 restriction applies in this case.
     """
     supported = []
 
@@ -337,8 +381,24 @@ def supported_python_versions(
     curr = MIN_PYTHON_VERSION
     while curr <= MAX_PYTHON_VERSION:
         if curr in package_python_versions:
-            if not custom_supported_versions or curr in custom_supported_versions:
+            if not custom_supported_versions:
                 supported.append(curr)
+
+            else:
+                if isinstance(custom_supported_versions, SpecifierSet):
+                    if curr in custom_supported_versions:
+                        supported.append(curr)
+
+                elif release_version is not None and isinstance(
+                    custom_supported_versions, dict
+                ):
+                    for v, py in custom_supported_versions.items():
+                        if release_version in v:
+                            if curr in py:
+                                supported.append(curr)
+                            break
+                    else:
+                        supported.append(curr)
 
         # Construct the next Python version (i.e., bump the minor)
         next = [int(v) for v in str(curr).split(".")]
@@ -387,8 +447,10 @@ def _parse_python_versions_from_classifiers(classifiers: list[str]) -> list[Vers
 
 def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Version]]:
     """
-    Given data from PyPI's release endpoint, determine the Python versions supported by the package
-    from the Python version classifiers, when present, or from `requires_python` if there are no classifiers.
+    Determine the Python versions supported by the package from PyPI data.
+
+    We're looking at Python version classifiers, if present, and
+    `requires_python` if there are no classifiers.
     """
     try:
         classifiers = pypi_data["info"]["classifiers"]
@@ -405,7 +467,7 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
 
     # We only use `requires_python` if there are no classifiers. This is because
     # `requires_python` doesn't tell us anything about the upper bound, which
-    # depends on when the release first came out
+    # implicitly depends on when the release first came out.
     try:
         requires_python = pypi_data["info"]["requires_python"]
     except (AttributeError, KeyError):
@@ -439,7 +501,7 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
             for dep in deps:
                 rendered.append(f"{{{constraint}}}-{integration}: {dep}")
         else:
-            restriction = SpecifierSet(constraint)
+            restriction = SpecifierSet(constraint, prereleases=True)
             for release in releases:
                 if release in restriction:
                     for dep in deps:
@@ -448,12 +510,14 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
     return rendered
 
 
-def write_tox_file(
-    packages: dict, update_timestamp: bool, last_updated: datetime
-) -> None:
+def write_tox_file(packages: dict) -> None:
     template = ENV.get_template("tox.jinja")
 
-    context = {"groups": {}}
+    context = {
+        "groups": {},
+        "testpaths": [],
+    }
+
     for group, integrations in packages.items():
         context["groups"][group] = []
         for integration in integrations:
@@ -468,11 +532,14 @@ def write_tox_file(
                     ),
                 }
             )
+            context["testpaths"].append(
+                (
+                    integration["name"],
+                    f"tests/integrations/{integration['integration_name']}",
+                )
+            )
 
-    if update_timestamp:
-        context["updated"] = datetime.now(tz=timezone.utc).isoformat()
-    else:
-        context["updated"] = last_updated.isoformat()
+    context["testpaths"].sort()
 
     rendered = template.render(context)
 
@@ -518,18 +585,36 @@ def _add_python_versions_to_release(
 
     time.sleep(PYPI_COOLDOWN)  # give PYPI some breathing room
 
-    target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-    if target_python_versions:
-        target_python_versions = SpecifierSet(target_python_versions)
+    target_python_versions = _transform_target_python_versions(
+        TEST_SUITE_CONFIG[integration].get("python")
+    )
 
     release.python_versions = pick_python_versions_to_test(
         supported_python_versions(
             determine_python_versions(release_pypi_data),
             target_python_versions,
+            release,
         )
     )
 
     release.rendered_python_versions = _render_python_versions(release.python_versions)
+
+
+def _transform_target_python_versions(
+    python_versions: Union[str, dict[str, str], None]
+) -> Union[SpecifierSet, dict[SpecifierSet, SpecifierSet], None]:
+    """Wrap the contents of the `python` key in SpecifierSets."""
+    if not python_versions:
+        return None
+
+    if isinstance(python_versions, str):
+        return SpecifierSet(python_versions)
+
+    if isinstance(python_versions, dict):
+        updated = {}
+        for key, value in python_versions.items():
+            updated[SpecifierSet(key)] = SpecifierSet(value)
+        return updated
 
 
 def get_file_hash() -> str:
@@ -544,20 +629,40 @@ def get_file_hash() -> str:
 
 
 def get_last_updated() -> Optional[datetime]:
-    timestamp = None
+    repo_root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    tox_ini_path = Path(repo_root) / "tox.ini"
 
-    with open(TOX_FILE, "r") as f:
-        for line in f:
-            if line.startswith("# Last generated:"):
-                timestamp = datetime.fromisoformat(line.strip().split()[-1])
-                break
+    timestamp = subprocess.run(
+        ["git", "log", "-1", "--pretty=%ct", str(tox_ini_path)],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
-    if timestamp is None:
-        print(
-            "Failed to find out when tox.ini was last generated; the timestamp seems to be missing from the file."
-        )
-
+    timestamp = datetime.fromtimestamp(int(timestamp), timezone.utc)
+    print(f"Last committed tox.ini update: {timestamp}")
     return timestamp
+
+
+def _normalize_name(package: str) -> str:
+    return package.lower().replace("-", "_")
+
+
+def _normalize_release(release: dict) -> dict:
+    """Filter out unneeded parts of the release JSON."""
+    normalized = {
+        "info": {
+            "classifiers": release["info"]["classifiers"],
+            "name": release["info"]["name"],
+            "requires_python": release["info"]["requires_python"],
+            "version": release["info"]["version"],
+            "yanked": release["info"]["yanked"],
+        },
+    }
+    return normalized
 
 
 def main(fail_on_changes: bool = False) -> None:
@@ -578,11 +683,12 @@ def main(fail_on_changes: bool = False) -> None:
     print(f"Running in {'fail_on_changes' if fail_on_changes else 'normal'} mode.")
     last_updated = get_last_updated()
     if fail_on_changes:
-        # We need to make the script ignore any new releases after the `last_updated`
+        # We need to make the script ignore any new releases after the last updated
         # timestamp so that we don't fail CI on a PR just because a new package
         # version was released, leading to unrelated changes in tox.ini.
         print(
-            f"Since we're in fail_on_changes mode, we're only considering releases before the last tox.ini update at {last_updated.isoformat()}."
+            f"Since we're in fail_on_changes mode, we're only considering "
+            f"releases before the last tox.ini update at {last_updated.isoformat()}."
         )
 
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
@@ -596,6 +702,20 @@ def main(fail_on_changes: bool = False) -> None:
         f"The SDK supports Python versions {MIN_PYTHON_VERSION} - {MAX_PYTHON_VERSION}."
     )
 
+    # Load file cache
+    global CACHE
+
+    with open(RELEASES_CACHE_FILE) as releases_cache:
+        for line in releases_cache:
+            release = json.loads(line)
+            name = _normalize_name(release["info"]["name"])
+            version = release["info"]["version"]
+            CACHE[name][version] = release
+            CACHE[name][version][
+                "_accessed"
+            ] = False  # for cleaning up unused cache entries
+
+    # Process packages
     packages = defaultdict(list)
 
     for group, integrations in GROUPS.items():
@@ -632,7 +752,9 @@ def main(fail_on_changes: bool = False) -> None:
             # Pick a handful of the supported releases to actually test against
             # and fetch the PyPI data for each to determine which Python versions
             # to test it on
-            test_releases = pick_releases_to_test(releases, latest_prerelease)
+            test_releases = pick_releases_to_test(
+                integration, releases, latest_prerelease
+            )
 
             for release in test_releases:
                 _add_python_versions_to_release(integration, package, release)
@@ -649,15 +771,32 @@ def main(fail_on_changes: bool = False) -> None:
                         "package": package,
                         "extra": extra,
                         "releases": test_releases,
+                        "integration_name": TEST_SUITE_CONFIG[integration].get(
+                            "integration_name"
+                        )
+                        or integration,
                     }
                 )
 
     if fail_on_changes:
         old_file_hash = get_file_hash()
 
-    write_tox_file(
-        packages, update_timestamp=not fail_on_changes, last_updated=last_updated
-    )
+    write_tox_file(packages)
+
+    # Sort the release cache file
+    releases = []
+    with open(RELEASES_CACHE_FILE) as releases_cache:
+        releases = [json.loads(line) for line in releases_cache]
+    releases.sort(key=lambda r: (r["info"]["name"], r["info"]["version"]))
+    with open(RELEASES_CACHE_FILE, "w") as releases_cache:
+        for release in releases:
+            if (
+                CACHE[_normalize_name(release["info"]["name"])][
+                    release["info"]["version"]
+                ]["_accessed"]
+                is True
+            ):
+                releases_cache.write(json.dumps(release) + "\n")
 
     if fail_on_changes:
         new_file_hash = get_file_hash()
@@ -674,19 +813,16 @@ def main(fail_on_changes: bool = False) -> None:
 
                 Please don't make manual changes to `tox.ini`. Instead, make the
                 changes to the `tox.jinja` template and/or the `populate_tox.py`
-                script (as applicable) and regenerate the `tox.ini` file with:
-
-                python -m venv toxgen.env
-                . toxgen.env/bin/activate
-                pip install -r scripts/populate_tox/requirements.txt
-                python scripts/populate_tox/populate_tox.py
+                script (as applicable) and regenerate the `tox.ini` file by
+                running scripts/generate-test-files.sh
                 """
                 )
             )
         print("Done checking tox.ini. Looking good!")
     else:
         print(
-            "Done generating tox.ini. Make sure to also update the CI YAML files to reflect the new test targets."
+            "Done generating tox.ini. Make sure to also update the CI YAML "
+            "files to reflect the new test targets."
         )
 
 

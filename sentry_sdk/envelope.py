@@ -273,7 +273,7 @@ class Item:
         elif ty == "event":
             return "error"
         elif ty == "log":
-            return "log"
+            return "log_item"
         elif ty == "client_report":
             return "internal"
         elif ty == "profile":
