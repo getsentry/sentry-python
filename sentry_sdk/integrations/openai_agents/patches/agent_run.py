@@ -26,12 +26,12 @@ def _patch_agent_run():
     original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
 
-    def _start_invoke_agent_span(context_wrapper, agent):
-        # type: (agents.RunContextWrapper, agents.Agent) -> None
+    def _start_invoke_agent_span(context_wrapper, agent, kwargs):
+        # type: (agents.RunContextWrapper, agents.Agent, dict[str, Any]) -> None
         """Start an agent invocation span"""
         # Store the agent on the context wrapper so we can access it later
         context_wrapper._sentry_current_agent = agent
-        invoke_agent_span(context_wrapper, agent)
+        invoke_agent_span(context_wrapper, agent, kwargs)
 
     def _end_invoke_agent_span(context_wrapper, agent, output=None):
         # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
@@ -72,7 +72,7 @@ def _patch_agent_run():
                 if current_agent and current_agent != agent:
                     _end_invoke_agent_span(context_wrapper, current_agent)
 
-            _start_invoke_agent_span(context_wrapper, agent)
+            _start_invoke_agent_span(context_wrapper, agent, kwargs)
 
         # Call original method with all the correct parameters
         result = await original_run_single_turn(*args, **kwargs)

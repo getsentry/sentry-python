@@ -29,7 +29,7 @@ class ConcurrentIntegration(Integration):
 
 
 def _wrap_submit_call(func):
-    # type: (Callable[..., Future[Any]]) -> Callable[..., Future[Any]]
+    # type: (Callable[..., Future[T]]) -> Callable[..., Future[T]]
     """
     Wrap submit call to propagate scopes on task submission.
     """
