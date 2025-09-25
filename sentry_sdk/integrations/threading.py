@@ -150,15 +150,13 @@ def _wrap_threadpool_executor_submit(func):
         if integration is None:
             return func(self, fn, *args, **kwargs)
 
-        if integration.propagate_scope:
-            isolation_scope = sentry_sdk.get_isolation_scope().fork()
-            current_scope = sentry_sdk.get_current_scope().fork()
-        else:
-            isolation_scope = None
-            current_scope = None
-
         def wrapped_fn(*args, **kwargs):
             # type: (*Any, **Any) -> Any
+            if not integration.propagate_scope:
+                return fn(*args, **kwargs)
+
+            isolation_scope = sentry_sdk.get_isolation_scope().fork()
+            current_scope = sentry_sdk.get_current_scope().fork()
             with use_isolation_scope(isolation_scope):
                 with use_scope(current_scope):
                     return fn(*args, **kwargs)
