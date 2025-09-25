@@ -207,5 +207,4 @@ picked (this doesn't count towards `num_versions`).
    "Defining constraints" section for the format.
 3. Add the integration to one of the groups in the `GROUPS` dictionary in
    `scripts/split_tox_gh_actions/split_tox_gh_actions.py`.
-4. Add the `TESTPATH` for the test suite in `tox.jinja`'s `setenv` section.
-5. Run `scripts/generate-test-files.sh` and commit the changes.
+4. Run `scripts/generate-test-files.sh` and commit the changes.
