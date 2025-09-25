@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.39.0
+
+### Various fixes & improvements
+
+- Don't swallow userland exceptions in openai (#4861) by @sl0thentr0py
+- feat(toxgen): Remove timestamp prone to merge conflicts (#4860) by @sentrivana
+- chore: Slim down test matrix (#4856) by @sentrivana
+- docs: Update contributing guidelines with instructions to run tests with tox (#4857) by @alexander-alderman-webb
+- chore: Clean up toxgen (#4855) by @sentrivana
+- feat(toxgen): Cache release data (#4835) by @sentrivana
+- fix(AI): Make agents integrations set the span status in case of error (#4820) by @antonpirker
+- fix(langchain): don't record tool call output if not include_prompt / should_send_default_pii (#4836) by @shellmayr
+- build(deps): bump actions/setup-python from 5 to 6 (#4830) by @dependabot
+- fix: Pin shibuya (#4839) by @sentrivana
+- Use weakref in dedupe where possible (#4834) by @sl0thentr0py
+- tests: Remove old system for checking for regressions (#4826) by @sentrivana
+- ci: 🤖 Update test matrix with new releases (09/22) (#4831) by @github-actions
+- tests: Move requests under toxgen (#4825) by @sentrivana
+- tests: Move rq under toxgen (#4818) by @sentrivana
+- tests: Move redis under toxgen (#4824) by @sentrivana
+- test(spark): Improve `test_spark` speed (#4822) by @mgaligniana
+- tests: Move httpx under toxgen (#4780) by @sentrivana
+- tests: Move ray under toxgen (#4810) by @sentrivana
+- tests: Move sanic under toxgen & add option to control how many releases to pick (#4767) by @sentrivana
+- ci: 🤖 Update test matrix with new releases (09/18) (#4816) by @github-actions
+- tests: Move pure_eval under toxgen (#4815) by @sentrivana
+- fix(Django): Avoid evaluating complex Django object in span.data/span.attributes (#4804) by @antonpirker
+- fix: Fix links to files in toxgen PRs (#4807) by @sentrivana
+
+_Plus 5 more_
+
 ## 2.38.0
 
 ### Various fixes & improvements
