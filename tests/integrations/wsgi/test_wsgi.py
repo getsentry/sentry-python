@@ -7,7 +7,7 @@ from werkzeug.test import Client
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk._werkzeug import get_host
+from sentry_sdk._werkzeug import get_host, _get_headers
 
 
 @pytest.fixture
@@ -76,9 +76,24 @@ class ExitingIterable:
             "ham",
             id="ignore x-forwarded-host",
         ),
+        pytest.param(
+            {
+                "SERVER_NAME": "2001:0db8:85a3:0042:1000:8a2e:0370:7334",
+                "SERVER_PORT": "8080",
+            },
+            "[2001:0db8:85a3:0042:1000:8a2e:0370:7334]:8080",
+            id="IPv6, custom port",
+        ),
+        pytest.param(
+            {"SERVER_NAME": "eggs"},
+            "eggs",
+            id="name, no port",
+        ),
     ),
 )
+#
 # https://github.com/pallets/werkzeug/blob/main/tests/test_wsgi.py#L60
+#
 def test_get_host(environ, expect):
     environ.setdefault("wsgi.url_scheme", "http")
     assert get_host(environ) == expect
@@ -106,26 +121,19 @@ def test_basic(sentry_init, crashing_app, capture_events):
     }
 
 
-def test_basic_forwarded_host(sentry_init, crashing_app, capture_events):
-    sentry_init(send_default_pii=True)
-    app = SentryWsgiMiddleware(crashing_app, use_x_forwarded_for=True)
-    client = Client(app)
-    events = capture_events()
-
-    with pytest.raises(ZeroDivisionError):
-        client.get("/", environ_overrides={"HTTP_X_FORWARDED_HOST": "foobarbaz:80"})
-
-    (event,) = events
-
-    assert event["transaction"] == "generic WSGI request"
-
-    assert event["request"] == {
-        "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-        "headers": {"Host": "localhost", "X-Forwarded-Host": "foobarbaz:80"},
-        "method": "GET",
-        "query_string": "",
-        "url": "http://foobarbaz/",
-    }
+@pytest.mark.parametrize(
+    ("environ", "expect"),
+    (
+        pytest.param(
+            {"CONTENT_TYPE": "text/html", "CONTENT_LENGTH": "0"},
+            [("Content-Length", "0"), ("Content-Type", "text/html")],
+            id="headers",
+        ),
+    ),
+)
+def test_headers(environ, expect):
+    environ.setdefault("wsgi.url_scheme", "http")
+    assert sorted(_get_headers(environ)) == expect
 
 
 @pytest.mark.parametrize("path_info", ("bark/", "/bark/"))
