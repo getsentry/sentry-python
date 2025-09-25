@@ -868,7 +868,6 @@ def test_event_processor_drop_records_client_report(
         (["atexit"], "sentry.python"),
         (["boto3"], "sentry.python"),
         (["celery"], "sentry.python"),
-        (["concurrent"], "sentry.python"),
         (["dedupe"], "sentry.python"),
         (["excepthook"], "sentry.python"),
         (["unraisablehook"], "sentry.python"),

@@ -2,6 +2,7 @@ import sys
 import warnings
 from functools import wraps
 from threading import Thread, current_thread
+from concurrent.futures import ThreadPoolExecutor, Future
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
+    T = TypeVar("T", bound=Any)
 
 
 class ThreadingIntegration(Integration):
@@ -109,6 +111,7 @@ class ThreadingIntegration(Integration):
             return old_start(self, *a, **kw)
 
         Thread.start = sentry_start  # type: ignore
+        ThreadPoolExecutor.submit = _wrap_threadpool_executor_submit(ThreadPoolExecutor.submit)  # type: ignore
 
 
 def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
@@ -132,6 +135,37 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
             return _run_old_run_func()
 
     return run  # type: ignore
+
+
+def _wrap_threadpool_executor_submit(func):
+    # type: (Callable[..., Future[T]]) -> Callable[..., Future[T]]
+    """
+    Wrap submit call to propagate scopes on task submission.
+    """
+
+    @wraps(func)
+    def sentry_submit(self, fn, *args, **kwargs):
+        # type: (ThreadPoolExecutor, Callable[..., T], *Any, **Any) -> Future[T]
+        integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
+        if integration is None:
+            return func(self, fn, *args, **kwargs)
+
+        if integration.propagate_scope:
+            isolation_scope = sentry_sdk.get_isolation_scope().fork()
+            current_scope = sentry_sdk.get_current_scope().fork()
+        else:
+            isolation_scope = None
+            current_scope = None
+
+        def wrapped_fn(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            with use_isolation_scope(isolation_scope):
+                with use_scope(current_scope):
+                    return fn(*args, **kwargs)
+
+        return func(self, wrapped_fn, *args, **kwargs)
+
+    return sentry_submit
 
 
 def _capture_exception():
