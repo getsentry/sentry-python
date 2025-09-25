@@ -278,10 +278,17 @@ def test_spans_from_multiple_threads(
         )
 
 
-def test_spans_from_threadpool(sentry_init, capture_events, render_span_tree):
+@pytest.mark.parametrize(
+    "propagate_scope",
+    (True, False),
+    ids=["propagate_scope=True", "propagate_scope=False"],
+)
+def test_spans_from_threadpool(
+    sentry_init, capture_events, render_span_tree, propagate_scope
+):
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[ThreadingIntegration()],
+        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
     )
     events = capture_events()
 
@@ -302,8 +309,9 @@ def test_spans_from_threadpool(sentry_init, capture_events, render_span_tree):
 
     (event,) = events
 
-    assert render_span_tree(event) == dedent(
-        """\
+    if propagate_scope:
+        assert render_span_tree(event) == dedent(
+            """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
                 - op="inner-run-0": description="Thread: child-0"
@@ -316,4 +324,16 @@ def test_spans_from_threadpool(sentry_init, capture_events, render_span_tree):
               - op="outer-submit-4": description="Thread: main"
                 - op="inner-run-4": description="Thread: child-4"\
 """
-    )
+        )
+
+    elif not propagate_scope:
+        assert render_span_tree(event) == dedent(
+            """\
+            - op="outer-trx": description=null
+              - op="outer-submit-0": description="Thread: main"
+              - op="outer-submit-1": description="Thread: main"
+              - op="outer-submit-2": description="Thread: main"
+              - op="outer-submit-3": description="Thread: main"
+              - op="outer-submit-4": description="Thread: main"\
+"""
+        )
