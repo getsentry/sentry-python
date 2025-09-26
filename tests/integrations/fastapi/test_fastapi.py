@@ -271,9 +271,9 @@ def test_response_status_code_ok_in_transaction_context(sentry_init, capture_env
 
     assert transaction["type"] == "transaction"
     assert len(transaction["contexts"]) > 0
-    assert (
-        "response" in transaction["contexts"].keys()
-    ), "Response context not found in transaction"
+    assert "response" in transaction["contexts"].keys(), (
+        "Response context not found in transaction"
+    )
     assert transaction["contexts"]["response"]["status_code"] == 200
 
 
@@ -307,9 +307,9 @@ def test_response_status_code_error_in_transaction_context(
 
     assert transaction["type"] == "transaction"
     assert len(transaction["contexts"]) > 0
-    assert (
-        "response" in transaction["contexts"].keys()
-    ), "Response context not found in transaction"
+    assert "response" in transaction["contexts"].keys(), (
+        "Response context not found in transaction"
+    )
     assert transaction["contexts"]["response"]["status_code"] == 500
 
 
@@ -338,9 +338,9 @@ def test_response_status_code_not_found_in_transaction_context(
 
     assert transaction["type"] == "transaction"
     assert len(transaction["contexts"]) > 0
-    assert (
-        "response" in transaction["contexts"].keys()
-    ), "Response context not found in transaction"
+    assert "response" in transaction["contexts"].keys(), (
+        "Response context not found in transaction"
+    )
     assert transaction["contexts"]["response"]["status_code"] == 404
 
 

@@ -998,9 +998,7 @@ class Transaction(Span):
 
         # For backwards compatibility, we must handle the case where `scope`
         # or `hub` could both either be a `Scope` or a `Hub`.
-        scope = self._get_scope_from_finish_args(
-            scope, hub
-        )  # type: Optional[sentry_sdk.Scope]
+        scope = self._get_scope_from_finish_args(scope, hub)  # type: Optional[sentry_sdk.Scope]
 
         scope = scope or self.scope or sentry_sdk.get_current_scope()
         client = sentry_sdk.get_client()
@@ -1209,8 +1207,8 @@ class Transaction(Span):
         sample_rate = (
             client.options["traces_sampler"](sampling_context)
             if callable(client.options.get("traces_sampler"))
+            # default inheritance behavior
             else (
-                # default inheritance behavior
                 sampling_context["parent_sampled"]
                 if sampling_context["parent_sampled"] is not None
                 else client.options["traces_sample_rate"]

@@ -15,7 +15,6 @@ DEFAULT_FLAG_CAPACITY = 100
 
 
 class FlagBuffer:
-
     def __init__(self, capacity):
         # type: (int) -> None
         self.capacity = capacity

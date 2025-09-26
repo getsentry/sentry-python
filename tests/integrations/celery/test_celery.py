@@ -374,9 +374,9 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     assert submit_transaction["type"] == "transaction"
     assert submit_transaction["transaction"] == "submit_celery"
 
-    assert len(
-        submit_transaction["spans"]
-    ), 4  # Because redis integration was auto enabled
+    assert len(submit_transaction["spans"]), (
+        4
+    )  # Because redis integration was auto enabled
     span = submit_transaction["spans"][0]
     assert span["op"] == "queue.submit.celery"
     assert span["description"] == "dummy_task"
