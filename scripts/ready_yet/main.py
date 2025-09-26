@@ -56,7 +56,7 @@ def main():
     Check if libraries in our tox.ini are ready for Python version defined in `PYTHON_VERSION`.
     """
     print(f"Checking libs from tox.ini for Python {PYTHON_VERSION} compatibility:")
-    
+
     ready = set()
     not_ready = set()
     not_found = set()
