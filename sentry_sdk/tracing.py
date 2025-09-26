@@ -996,6 +996,7 @@ class Transaction(Span):
         return False
 
     def _get_log_representation(self):
+        # type: () -> str
         return "{op}transaction <{name}>".format(
             op=("<" + self.op + "> " if self.op else ""), name=self.name
         )
