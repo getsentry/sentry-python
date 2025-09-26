@@ -208,13 +208,13 @@ select = [
 
 # Use ONLY the same ignores as the original flake8 config + compatibility for this codebase
 ignore = [
-    "E203", # Whitespace before ':' -- handled by black
-    "E501", # Line too long -- handled by black
+    "E203", # Whitespace before ':'
+    "E501", # Line too long
     "E402", # Module level import not at top of file
     "E731", # Do not assign a lambda expression, use a def
-    "B014", # Redundant exception types by flake8-bugbear (but B rules not selected anyway)
-    "N812", # Lowercase imported as non-lowercase (but N rules not selected anyway)
-    "N804", # First argument of classmethod should be named cls (but N rules not selected anyway)
+    "B014", # Redundant exception types
+    "N812", # Lowercase imported as non-lowercase
+    "N804", # First argument of classmethod should be named cls
 
     # Additional ignores for codebase compatibility
     "F401", # Unused imports - many in TYPE_CHECKING blocks used for type comments
@@ -222,7 +222,6 @@ ignore = [
 ]
 
 [tool.ruff.format]
-# Match black's behavior
 # ruff format already excludes the same files as specified in extend-exclude
 # Ensure Python 3.7 compatibility - avoid using Python 3.9+ syntax features
 skip-magic-trailing-comma = false
