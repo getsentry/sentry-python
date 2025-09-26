@@ -271,3 +271,5 @@ ignore = [
 [tool.ruff.format]
 # Match black's behavior
 # ruff format already excludes the same files as specified in extend-exclude
+# Ensure Python 3.7 compatibility - avoid using Python 3.9+ syntax features
+skip-magic-trailing-comma = false
