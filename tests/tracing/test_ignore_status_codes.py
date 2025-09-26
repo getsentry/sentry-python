@@ -125,7 +125,7 @@ def test_transaction_not_ignored_when_status_code_has_invalid_type(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_ignore_status_codes=(404,),
+        trace_ignore_status_codes=((401, 404),),
     )
     events = capture_events()
 
