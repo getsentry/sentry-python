@@ -975,7 +975,6 @@ class Transaction(Span):
         # type: (int, Sequence[Union[int, Tuple[int, int]]]) -> bool
         for target in code_ranges:
             if isinstance(target, int):
-                print(code, target, code == target, type(code), type(target))
                 if code == target:
                     return True
                 continue
@@ -994,6 +993,11 @@ class Transaction(Span):
                 return True
 
         return False
+
+    def _get_log_representation(self):
+        return "{op}transaction <{name}>".format(
+            op=("<" + self.op + "> " if self.op else ""), name=self.name
+        )
 
     def finish(
         self,
@@ -1068,6 +1072,15 @@ class Transaction(Span):
             self._data[SPANDATA.HTTP_STATUS_CODE],
             client.options["trace_ignore_status_codes"],
         ):
+            logger.debug(
+                "[Tracing] Discarding {transaction_description} because the HTTP status code {status_code} is matched by trace_ignore_status_codes: {trace_ignore_status_codes}".format(
+                    transaction_description=self._get_log_reprensentation(),
+                    status_code=self._data[SPANDATA.HTTP_STATUS_CODE],
+                    trace_ignore_status_codes=client.options[
+                        "trace_ignore_status_codes"
+                    ],
+                )
+            )
             self.sampled = False
 
         if not self.sampled:
@@ -1217,9 +1230,7 @@ class Transaction(Span):
         """
         client = sentry_sdk.get_client()
 
-        transaction_description = "{op}transaction <{name}>".format(
-            op=("<" + self.op + "> " if self.op else ""), name=self.name
-        )
+        transaction_description = self._get_log_representation()
 
         # nothing to do if tracing is disabled
         if not has_tracing_enabled(client.options):
