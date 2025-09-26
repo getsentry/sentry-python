@@ -1070,11 +1070,11 @@ class Transaction(Span):
         super().finish(scope, end_timestamp)
 
         status_code = self._data.get(SPANDATA.HTTP_STATUS_CODE)
-        if status_code and not isinstance(status_code, int):
+        if status_code is not None and not isinstance(status_code, int):
             logger.warning(
                 f"Invalid type for http.response.status_code; is {status_code!r} of type {type(status_code)}, expected an int."
             )
-        elif status_code and self._in_http_status_code_range(
+        elif status_code is not None and self._in_http_status_code_range(
             status_code,
             client.options["trace_ignore_status_codes"],
         ):
