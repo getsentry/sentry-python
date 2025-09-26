@@ -333,7 +333,6 @@ def test_pregel_ainvoke(sentry_init, capture_events, send_default_pii, include_p
 
     async def run_test():
         with start_transaction():
-
             wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
             result = await wrapped_ainvoke(pregel, test_state)
             return result
@@ -394,7 +393,6 @@ def test_pregel_invoke_error(sentry_init, capture_events):
         raise Exception("Graph execution failed")
 
     with start_transaction(), pytest.raises(Exception, match="Graph execution failed"):
-
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
         wrapped_invoke(pregel, test_state)
 
@@ -426,7 +424,6 @@ def test_pregel_ainvoke_error(sentry_init, capture_events):
         with start_transaction(), pytest.raises(
             Exception, match="Async graph execution failed"
         ):
-
             wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
             await wrapped_ainvoke(pregel, test_state)
 
@@ -482,7 +479,6 @@ def test_pregel_invoke_with_different_graph_names(
 
     pregel = MockPregelInstance(graph_name) if graph_name else MockPregelInstance()
     if not graph_name:
-
         delattr(pregel, "name")
         delattr(pregel, "graph_name")
 
@@ -490,7 +486,6 @@ def test_pregel_invoke_with_different_graph_names(
         return {"result": "test"}
 
     with start_transaction():
-
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
         wrapped_invoke(pregel, {"messages": []})
 

@@ -601,7 +601,7 @@ def _add_python_versions_to_release(
 
 
 def _transform_target_python_versions(
-    python_versions: Union[str, dict[str, str], None]
+    python_versions: Union[str, dict[str, str], None],
 ) -> Union[SpecifierSet, dict[SpecifierSet, SpecifierSet], None]:
     """Wrap the contents of the `python` key in SpecifierSets."""
     if not python_versions:
@@ -711,9 +711,9 @@ def main(fail_on_changes: bool = False) -> None:
             name = _normalize_name(release["info"]["name"])
             version = release["info"]["version"]
             CACHE[name][version] = release
-            CACHE[name][version][
-                "_accessed"
-            ] = False  # for cleaning up unused cache entries
+            CACHE[name][version]["_accessed"] = (
+                False  # for cleaning up unused cache entries
+            )
 
     # Process packages
     packages = defaultdict(list)

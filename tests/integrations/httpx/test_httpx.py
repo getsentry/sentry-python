@@ -328,7 +328,8 @@ def test_option_trace_propagation_targets(
         integrations=[HttpxIntegration()],
     )
 
-    with sentry_sdk.start_transaction():  # Must be in a transaction to propagate headers
+    # Must be in a transaction to propagate headers
+    with sentry_sdk.start_transaction():
         if asyncio.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:

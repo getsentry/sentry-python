@@ -104,13 +104,11 @@ def test_transport_works_gevent(
         (compression_level is None)
         or (
             # setting compression level to 0 means don't compress
-            compression_level
-            > 0
+            compression_level > 0
         )
     ) and (
         # if we couldn't resolve to a known algo, we don't compress
-        compression_algo
-        != "<invalid>"
+        compression_algo != "<invalid>"
     )
 
     assert capturing_server.captured[0].compressed == should_compress

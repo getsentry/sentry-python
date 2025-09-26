@@ -22,7 +22,9 @@ import pytest
     ],
 )
 def test_string_containing(
-    test_string, expected_result, StringContaining  # noqa: N803
+    test_string,
+    expected_result,
+    StringContaining,  # noqa: N803
 ):
     assert (test_string == StringContaining("dogs")) is expected_result
 
@@ -46,7 +48,9 @@ def test_string_containing(
     ],
 )
 def test_dictionary_containing(
-    test_dict, expected_result, DictionaryContaining  # noqa: N803
+    test_dict,
+    expected_result,
+    DictionaryContaining,  # noqa: N803
 ):
     assert (
         test_dict == DictionaryContaining({"dogs": "yes", "cats": "maybe"})

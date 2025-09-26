@@ -529,33 +529,33 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     from django.core.cache import cache
 
     with sentry_sdk.start_transaction():
-        cache.get_many([f"S{id}", f"S{id+1}"])
+        cache.get_many([f"S{id}", f"S{id + 1}"])
         cache.set(f"S{id}", "Sensitive1")
-        cache.get_many([f"S{id}", f"S{id+1}"])
+        cache.get_many([f"S{id}", f"S{id + 1}"])
 
     (transaction,) = events
     assert len(transaction["spans"]) == 7
 
     assert transaction["spans"][0]["op"] == "cache.get"
-    assert transaction["spans"][0]["description"] == f"S{id}, S{id+1}"
+    assert transaction["spans"][0]["description"] == f"S{id}, S{id + 1}"
 
     assert transaction["spans"][1]["op"] == "cache.get"
     assert transaction["spans"][1]["description"] == f"S{id}"
 
     assert transaction["spans"][2]["op"] == "cache.get"
-    assert transaction["spans"][2]["description"] == f"S{id+1}"
+    assert transaction["spans"][2]["description"] == f"S{id + 1}"
 
     assert transaction["spans"][3]["op"] == "cache.put"
     assert transaction["spans"][3]["description"] == f"S{id}"
 
     assert transaction["spans"][4]["op"] == "cache.get"
-    assert transaction["spans"][4]["description"] == f"S{id}, S{id+1}"
+    assert transaction["spans"][4]["description"] == f"S{id}, S{id + 1}"
 
     assert transaction["spans"][5]["op"] == "cache.get"
     assert transaction["spans"][5]["description"] == f"S{id}"
 
     assert transaction["spans"][6]["op"] == "cache.get"
-    assert transaction["spans"][6]["description"] == f"S{id+1}"
+    assert transaction["spans"][6]["description"] == f"S{id + 1}"
 
 
 @pytest.mark.forked
@@ -578,20 +578,20 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     from django.core.cache import cache
 
     with sentry_sdk.start_transaction():
-        cache.set_many({f"S{id}": "Sensitive1", f"S{id+1}": "Sensitive2"})
+        cache.set_many({f"S{id}": "Sensitive1", f"S{id + 1}": "Sensitive2"})
         cache.get(f"S{id}")
 
     (transaction,) = events
     assert len(transaction["spans"]) == 4
 
     assert transaction["spans"][0]["op"] == "cache.put"
-    assert transaction["spans"][0]["description"] == f"S{id}, S{id+1}"
+    assert transaction["spans"][0]["description"] == f"S{id}, S{id + 1}"
 
     assert transaction["spans"][1]["op"] == "cache.put"
     assert transaction["spans"][1]["description"] == f"S{id}"
 
     assert transaction["spans"][2]["op"] == "cache.put"
-    assert transaction["spans"][2]["description"] == f"S{id+1}"
+    assert transaction["spans"][2]["description"] == f"S{id + 1}"
 
     assert transaction["spans"][3]["op"] == "cache.get"
     assert transaction["spans"][3]["description"] == f"S{id}"

@@ -158,7 +158,8 @@ class SparkListener:
         pass
 
     def onExecutorBlacklistedForStage(  # noqa: N802
-        self, executorBlacklistedForStage  # noqa: N803
+        self,
+        executorBlacklistedForStage,  # noqa: N803
     ):
         # type: (Any) -> None
         pass

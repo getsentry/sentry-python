@@ -97,7 +97,9 @@ def test_transport_shutdown(sentry_init, capture_events_forksafe):
 
 
 def test_transaction_with_error(
-    sentry_init, capture_events, DictionaryContaining  # noqa:N803
+    sentry_init,
+    capture_events,
+    DictionaryContaining,  # noqa:N803
 ):
     sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -195,7 +197,9 @@ def test_tracing_disabled(
 
 
 def test_transaction_no_error(
-    sentry_init, capture_events, DictionaryContaining  # noqa:N803
+    sentry_init,
+    capture_events,
+    DictionaryContaining,  # noqa:N803
 ):
     sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -222,7 +226,9 @@ def test_transaction_no_error(
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
-    sentry_init, DictionaryContaining, ObjectDescribedBy  # noqa:N803
+    sentry_init,
+    DictionaryContaining,
+    ObjectDescribedBy,  # noqa:N803
 ):
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(integrations=[RqIntegration()], traces_sampler=traces_sampler)

@@ -116,7 +116,9 @@ def pure_eval_frame(frame):
             return (n.lineno, n.col_offset)
 
         nodes_before_stmt = [
-            node for node in nodes if start(node) < stmt.last_token.end  # type: ignore
+            node
+            for node in nodes
+            if start(node) < stmt.last_token.end  # type: ignore
         ]
         if nodes_before_stmt:
             # The position of the last node before or in the statement

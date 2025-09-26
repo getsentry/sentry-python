@@ -852,7 +852,6 @@ class OP:
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor:
-
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
