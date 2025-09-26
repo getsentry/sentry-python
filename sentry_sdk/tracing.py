@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Union
     from typing import TypeVar
+    from typing import Sequence
 
     from typing_extensions import TypedDict, Unpack
 
@@ -970,6 +971,30 @@ class Transaction(Span):
 
         return scope_or_hub
 
+    def _in_http_status_code_range(self, code, code_ranges):
+        # type: (int, Sequence[Union[int, Tuple[int, int]]]) -> bool
+        for target in code_ranges:
+            if isinstance(target, int):
+                print(code, target, code == target, type(code), type(target))
+                if code == target:
+                    return True
+                continue
+
+            if (
+                len(target) != 2
+                or not isinstance(target[0], int)
+                or not isinstance(target[1], int)
+            ):
+                logger.warning(
+                    "trace_ignore_status_codes must be a sequences including only integers or pairs of integers."
+                )
+                continue
+
+            if target[0] <= code <= target[1]:
+                return True
+
+        return False
+
     def finish(
         self,
         scope=None,  # type: Optional[sentry_sdk.Scope]
@@ -1038,6 +1063,12 @@ class Transaction(Span):
             self.name = "<unlabeled transaction>"
 
         super().finish(scope, end_timestamp)
+
+        if SPANDATA.HTTP_STATUS_CODE in self._data and self._in_http_status_code_range(
+            self._data[SPANDATA.HTTP_STATUS_CODE],
+            client.options["trace_ignore_status_codes"],
+        ):
+            self.sampled = False
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
