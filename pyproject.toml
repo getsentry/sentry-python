@@ -222,3 +222,46 @@ exclude = [
   "grpc_test_service_pb2.py",
   "grpc_test_service_pb2_grpc.py",
 ]
+
+#
+# Tool: Ruff (replaces Black + Flake8 + plugins)
+#
+
+[tool.ruff]
+# Target Python 3.6+ (minimum supported version)
+target-version = "py36"
+
+# Exclude files and directories (from black + flake8)
+extend-exclude = [
+    "*_pb2.py",     # Protocol Buffer files
+    "*_pb2_grpc.py", # Protocol Buffer files
+    "checkouts",    # From flake8
+    "lol*",         # From flake8
+    "grpc_test_service_pb2.py",
+    "grpc_test_service_pb2_grpc.py",
+]
+
+[tool.ruff.lint]
+# Enable flake8-bugbear (B) and pep8-naming (N) rules to match old plugins
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "W",   # pycodestyle warnings
+    "B",   # flake8-bugbear
+    "N",   # pep8-naming
+]
+
+# Ignore the same rules as flake8 config
+ignore = [
+    "E203", # Handled by formatter (was handled by black)
+    "E501", # Handled by formatter (was handled by black)
+    "E402", # Module level import not at top of file
+    "E731", # Do not assign a lambda expression, use a def
+    "B014", # Redundant exception types (doesn't apply to Python 2)
+    "N812", # Lowercase imported as non-lowercase
+    "N804", # First argument of classmethod should be named cls
+]
+
+[tool.ruff.format]
+# Match black's behavior
+# ruff format already excludes the same files as specified in extend-exclude
