@@ -1,9 +1,10 @@
 """
-Find out what the actual minimum supported version of each framework/library is.
+Small utility to determine the actual minimum supported version of each framework/library.
 """
 
 import os
 import sys
+from textwrap import dedent
 
 populate_tox_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "populate_tox"
@@ -38,10 +39,12 @@ def update():
     print()
     print("Effective minimal versions:")
     print(
-        "(The format is the same as _MIN_VERSIONS in sentry_sdk/integrations/__init__.py for easy replacing.)"
-    )
-    print(
-        "(When updating these, make sure to also update the docs page for the integration.)"
+        dedent("""
+        - The format is the same as _MIN_VERSIONS in sentry_sdk/integrations/__init__.py for easy replacing.
+        - When updating these, make sure to also update:
+            - The docs page for the integration
+            - The lower bounds in extras_require in setup.py
+    """)
     )
     print()
     for integration, min_version in min_versions:
