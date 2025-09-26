@@ -979,18 +979,19 @@ class Transaction(Span):
                     return True
                 continue
 
-            if (
-                len(target) != 2
-                or not isinstance(target[0], int)
-                or not isinstance(target[1], int)
-            ):
-                logger.warning(
-                    "trace_ignore_status_codes must be a sequences including only integers or pairs of integers."
-                )
-                continue
-
-            if target[0] <= code <= target[1]:
-                return True
+            wrong_type_message = "trace_ignore_status_codes must be a list of integers or pairs of integers."
+            try:
+                if (
+                    len(target) == 2
+                    and isinstance(target[0], int)
+                    and isinstance(target[1], int)
+                    and target[0] <= code <= target[1]
+                ):
+                    return True
+                elif not isinstance(target[0], int) or not isinstance(target[1], int):
+                    logger.warning(wrong_type_message)
+            except (TypeError, IndexError):
+                logger.warning(wrong_type_message)
 
         return False
 
@@ -1074,7 +1075,7 @@ class Transaction(Span):
         ):
             logger.debug(
                 "[Tracing] Discarding {transaction_description} because the HTTP status code {status_code} is matched by trace_ignore_status_codes: {trace_ignore_status_codes}".format(
-                    transaction_description=self._get_log_reprensentation(),
+                    transaction_description=self._get_log_representation(),
                     status_code=self._data[SPANDATA.HTTP_STATUS_CODE],
                     trace_ignore_status_codes=client.options[
                         "trace_ignore_status_codes"

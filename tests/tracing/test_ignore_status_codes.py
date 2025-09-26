@@ -39,7 +39,12 @@ def test_single_code_ignored(sentry_init, capture_events, status_code):
 def test_range_ignored(sentry_init, capture_events, status_code):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_ignore_status_codes=((305, 399),),
+        trace_ignore_status_codes=(
+            (
+                305,
+                399,
+            ),
+        ),
     )
     events = capture_events()
 
@@ -61,8 +66,14 @@ def test_variety_ignored(sentry_init, capture_events, status_code):
             301,
             302,
             303,
-            (305, 399),
-            (401, 404),
+            (
+                305,
+                399,
+            ),
+            (
+                401,
+                404,
+            ),
         ),
     )
     events = capture_events()
@@ -79,3 +90,31 @@ def test_variety_ignored(sentry_init, capture_events, status_code):
         assert not events
     else:
         assert len(events) == 1
+
+
+def test_malformed_argument_ignored(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_ignore_status_codes=(
+            404.0,
+            "404",
+            "401-404",
+            (404,),
+            (
+                "401",
+                "404",
+            ),
+            (
+                401,
+                404,
+                500,
+            ),
+        ),
+    )
+    events = capture_events()
+
+    with start_transaction(op="http", name="GET /"):
+        span_or_tx = sentry_sdk.get_current_span()
+        span_or_tx.set_data("http.response.status_code", 404)
+
+    assert len(events) == 1
