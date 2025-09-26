@@ -228,8 +228,8 @@ exclude = [
 #
 
 [tool.ruff]
-# Target Python 3.6+ (minimum supported version)
-target-version = "py36"
+# Target Python 3.7+ (minimum version supported by ruff)
+target-version = "py37"
 
 # Exclude files and directories (from black + flake8)
 extend-exclude = [
