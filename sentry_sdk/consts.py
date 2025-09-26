@@ -919,6 +919,7 @@ class ClientConstructor:
         max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
         enable_logs=False,  # type: bool
         before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
+        trace_ignore_status_codes=[],  # type: Sequence[Union[int, Tuple[int, int]]]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1306,6 +1307,16 @@ class ClientConstructor:
             before they're sent to Sentry. Any modifications to the log in this
             function will be retained. If the function returns None, the log will
             not be sent to Sentry.
+
+        :param trace_ignore_status_codes: An optional property that disables tracing for
+            HTTP requests with certain response codes.
+
+            The option is a list, where elements are individual response codes, or inclusive
+            ranges of response codes. Requests are not traced if any code matches or
+            any provided range contains the response code.
+
+            If `trace_ignore_status_codes` is not provided, requests with any status code
+            may be traced.
 
         :param _experiments:
         """

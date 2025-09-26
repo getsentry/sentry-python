@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Union
     from typing import TypeVar
+    from typing import Sequence
 
     from typing_extensions import TypedDict, Unpack
 
@@ -970,6 +971,35 @@ class Transaction(Span):
 
         return scope_or_hub
 
+    def _in_http_status_code_range(self, code, code_ranges):
+        # type: (int, Sequence[Union[int, Tuple[int, int]]]) -> bool
+        for target in code_ranges:
+            if isinstance(target, int):
+                if code == target:
+                    return True
+                continue
+
+            wrong_type_message = "trace_ignore_status_codes must be a list of integers or pairs of integers."
+            try:
+                low, high = target
+                if not isinstance(low, int) or not isinstance(high, int):
+                    logger.warning(wrong_type_message)
+                    continue
+
+                if low <= code <= high:
+                    return True
+
+            except Exception:
+                logger.warning(wrong_type_message)
+
+        return False
+
+    def _get_log_representation(self):
+        # type: () -> str
+        return "{op}transaction <{name}>".format(
+            op=("<" + self.op + "> " if self.op else ""), name=self.name
+        )
+
     def finish(
         self,
         scope=None,  # type: Optional[sentry_sdk.Scope]
@@ -1038,6 +1068,26 @@ class Transaction(Span):
             self.name = "<unlabeled transaction>"
 
         super().finish(scope, end_timestamp)
+
+        status_code = self._data.get(SPANDATA.HTTP_STATUS_CODE)
+        if status_code is not None and not isinstance(status_code, int):
+            logger.warning(
+                f"Invalid type for http.response.status_code; is {status_code!r} of type {type(status_code)}, expected an int."
+            )
+        elif status_code is not None and self._in_http_status_code_range(
+            status_code,
+            client.options["trace_ignore_status_codes"],
+        ):
+            logger.debug(
+                "[Tracing] Discarding {transaction_description} because the HTTP status code {status_code} is matched by trace_ignore_status_codes: {trace_ignore_status_codes}".format(
+                    transaction_description=self._get_log_representation(),
+                    status_code=self._data[SPANDATA.HTTP_STATUS_CODE],
+                    trace_ignore_status_codes=client.options[
+                        "trace_ignore_status_codes"
+                    ],
+                )
+            )
+            self.sampled = False
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -1186,9 +1236,7 @@ class Transaction(Span):
         """
         client = sentry_sdk.get_client()
 
-        transaction_description = "{op}transaction <{name}>".format(
-            op=("<" + self.op + "> " if self.op else ""), name=self.name
-        )
+        transaction_description = self._get_log_representation()
 
         # nothing to do if tracing is disabled
         if not has_tracing_enabled(client.options):
