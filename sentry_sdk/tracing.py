@@ -986,12 +986,6 @@ class Transaction(Span):
                     logger.warning(wrong_type_message)
                     continue
 
-                if not isinstance(code, int):
-                    logger.warning(
-                        f"Invalid type for http.response.status_code; is {code!r} of type {type(code)}, expected an int."
-                    )
-                    continue
-
                 if low <= code <= high:
                     return True
 
@@ -1075,8 +1069,13 @@ class Transaction(Span):
 
         super().finish(scope, end_timestamp)
 
-        if SPANDATA.HTTP_STATUS_CODE in self._data and self._in_http_status_code_range(
-            self._data[SPANDATA.HTTP_STATUS_CODE],
+        status_code = self._data.get(SPANDATA.HTTP_STATUS_CODE)
+        if status_code and not isinstance(status_code, int):
+            logger.warning(
+                f"Invalid type for http.response.status_code; is {status_code!r} of type {type(status_code)}, expected an int."
+            )
+        elif status_code and self._in_http_status_code_range(
+            status_code,
             client.options["trace_ignore_status_codes"],
         ):
             logger.debug(
