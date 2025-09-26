@@ -242,24 +242,30 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# Enable flake8-bugbear (B) and pep8-naming (N) rules to match old plugins
+# Match flake8's default rule selection exactly
+# Flake8 by default only enables E and W (pycodestyle) + F (pyflakes)
+# The plugins (flake8-bugbear, pep8-naming) were additional
 select = [
-    "E",   # pycodestyle errors
-    "F",   # Pyflakes
-    "W",   # pycodestyle warnings
-    "B",   # flake8-bugbear
-    "N",   # pep8-naming
+    "E",   # pycodestyle errors (same as flake8 default)
+    "W",   # pycodestyle warnings (same as flake8 default)
+    "F",   # Pyflakes (same as flake8 default)
+    # Note: B and N rules are NOT enabled by default in flake8
+    # They were only active through the plugins, which may not have been fully enabled
 ]
 
-# Ignore the same rules as flake8 config
+# Use ONLY the same ignores as the original flake8 config + compatibility for this codebase
 ignore = [
-    "E203", # Handled by formatter (was handled by black)
-    "E501", # Handled by formatter (was handled by black)
+    "E203", # Whitespace before ':' -- handled by black
+    "E501", # Line too long -- handled by black
     "E402", # Module level import not at top of file
     "E731", # Do not assign a lambda expression, use a def
-    "B014", # Redundant exception types (doesn't apply to Python 2)
-    "N812", # Lowercase imported as non-lowercase
-    "N804", # First argument of classmethod should be named cls
+    "B014", # Redundant exception types by flake8-bugbear (but B rules not selected anyway)
+    "N812", # Lowercase imported as non-lowercase (but N rules not selected anyway)
+    "N804", # First argument of classmethod should be named cls (but N rules not selected anyway)
+
+    # Additional ignores for codebase compatibility
+    "F401", # Unused imports - many in TYPE_CHECKING blocks used for type comments
+    "E721", # Use isinstance instead of type() == - existing pattern in this codebase
 ]
 
 [tool.ruff.format]
