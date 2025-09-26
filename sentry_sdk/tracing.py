@@ -982,10 +982,8 @@ class Transaction(Span):
             wrong_type_message = "trace_ignore_status_codes must be a list of integers or pairs of integers."
             try:
                 low, high = target
-                if (
-                    isinstance(code, int)
-                    and not isinstance(low, int)
-                    or not isinstance(high, int)
+                if isinstance(code, int) and (
+                    not isinstance(low, int) or not isinstance(high, int)
                 ):
                     logger.warning(wrong_type_message)
                     continue
