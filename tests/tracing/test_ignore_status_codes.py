@@ -118,3 +118,19 @@ def test_malformed_argument_ignored(sentry_init, capture_events):
         span_or_tx.set_data("http.response.status_code", 404)
 
     assert len(events) == 1
+
+
+def test_transaction_not_ignored_when_status_code_has_invalid_type(
+    sentry_init, capture_events
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_ignore_status_codes=(404,),
+    )
+    events = capture_events()
+
+    with start_transaction(op="http", name="GET /"):
+        span_or_tx = sentry_sdk.get_current_span()
+        span_or_tx.set_data("http.response.status_code", "404")
+
+    assert len(events) == 1
