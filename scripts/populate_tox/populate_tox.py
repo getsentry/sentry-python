@@ -665,7 +665,7 @@ def _normalize_release(release: dict) -> dict:
     return normalized
 
 
-def main(fail_on_changes: bool = False) -> None:
+def main(fail_on_changes: bool = False) -> dict[str, list]:
     """
     Generate tox.ini from the tox.jinja template.
 
@@ -824,6 +824,8 @@ def main(fail_on_changes: bool = False) -> None:
             "Done generating tox.ini. Make sure to also update the CI YAML "
             "files to reflect the new test targets."
         )
+
+    return packages
 
 
 if __name__ == "__main__":
