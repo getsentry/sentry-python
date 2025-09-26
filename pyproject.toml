@@ -180,27 +180,24 @@ module = "agents.*"
 ignore_missing_imports = true
 
 #
-# Tool: Ruff (replaces Black + Flake8 + plugins)
+# Tool: Ruff (linting and formatting)
 #
 
 [tool.ruff]
 # Target Python 3.7+ (minimum version supported by ruff)
 target-version = "py37"
 
-# Exclude files and directories (from black + flake8)
+# Exclude files and directories
 extend-exclude = [
-    "*_pb2.py",     # Protocol Buffer files
-    "*_pb2_grpc.py", # Protocol Buffer files
+    "*_pb2.py",     # Protocol Buffer files (covers all pb2 files including grpc_test_service_pb2.py)
+    "*_pb2_grpc.py", # Protocol Buffer files (covers all pb2_grpc files including grpc_test_service_pb2_grpc.py)
     "checkouts",    # From flake8
     "lol*",         # From flake8
-    "grpc_test_service_pb2.py",
-    "grpc_test_service_pb2_grpc.py",
 ]
 
 [tool.ruff.lint]
 # Match flake8's default rule selection exactly
 # Flake8 by default only enables E and W (pycodestyle) + F (pyflakes)
-# The plugins (flake8-bugbear, pep8-naming) were additional
 select = [
     "E",   # pycodestyle errors (same as flake8 default)
     "W",   # pycodestyle warnings (same as flake8 default)
