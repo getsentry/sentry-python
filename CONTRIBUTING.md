@@ -113,7 +113,7 @@ tox -p auto -o -e <tox_env> -- <pytest_args>
    - Don't make the user pass anything to your integration for anything to work. Aim for zero configuration.
    - Everybody monkeypatches. That means you don't need to feel bad about it.
    - Make sure your changes don't break end user contracts. The SDK should never alter the expected behavior of the underlying library or framework from the user's perspective and it shouldn't have any side effects.
-   - Be defensive. Don't assume the code you're patching will stay the same forever, especially if it's an internal function. Allow for future variability whenever reasonable.
+   - Be defensive. Don't assume the code you're patching will stay the same forever, especially if it's an internal function. Allow for future variability whenever it makes sense.
    - Avoid registering a new client or the like. The user drives the client, and the client owns integrations.
    - Allow the user to turn off the integration by changing the client. Check `sentry_sdk.get_client().get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
 
