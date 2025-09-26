@@ -982,14 +982,29 @@ class Transaction(Span):
             wrong_type_message = "trace_ignore_status_codes must be a list of integers or pairs of integers."
             try:
                 low, high = target
-                if not isinstance(low, int) or not isinstance(high, int):
+                if (
+                    isinstance(code, int)
+                    and not isinstance(low, int)
+                    or not isinstance(high, int)
+                ):
                     logger.warning(wrong_type_message)
+                    continue
+                elif not isinstance(code, int):
+                    logger.warning(
+                        f"Invalid type for http.request.status_code; is {code!r} of type {type(code)}, expected an int."
+                    )
                     continue
 
                 if low <= code <= high:
                     return True
 
             except Exception:
+                if not isinstance(code, int):
+                    logger.warning(
+                        f"Invalid type for http.request.status_code; is {code!r} of type {type(code)}, expected an int."
+                    )
+                    continue
+
                 logger.warning(wrong_type_message)
 
         return False
