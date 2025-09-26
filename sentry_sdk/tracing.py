@@ -989,7 +989,7 @@ class Transaction(Span):
                     continue
                 elif not isinstance(code, int):
                     logger.warning(
-                        f"Invalid type for http.request.status_code; is {code!r} of type {type(code)}, expected an int."
+                        f"Invalid type for http.response.status_code; is {code!r} of type {type(code)}, expected an int."
                     )
                     continue
 
@@ -999,7 +999,7 @@ class Transaction(Span):
             except Exception:
                 if not isinstance(code, int):
                     logger.warning(
-                        f"Invalid type for http.request.status_code; is {code!r} of type {type(code)}, expected an int."
+                        f"Invalid type for http.response.status_code; is {code!r} of type {type(code)}, expected an int."
                     )
                     continue
 
