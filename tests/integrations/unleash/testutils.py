@@ -34,7 +34,6 @@ def mock_unleash_client():
 
 
 class MockUnleashClient:
-
     def __init__(self, *a, **kw):
         self.features = {
             "hello": True,

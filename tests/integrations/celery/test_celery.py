@@ -439,7 +439,9 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
 
 
 def test_traces_sampler_gets_task_info_in_sampling_context(
-    init_celery, celery_invocation, DictionaryContaining  # noqa:N803
+    init_celery,
+    celery_invocation,
+    DictionaryContaining,  # noqa:N803
 ):
     traces_sampler = mock.Mock()
     celery = init_celery(traces_sampler=traces_sampler)
