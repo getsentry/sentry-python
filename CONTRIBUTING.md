@@ -78,7 +78,7 @@ We test against a number of Python language and library versions, which are auto
 
 The tox CLI tool is required to run the tests locally. Follow [the installation instructions](https://tox.wiki/en/latest/installation.html) for tox. Dependencies are installed for you when you run the command below, but _you_ need to bring an appropriate Python interpreter.
 
-[Pyenv](https://github.com/pyenv/pyenv) is a cross-platform utility for managing Python versions. You can also use a conventional package manager, but not all versions may be distributed in the package manager of your choice. For macOS, Versions 3.8 and up can be installed with Homebrew.
+[Pyenv](https://github.com/pyenv/pyenv) is a cross-platform utility for managing Python versions. You can also use a conventional package manager, but not all versions may be distributed in the package manager of your choice. For macOS, versions 3.8 and up can be installed with Homebrew.
 
 An environment consists of the Python major and minor version and the library name and version. The exception to the rule is that you can provide `common` instead of the library information. The environments tied to a specific library usually run the corresponding test suite, while `common` targets all tests but skips those that require uninstalled dependencies.
 
@@ -109,29 +109,20 @@ tox -p auto -o -e <tox_env> -- <pytest_args>
 ## Adding a New Integration
 
 1. Write the integration.
-
-   - Instrument all application instances by default. Prefer global signals/patches instead of configuring a specific instance. Don't make the user pass anything to your integration for anything to work. Aim for zero configuration.
-
-   - Everybody monkeypatches. That means:
-
-     - Make sure to think about conflicts with other monkeypatches when monkeypatching.
-
-     - You don't need to feel bad about it.
-
+   - Instrument all application instances by default. Prefer global signals/patches.
+   - Don't make the user pass anything to your integration for anything to work. Aim for zero configuration.
+   - Everybody monkeypatches. That means you don't need to feel bad about it.
    - Make sure your changes don't break end user contracts. The SDK should never alter the expected behavior of the underlying library or framework from the user's perspective and it shouldn't have any side effects.
-
-   - Avoid modifying the hub, registering a new client or the like. The user drives the client, and the client owns integrations.
-
-   - Allow the user to turn off the integration by changing the client. Check `Hub.current.get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
+   - Be defensive. Don't assume the code you're patching will stay the same forever, especially if it's an internal function. Allow for future variability whenever reasonable.
+   - Avoid registering a new client or the like. The user drives the client, and the client owns integrations.
+   - Allow the user to turn off the integration by changing the client. Check `sentry_sdk.get_client().get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
 
 2. Write tests.
-
-   - Consider the minimum versions supported, and test each version in a separate env in `tox.ini`.
-
+   - Consider the minimum versions supported, and document in `_MIN_VERSIONS` in `integrations/__init__.py`.
    - Create a new folder in `tests/integrations/`, with an `__init__` file that skips the entire suite if the package is not installed.
+   - Add the test suite to the script generating our test matrix. See [`scripts/populate_tox/README.md`](https://github.com/getsentry/sentry-python/blob/master/scripts/populate_tox/README.md#add-a-new-test-suite).
 
 3. Update package metadata.
-
    - We use `extras_require` in `setup.py` to communicate minimum version requirements for integrations. People can use this in combination with tools like Poetry or Pipenv to detect conflicts between our supported versions and their used versions programmatically.
 
      Do not set upper bounds on version requirements as people are often faster in adopting new versions of a web framework than we are in adding them to the test matrix or our package metadata.
@@ -139,8 +130,6 @@ tox -p auto -o -e <tox_env> -- <pytest_args>
 4. Write the [docs](https://github.com/getsentry/sentry-docs). Follow the structure of [existing integration docs](https://docs.sentry.io/platforms/python/integrations/). And, please **make sure to add your integration to the table in `python/integrations/index.md`** (people often forget this step 🙂).
 
 5. Merge docs after new version has been released. The docs are built and deployed after each merge, so your changes should go live in a few minutes.
-
-6. (optional, if possible) Update data in [`sdk_updates.py`](https://github.com/getsentry/sentry/blob/master/src/sentry/sdk_updates.py) to give users in-app suggestions to use your integration. This step will only apply to some integrations.
 
 ## Releasing a New Version
 
