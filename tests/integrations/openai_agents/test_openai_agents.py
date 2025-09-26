@@ -437,24 +437,10 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         ai_client_span2,
     ) = spans
 
-    available_tools = safe_serialize(
-        [
-            {
-                "name": "simple_test_tool",
-                "description": "A simple tool",
-                "params_json_schema": {
-                    "properties": {"message": {"title": "Message", "type": "string"}},
-                    "required": ["message"],
-                    "title": "simple_test_tool_args",
-                    "type": "object",
-                    "additionalProperties": False,
-                },
-                "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
-                "strict_json_schema": True,
-                "is_enabled": True,
-            }
-        ]
-    )
+    # Expect simplified tool format, not raw tool data
+    available_tools = [
+        {"name": "simple_test_tool", "description": "A simple tool", "type": "function"}
+    ]
 
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
@@ -500,35 +486,22 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-    assert re.sub(
-        r"SerializationIterator\(.*\)",
-        "NOT_CHECKED",
-        ai_client_span1["data"]["gen_ai.response.tool_calls"],
-    ) == safe_serialize(
-        [
-            {
-                "arguments": '{"message": "hello"}',
-                "call_id": "call_123",
-                "name": "simple_test_tool",
-                "type": "function_call",
-                "id": "call_123",
-                "status": None,
-                "function": "NOT_CHECKED",
-            }
-        ]
-    )
+    # Tool calls are now stored as a list, not a JSON string
+    tool_calls = ai_client_span1["data"]["gen_ai.response.tool_calls"]
+    assert len(tool_calls) == 1
+    tool_call = tool_calls[0]
+    assert tool_call["arguments"] == '{"message": "hello"}'
+    assert tool_call["call_id"] == "call_123"
+    assert tool_call["name"] == "simple_test_tool"
+    assert tool_call["type"] == "function_call"
+    assert tool_call["id"] == "call_123"
+    assert tool_call["status"] is None
+    # Don't check the function field as it contains mock objects
 
     assert tool_span["description"] == "execute_tool simple_test_tool"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert (
-        re.sub(
-            "<.*>(,)",
-            r"'NOT_CHECKED'\1",
-            agent_span["data"]["gen_ai.request.available_tools"],
-        )
-        == available_tools
-    )
+    assert agent_span["data"]["gen_ai.request.available_tools"] == available_tools
     assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
     assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"
     assert tool_span["data"]["gen_ai.request.temperature"] == 0.7
@@ -543,14 +516,10 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["description"] == "chat gpt-4"
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
-    assert (
-        re.sub(
-            "<.*>(,)",
-            r"'NOT_CHECKED'\1",
-            agent_span["data"]["gen_ai.request.available_tools"],
-        )
-        == available_tools
-    )
+    # available_tools is now a list, not a JSON string, so we can compare directly
+    assert agent_span["data"]["gen_ai.request.available_tools"] == [
+        {"name": "simple_test_tool", "description": "A simple tool", "type": "function"}
+    ]
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
     assert re.sub(
         r"SerializationIterator\(.*\)",
@@ -697,3 +666,292 @@ async def test_multiple_agents_asyncio(
     assert txn2["transaction"] == "test_agent workflow"
     assert txn3["type"] == "transaction"
     assert txn3["transaction"] == "test_agent workflow"
+
+
+@pytest.mark.asyncio
+async def test_available_tools_simplified_format(
+    sentry_init, capture_events, test_agent, mock_model_response
+):
+    """
+    Test that available tools are recorded in simplified format on invoke_agent spans.
+    """
+
+    @agents.function_tool
+    def search_tool(query: str) -> str:
+        """Search for information using the given query."""
+        return f"Search results for: {query}"
+
+    @agents.function_tool
+    def calculator_tool(expression: str) -> str:
+        """Calculate mathematical expressions."""
+        return f"Result: {expression}"
+
+    # Create agent with multiple tools
+    agent_with_tools = test_agent.clone(tools=[search_tool, calculator_tool])
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent_with_tools, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span = spans[0]
+
+    # Verify simplified tools format
+    available_tools = invoke_agent_span["data"]["gen_ai.request.available_tools"]
+    assert isinstance(available_tools, list)
+    assert len(available_tools) == 2
+
+    # Check first tool
+    search_tool_data = next(
+        (t for t in available_tools if t["name"] == "search_tool"), None
+    )
+    assert search_tool_data is not None
+    assert search_tool_data["name"] == "search_tool"
+    assert (
+        search_tool_data["description"]
+        == "Search for information using the given query."
+    )
+    assert search_tool_data["type"] == "function"
+
+    # Check second tool
+    calculator_tool_data = next(
+        (t for t in available_tools if t["name"] == "calculator_tool"), None
+    )
+    assert calculator_tool_data is not None
+    assert calculator_tool_data["name"] == "calculator_tool"
+    assert calculator_tool_data["description"] == "Calculate mathematical expressions."
+    assert calculator_tool_data["type"] == "function"
+
+    # Verify no extra fields are included (simplified format)
+    for tool_data in available_tools:
+        expected_keys = {"name", "description", "type"}
+        assert set(tool_data.keys()) == expected_keys
+
+
+@pytest.mark.asyncio
+async def test_tool_calls_captured_in_invoke_agent_span(
+    sentry_init, capture_events, test_agent
+):
+    """
+    Test that tool calls are captured in invoke_agent spans when tools are used.
+    """
+
+    @agents.function_tool
+    def test_function(input_text: str) -> str:
+        """A test function."""
+        return f"Processed: {input_text}"
+
+    agent_with_tool = test_agent.clone(tools=[test_function])
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+
+            # Mock response that includes a tool call
+            tool_call_response = ModelResponse(
+                output=[
+                    ResponseFunctionToolCall(
+                        id="call_test_123",
+                        call_id="call_test_123",
+                        name="test_function",
+                        type="function_call",
+                        arguments='{"input_text": "hello world"}',
+                        function=MagicMock(
+                            name="test_function",
+                            arguments='{"input_text": "hello world"}',
+                        ),
+                    )
+                ],
+                usage=Usage(
+                    requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+                ),
+                response_id="resp_tool_123",
+            )
+
+            # Final response after tool execution
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="Tool execution completed successfully",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1, input_tokens=15, output_tokens=10, total_tokens=25
+                ),
+                response_id="resp_final_123",
+            )
+
+            mock_get_response.side_effect = [tool_call_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent_with_tool,
+                "Please use the test function",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span = spans[0]
+
+    # Verify that available tools are recorded
+    assert "gen_ai.request.available_tools" in invoke_agent_span["data"]
+    available_tools = invoke_agent_span["data"]["gen_ai.request.available_tools"]
+    assert len(available_tools) == 1
+    assert available_tools[0]["name"] == "test_function"
+    assert available_tools[0]["type"] == "function"
+
+    # Find the AI client span that contains the tool call (first response)
+    # The tool calls should be captured in the AI client span, not the invoke agent span
+    tool_call_span = None
+    for span in spans:
+        if span.get("description", "").startswith(
+            "chat"
+        ) and "gen_ai.response.tool_calls" in span.get("data", {}):
+            tool_call_span = span
+            break
+
+    assert tool_call_span is not None, "Tool call span not found"
+    tool_calls = tool_call_span["data"]["gen_ai.response.tool_calls"]
+    assert len(tool_calls) == 1
+
+    tool_call = tool_calls[0]
+    assert tool_call["name"] == "test_function"
+    assert tool_call["type"] == "function_call"
+    assert tool_call["call_id"] == "call_test_123"
+    assert tool_call["arguments"] == '{"input_text": "hello world"}'
+
+
+@pytest.mark.asyncio
+async def test_agent_without_tools(
+    sentry_init, capture_events, test_agent, mock_model_response
+):
+    """
+    Test that agents without tools don't cause issues and don't include tools data.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span = spans[0]
+
+    # Agent has no tools, so available_tools should not be present
+    assert "gen_ai.request.available_tools" not in invoke_agent_span["data"]
+
+    # And no tool calls should be present since no tools were used
+    assert "gen_ai.response.tool_calls" not in invoke_agent_span["data"]
+
+
+def test_simplify_openai_agent_tools_edge_cases():
+    """
+    Test edge cases for the _simplify_openai_agent_tools function.
+    """
+    from sentry_sdk.integrations.openai_agents.utils import _simplify_openai_agent_tools
+
+    # Test with None
+    assert _simplify_openai_agent_tools(None) is None
+
+    # Test with empty list
+    assert _simplify_openai_agent_tools([]) is None
+
+    # Test with non-list/tuple
+    assert _simplify_openai_agent_tools("invalid") is None
+    assert _simplify_openai_agent_tools(42) is None
+
+    # Test with mock tool objects
+    class FunctionTool:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
+    class CustomTool:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
+    # Test with valid tools
+    mock_tools = [
+        FunctionTool("tool1", "Description 1"),
+        CustomTool("tool2", "Description 2"),
+    ]
+
+    result = _simplify_openai_agent_tools(mock_tools)
+    assert result is not None
+    assert len(result) == 2
+    assert result[0]["name"] == "tool1"
+    assert result[0]["description"] == "Description 1"
+    assert result[0]["type"] == "function"
+    assert result[1]["name"] == "tool2"
+    assert result[1]["description"] == "Description 2"
+    assert result[1]["type"] == "custom"
+
+    # Test with tool missing name (should be filtered out)
+    class MockToolNoName:
+        def __init__(self):
+            self.description = "Has description but no name"
+
+    mock_tools_with_invalid = [
+        FunctionTool("valid_tool", "Valid description"),
+        MockToolNoName(),
+    ]
+
+    result = _simplify_openai_agent_tools(mock_tools_with_invalid)
+    assert result is not None
+    assert len(result) == 1
+    assert result[0]["name"] == "valid_tool"

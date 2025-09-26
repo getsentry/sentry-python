@@ -3,7 +3,7 @@ from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import event_from_exception, safe_serialize
+from sentry_sdk.utils import event_from_exception
 
 from typing import TYPE_CHECKING
 
@@ -26,6 +26,35 @@ def _capture_exception(exc):
         mechanism={"type": "openai_agents", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
+
+
+def _simplify_openai_agent_tools(tools):
+    # type: (Any) -> list[dict[str, Any]] | None
+    """Parse and simplify OpenAI agent tools into a cleaner format."""
+    if not tools:
+        return None
+
+    if not isinstance(tools, (list, tuple)):
+        return None
+
+    simplified_tools = []
+    for tool in tools:
+        try:
+            simplified_tool = {
+                "name": getattr(tool, "name", None),
+                "description": getattr(tool, "description", None),
+            }
+
+            tool_type = getattr(tool, "__class__", None)
+            if tool_type:
+                simplified_tool["type"] = tool_type.__name__.lower().replace("tool", "")
+
+            if simplified_tool["name"]:
+                simplified_tools.append(simplified_tool)
+        except Exception:
+            continue
+
+    return simplified_tools if simplified_tools else None
 
 
 def _set_agent_data(span, agent):
@@ -66,10 +95,10 @@ def _set_agent_data(span, agent):
         )
 
     if len(agent.tools) > 0:
-        span.set_data(
-            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-            safe_serialize([vars(tool) for tool in agent.tools]),
-        )
+        simplified_tools = _simplify_openai_agent_tools(agent.tools)
+        if simplified_tools:
+            # Use span.set_data directly to preserve list type instead of JSON string
+            span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, simplified_tools)
 
 
 def _set_usage_data(span, usage):
@@ -128,6 +157,14 @@ def _set_output_data(span, result):
     if not should_send_default_pii():
         return
 
+    # Handle case where result is a string directly
+    if isinstance(result, str):
+        return
+
+    # Handle case where result doesn't have an output attribute
+    if not hasattr(result, "output"):
+        return
+
     output_messages = {
         "response": [],
         "tool": [],
@@ -135,19 +172,26 @@ def _set_output_data(span, result):
 
     for output in result.output:
         if output.type == "function_call":
-            output_messages["tool"].append(output.dict())
+            # Use model_dump() if available (Pydantic v2), fallback to dict() for compatibility
+            if hasattr(output, "model_dump"):
+                output_messages["tool"].append(output.model_dump())
+            else:
+                output_messages["tool"].append(output.dict())
         elif output.type == "message":
             for output_message in output.content:
                 try:
                     output_messages["response"].append(output_message.text)
                 except AttributeError:
                     # Unknown output message type, just return the json
-                    output_messages["response"].append(output_message.dict())
+                    # Use model_dump() if available (Pydantic v2), fallback to dict() for compatibility
+                    if hasattr(output_message, "model_dump"):
+                        output_messages["response"].append(output_message.model_dump())
+                    else:
+                        output_messages["response"].append(output_message.dict())
 
     if len(output_messages["tool"]) > 0:
-        span.set_data(
-            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(output_messages["tool"])
-        )
+        # Use span.set_data directly to preserve list type instead of JSON string
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, output_messages["tool"])
 
     if len(output_messages["response"]) > 0:
         set_data_normalized(

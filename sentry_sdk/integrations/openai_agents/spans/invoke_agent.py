@@ -5,7 +5,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data
+from ..utils import _set_agent_data, _set_output_data
 
 from typing import TYPE_CHECKING
 
@@ -74,5 +74,8 @@ def update_invoke_agent_span(context, agent, output):
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
             )
+
+        # Capture tool calls from the output if available
+        _set_output_data(span, output)
 
         span.__exit__(None, None, None)
