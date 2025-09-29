@@ -195,7 +195,6 @@ TEST_SUITE_CONFIG = {
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
         },
-        "include": "<1.0",
     },
     "langchain-notiktoken": {
         "package": "langchain",
@@ -205,7 +204,6 @@ TEST_SUITE_CONFIG = {
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
         },
-        "include": "<1.0",
     },
     "langgraph": {
         "package": "langgraph",
