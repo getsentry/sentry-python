@@ -7,6 +7,7 @@ from ..utils import (
     _set_input_data,
     _set_output_data,
     _set_usage_data,
+    _create_mcp_execute_tool_spans,
 )
 
 from typing import TYPE_CHECKING
@@ -37,3 +38,4 @@ def update_ai_client_span(span, agent, get_response_kwargs, result):
     _set_usage_data(span, result.usage)
     _set_input_data(span, get_response_kwargs)
     _set_output_data(span, result)
+    _create_mcp_execute_tool_spans(span, result)
