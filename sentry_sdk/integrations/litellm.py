@@ -56,6 +56,12 @@ def _get_provider_from_model(model):
             return "unknown"
 
 
+def _get_metadata_dict(kwargs):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
+    """Get the metadata dictionary from the kwargs."""
+    return kwargs.setdefault("litellm_params", {}).setdefault("metadata", {})
+
+
 def _input_callback(
     kwargs,  # type: Dict[str, Any]
 ):
@@ -84,7 +90,7 @@ def _input_callback(
     span.__enter__()
 
     # Store span for later
-    kwargs["_sentry_span"] = span
+    _get_metadata_dict(kwargs)["_sentry_span"] = span
 
     # Set basic data
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "litellm")
@@ -134,7 +140,7 @@ def _success_callback(
     # type: (...) -> None
     """Handle successful completion."""
 
-    span = kwargs.get("_sentry_span")
+    span = _get_metadata_dict(kwargs).get("_sentry_span")
     if span is None:
         return
 
@@ -198,7 +204,7 @@ def _failure_callback(
 ):
     # type: (...) -> None
     """Handle request failure."""
-    span = kwargs.get("_sentry_span")
+    span = _get_metadata_dict(kwargs).get("_sentry_span")
     if span is None:
         return
 
@@ -240,6 +246,7 @@ class LiteLLMIntegration(Integration):
     # Initialize Sentry with the LiteLLM integration
     sentry_sdk.init(
         dsn="your-dsn",
+        send_default_pii=True
         integrations=[
             sentry_sdk.integrations.LiteLLMIntegration(
                 include_prompts=True  # Set to False to exclude message content
