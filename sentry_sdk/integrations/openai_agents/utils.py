@@ -97,7 +97,6 @@ def _set_agent_data(span, agent):
     if len(agent.tools) > 0:
         simplified_tools = _simplify_openai_agent_tools(agent.tools)
         if simplified_tools:
-            # Use span.set_data directly to preserve list type instead of JSON string
             span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, simplified_tools)
 
 
@@ -157,14 +156,6 @@ def _set_output_data(span, result):
     if not should_send_default_pii():
         return
 
-    # Handle case where result is a string directly
-    if isinstance(result, str):
-        return
-
-    # Handle case where result doesn't have an output attribute
-    if not hasattr(result, "output"):
-        return
-
     output_messages = {
         "response": [],
         "tool": [],
@@ -172,7 +163,6 @@ def _set_output_data(span, result):
 
     for output in result.output:
         if output.type == "function_call":
-            # Use model_dump() if available (Pydantic v2), fallback to dict() for compatibility
             if hasattr(output, "model_dump"):
                 output_messages["tool"].append(output.model_dump())
             else:
@@ -182,15 +172,12 @@ def _set_output_data(span, result):
                 try:
                     output_messages["response"].append(output_message.text)
                 except AttributeError:
-                    # Unknown output message type, just return the json
-                    # Use model_dump() if available (Pydantic v2), fallback to dict() for compatibility
                     if hasattr(output_message, "model_dump"):
                         output_messages["response"].append(output_message.model_dump())
                     else:
                         output_messages["response"].append(output_message.dict())
 
     if len(output_messages["tool"]) > 0:
-        # Use span.set_data directly to preserve list type instead of JSON string
         span.set_data(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, output_messages["tool"])
 
     if len(output_messages["response"]) > 0:
