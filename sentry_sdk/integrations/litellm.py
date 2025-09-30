@@ -179,7 +179,7 @@ def _failure_callback(kwargs, exception, start_time, end_time):
         sentry_sdk.capture_event(event, hint=hint)
     finally:
         # Always finish the span and clean up
-        span.__exit__(None, None, None)
+        span.__exit__(type(exception), exception, None)
 
 
 class LiteLLMIntegration(Integration):
