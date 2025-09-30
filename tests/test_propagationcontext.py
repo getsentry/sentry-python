@@ -155,8 +155,7 @@ def test_sample_rand_filled(parent_sampled, sample_rate, expected_interval):
         )
 
     assert (
-        ctx.dynamic_sampling_context["sample_rand"]
-        == f"{expected_interval[0]:.6f}"  # noqa: E231
+        ctx.dynamic_sampling_context["sample_rand"] == f"{expected_interval[0]:.6f}"  # noqa: E231
     )
     assert mock_randrange.call_count == 1
     assert mock_randrange.call_args[0] == (

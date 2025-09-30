@@ -228,7 +228,8 @@ class SessionFlusher:
         return None
 
     def add_aggregate_session(
-        self, session  # type: Session
+        self,
+        session,  # type: Session
     ):
         # type: (...) -> None
         # NOTE on `session.did`:
@@ -259,7 +260,8 @@ class SessionFlusher:
                 state["exited"] = state.get("exited", 0) + 1
 
     def add_session(
-        self, session  # type: Session
+        self,
+        session,  # type: Session
     ):
         # type: (...) -> None
         if session.session_mode == "request":

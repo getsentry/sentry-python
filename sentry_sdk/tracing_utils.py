@@ -527,9 +527,7 @@ class PropagationContext:
             )
             return
 
-        self.dynamic_sampling_context["sample_rand"] = (
-            f"{sample_rand:.6f}"  # noqa: E231
-        )
+        self.dynamic_sampling_context["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
 
     def _sample_rand(self):
         # type: () -> Optional[str]

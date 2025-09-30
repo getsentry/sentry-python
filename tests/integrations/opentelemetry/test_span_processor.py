@@ -549,8 +549,10 @@ def test_pruning_old_spans_on_start():
     current_time_minutes = int(time.time() / 60)
     span_processor.open_spans = {
         current_time_minutes - 3: {"111111111abcdef"},  # should stay
-        current_time_minutes
-        - 11: {"2222222222abcdef", "3333333333abcdef"},  # should go
+        current_time_minutes - 11: {
+            "2222222222abcdef",
+            "3333333333abcdef",
+        },  # should go
     }
 
     span_processor.on_start(otel_span, parent_context)
@@ -599,8 +601,10 @@ def test_pruning_old_spans_on_end():
     span_processor.open_spans = {
         current_time_minutes: {"1234567890abcdef"},  # should go (because it is closed)
         current_time_minutes - 3: {"111111111abcdef"},  # should stay
-        current_time_minutes
-        - 11: {"2222222222abcdef", "3333333333abcdef"},  # should go
+        current_time_minutes - 11: {
+            "2222222222abcdef",
+            "3333333333abcdef",
+        },  # should go
     }
 
     span_processor.on_end(otel_span)

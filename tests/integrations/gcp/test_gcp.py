@@ -101,14 +101,14 @@ def run_cloud_function():
 
             subprocess.check_call(
                 [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             subprocess.check_call(
                 "pip install ../*.tar.gz -t .",
                 cwd=tmpdir,
                 shell=True,
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             stream = os.popen("python {}/main.py".format(tmpdir))
@@ -280,7 +280,8 @@ def test_performance_error(run_cloud_function):
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
-    run_cloud_function, DictionaryContaining  # noqa:N803
+    run_cloud_function,
+    DictionaryContaining,  # noqa:N803
 ):
     # TODO: There are some decent sized hacks below. For more context, see the
     # long comment in the test of the same name in the AWS integration. The

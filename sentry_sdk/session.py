@@ -130,7 +130,8 @@ class Session:
             self.status = status
 
     def close(
-        self, status=None  # type: Optional[SessionStatus]
+        self,
+        status=None,  # type: Optional[SessionStatus]
     ):
         # type: (...) -> Any
         if status is None and self.status == "ok":
@@ -139,7 +140,8 @@ class Session:
             self.update(status=status)
 
     def get_json_attrs(
-        self, with_user_info=True  # type: Optional[bool]
+        self,
+        with_user_info=True,  # type: Optional[bool]
     ):
         # type: (...) -> Any
         attrs = {}

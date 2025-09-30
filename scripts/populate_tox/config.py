@@ -28,6 +28,7 @@ TEST_SUITE_CONFIG = {
             "*": ["fastapi", "flask", "httpx"],
         },
         "python": ">=3.8",
+        "num_versions": 2,
     },
     "arq": {
         "package": "arq",
@@ -35,6 +36,7 @@ TEST_SUITE_CONFIG = {
             "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
             "<=0.23": ["pydantic<2"],
         },
+        "num_versions": 2,
     },
     "asyncpg": {
         "package": "asyncpg",
@@ -46,6 +48,7 @@ TEST_SUITE_CONFIG = {
     "beam": {
         "package": "apache-beam",
         "python": ">=3.7",
+        "num_versions": 2,
     },
     "boto3": {
         "package": "boto3",
@@ -71,9 +74,11 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-chalice"],
         },
+        "num_versions": 2,
     },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
+        "num_versions": 2,
     },
     "cohere": {
         "package": "cohere",
@@ -100,6 +105,7 @@ TEST_SUITE_CONFIG = {
     },
     "dramatiq": {
         "package": "dramatiq",
+        "num_versions": 2,
     },
     "falcon": {
         "package": "falcon",
@@ -135,6 +141,7 @@ TEST_SUITE_CONFIG = {
     },
     "gql": {
         "package": "gql[all]",
+        "num_versions": 2,
     },
     "graphene": {
         "package": "graphene",
@@ -171,6 +178,7 @@ TEST_SUITE_CONFIG = {
     },
     "huey": {
         "package": "huey",
+        "num_versions": 2,
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
@@ -204,6 +212,7 @@ TEST_SUITE_CONFIG = {
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
+        "num_versions": 2,
     },
     "litestar": {
         "package": "litestar",
@@ -214,6 +223,7 @@ TEST_SUITE_CONFIG = {
     },
     "loguru": {
         "package": "loguru",
+        "num_versions": 2,
     },
     "openai-base": {
         "package": "openai",
@@ -242,9 +252,11 @@ TEST_SUITE_CONFIG = {
     },
     "openfeature": {
         "package": "openfeature-sdk",
+        "num_versions": 2,
     },
     "pure_eval": {
         "package": "pure_eval",
+        "num_versions": 2,
     },
     "pymongo": {
         "package": "pymongo",
@@ -271,6 +283,7 @@ TEST_SUITE_CONFIG = {
             ],
             "py3.8": ["taskgroup==0.0.0a4"],
         },
+        "num_versions": 2,
     },
     "ray": {
         "package": "ray",
@@ -288,6 +301,7 @@ TEST_SUITE_CONFIG = {
     },
     "redis_py_cluster_legacy": {
         "package": "redis-py-cluster",
+        "num_versions": 2,
     },
     "requests": {
         "package": "requests",
@@ -352,12 +366,14 @@ TEST_SUITE_CONFIG = {
         },
         "python": "<=3.11",
         "include": "!=2.0.0a1,!=2.0.0a2",  # these are not relevant as there will never be a stable 2.0 release (starlite continues as litestar)
+        "num_versions": 2,
     },
     "statsig": {
         "package": "statsig",
         "deps": {
             "*": ["typing_extensions"],
         },
+        "num_versions": 2,
     },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
@@ -365,6 +381,7 @@ TEST_SUITE_CONFIG = {
             "*": ["httpx"],
             "<=0.262.5": ["pydantic<2.11"],
         },
+        "num_versions": 2,
     },
     "tornado": {
         "package": "tornado",
@@ -375,6 +392,7 @@ TEST_SUITE_CONFIG = {
             ],  # https://github.com/tornadoweb/tornado/pull/3382
             "py3.6": ["aiocontextvars"],
         },
+        "num_versions": 2,
     },
     "trytond": {
         "package": "trytond",
@@ -385,8 +403,10 @@ TEST_SUITE_CONFIG = {
     },
     "typer": {
         "package": "typer",
+        "num_versions": 2,
     },
     "unleash": {
         "package": "UnleashClient",
+        "num_versions": 2,
     },
 }

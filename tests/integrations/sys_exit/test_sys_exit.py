@@ -66,6 +66,6 @@ def test_sys_exit_integration_not_auto_enabled(sentry_init, capture_events):
             "sys.exit should not be patched, but it must have been because it did not raise SystemExit"
         )
 
-    assert (
-        len(events) == 0
-    ), "No events should have been captured because sys.exit should not have been patched"
+    assert len(events) == 0, (
+        "No events should have been captured because sys.exit should not have been patched"
+    )

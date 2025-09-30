@@ -205,7 +205,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         scope._isolation_scope.set(old_isolation_scope)
 
     def run(
-        self, callback  # type: Callable[[], T]
+        self,
+        callback,  # type: Callable[[], T]
     ):
         # type: (...) -> T
         """
@@ -219,7 +220,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return callback()
 
     def get_integration(
-        self, name_or_class  # type: Union[str, Type[Integration]]
+        self,
+        name_or_class,  # type: Union[str, Type[Integration]]
     ):
         # type: (...) -> Any
         """
@@ -277,7 +279,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self._last_event_id
 
     def bind_client(
-        self, new  # type: Optional[BaseClient]
+        self,
+        new,  # type: Optional[BaseClient]
     ):
         # type: (...) -> None
         """
@@ -430,7 +433,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         transaction=None,
         instrumenter=INSTRUMENTER.SENTRY,
         custom_sampling_context=None,
-        **kwargs
+        **kwargs,
     ):
         # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
@@ -487,14 +490,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     @overload
     def push_scope(
-        self, callback=None  # type: Optional[None]
+        self,
+        callback=None,  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
         pass
 
     @overload
     def push_scope(  # noqa: F811
-        self, callback  # type: Callable[[Scope], None]
+        self,
+        callback,  # type: Callable[[Scope], None]
     ):
         # type: (...) -> None
         pass
@@ -540,14 +545,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     @overload
     def configure_scope(
-        self, callback=None  # type: Optional[None]
+        self,
+        callback=None,  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
         pass
 
     @overload
     def configure_scope(  # noqa: F811
-        self, callback  # type: Callable[[Scope], None]
+        self,
+        callback,  # type: Callable[[Scope], None]
     ):
         # type: (...) -> None
         pass
@@ -587,7 +594,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return inner()
 
     def start_session(
-        self, session_mode="application"  # type: str
+        self,
+        session_mode="application",  # type: str
     ):
         # type: (...) -> None
         """

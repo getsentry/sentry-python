@@ -103,9 +103,7 @@ class StarletteIntegration(Integration):
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
         if isinstance(failed_request_status_codes, Set):
-            self.failed_request_status_codes = (
-                failed_request_status_codes
-            )  # type: Container[int]
+            self.failed_request_status_codes = failed_request_status_codes  # type: Container[int]
         else:
             warnings.warn(
                 "Passing a list or None for failed_request_status_codes is deprecated. "

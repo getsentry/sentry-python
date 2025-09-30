@@ -8,6 +8,7 @@ import functools
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 from bisect import bisect_left
@@ -509,12 +510,14 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
     return rendered
 
 
-def write_tox_file(
-    packages: dict, update_timestamp: bool, last_updated: datetime
-) -> None:
+def write_tox_file(packages: dict) -> None:
     template = ENV.get_template("tox.jinja")
 
-    context = {"groups": {}}
+    context = {
+        "groups": {},
+        "testpaths": [],
+    }
+
     for group, integrations in packages.items():
         context["groups"][group] = []
         for integration in integrations:
@@ -529,11 +532,14 @@ def write_tox_file(
                     ),
                 }
             )
+            context["testpaths"].append(
+                (
+                    integration["name"],
+                    f"tests/integrations/{integration['integration_name']}",
+                )
+            )
 
-    if update_timestamp:
-        context["updated"] = datetime.now(tz=timezone.utc).isoformat()
-    else:
-        context["updated"] = last_updated.isoformat()
+    context["testpaths"].sort()
 
     rendered = template.render(context)
 
@@ -595,7 +601,7 @@ def _add_python_versions_to_release(
 
 
 def _transform_target_python_versions(
-    python_versions: Union[str, dict[str, str], None]
+    python_versions: Union[str, dict[str, str], None],
 ) -> Union[SpecifierSet, dict[SpecifierSet, SpecifierSet], None]:
     """Wrap the contents of the `python` key in SpecifierSets."""
     if not python_versions:
@@ -623,19 +629,21 @@ def get_file_hash() -> str:
 
 
 def get_last_updated() -> Optional[datetime]:
-    timestamp = None
+    repo_root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    tox_ini_path = Path(repo_root) / "tox.ini"
 
-    with open(TOX_FILE, "r") as f:
-        for line in f:
-            if line.startswith("# Last generated:"):
-                timestamp = datetime.fromisoformat(line.strip().split()[-1])
-                break
+    timestamp = subprocess.run(
+        ["git", "log", "-1", "--pretty=%ct", str(tox_ini_path)],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
-    if timestamp is None:
-        print(
-            "Failed to find out when tox.ini was last generated; the timestamp seems to be missing from the file."
-        )
-
+    timestamp = datetime.fromtimestamp(int(timestamp), timezone.utc)
+    print(f"Last committed tox.ini update: {timestamp}")
     return timestamp
 
 
@@ -657,7 +665,7 @@ def _normalize_release(release: dict) -> dict:
     return normalized
 
 
-def main(fail_on_changes: bool = False) -> None:
+def main(fail_on_changes: bool = False) -> dict[str, list]:
     """
     Generate tox.ini from the tox.jinja template.
 
@@ -675,7 +683,7 @@ def main(fail_on_changes: bool = False) -> None:
     print(f"Running in {'fail_on_changes' if fail_on_changes else 'normal'} mode.")
     last_updated = get_last_updated()
     if fail_on_changes:
-        # We need to make the script ignore any new releases after the `last_updated`
+        # We need to make the script ignore any new releases after the last updated
         # timestamp so that we don't fail CI on a PR just because a new package
         # version was released, leading to unrelated changes in tox.ini.
         print(
@@ -703,9 +711,9 @@ def main(fail_on_changes: bool = False) -> None:
             name = _normalize_name(release["info"]["name"])
             version = release["info"]["version"]
             CACHE[name][version] = release
-            CACHE[name][version][
-                "_accessed"
-            ] = False  # for cleaning up unused cache entries
+            CACHE[name][version]["_accessed"] = (
+                False  # for cleaning up unused cache entries
+            )
 
     # Process packages
     packages = defaultdict(list)
@@ -763,15 +771,17 @@ def main(fail_on_changes: bool = False) -> None:
                         "package": package,
                         "extra": extra,
                         "releases": test_releases,
+                        "integration_name": TEST_SUITE_CONFIG[integration].get(
+                            "integration_name"
+                        )
+                        or integration,
                     }
                 )
 
     if fail_on_changes:
         old_file_hash = get_file_hash()
 
-    write_tox_file(
-        packages, update_timestamp=not fail_on_changes, last_updated=last_updated
-    )
+    write_tox_file(packages)
 
     # Sort the release cache file
     releases = []
@@ -814,6 +824,8 @@ def main(fail_on_changes: bool = False) -> None:
             "Done generating tox.ini. Make sure to also update the CI YAML "
             "files to reflect the new test targets."
         )
+
+    return packages
 
 
 if __name__ == "__main__":

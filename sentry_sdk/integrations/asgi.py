@@ -233,14 +233,15 @@ class SentryAsgiMiddleware:
                     if transaction:
                         transaction.set_tag("asgi.type", ty)
 
-                    with (
+                    transaction_context = (
                         sentry_sdk.start_transaction(
                             transaction,
                             custom_sampling_context={"asgi_scope": scope},
                         )
                         if transaction is not None
                         else nullcontext()
-                    ):
+                    )
+                    with transaction_context:
                         try:
 
                             async def _sentry_wrapped_send(event):

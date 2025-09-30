@@ -860,7 +860,6 @@ class OP:
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor:
-
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
@@ -1341,4 +1340,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.38.0"
+VERSION = "2.39.0"

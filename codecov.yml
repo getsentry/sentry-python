@@ -19,7 +19,7 @@ comment:
   # Comments will only post when coverage changes. Furthermore, if a comment
   # already exists, and a newer commit results in no coverage change for the
   # entire pull, the comment will be deleted.
-  require_changes: true  
+  require_changes: true
   require_base: true  # must have a base report to post
   require_head: true  # must have a head report to post
 
