@@ -19,53 +19,21 @@ except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
 
-def _get_provider_from_model(model):
-    # type: (str) -> str
-    """Extract provider name from model string using LiteLLM's logic"""
-    if not model:
-        return "unknown"
-
-    # Common provider prefixes/patterns
-    if model.startswith("gpt-") or model.startswith("o1-") or "openai/" in model:
-        return "openai"
-    elif model.startswith("claude-") or "anthropic/" in model:
-        return "anthropic"
-    elif (
-        model.startswith("gemini-")
-        or "google/" in model
-        or model.startswith("vertex_ai/")
-    ):
-        return "google"
-    elif "cohere/" in model or model.startswith("command-"):
-        return "cohere"
-    elif "azure/" in model:
-        return "azure"
-    elif "bedrock/" in model:
-        return "bedrock"
-    elif "ollama/" in model:
-        return "ollama"
-    else:
-        # Try to use LiteLLM's internal provider detection if available
-        try:
-            if hasattr(litellm, "get_llm_provider"):
-                provider_info = litellm.get_llm_provider(model)
-                if isinstance(provider_info, tuple) and len(provider_info) > 1:
-                    return provider_info[1] or "unknown"
-            return "unknown"
-        except Exception:
-            return "unknown"
-
-
 def _get_metadata_dict(kwargs):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     """Get the metadata dictionary from the kwargs."""
-    return kwargs.setdefault("litellm_params", {}).setdefault("metadata", {})
+    litellm_params = kwargs.setdefault("litellm_params", {})
+
+    # we need this weird little dance, as metadata might be set but may be None initially
+    metadata = litellm_params.get("metadata")
+    if metadata is None:
+        metadata = {}
+        litellm_params["metadata"] = metadata
+    return metadata
 
 
-def _input_callback(
-    kwargs,  # type: Dict[str, Any]
-):
-    # type: (...) -> None
+def _input_callback(kwargs):
+    # type: (Dict[str, Any]) -> None
     """Handle the start of a request."""
     integration = sentry_sdk.get_client().get_integration(LiteLLMIntegration)
 
@@ -73,7 +41,13 @@ def _input_callback(
         return
 
     # Get key parameters
-    model = kwargs.get("model", "")
+    full_model = kwargs.get("model", "")
+    try:
+        model, provider, _, _ = litellm.get_llm_provider(full_model)
+    except Exception:
+        model = full_model
+        provider = "unknown"
+
     messages = kwargs.get("messages", [])
     operation = "chat" if messages else "embeddings"
 
@@ -93,11 +67,8 @@ def _input_callback(
     _get_metadata_dict(kwargs)["_sentry_span"] = span
 
     # Set basic data
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "litellm")
+    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
-    set_data_normalized(
-        span, "gen_ai.litellm.provider", _get_provider_from_model(model)
-    )
 
     # Record messages if allowed
     if messages and should_send_default_pii() and integration.include_prompts:
@@ -131,13 +102,8 @@ def _input_callback(
             set_data_normalized(span, f"gen_ai.litellm.{key}", value)
 
 
-def _success_callback(
-    kwargs,  # type: Dict[str, Any]
-    completion_response,  # type: Any
-    start_time,  # type: datetime
-    end_time,  # type: datetime
-):
-    # type: (...) -> None
+def _success_callback(kwargs, completion_response, start_time, end_time):
+    # type: (Dict[str, Any], Any, datetime, datetime) -> None
     """Handle successful completion."""
 
     span = _get_metadata_dict(kwargs).get("_sentry_span")
@@ -196,13 +162,8 @@ def _success_callback(
         span.__exit__(None, None, None)
 
 
-def _failure_callback(
-    kwargs,  # type: Dict[str, Any]
-    exception,  # type: Exception
-    start_time,  # type: datetime
-    end_time,  # type: datetime
-):
-    # type: (...) -> None
+def _failure_callback(kwargs, exception, start_time, end_time):
+    # type: (Dict[str, Any], Exception, datetime, datetime) -> None
     """Handle request failure."""
     span = _get_metadata_dict(kwargs).get("_sentry_span")
     if span is None:
