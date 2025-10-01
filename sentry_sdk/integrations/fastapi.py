@@ -112,32 +112,33 @@ def patch_get_request_handler():
             sentry_scope = sentry_sdk.get_isolation_scope()
             sentry_scope._name = FastApiIntegration.identifier
 
-            response = await old_app(*args, **kwargs)
+            try:
+                response = await old_app(*args, **kwargs)
+            finally:
+                extractor = StarletteRequestExtractor(request)
+                info = await extractor.extract_request_info()
 
-            extractor = StarletteRequestExtractor(request)
-            info = await extractor.extract_request_info()
+                def _make_request_event_processor(req, integration):
+                    # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
+                    def event_processor(event, hint):
+                        # type: (Event, Dict[str, Any]) -> Event
 
-            def _make_request_event_processor(req, integration):
-                # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
-                def event_processor(event, hint):
-                    # type: (Event, Dict[str, Any]) -> Event
+                        # Extract information from request
+                        request_info = event.get("request", {})
+                        if info:
+                            if "cookies" in info and should_send_default_pii():
+                                request_info["cookies"] = info["cookies"]
+                            if "data" in info:
+                                request_info["data"] = info["data"]
+                        event["request"] = deepcopy(request_info)
 
-                    # Extract information from request
-                    request_info = event.get("request", {})
-                    if info:
-                        if "cookies" in info and should_send_default_pii():
-                            request_info["cookies"] = info["cookies"]
-                        if "data" in info:
-                            request_info["data"] = info["data"]
-                    event["request"] = deepcopy(request_info)
+                        return event
 
-                    return event
+                    return event_processor
 
-                return event_processor
-
-            sentry_scope.add_event_processor(
-                _make_request_event_processor(request, integration)
-            )
+                sentry_scope.add_event_processor(
+                    _make_request_event_processor(request, integration)
+                )
 
             return response
 
