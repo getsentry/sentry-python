@@ -21,6 +21,7 @@ class EndpointType(Enum):
     """
 
     ENVELOPE = "envelope"
+    OTLP_TRACES = "integration/otlp/v1/traces"
 
 
 class CompressionAlgo(Enum):
