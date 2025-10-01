@@ -8,7 +8,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
+from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace, add_http_query_source
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
@@ -132,6 +132,9 @@ def _install_httplib():
 
             span.set_http_status(int(rv.status))
             span.set_data("reason", rv.reason)
+            
+            with capture_internal_exceptions():
+                add_http_query_source(span)
         finally:
             span.finish()
 

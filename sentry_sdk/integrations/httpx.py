@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
-from sentry_sdk.tracing_utils import Baggage, should_propagate_trace
+from sentry_sdk.tracing_utils import Baggage, should_propagate_trace, add_http_query_source
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
@@ -88,6 +88,9 @@ def _install_httpx_client():
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
+            with capture_internal_exceptions():
+                add_http_query_source(span)
+
             return rv
 
     Client.send = send
@@ -143,6 +146,9 @@ def _install_httpx_async_client():
 
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
+
+            with capture_internal_exceptions():
+                add_http_query_source(span)
 
             return rv
 
