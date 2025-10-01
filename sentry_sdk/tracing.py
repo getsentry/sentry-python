@@ -1064,6 +1064,16 @@ class Transaction(Span):
                     ],
                 )
             )
+            if client.transport:
+                client.transport.record_lost_event(
+                    "event_processor", data_category="transaction"
+                )
+
+                num_spans = len(self._span_recorder.spans) + 1
+                client.transport.record_lost_event(
+                    "event_processor", data_category="span", quantity=num_spans
+                )
+
             self.sampled = False
 
         if not self.sampled:
