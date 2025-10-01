@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Sequence
     from typing import Tuple
+    from typing import AbstractSet
     from typing_extensions import Literal
     from typing_extensions import TypedDict
 
@@ -919,7 +920,7 @@ class ClientConstructor:
         max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
         enable_logs=False,  # type: bool
         before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
-        trace_ignore_status_codes=[],  # type: Sequence[Union[int, Tuple[int, int]]]
+        trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Union
     from typing import TypeVar
-    from typing import Sequence
+    from typing import Set
 
     from typing_extensions import TypedDict, Unpack
 
@@ -971,29 +971,6 @@ class Transaction(Span):
 
         return scope_or_hub
 
-    def _in_http_status_code_range(self, code, code_ranges):
-        # type: (int, Sequence[Union[int, Tuple[int, int]]]) -> bool
-        for target in code_ranges:
-            if isinstance(target, int):
-                if code == target:
-                    return True
-                continue
-
-            wrong_type_message = "trace_ignore_status_codes must be a list of integers or pairs of integers."
-            try:
-                low, high = target
-                if not isinstance(low, int) or not isinstance(high, int):
-                    logger.warning(wrong_type_message)
-                    continue
-
-                if low <= code <= high:
-                    return True
-
-            except Exception:
-                logger.warning(wrong_type_message)
-
-        return False
-
     def _get_log_representation(self):
         # type: () -> str
         return "{op}transaction <{name}>".format(
@@ -1074,9 +1051,9 @@ class Transaction(Span):
             logger.warning(
                 f"Invalid type for http.response.status_code; is {status_code!r} of type {type(status_code)}, expected an int."
             )
-        elif status_code is not None and self._in_http_status_code_range(
-            status_code,
-            client.options["trace_ignore_status_codes"],
+        elif (
+            status_code is not None
+            and status_code in client.options["trace_ignore_status_codes"]
         ):
             logger.debug(
                 "[Tracing] Discarding {transaction_description} because the HTTP status code {status_code} is matched by trace_ignore_status_codes: {trace_ignore_status_codes}".format(
