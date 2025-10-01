@@ -21,7 +21,9 @@ def test_no_ignored_codes(sentry_init, capture_events):
 def test_single_code_ignored(sentry_init, capture_events, status_code):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_ignore_status_codes=(404,),
+        trace_ignore_status_codes={
+            404,
+        },
     )
     events = capture_events()
 
@@ -39,10 +41,10 @@ def test_single_code_ignored(sentry_init, capture_events, status_code):
 def test_range_ignored(sentry_init, capture_events, status_code):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_ignore_status_codes=(
-            (
+        trace_ignore_status_codes=set(
+            range(
                 305,
-                399,
+                400,
             ),
         ),
     )
@@ -62,19 +64,19 @@ def test_range_ignored(sentry_init, capture_events, status_code):
 def test_variety_ignored(sentry_init, capture_events, status_code):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_ignore_status_codes=(
+        trace_ignore_status_codes={
             301,
             302,
             303,
-            (
+            *range(
                 305,
-                399,
+                400,
             ),
-            (
+            *range(
                 401,
-                404,
+                405,
             ),
-        ),
+        },
     )
     events = capture_events()
 
@@ -92,40 +94,14 @@ def test_variety_ignored(sentry_init, capture_events, status_code):
         assert len(events) == 1
 
 
-def test_malformed_argument_ignored(sentry_init, capture_events):
-    sentry_init(
-        traces_sample_rate=1.0,
-        trace_ignore_status_codes=(
-            404.0,
-            "404",
-            "401-404",
-            (404,),
-            (
-                "401",
-                "404",
-            ),
-            (
-                401,
-                404,
-                500,
-            ),
-        ),
-    )
-    events = capture_events()
-
-    with start_transaction(op="http", name="GET /"):
-        span_or_tx = sentry_sdk.get_current_span()
-        span_or_tx.set_data("http.response.status_code", 404)
-
-    assert len(events) == 1
-
-
 def test_transaction_not_ignored_when_status_code_has_invalid_type(
     sentry_init, capture_events
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_ignore_status_codes=((401, 404),),
+        trace_ignore_status_codes=set(
+            range(401, 404),
+        ),
     )
     events = capture_events()
 
