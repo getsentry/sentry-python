@@ -167,8 +167,10 @@ def _create_mcp_execute_tool_spans(span, result):
                 description=f"execute_tool {output.name}",
                 start_timestamp=span.start_timestamp,
             ) as execute_tool_span:
-                execute_tool_span.set_tag(SPANDATA.GEN_AI_TOOL_TYPE, "mcp")
-                execute_tool_span.set_tag(SPANDATA.GEN_AI_TOOL_NAME, output.name)
+                set_data_normalized(execute_tool_span, SPANDATA.GEN_AI_TOOL_TYPE, "mcp")
+                set_data_normalized(
+                    execute_tool_span, SPANDATA.GEN_AI_TOOL_NAME, output.name
+                )
                 if should_send_default_pii():
                     execute_tool_span.set_data(
                         SPANDATA.GEN_AI_TOOL_INPUT, output.arguments
