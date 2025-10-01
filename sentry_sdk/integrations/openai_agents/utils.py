@@ -173,6 +173,8 @@ def _create_mcp_execute_tool_spans(span, result):
                     execute_tool_span.set_data(
                         SPANDATA.GEN_AI_TOOL_INPUT, output.arguments
                     )
-                    span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, output.output)
+                    execute_tool_span.set_data(
+                        SPANDATA.GEN_AI_TOOL_OUTPUT, output.output
+                    )
                 if output.error:
                     execute_tool_span.set_status(SPANSTATUS.ERROR)
