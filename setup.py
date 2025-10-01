@@ -73,6 +73,7 @@ setup(
         "openfeature": ["openfeature-sdk>=0.7.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": ["opentelemetry-distro"],
+        "opentelemetry-otlp": ["opentelemetry-distro[otlp]>=0.35b0"],
         "pure-eval": ["pure_eval", "executing", "asttokens"],
         "pydantic_ai": ["pydantic-ai>=1.0.0"],
         "pymongo": ["pymongo>=3.1"],
