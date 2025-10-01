@@ -1310,11 +1310,9 @@ class ClientConstructor:
             not be sent to Sentry.
 
         :param trace_ignore_status_codes: An optional property that disables tracing for
-            HTTP requests with certain response codes.
+            HTTP requests with certain status codes.
 
-            The option is a list, where elements are individual response codes, or inclusive
-            ranges of response codes. Requests are not traced if any code matches or
-            any provided range contains the response code.
+            Requests are not traced if the status code is contained in the provided set.
 
             If `trace_ignore_status_codes` is not provided, requests with any status code
             may be traced.
