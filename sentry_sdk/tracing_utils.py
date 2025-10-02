@@ -101,12 +101,12 @@ def has_tracing_enabled(options):
     if options is None:
         return False
 
-    return bool(
-        options.get("enable_tracing") is not False
-        and (
-            options.get("traces_sample_rate") is not None
-            or options.get("traces_sampler") is not None
-        )
+    if options.get("enable_tracing") is False:
+        return False
+
+    return (
+        options.get("traces_sample_rate") is not None
+        or options.get("traces_sampler") is not None
     )
 
 
@@ -527,7 +527,9 @@ class PropagationContext:
             )
             return
 
-        self.dynamic_sampling_context["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
+        self.dynamic_sampling_context["sample_rand"] = (
+            f"{sample_rand:.6f}"  # noqa: E231
+        )
 
     def _sample_rand(self):
         # type: () -> Optional[str]
