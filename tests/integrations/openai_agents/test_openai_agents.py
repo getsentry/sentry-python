@@ -688,7 +688,6 @@ async def test_span_status_error(sentry_init, capture_events, test_agent):
 async def test_mcp_tool_execution_spans(sentry_init, capture_events, test_agent):
     """
     Test that MCP (Model Context Protocol) tool calls create execute_tool spans.
-    This tests the functionality added in the PR for MCP tool execution tracking.
     """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
