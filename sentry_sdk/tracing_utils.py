@@ -327,9 +327,9 @@ def extract_sentrytrace_data(header):
     trace_id, parent_span_id, sampled_str = match.groups()
     parent_sampled = None
 
-    if trace_id:
+    if trace_id and len(trace_id) != 32:
         trace_id = "{:032x}".format(int(trace_id, 16))
-    if parent_span_id:
+    if parent_span_id and len(parent_span_id) != 16:
         parent_span_id = "{:016x}".format(int(parent_span_id, 16))
     if sampled_str:
         parent_sampled = sampled_str != "0"
@@ -527,7 +527,9 @@ class PropagationContext:
             )
             return
 
-        self.dynamic_sampling_context["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
+        self.dynamic_sampling_context["sample_rand"] = (
+            f"{sample_rand:.6f}"  # noqa: E231
+        )
 
     def _sample_rand(self):
         # type: () -> Optional[str]
