@@ -15,6 +15,7 @@ from agents import (
     ModelSettings,
 )
 from agents.items import (
+    McpCall,
     ResponseOutputMessage,
     ResponseOutputText,
     ResponseFunctionToolCall,
@@ -452,6 +453,8 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                 "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
                 "strict_json_schema": True,
                 "is_enabled": True,
+                "tool_input_guardrails": None,
+                "tool_output_guardrails": None,
             }
         ]
     )
@@ -694,13 +697,16 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_events, test_agent)
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
         ) as mock_get_response:
-            # Create a mock McpCall object
-            mcp_call = MagicMock()
-            mcp_call.__class__.__name__ = "McpCall"
-            mcp_call.name = "test_mcp_tool"
-            mcp_call.arguments = '{"query": "search term"}'
-            mcp_call.output = "MCP tool executed successfully"
-            mcp_call.error = None
+            # Create a McpCall object
+            mcp_call = McpCall(
+                id="mcp_call_123",
+                name="test_mcp_tool",
+                arguments='{"query": "search term"}',
+                output="MCP tool executed successfully",
+                error=None,
+                type="mcp_call",
+                server_label="test_server",
+            )
 
             # Create a ModelResponse with an McpCall in the output
             mcp_response = ModelResponse(
@@ -780,7 +786,7 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_events, test_agent)
     )
 
     # Verify no error status since error was None
-    assert mcp_tool_span.get("status") != "error"
+    assert mcp_tool_span.get("tags", {}).get("status") != "error"
 
 
 @pytest.mark.asyncio
@@ -793,13 +799,16 @@ async def test_mcp_tool_execution_with_error(sentry_init, capture_events, test_a
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
         ) as mock_get_response:
-            # Create a mock McpCall object with an error
-            mcp_call_with_error = MagicMock()
-            mcp_call_with_error.__class__.__name__ = "McpCall"
-            mcp_call_with_error.name = "failing_mcp_tool"
-            mcp_call_with_error.arguments = '{"query": "test"}'
-            mcp_call_with_error.output = None
-            mcp_call_with_error.error = "MCP tool execution failed"
+            # Create a McpCall object with an error
+            mcp_call_with_error = McpCall(
+                id="mcp_call_error_123",
+                name="failing_mcp_tool",
+                arguments='{"query": "test"}',
+                output=None,
+                error="MCP tool execution failed",
+                type="mcp_call",
+                server_label="test_server",
+            )
 
             # Create a ModelResponse with a failing McpCall
             mcp_response = ModelResponse(
@@ -877,7 +886,7 @@ async def test_mcp_tool_execution_with_error(sentry_init, capture_events, test_a
     assert mcp_tool_span["data"]["gen_ai.tool.output"] is None
 
     # Verify error status was set
-    assert mcp_tool_span["status"] == "error"
+    assert mcp_tool_span["tags"]["status"] == "error"
 
 
 @pytest.mark.asyncio
@@ -890,13 +899,16 @@ async def test_mcp_tool_execution_without_pii(sentry_init, capture_events, test_
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
         ) as mock_get_response:
-            # Create a mock McpCall object
-            mcp_call = MagicMock()
-            mcp_call.__class__.__name__ = "McpCall"
-            mcp_call.name = "test_mcp_tool"
-            mcp_call.arguments = '{"query": "sensitive data"}'
-            mcp_call.output = "Result with sensitive info"
-            mcp_call.error = None
+            # Create a McpCall object
+            mcp_call = McpCall(
+                id="mcp_call_pii_123",
+                name="test_mcp_tool",
+                arguments='{"query": "sensitive data"}',
+                output="Result with sensitive info",
+                error=None,
+                type="mcp_call",
+                server_label="test_server",
+            )
 
             # Create a ModelResponse with an McpCall
             mcp_response = ModelResponse(
