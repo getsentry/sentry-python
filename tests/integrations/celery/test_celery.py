@@ -374,9 +374,9 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     assert submit_transaction["type"] == "transaction"
     assert submit_transaction["transaction"] == "submit_celery"
 
-    assert len(
-        submit_transaction["spans"]
-    ), 4  # Because redis integration was auto enabled
+    assert len(submit_transaction["spans"]), (
+        4
+    )  # Because redis integration was auto enabled
     span = submit_transaction["spans"][0]
     assert span["op"] == "queue.submit.celery"
     assert span["description"] == "dummy_task"
@@ -439,7 +439,9 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
 
 
 def test_traces_sampler_gets_task_info_in_sampling_context(
-    init_celery, celery_invocation, DictionaryContaining  # noqa:N803
+    init_celery,
+    celery_invocation,
+    DictionaryContaining,  # noqa:N803
 ):
     traces_sampler = mock.Mock()
     celery = init_celery(traces_sampler=traces_sampler)

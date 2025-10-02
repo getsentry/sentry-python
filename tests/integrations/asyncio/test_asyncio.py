@@ -291,7 +291,8 @@ def test_sentry_task_factory_with_factory(mock_get_running_loop):
 @patch("asyncio.get_running_loop")
 @patch("sentry_sdk.integrations.asyncio.Task")
 def test_sentry_task_factory_context_no_factory(
-    MockTask, mock_get_running_loop  # noqa: N803
+    MockTask,
+    mock_get_running_loop,  # noqa: N803
 ):
     mock_loop = mock_get_running_loop.return_value
     mock_coro = MagicMock()

@@ -159,7 +159,8 @@ class CounterMetric(Metric):
     __slots__ = ("value",)
 
     def __init__(
-        self, first  # type: MetricValue
+        self,
+        first,  # type: MetricValue
     ):
         # type: (...) -> None
         self.value = float(first)
@@ -170,7 +171,8 @@ class CounterMetric(Metric):
         return 1
 
     def add(
-        self, value  # type: MetricValue
+        self,
+        value,  # type: MetricValue
     ):
         # type: (...) -> None
         self.value += float(value)
@@ -190,7 +192,8 @@ class GaugeMetric(Metric):
     )
 
     def __init__(
-        self, first  # type: MetricValue
+        self,
+        first,  # type: MetricValue
     ):
         # type: (...) -> None
         first = float(first)
@@ -207,7 +210,8 @@ class GaugeMetric(Metric):
         return 5
 
     def add(
-        self, value  # type: MetricValue
+        self,
+        value,  # type: MetricValue
     ):
         # type: (...) -> None
         value = float(value)
@@ -232,7 +236,8 @@ class DistributionMetric(Metric):
     __slots__ = ("value",)
 
     def __init__(
-        self, first  # type: MetricValue
+        self,
+        first,  # type: MetricValue
     ):
         # type(...) -> None
         self.value = [float(first)]
@@ -243,7 +248,8 @@ class DistributionMetric(Metric):
         return len(self.value)
 
     def add(
-        self, value  # type: MetricValue
+        self,
+        value,  # type: MetricValue
     ):
         # type: (...) -> None
         self.value.append(float(value))
@@ -257,7 +263,8 @@ class SetMetric(Metric):
     __slots__ = ("value",)
 
     def __init__(
-        self, first  # type: MetricValue
+        self,
+        first,  # type: MetricValue
     ):
         # type: (...) -> None
         self.value = {first}
@@ -268,7 +275,8 @@ class SetMetric(Metric):
         return len(self.value)
 
     def add(
-        self, value  # type: MetricValue
+        self,
+        value,  # type: MetricValue
     ):
         # type: (...) -> None
         self.value.add(value)
@@ -373,9 +381,7 @@ class LocalAggregator:
 
     def __init__(self):
         # type: (...) -> None
-        self._measurements = (
-            {}
-        )  # type: Dict[Tuple[str, MetricTagsInternal], Tuple[float, float, int, float]]
+        self._measurements = {}  # type: Dict[Tuple[str, MetricTagsInternal], Tuple[float, float, int, float]]
 
     def add(
         self,

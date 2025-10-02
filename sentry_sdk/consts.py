@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Sequence
     from typing import Tuple
+    from typing import AbstractSet
     from typing_extensions import Literal
     from typing_extensions import TypedDict
 
@@ -765,11 +766,12 @@ class SPANSTATUS:
     CANCELLED = "cancelled"
     DATA_LOSS = "data_loss"
     DEADLINE_EXCEEDED = "deadline_exceeded"
+    ERROR = "error"  # OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
     FAILED_PRECONDITION = "failed_precondition"
     INTERNAL_ERROR = "internal_error"
     INVALID_ARGUMENT = "invalid_argument"
     NOT_FOUND = "not_found"
-    OK = "ok"
+    OK = "ok"  # HTTP 200 and OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
     OUT_OF_RANGE = "out_of_range"
     PERMISSION_DENIED = "permission_denied"
     RESOURCE_EXHAUSTED = "resource_exhausted"
@@ -777,6 +779,7 @@ class SPANSTATUS:
     UNAVAILABLE = "unavailable"
     UNIMPLEMENTED = "unimplemented"
     UNKNOWN_ERROR = "unknown_error"
+    UNSET = "unset"  # OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
 
 
 class OP:
@@ -851,7 +854,6 @@ class OP:
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor:
-
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
@@ -919,6 +921,7 @@ class ClientConstructor:
         max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
         enable_logs=False,  # type: bool
         before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
+        trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1307,6 +1310,14 @@ class ClientConstructor:
             function will be retained. If the function returns None, the log will
             not be sent to Sentry.
 
+        :param trace_ignore_status_codes: An optional property that disables tracing for
+            HTTP requests with certain status codes.
+
+            Requests are not traced if the status code is contained in the provided set.
+
+            If `trace_ignore_status_codes` is not provided, requests with any status code
+            may be traced.
+
         :param _experiments:
         """
         pass
@@ -1332,4 +1343,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.38.0"
+VERSION = "2.39.0"

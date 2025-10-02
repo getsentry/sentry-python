@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Union
     from typing import TypeVar
+    from typing import Set
 
     from typing_extensions import TypedDict, Unpack
 
@@ -416,7 +417,8 @@ class Span:
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None and should_be_treated_as_error(ty, value):
-            self.set_status(SPANSTATUS.INTERNAL_ERROR)
+            if self.status != SPANSTATUS.ERROR:
+                self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         with capture_internal_exceptions():
             scope, old_span = self._context_manager_state
@@ -969,6 +971,12 @@ class Transaction(Span):
 
         return scope_or_hub
 
+    def _get_log_representation(self):
+        # type: () -> str
+        return "{op}transaction <{name}>".format(
+            op=("<" + self.op + "> " if self.op else ""), name=self.name
+        )
+
     def finish(
         self,
         scope=None,  # type: Optional[sentry_sdk.Scope]
@@ -997,9 +1005,7 @@ class Transaction(Span):
 
         # For backwards compatibility, we must handle the case where `scope`
         # or `hub` could both either be a `Scope` or a `Hub`.
-        scope = self._get_scope_from_finish_args(
-            scope, hub
-        )  # type: Optional[sentry_sdk.Scope]
+        scope = self._get_scope_from_finish_args(scope, hub)  # type: Optional[sentry_sdk.Scope]
 
         scope = scope or self.scope or sentry_sdk.get_current_scope()
         client = sentry_sdk.get_client()
@@ -1039,6 +1045,32 @@ class Transaction(Span):
             self.name = "<unlabeled transaction>"
 
         super().finish(scope, end_timestamp)
+
+        status_code = self._data.get(SPANDATA.HTTP_STATUS_CODE)
+        if (
+            status_code is not None
+            and status_code in client.options["trace_ignore_status_codes"]
+        ):
+            logger.debug(
+                "[Tracing] Discarding {transaction_description} because the HTTP status code {status_code} is matched by trace_ignore_status_codes: {trace_ignore_status_codes}".format(
+                    transaction_description=self._get_log_representation(),
+                    status_code=self._data[SPANDATA.HTTP_STATUS_CODE],
+                    trace_ignore_status_codes=client.options[
+                        "trace_ignore_status_codes"
+                    ],
+                )
+            )
+            if client.transport:
+                client.transport.record_lost_event(
+                    "event_processor", data_category="transaction"
+                )
+
+                num_spans = len(self._span_recorder.spans) + 1
+                client.transport.record_lost_event(
+                    "event_processor", data_category="span", quantity=num_spans
+                )
+
+            self.sampled = False
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -1187,9 +1219,7 @@ class Transaction(Span):
         """
         client = sentry_sdk.get_client()
 
-        transaction_description = "{op}transaction <{name}>".format(
-            op=("<" + self.op + "> " if self.op else ""), name=self.name
-        )
+        transaction_description = self._get_log_representation()
 
         # nothing to do if tracing is disabled
         if not has_tracing_enabled(client.options):
@@ -1208,8 +1238,8 @@ class Transaction(Span):
         sample_rate = (
             client.options["traces_sampler"](sampling_context)
             if callable(client.options.get("traces_sampler"))
+            # default inheritance behavior
             else (
-                # default inheritance behavior
                 sampling_context["parent_sampled"]
                 if sampling_context["parent_sampled"] is not None
                 else client.options["traces_sample_rate"]

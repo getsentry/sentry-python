@@ -136,7 +136,10 @@ def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
 
 
 def test_transaction_with_error(
-    sentry_init, crashing_app, capture_events, DictionaryContaining  # noqa:N803
+    sentry_init,
+    crashing_app,
+    capture_events,
+    DictionaryContaining,  # noqa:N803
 ):
     def dogpark(environ, start_response):
         raise ValueError("Fetch aborted. The ball was not returned.")
@@ -173,7 +176,9 @@ def test_transaction_with_error(
 
 
 def test_transaction_no_error(
-    sentry_init, capture_events, DictionaryContaining  # noqa:N803
+    sentry_init,
+    capture_events,
+    DictionaryContaining,  # noqa:N803
 ):
     def dogpark(environ, start_response):
         start_response("200 OK", [])

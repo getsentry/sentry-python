@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.39.0
+
+### Various fixes & improvements
+
+- Fix(AI): Make agents integrations set the span status in case of error (#4820) by @antonpirker
+- Fix(dedupe): Use weakref in dedupe where possible (#4834) by @sl0thentr0py
+- Fix(Django): Avoid evaluating complex Django object in span.data/span.attributes (#4804) by @antonpirker
+- Fix(Langchain): Don't record tool call output if not include_prompt / should_send_default_pii (#4836) by @shellmayr
+- Fix(OpenAI): Don't swallow userland exceptions in openai (#4861) by @sl0thentr0py
+- Docs: Update contributing guidelines with instructions to run tests with tox (#4857) by @alexander-alderman-webb
+- Test(Spark): Improve `test_spark` speed (#4822) by @mgaligniana
+
+Note: This is my last release. So long, and thanks for all the fish! by @antonpirker
+
+
 ## 2.38.0
 
 ### Various fixes & improvements

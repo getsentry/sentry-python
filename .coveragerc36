@@ -3,12 +3,12 @@
 
 [run]
 branch = true
-omit = 
+omit =
     /tmp/*
     */tests/*
     */.venv/*
 
 
 [report]
-exclude_lines = 
+exclude_lines =
     if TYPE_CHECKING:

@@ -178,9 +178,7 @@ class BaseClient:
 
     def __init__(self, options=None):
         # type: (Optional[Dict[str, Any]]) -> None
-        self.options = (
-            options if options is not None else DEFAULT_OPTIONS
-        )  # type: Dict[str, Any]
+        self.options = options if options is not None else DEFAULT_OPTIONS  # type: Dict[str, Any]
 
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
@@ -956,7 +954,7 @@ class _Client(BaseClient):
         debug = self.options.get("debug", False)
         if debug:
             logger.debug(
-                f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
+                f"[Sentry Logs] [{log.get('severity_text')}] {log.get('body')}"
             )
 
         before_send_log = get_before_send_log(self.options)
@@ -970,7 +968,8 @@ class _Client(BaseClient):
             self.log_batcher.add(log)
 
     def capture_session(
-        self, session  # type: Session
+        self,
+        session,  # type: Session
     ):
         # type: (...) -> None
         if not session.release:
@@ -991,7 +990,8 @@ class _Client(BaseClient):
             ...
 
     def get_integration(
-        self, name_or_class  # type: Union[str, Type[Integration]]
+        self,
+        name_or_class,  # type: Union[str, Type[Integration]]
     ):
         # type: (...) -> Optional[Integration]
         """Returns the integration for this client by name or class.

@@ -7,6 +7,7 @@ from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -83,6 +84,8 @@ def _capture_exception(exc, manual_span_cleanup=True):
     # Close an eventually open span
     # We need to do this by hand because we are not using the start_span context manager
     current_span = sentry_sdk.get_current_span()
+    set_span_errored(current_span)
+
     if manual_span_cleanup and current_span is not None:
         current_span.__exit__(None, None, None)
 
@@ -279,9 +282,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
 
         def new_iterator():
             # type: () -> Iterator[ChatCompletionChunk]
-            with capture_internal_exceptions():
-                count_tokens_manually = True
-                for x in old_iterator:
+            count_tokens_manually = True
+            for x in old_iterator:
+                with capture_internal_exceptions():
                     # OpenAI chat completion API
                     if hasattr(x, "choices"):
                         choice_index = 0
@@ -312,8 +315,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         )
                         count_tokens_manually = False
 
-                    yield x
+                yield x
 
+            with capture_internal_exceptions():
                 if len(data_buf) > 0:
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
@@ -334,9 +338,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
 
         async def new_iterator_async():
             # type: () -> AsyncIterator[ChatCompletionChunk]
-            with capture_internal_exceptions():
-                count_tokens_manually = True
-                async for x in old_iterator:
+            count_tokens_manually = True
+            async for x in old_iterator:
+                with capture_internal_exceptions():
                     # OpenAI chat completion API
                     if hasattr(x, "choices"):
                         choice_index = 0
@@ -367,8 +371,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         )
                         count_tokens_manually = False
 
-                    yield x
+                yield x
 
+            with capture_internal_exceptions():
                 if len(data_buf) > 0:
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:

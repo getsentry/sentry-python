@@ -30,9 +30,6 @@ env:
     {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}
 
 jobs:
-{% for category in categories %}
 {% include "test_group.jinja" %}
-{% endfor %}
-
 {% include "check_required.jinja" %}
 {% endwith %}
