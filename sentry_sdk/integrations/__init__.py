@@ -146,6 +146,7 @@ _MIN_VERSIONS = {
     "langchain": (0, 1, 0),
     "langgraph": (0, 6, 6),
     "launchdarkly": (9, 8, 0),
+    "litellm": (1, 77, 2),
     "loguru": (0, 7, 0),
     "openai": (1, 0, 0),
     "openai_agents": (0, 0, 19),
