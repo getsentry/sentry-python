@@ -35,97 +35,78 @@ else:
 
 
 @pytest.fixture
-def mock_hf_text_generation_api():
+def mock_hf_text_generation_api(httpx_mock):
     # type: () -> Any
     """Mock HuggingFace text generation API"""
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        model_name = "test-model"
+    model_name = "test-model"
 
+    model_endpoint_response = {
+        "id": model_name,
+        "pipeline_tag": "text-generation",
+        "inferenceProviderMapping": {
+            "hf-inference": {
+                "status": "live",
+                "providerId": model_name,
+                "task": "text-generation",
+            }
+        },
+    }
+    inference_endpoint_response = {
+        "generated_text": "[mocked] Hello! How can i help you?",
+        "details": {
+            "finish_reason": "length",
+            "generated_tokens": 10,
+            "prefill": [],
+            "tokens": [],
+        },
+    }
+
+    if HF_VERSION >= (1, 0, 0):
         # Mock model info endpoint
-        rsps.add(
-            responses.GET,
-            MODEL_ENDPOINT.format(model_name=model_name),
-            json={
-                "id": model_name,
-                "pipeline_tag": "text-generation",
-                "inferenceProviderMapping": {
-                    "hf-inference": {
-                        "status": "live",
-                        "providerId": model_name,
-                        "task": "text-generation",
-                    }
-                },
-            },
-            status=200,
+        httpx_mock.add_response(
+            method="GET",
+            url=re.compile(
+                MODEL_ENDPOINT.format(model_name=model_name)
+                + r"(\?expand=inferenceProviderMapping)?"
+            ),
+            json=model_endpoint_response,
+            status_code=200,
+            is_optional=True,
+            is_reusable=True,
         )
 
         # Mock text generation endpoint
-        rsps.add(
-            responses.POST,
-            INFERENCE_ENDPOINT.format(model_name=model_name),
-            json={
-                "generated_text": "[mocked] Hello! How can i help you?",
-                "details": {
-                    "finish_reason": "length",
-                    "generated_tokens": 10,
-                    "prefill": [],
-                    "tokens": [],
-                },
-            },
-            status=200,
-        )
-
-        yield rsps
-
-
-@pytest.fixture
-def mock_hf_text_generation_api_httpx(httpx_mock):
-    # type: (Any) -> Any
-    """Mock HuggingFace text generation API for httpx"""
-    model_name = "test-model"
-
-    # Mock model info endpoint (with query parameters) - allow multiple calls
-    # Using pattern matching to handle query parameters
-    model_url_pattern = re.compile(
-        re.escape(MODEL_ENDPOINT.format(model_name=model_name)) + r"(\?.*)?$"
-    )
-
-    # Add exactly the number of responses we expect (2 calls observed from debug output)
-    for _ in range(2):  # Allow exactly 2 calls to the model info endpoint
         httpx_mock.add_response(
-            method="GET",
-            url=model_url_pattern,
-            json={
-                "id": model_name,
-                "pipeline_tag": "text-generation",
-                "inferenceProviderMapping": {
-                    "hf-inference": {
-                        "status": "live",
-                        "providerId": model_name,
-                        "task": "text-generation",
-                    }
-                },
-            },
+            method="POST",
+            url=INFERENCE_ENDPOINT.format(model_name=model_name),
+            json=inference_endpoint_response,
             status_code=200,
+            is_optional=True,
+            is_reusable=True,
         )
 
-    # Mock text generation endpoint
-    httpx_mock.add_response(
-        method="POST",
-        url=INFERENCE_ENDPOINT.format(model_name=model_name),
-        json={
-            "generated_text": "[mocked] Hello! How can i help you?",
-            "details": {
-                "finish_reason": "length",
-                "generated_tokens": 10,
-                "prefill": [],
-                "tokens": [],
-            },
-        },
-        status_code=200,
-    )
+        yield httpx_mock
 
-    return httpx_mock
+    else:
+        # Older version of huggingface_hub, we need to mock requests
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            # Mock model info endpoint
+            rsps.add(
+                responses.GET,
+                MODEL_ENDPOINT.format(model_name=model_name),
+                json=model_endpoint_response,
+                status=200,
+            )
+
+            # Mock text generation endpoint
+            rsps.add(
+                responses.POST,
+                INFERENCE_ENDPOINT.format(model_name=model_name),
+                json=inference_endpoint_response,
+                status=200,
+            )
+
+            yield rsps
 
 
 @pytest.fixture
@@ -426,6 +407,7 @@ def mock_hf_chat_completion_api_streaming_tools():
         yield rsps
 
 
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation(
@@ -453,11 +435,21 @@ def test_text_generation(
         )
 
     (transaction,) = events
-    (span,) = transaction["spans"]
 
-    assert span["op"] == "gen_ai.generate_text"
-    assert span["description"] == "generate_text test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
+    gen_ai_span = None
+    for span in transaction["spans"]:
+        if span["op"] == "gen_ai.generate_text":
+            gen_ai_span = span
+        else:
+            # there should be no other spans, just the gen_ai.generate_text span
+            # and optionally some http.client spans from talking to the hf api
+            assert span["op"] == "http.client"
+
+    assert gen_ai_span is not None
+
+    assert gen_ai_span["op"] == "gen_ai.generate_text"
+    assert gen_ai_span["description"] == "generate_text test-model"
+    assert gen_ai_span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "generate_text",
@@ -477,67 +469,10 @@ def test_text_generation(
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
-    assert span["data"] == expected_data
+    assert gen_ai_span["data"] == expected_data
 
     # text generation does not set the response model
-    assert "gen_ai.response.model" not in span["data"]
-
-
-@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-def test_text_generation_TODO(
-    sentry_init,
-    capture_events,
-    mock_hf_text_generation_api_httpx,
-):
-    # type: (Any, Any, Any) -> None
-    sentry_init(
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        integrations=[HuggingfaceHubIntegration(include_prompts=True)],
-    )
-    events = capture_events()
-
-    client = InferenceClient(model="test-model")
-
-    with sentry_sdk.start_transaction(name="test"):
-        client.text_generation(
-            "Hello",
-            stream=False,
-            details=True,
-        )
-
-    (transaction,) = events
-
-    # Find the huggingface_hub span (there might be httpx spans too)
-    hf_spans = [
-        span for span in transaction["spans"] if span["op"] == "gen_ai.generate_text"
-    ]
-    assert len(hf_spans) == 1, (
-        f"Expected 1 huggingface span, got {len(hf_spans)}: {[s['op'] for s in transaction['spans']]}"
-    )
-    span = hf_spans[0]
-
-    assert span["op"] == "gen_ai.generate_text"
-    assert span["description"] == "generate_text test-model"
-    assert span["origin"] == "auto.ai.huggingface_hub"
-
-    expected_data = {
-        "gen_ai.operation.name": "generate_text",
-        "gen_ai.request.model": "test-model",
-        "gen_ai.response.finish_reasons": "length",
-        "gen_ai.response.streaming": False,
-        "gen_ai.usage.total_tokens": 10,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
-
-    expected_data["gen_ai.request.messages"] = "Hello"
-    expected_data["gen_ai.response.text"] = "[mocked] Hello! How can i help you?"
-
-    assert span["data"] == expected_data
-
-    # text generation does not set the response model
-    assert "gen_ai.response.model" not in span["data"]
+    assert "gen_ai.response.model" not in gen_ai_span["data"]
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
