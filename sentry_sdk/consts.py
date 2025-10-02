@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Sequence
     from typing import Tuple
+    from typing import AbstractSet
     from typing_extensions import Literal
     from typing_extensions import TypedDict
 
@@ -919,6 +920,7 @@ class ClientConstructor:
         max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
         enable_logs=False,  # type: bool
         before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
+        trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1306,6 +1308,14 @@ class ClientConstructor:
             before they're sent to Sentry. Any modifications to the log in this
             function will be retained. If the function returns None, the log will
             not be sent to Sentry.
+
+        :param trace_ignore_status_codes: An optional property that disables tracing for
+            HTTP requests with certain status codes.
+
+            Requests are not traced if the status code is contained in the provided set.
+
+            If `trace_ignore_status_codes` is not provided, requests with any status code
+            may be traced.
 
         :param _experiments:
         """
