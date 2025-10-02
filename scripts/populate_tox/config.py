@@ -183,8 +183,11 @@ TEST_SUITE_CONFIG = {
     "huggingface_hub": {
         "package": "huggingface_hub",
         "deps": {
-            "*": ["responses"],
-            ">=1.0": ["pytest-httpx"],
+            "<1.0.0": ["responses"],
+            # the following is a hack because for whatever reason, if we set this
+            # to the actual value (>=1.0.0), according to Python's packaging
+            # '1.0.0rc2' is NOT in SpecifierSet('>=1.0.0', prereleases=True)
+            ">=0.9999": ["pytest-httpx"],
         },
     },
     "langchain-base": {
