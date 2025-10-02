@@ -6,6 +6,7 @@ import os
 
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import safe_serialize
+from sentry_sdk.utils import parse_version
 
 import agents
 from agents import (
@@ -20,6 +21,7 @@ from agents.items import (
     ResponseOutputText,
     ResponseFunctionToolCall,
 )
+from agents.version import __version__ as OPENAI_AGENTS_VERSION
 
 from openai.types.responses.response_usage import (
     InputTokensDetails,
@@ -438,24 +440,28 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         ai_client_span2,
     ) = spans
 
-    available_tools = safe_serialize(
-        [
-            {
-                "name": "simple_test_tool",
-                "description": "A simple tool",
-                "params_json_schema": {
-                    "properties": {"message": {"title": "Message", "type": "string"}},
-                    "required": ["message"],
-                    "title": "simple_test_tool_args",
-                    "type": "object",
-                    "additionalProperties": False,
-                },
-                "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
-                "strict_json_schema": True,
-                "is_enabled": True,
-            }
-        ]
-    )
+    available_tools = [
+        {
+            "name": "simple_test_tool",
+            "description": "A simple tool",
+            "params_json_schema": {
+                "properties": {"message": {"title": "Message", "type": "string"}},
+                "required": ["message"],
+                "title": "simple_test_tool_args",
+                "type": "object",
+                "additionalProperties": False,
+            },
+            "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
+            "strict_json_schema": True,
+            "is_enabled": True,
+        }
+    ]
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
+        available_tools[0].update(
+            {"tool_input_guardrails": None, "tool_output_guardrails": None}
+        )
+
+    available_tools = safe_serialize(available_tools)
 
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
