@@ -14,9 +14,6 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
-    ContextVar,
-    HAS_REAL_CONTEXTVARS,
-    CONTEXTVARS_ERROR_MESSAGE,
 )
 from typing import TypeVar
 
@@ -50,15 +47,11 @@ class DramatiqIntegration(Integration):
     """
 
     identifier = "dramatiq"
+    origin = f"auto.queue.{identifier}"
 
     @staticmethod
     def setup_once():
         # type: () -> None
-        if not HAS_REAL_CONTEXTVARS:
-            raise DidNotEnable(
-                "The dramatiq integration for Sentry requires Python 3.7+ "
-                " or aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
-            )
 
         _patch_dramatiq_broker()
 
@@ -107,8 +100,6 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
     DramatiqIntegration.
     """
 
-    _transaction = ContextVar("_transaction")
-
     def before_enqueue(self, broker, message, delay):
         # type: (Broker, Message[R], int) -> None
         message.options["sentry_headers"] = {
@@ -123,7 +114,6 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
             return
 
         scope = sentry_sdk.get_current_scope()
-        scope.set_tag("dramatiq_message_id", message.message_id)
         scope.clear_breadcrumbs()
         scope.add_event_processor(_make_message_event_processor(message, integration))
 
@@ -137,7 +127,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
             name=message.actor_name,
             op=OP.QUEUE_TASK_DRAMATIQ,
             source=TransactionSource.TASK,
-            # origin=DramatiqIntegration.origin,
+            origin=DramatiqIntegration.origin,
         )
         transaction.set_status(SPANSTATUS.OK)
         sentry_sdk.start_transaction(
@@ -147,7 +137,6 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
             source=TransactionSource.TASK,
         )
         transaction.__enter__()
-        self._transaction.set(transaction)
 
     def after_process_message(self, broker, message, *, result=None, exception=None):
         # type: (Broker, Message[R], Optional[Any], Optional[Exception]) -> None
@@ -155,7 +144,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         actor = broker.get_actor(message.actor_name)
         throws = message.options.get("throws") or actor.options.get("throws")
 
-        transaction = self._transaction.get(None)
+        transaction = sentry_sdk.get_current_scope().transaction
         if not transaction:
             return None
 
