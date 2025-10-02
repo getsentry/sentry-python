@@ -453,8 +453,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                 "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
                 "strict_json_schema": True,
                 "is_enabled": True,
-                "tool_input_guardrails": None,
-                "tool_output_guardrails": None,
             }
         ]
     )
