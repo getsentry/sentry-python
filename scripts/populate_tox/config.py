@@ -184,6 +184,7 @@ TEST_SUITE_CONFIG = {
         "package": "huggingface_hub",
         "deps": {
             "*": ["responses"],
+            ">=1.0": ["pytest-httpx"],
         },
     },
     "langchain-base": {
