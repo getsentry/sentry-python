@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized, normalize_message_role
 from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
@@ -107,9 +107,20 @@ def _set_input_data(span, get_response_kwargs):
 
     for message in get_response_kwargs.get("input", []):
         if "role" in message:
-            messages_by_role[message.get("role")].append(
-                {"type": "text", "text": message.get("content")}
-            )
+            # Normalize role to standard gen_ai values
+            normalized_role = normalize_message_role(message.get("role"))
+            # Ensure we have a valid bucket for the normalized role
+            if normalized_role not in messages_by_role:
+                # Map any unrecognized roles to appropriate defaults
+                if normalized_role == "tool_call":
+                    normalized_role = (
+                        "tool"  # OpenAI Agents uses "tool" instead of "tool_call"
+                    )
+
+            if normalized_role in messages_by_role:
+                messages_by_role[normalized_role].append(
+                    {"type": "text", "text": message.get("content")}
+                )
         else:
             if message.get("type") == "function_call":
                 messages_by_role["assistant"].append(message)
