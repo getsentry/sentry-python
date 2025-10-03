@@ -108,7 +108,7 @@ def mock_hf_text_generation_api(httpx_mock):
             status=200,
         )
 
-        if HF_VERSION > (1, 0, 0):
+        if HF_VERSION >= (1, 0, 0):
             yield httpx_mock
         else:
             yield rsps
@@ -160,7 +160,7 @@ def mock_hf_api_with_errors(httpx_mock):
             status=500,
         )
 
-        if HF_VERSION > (1, 0, 0):
+        if HF_VERSION >= (1, 0, 0):
             yield httpx_mock
         else:
             yield rsps
@@ -210,7 +210,7 @@ def mock_hf_text_generation_api_streaming(httpx_mock):
             },
         )
 
-        if HF_VERSION > (1, 0, 0):
+        if HF_VERSION >= (1, 0, 0):
             yield httpx_mock
         else:
             yield rsps
@@ -273,7 +273,7 @@ def mock_hf_chat_completion_api(httpx_mock):
             status=200,
         )
 
-        if HF_VERSION > (1, 0, 0):
+        if HF_VERSION >= (1, 0, 0):
             yield httpx_mock
         else:
             yield rsps
@@ -345,7 +345,7 @@ def mock_hf_chat_completion_api_tools(httpx_mock):
             status=200,
         )
 
-        if HF_VERSION > (1, 0, 0):
+        if HF_VERSION >= (1, 0, 0):
             yield httpx_mock
         else:
             yield rsps
@@ -398,7 +398,7 @@ def mock_hf_chat_completion_api_streaming(httpx_mock):
             },
         )
 
-        if HF_VERSION > (1, 0, 0):
+        if HF_VERSION >= (1, 0, 0):
             yield httpx_mock
         else:
             yield rsps
@@ -451,7 +451,7 @@ def mock_hf_chat_completion_api_streaming_tools(httpx_mock):
             },
         )
 
-        if HF_VERSION > (1, 0, 0):
+        if HF_VERSION >= (1, 0, 0):
             yield httpx_mock
         else:
             yield rsps
