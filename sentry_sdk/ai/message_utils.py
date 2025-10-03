@@ -13,7 +13,9 @@ except ImportError:
         return obj
 
 
-MAX_GEN_AI_MESSAGE_BYTES = 30_000  # 300KB
+# Custom limit for gen_ai message serialization - 50% of MAX_EVENT_BYTES
+# to leave room for other event data while still being generous for messages
+MAX_GEN_AI_MESSAGE_BYTES = 500_000  # 500KB
 
 
 def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
