@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
 try:
-    import litellm
+    import litellm  # type: ignore[import-not-found]
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 

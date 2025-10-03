@@ -18,4 +18,3 @@ statsig
 UnleashClient
 typer
 strawberry-graphql
-litellm
