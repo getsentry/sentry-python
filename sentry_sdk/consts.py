@@ -839,6 +839,7 @@ class OP:
     QUEUE_TASK_HUEY = "queue.task.huey"
     QUEUE_SUBMIT_RAY = "queue.submit.ray"
     QUEUE_TASK_RAY = "queue.task.ray"
+    QUEUE_TASK_DRAMATIQ = "queue.task.dramatiq"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"

@@ -179,6 +179,10 @@ ignore_missing_imports = true
 module = "agents.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "dramatiq.*"
+ignore_missing_imports = true
+
 #
 # Tool: Ruff (linting and formatting)
 #
