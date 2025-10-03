@@ -489,6 +489,7 @@ def test_text_generation(
     span = None
     for sp in transaction["spans"]:
         if sp["op"] == "gen_ai.generate_text":
+            assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
             # there should be no other spans, just the gen_ai span
@@ -558,6 +559,7 @@ def test_text_generation_streaming(
     span = None
     for sp in transaction["spans"]:
         if sp["op"] == "gen_ai.generate_text":
+            assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
             # there should be no other spans, just the gen_ai span
@@ -625,6 +627,7 @@ def test_chat_completion(
     span = None
     for sp in transaction["spans"]:
         if sp["op"] == "gen_ai.chat":
+            assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
             # there should be no other spans, just the gen_ai span
@@ -698,6 +701,7 @@ def test_chat_completion_streaming(
     span = None
     for sp in transaction["spans"]:
         if sp["op"] == "gen_ai.chat":
+            assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
             # there should be no other spans, just the gen_ai span
@@ -765,6 +769,7 @@ def test_chat_completion_api_error(
     span = None
     for sp in transaction["spans"]:
         if sp["op"] == "gen_ai.chat":
+            assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
             # there should be no other spans, just the gen_ai span
@@ -858,6 +863,7 @@ def test_chat_completion_with_tools(
     span = None
     for sp in transaction["spans"]:
         if sp["op"] == "gen_ai.chat":
+            assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
             # there should be no other spans, just the gen_ai span
@@ -949,6 +955,7 @@ def test_chat_completion_streaming_with_tools(
     span = None
     for sp in transaction["spans"]:
         if sp["op"] == "gen_ai.chat":
+            assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
             # there should be no other spans, just the gen_ai span
