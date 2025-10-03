@@ -72,8 +72,8 @@ def mock_hf_text_generation_api(httpx_mock):
         _add_mock_response(
             httpx_mock,
             rsps,
-            method="GET",
-            url=re.compile(
+            "GET",
+            re.compile(
                 MODEL_ENDPOINT.format(model_name=model_name)
                 + r"(\?expand=inferenceProviderMapping)?"
             ),
@@ -94,8 +94,8 @@ def mock_hf_text_generation_api(httpx_mock):
         _add_mock_response(
             httpx_mock,
             rsps,
-            method="POST",
-            url=INFERENCE_ENDPOINT.format(model_name=model_name),
+            "POST",
+            INFERENCE_ENDPOINT.format(model_name=model_name),
             json={
                 "generated_text": "[mocked] Hello! How can i help you?",
                 "details": {
