@@ -3,7 +3,11 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
+from sentry_sdk.ai.utils import (
+    set_data_normalized,
+    normalize_message_roles,
+    get_start_span_function,
+)
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -140,8 +144,13 @@ def _set_input_data(span, kwargs, integration):
             else:
                 normalized_messages.append(message)
 
+        # Further normalize message roles to standard gen_ai values
+        role_normalized_messages = normalize_message_roles(normalized_messages)
         set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, normalized_messages, unpack=False
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            role_normalized_messages,
+            unpack=False,
         )
 
     set_data_normalized(

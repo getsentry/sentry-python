@@ -10,6 +10,21 @@ import sentry_sdk
 from sentry_sdk.utils import logger
 
 
+# Gen AI message role reverse mapping showing allowed target roles and their source variants
+GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING = {
+    "system": ["system"],
+    "user": ["user"],
+    "assistant": ["assistant", "ai"],
+    "tool_call": ["tool_call"],
+}
+
+# Convert reverse mapping to actual mapping for efficient lookups
+GEN_AI_MESSAGE_ROLE_MAPPING = {}
+for target_role, source_roles in GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING.items():
+    for source_role in source_roles:
+        GEN_AI_MESSAGE_ROLE_MAPPING[source_role] = target_role
+
+
 def _normalize_data(data, unpack=True):
     # type: (Any, bool) -> Any
     # convert pydantic data (e.g. OpenAI v1+) to json compatible format
@@ -38,6 +53,38 @@ def set_data_normalized(span, key, value, unpack=True):
         span.set_data(key, normalized)
     else:
         span.set_data(key, json.dumps(normalized))
+
+
+def normalize_message_role(role):
+    # type: (str) -> str
+    """
+    Normalize a message role to one of the 4 allowed gen_ai role values.
+    Maps "ai" -> "assistant" and keeps other standard roles unchanged.
+    """
+    return GEN_AI_MESSAGE_ROLE_MAPPING.get(role, role)
+
+
+def normalize_message_roles(messages):
+    # type: (list[dict[str, Any]]) -> list[dict[str, Any]]
+    """
+    Normalize roles in a list of messages to use standard gen_ai role values.
+    Creates a deep copy to avoid modifying the original messages.
+    """
+    if not messages:
+        return messages
+
+    normalized_messages = []
+    for message in messages:
+        if not isinstance(message, dict):
+            normalized_messages.append(message)
+            continue
+
+        normalized_message = message.copy()
+        if "role" in message:
+            normalized_message["role"] = normalize_message_role(message["role"])
+        normalized_messages.append(normalized_message)
+
+    return normalized_messages
 
 
 def get_start_span_function():

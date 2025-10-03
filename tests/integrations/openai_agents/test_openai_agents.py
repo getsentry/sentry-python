@@ -1031,3 +1031,49 @@ async def test_multiple_agents_asyncio(
     assert txn2["transaction"] == "test_agent workflow"
     assert txn3["type"] == "transaction"
     assert txn3["transaction"] == "test_agent workflow"
+
+
+def test_openai_agents_message_role_mapping(sentry_init, capture_events):
+    """Test that OpenAI Agents integration properly maps message roles like 'ai' to 'assistant'"""
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    # Test input messages with mixed roles including "ai"
+    test_input = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello"},
+        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
+        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
+    ]
+
+    get_response_kwargs = {"input": test_input}
+
+    from sentry_sdk.integrations.openai_agents.utils import _set_input_data
+    from sentry_sdk import start_span
+
+    with start_span(op="test") as span:
+        _set_input_data(span, get_response_kwargs)
+
+    # Verify that messages were processed and roles were mapped
+    from sentry_sdk.consts import SPANDATA
+
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
+        import json
+
+        stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+        # Verify roles were properly mapped
+        found_assistant_roles = 0
+        for message in stored_messages:
+            if message["role"] == "assistant":
+                found_assistant_roles += 1
+
+        # Should have 2 assistant roles (1 from original "assistant", 1 from mapped "ai")
+        assert found_assistant_roles == 2
+
+        # Verify no "ai" roles remain in any message
+        for message in stored_messages:
+            assert message["role"] != "ai"
