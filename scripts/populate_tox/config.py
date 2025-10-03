@@ -214,6 +214,9 @@ TEST_SUITE_CONFIG = {
         "package": "launchdarkly-server-sdk",
         "num_versions": 2,
     },
+    "litellm": {
+        "package": "litellm",
+    },
     "litestar": {
         "package": "litestar",
         "deps": {
