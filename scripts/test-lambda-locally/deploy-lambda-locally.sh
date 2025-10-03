@@ -13,9 +13,9 @@ fi
 uv sync
 
 # Create a deployment package of the lambda function in `lambda_function.py`.
-rm -rf package && mkdir -p package              
+rm -rf package && mkdir -p package
 pip install ../../../sentry-python -t package/ --upgrade
-cp lambda_function.py package/ 
+cp lambda_function.py package/
 cd package && zip -r ../lambda_deployment_package.zip . && cd ..
 
 # Start the local Lambda server with the new function (defined in template.yaml)

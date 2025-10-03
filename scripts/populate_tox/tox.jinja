@@ -176,11 +176,9 @@ basepython =
     py3.12: python3.12
     py3.13: python3.13
 
-    # Python version is pinned here because flake8 actually behaves differently
-    # depending on which version is used. You can patch this out to point to
-    # some random Python 3 binary, but then you get guaranteed mismatches with
-    # CI. Other tools such as mypy and black have options that pin the Python
-    # version.
+    # Python version is pinned here for consistency across environments.
+    # Tools like ruff and mypy have options that pin the target Python
+    # version (configured in pyproject.toml), ensuring consistent behavior.
     linters: python3.12
 
 commands =
@@ -196,6 +194,6 @@ commands =
 
 [testenv:linters]
 commands =
-    flake8 tests sentry_sdk
-    black --check tests sentry_sdk
+    ruff check tests sentry_sdk
+    ruff format --check tests sentry_sdk
     mypy sentry_sdk

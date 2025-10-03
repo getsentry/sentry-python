@@ -65,7 +65,8 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
 
 
 class SentryUnaryStreamClientInterceptor(
-    ClientInterceptor, UnaryStreamClientInterceptor  # type: ignore
+    ClientInterceptor,
+    UnaryStreamClientInterceptor,  # type: ignore
 ):
     async def intercept_unary_stream(
         self,

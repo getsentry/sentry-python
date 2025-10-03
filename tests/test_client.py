@@ -608,9 +608,7 @@ def test_atexit(tmpdir, monkeypatch, num_messages, http2):
 
     for _ in range({num_messages}):
         capture_message("HI")
-    """.format(
-                transport=transport, options=options, num_messages=num_messages
-            )
+    """.format(transport=transport, options=options, num_messages=num_messages)
         )
     )
 
@@ -1194,9 +1192,9 @@ def test_spotlight_option(
 
     client = sentry_sdk.get_client()
     url = client.spotlight.url if client.spotlight else None
-    assert (
-        url == spotlight_url_expected
-    ), f"With config {client_option} and env {env_var_value}"
+    assert url == spotlight_url_expected, (
+        f"With config {client_option} and env {env_var_value}"
+    )
 
 
 class IssuesSamplerTestConfig:

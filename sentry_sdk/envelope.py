@@ -57,25 +57,29 @@ class Envelope:
         )
 
     def add_event(
-        self, event  # type: Event
+        self,
+        event,  # type: Event
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
 
     def add_transaction(
-        self, transaction  # type: Event
+        self,
+        transaction,  # type: Event
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
 
     def add_profile(
-        self, profile  # type: Any
+        self,
+        profile,  # type: Any
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))
 
     def add_profile_chunk(
-        self, profile_chunk  # type: Any
+        self,
+        profile_chunk,  # type: Any
     ):
         # type: (...) -> None
         self.add_item(
@@ -87,13 +91,15 @@ class Envelope:
         )
 
     def add_checkin(
-        self, checkin  # type: Any
+        self,
+        checkin,  # type: Any
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=checkin), type="check_in"))
 
     def add_session(
-        self, session  # type: Union[Session, Any]
+        self,
+        session,  # type: Union[Session, Any]
     ):
         # type: (...) -> None
         if isinstance(session, Session):
@@ -101,13 +107,15 @@ class Envelope:
         self.add_item(Item(payload=PayloadRef(json=session), type="session"))
 
     def add_sessions(
-        self, sessions  # type: Any
+        self,
+        sessions,  # type: Any
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=sessions), type="sessions"))
 
     def add_item(
-        self, item  # type: Item
+        self,
+        item,  # type: Item
     ):
         # type: (...) -> None
         self.items.append(item)
@@ -133,7 +141,8 @@ class Envelope:
         return iter(self.items)
 
     def serialize_into(
-        self, f  # type: Any
+        self,
+        f,  # type: Any
     ):
         # type: (...) -> None
         f.write(json_dumps(self.headers))
@@ -149,7 +158,8 @@ class Envelope:
 
     @classmethod
     def deserialize_from(
-        cls, f  # type: Any
+        cls,
+        f,  # type: Any
     ):
         # type: (...) -> Envelope
         headers = parse_json(f.readline())
@@ -163,7 +173,8 @@ class Envelope:
 
     @classmethod
     def deserialize(
-        cls, bytes  # type: bytes
+        cls,
+        bytes,  # type: bytes
     ):
         # type: (...) -> Envelope
         return cls.deserialize_from(io.BytesIO(bytes))
@@ -307,7 +318,8 @@ class Item:
         return None
 
     def serialize_into(
-        self, f  # type: Any
+        self,
+        f,  # type: Any
     ):
         # type: (...) -> None
         headers = dict(self.headers)
@@ -326,7 +338,8 @@ class Item:
 
     @classmethod
     def deserialize_from(
-        cls, f  # type: Any
+        cls,
+        f,  # type: Any
     ):
         # type: (...) -> Optional[Item]
         line = f.readline().rstrip()
@@ -349,7 +362,8 @@ class Item:
 
     @classmethod
     def deserialize(
-        cls, bytes  # type: bytes
+        cls,
+        bytes,  # type: bytes
     ):
         # type: (...) -> Optional[Item]
         return cls.deserialize_from(io.BytesIO(bytes))

@@ -554,7 +554,6 @@ def _simplify_langchain_tools(tools):
     for tool in tools:
         try:
             if isinstance(tool, dict):
-
                 if "function" in tool and isinstance(tool["function"], dict):
                     func = tool["function"]
                     simplified_tool = {

@@ -384,7 +384,6 @@ def render_span_tree():
 
         root_span = event["contexts"]["trace"]
 
-        # Return a list instead of a multiline string because black will know better how to format that
         return "\n".join(render_span(root_span))
 
     return inner

@@ -389,7 +389,8 @@ class Auth:
         self.client = client
 
     def get_api_url(
-        self, type=EndpointType.ENVELOPE  # type: EndpointType
+        self,
+        type=EndpointType.ENVELOPE,  # type: EndpointType
     ):
         # type: (...) -> str
         """Returns the API url for storing events."""
@@ -850,7 +851,9 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    should_supress_context = (
+        hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    )
     if should_supress_context:
         # Add direct cause.
         # The field `__cause__` is set when raised with the exception (using the `from` keyword).
@@ -1845,7 +1848,6 @@ try:
     from gevent import get_hub as get_gevent_hub
     from gevent.monkey import is_module_patched
 except ImportError:
-
     # it's not great that the signatures are different, get_hub can't return None
     # consider adding an if TYPE_CHECKING to change the signature to Optional[Hub]
     def get_gevent_hub():  # type: ignore[misc]

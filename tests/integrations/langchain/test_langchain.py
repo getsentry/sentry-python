@@ -223,9 +223,9 @@ def test_langchain_agent(
         assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
         # Verify tool calls are recorded when PII is enabled
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
-            "data", {}
-        ), "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
+            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        )
         tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
         assert isinstance(tool_calls_data, (list, str))  # Could be serialized
         if isinstance(tool_calls_data, str):
@@ -261,9 +261,9 @@ def test_langchain_agent(
         span_data = chat_span.get("data", {})
         if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
             tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-            assert (
-                tools_data is not None
-            ), "Available tools should always be recorded regardless of PII settings"
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
+            )
 
 
 def test_langchain_error(sentry_init, capture_events):
@@ -537,9 +537,9 @@ def test_span_map_is_instance_variable():
     callback2 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
 
     # Verify they have different span_map instances
-    assert (
-        callback1.span_map is not callback2.span_map
-    ), "span_map should be an instance variable, not shared between instances"
+    assert callback1.span_map is not callback2.span_map, (
+        "span_map should be an instance variable, not shared between instances"
+    )
 
 
 def test_langchain_callback_manager(sentry_init):
