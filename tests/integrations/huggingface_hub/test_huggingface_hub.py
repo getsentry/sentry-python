@@ -123,8 +123,10 @@ def mock_hf_api_with_errors(httpx_mock):
         model_name = "test-model"
 
         # Mock model info endpoint with error
-        rsps.add(
-            responses.GET,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
             MODEL_ENDPOINT.format(model_name=model_name),
             json={"error": "Model not found"},
             status=404,
