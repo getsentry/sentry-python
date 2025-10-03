@@ -106,6 +106,29 @@ def test_dramatiq_propagate_trace(broker, worker, capture_events):
     assert events[0]["contexts"]["trace"]["trace_id"] == outer_transaction.trace_id
 
 
+def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events):
+    events = capture_events()
+
+    @dramatiq.actor(max_retries=0)
+    def dummy_actor(x, y):
+        sentry_sdk.capture_message("hi")
+        return x / y
+
+    dummy_actor.send(1, 0)
+    broker.join(dummy_actor.queue_name)
+    worker.join()
+
+    event_message, event_error = events
+    assert "dramatiq_message_id" in event_message["extra"]
+    assert "dramatiq_message_id" in event_error["extra"]
+    assert (
+        event_message["extra"]["dramatiq_message_id"]
+        == event_error["extra"]["dramatiq_message_id"]
+    )
+    msg_ids = [e["extra"]["dramatiq_message_id"] for e in events]
+    assert all(uuid.UUID(msg_id) and isinstance(msg_id, str) for msg_id in msg_ids)
+
+
 def test_that_local_variables_are_captured(broker, worker, capture_events):
     events = capture_events()
 

@@ -100,9 +100,15 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
     DramatiqIntegration.
     """
 
+    SENTRY_HEADERS_NAME = "_sentry_headers"
+
     def before_enqueue(self, broker, message, delay):
         # type: (Broker, Message[R], int) -> None
-        message.options["sentry_headers"] = {
+        integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
+        if integration is None:
+            return
+
+        message.options[self.SENTRY_HEADERS_NAME] = {
             BAGGAGE_HEADER_NAME: get_baggage(),
             SENTRY_TRACE_HEADER_NAME: get_traceparent(),
         }
@@ -113,11 +119,15 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         if integration is None:
             return
 
+        message._scope_manager = sentry_sdk.isolation_scope()
+        message._scope_manager.__enter__()
+
         scope = sentry_sdk.get_current_scope()
         scope.clear_breadcrumbs()
+        scope.set_extra("dramatiq_message_id", message.message_id)
         scope.add_event_processor(_make_message_event_processor(message, integration))
 
-        sentry_headers = message.options.get("sentry_headers") or {}
+        sentry_headers = message.options.get(self.SENTRY_HEADERS_NAME) or {}
         if "retries" in message.options:
             # start new trace in case of retrying
             sentry_headers = {}
@@ -140,10 +150,14 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
 
     def after_process_message(self, broker, message, *, result=None, exception=None):
         # type: (Broker, Message[R], Optional[Any], Optional[Exception]) -> None
+        integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
+        if integration is None:
+            return
 
         actor = broker.get_actor(message.actor_name)
         throws = message.options.get("throws") or actor.options.get("throws")
 
+        scope_manager = message._scope_manager
         transaction = sentry_sdk.get_current_scope().transaction
         if not transaction:
             return None
@@ -156,6 +170,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         if not is_event_capture_required:
             # normal transaction finish
             transaction.__exit__(None, None, None)
+            scope_manager.__exit__(None, None, None)
             return
 
         event, hint = event_from_exception(
@@ -169,6 +184,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         sentry_sdk.capture_event(event, hint=hint)
         # transaction error
         transaction.__exit__(type(exception), exception, None)
+        scope_manager.__exit__(type(exception), exception, None)
 
 
 def _make_message_event_processor(message, integration):
