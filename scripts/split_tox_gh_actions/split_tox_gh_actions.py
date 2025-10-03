@@ -74,6 +74,7 @@ GROUPS = {
         "cohere",
         "langchain-base",
         "langchain-notiktoken",
+        "litellm",
         "openai-base",
         "openai-notiktoken",
         "langgraph",

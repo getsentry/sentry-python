@@ -66,6 +66,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-notiktoken"
+      - name: Test litellm
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-litellm"
       - name: Test openai-base
         run: |
           set -x # print commands that are executed
