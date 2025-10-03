@@ -120,9 +120,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
             return
 
         message._scope_manager = sentry_sdk.isolation_scope()
-        message._scope_manager.__enter__()
-
-        scope = sentry_sdk.get_current_scope()
+        scope = message._scope_manager.__enter__()
         scope.clear_breadcrumbs()
         scope.set_extra("dramatiq_message_id", message.message_id)
         scope.add_event_processor(_make_message_event_processor(message, integration))
