@@ -488,7 +488,7 @@ def test_text_generation(
 
     span = None
     for sp in transaction["spans"]:
-        if sp["op"] == "gen_ai.generate_text":
+        if sp["op"].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
@@ -558,7 +558,7 @@ def test_text_generation_streaming(
 
     span = None
     for sp in transaction["spans"]:
-        if sp["op"] == "gen_ai.generate_text":
+        if sp["op"].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
@@ -626,7 +626,7 @@ def test_chat_completion(
 
     span = None
     for sp in transaction["spans"]:
-        if sp["op"] == "gen_ai.chat":
+        if sp["op"].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
@@ -700,7 +700,7 @@ def test_chat_completion_streaming(
 
     span = None
     for sp in transaction["spans"]:
-        if sp["op"] == "gen_ai.chat":
+        if sp["op"].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
@@ -768,7 +768,7 @@ def test_chat_completion_api_error(
 
     span = None
     for sp in transaction["spans"]:
-        if sp["op"] == "gen_ai.chat":
+        if sp["op"].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
@@ -862,7 +862,7 @@ def test_chat_completion_with_tools(
 
     span = None
     for sp in transaction["spans"]:
-        if sp["op"] == "gen_ai.chat":
+        if sp["op"].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
@@ -954,7 +954,7 @@ def test_chat_completion_streaming_with_tools(
 
     span = None
     for sp in transaction["spans"]:
-        if sp["op"] == "gen_ai.chat":
+        if sp["op"].startswith("gen_ai"):
             assert span is None, "there is exactly one gen_ai span"
             span = sp
         else:
