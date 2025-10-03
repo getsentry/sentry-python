@@ -46,13 +46,16 @@ def large_messages():
 class TestTruncateMessagesBySize:
     def test_no_truncation_needed(self, sample_messages):
         """Test that messages under the limit are not truncated"""
-        result = truncate_messages_by_size(sample_messages, max_bytes=50000)
+        result = truncate_messages_by_size(
+            sample_messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
+        )
         assert len(result) == len(sample_messages)
         assert result == sample_messages
 
     def test_truncation_removes_oldest_first(self, large_messages):
         """Test that oldest messages are removed first during truncation"""
-        result = truncate_messages_by_size(large_messages, max_bytes=5000)
+        small_limit = MAX_GEN_AI_MESSAGE_BYTES // 100  # 5KB limit to force truncation
+        result = truncate_messages_by_size(large_messages, max_bytes=small_limit)
 
         # Should have fewer messages
         assert len(result) < len(large_messages)
@@ -64,28 +67,38 @@ class TestTruncateMessagesBySize:
 
     def test_empty_messages_list(self):
         """Test handling of empty messages list"""
-        result = truncate_messages_by_size([], max_bytes=1000)
+        result = truncate_messages_by_size(
+            [], max_bytes=MAX_GEN_AI_MESSAGE_BYTES // 500
+        )
         assert result == []
 
     def test_single_message_under_limit(self):
         """Test single message under size limit"""
         messages = [{"role": "user", "content": "Hello!"}]
-        result = truncate_messages_by_size(messages, max_bytes=1000)
+        result = truncate_messages_by_size(
+            messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES // 500
+        )
         assert result == messages
 
     def test_single_message_over_limit(self):
         """Test single message that exceeds size limit"""
         large_content = "x" * 10000
         messages = [{"role": "user", "content": large_content}]
-        result = truncate_messages_by_size(messages, max_bytes=100)
+        result = truncate_messages_by_size(messages, max_bytes=100)  # Very small limit
 
         # Should return empty list if even single message is too large
         assert result == []
 
     def test_progressive_truncation(self, large_messages):
         """Test that truncation works progressively with different limits"""
-        # Test different size limits
-        limits = [100000, 50000, 20000, 5000, 1000]
+        # Test different size limits based on the constant
+        limits = [
+            MAX_GEN_AI_MESSAGE_BYTES // 5,  # 100KB
+            MAX_GEN_AI_MESSAGE_BYTES // 10,  # 50KB
+            MAX_GEN_AI_MESSAGE_BYTES // 25,  # 20KB
+            MAX_GEN_AI_MESSAGE_BYTES // 100,  # 5KB
+            MAX_GEN_AI_MESSAGE_BYTES // 500,  # 1KB
+        ]
         prev_count = len(large_messages)
 
         for limit in limits:
@@ -142,14 +155,15 @@ class TestSerializeGenAiMessages:
 
     def test_serialize_with_truncation(self, large_messages):
         """Test serialization with size-based truncation"""
-        result = serialize_gen_ai_messages(large_messages, max_bytes=5000)
+        small_limit = MAX_GEN_AI_MESSAGE_BYTES // 100  # 5KB limit to force truncation
+        result = serialize_gen_ai_messages(large_messages, max_bytes=small_limit)
 
         if result:  # Might be None if all messages are too large
             assert isinstance(result, str)
 
             # Verify the result is under the size limit
             result_size = len(result.encode("utf-8"))
-            assert result_size <= 5000
+            assert result_size <= small_limit
 
             # Should be valid JSON
             parsed = json.loads(result)
@@ -236,19 +250,20 @@ class TestTruncateAndSerializeMessages:
 
     def test_main_function_with_large_messages(self, large_messages):
         """Test the main function with messages requiring truncation"""
-        result = truncate_and_serialize_messages(large_messages, max_bytes=5000)
+        small_limit = MAX_GEN_AI_MESSAGE_BYTES // 100  # 5KB limit to force truncation
+        result = truncate_and_serialize_messages(large_messages, max_bytes=small_limit)
 
         assert "serialized_data" in result
         assert "metadata" in result
         assert "original_size" in result
 
         # Original size should be large
-        assert result["original_size"] > 5000
+        assert result["original_size"] > small_limit
 
         # May or may not be truncated depending on how large the messages are
         if result["serialized_data"]:
             serialized_size = len(result["serialized_data"].encode("utf-8"))
-            assert serialized_size <= 5000
+            assert serialized_size <= small_limit
 
     def test_main_function_with_none_input(self):
         """Test the main function with None input"""
@@ -277,7 +292,7 @@ class TestTruncateAndSerializeMessages:
 
     def test_main_function_respects_custom_limit(self, large_messages):
         """Test that the main function respects custom byte limits"""
-        custom_limit = 2000
+        custom_limit = MAX_GEN_AI_MESSAGE_BYTES // 250  # 2KB limit
         result = truncate_and_serialize_messages(large_messages, max_bytes=custom_limit)
 
         if result["serialized_data"]:
@@ -344,7 +359,8 @@ class TestEdgeCases:
 
     def test_very_small_limit(self, sample_messages):
         """Test behavior with extremely small size limit"""
-        result = truncate_and_serialize_messages(sample_messages, max_bytes=10)
+        tiny_limit = 10  # 10 bytes - extremely small limit
+        result = truncate_and_serialize_messages(sample_messages, max_bytes=tiny_limit)
 
         # With such a small limit, likely all messages will be removed
         if result["serialized_data"] is None:
@@ -352,7 +368,7 @@ class TestEdgeCases:
         else:
             # If any data remains, it should be under the limit
             size = len(result["serialized_data"].encode("utf-8"))
-            assert size <= 10
+            assert size <= tiny_limit
 
     def test_messages_with_none_values(self):
         """Test messages containing None values"""
@@ -380,7 +396,8 @@ class TestEdgeCases:
             )
 
         # Truncate to a small size that should remove several messages
-        result = truncate_and_serialize_messages(messages, max_bytes=1000)
+        small_limit = MAX_GEN_AI_MESSAGE_BYTES // 500  # 1KB limit to force truncation
+        result = truncate_and_serialize_messages(messages, max_bytes=small_limit)
 
         if result["serialized_data"]:
             parsed = json.loads(result["serialized_data"])
