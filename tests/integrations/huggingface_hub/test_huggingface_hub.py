@@ -812,7 +812,20 @@ def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors)
 
     (error, transaction) = events
     assert error["level"] == "error"
-    assert transaction["spans"][0]["tags"]["status"] == "error"
+
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
+    assert span["tags"]["status"] == "error"
+
     assert transaction["contexts"]["trace"]["status"] == "error"
 
 
