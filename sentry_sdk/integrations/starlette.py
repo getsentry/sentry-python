@@ -420,6 +420,41 @@ def _is_async_callable(obj):
     )
 
 
+def _patch_request(request):
+    # type: (Request) -> None
+    _original_body = request.body
+    _original_json = request.json
+    _original_form = request.form
+
+    def restore_original_methods():
+        # type: () -> None
+        request.body = _original_body
+        request.json = _original_json
+        request.form = _original_form
+
+    async def sentry_body():
+        # type: () -> bytes
+        request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
+        restore_original_methods()
+        return await _original_body()
+
+    async def sentry_json():
+        # type: () -> Any
+        request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
+        restore_original_methods()
+        return await _original_json()
+
+    async def sentry_form():
+        # type: () -> Any
+        request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
+        restore_original_methods()
+        return await _original_form()
+
+    request.body = sentry_body
+    request.json = sentry_json
+    request.form = sentry_form
+
+
 def patch_request_response():
     # type: () -> None
     old_request_response = starlette.routing.request_response
@@ -440,6 +475,7 @@ def patch_request_response():
                     return await old_func(*args, **kwargs)
 
                 request = args[0]
+                _patch_request(request)
 
                 _set_transaction_name_and_source(
                     sentry_sdk.get_current_scope(),
@@ -448,6 +484,10 @@ def patch_request_response():
                 )
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
+                sentry_scope._name = StarletteIntegration.identifier
+
+                response = await old_func(*args, **kwargs)
+
                 extractor = StarletteRequestExtractor(request)
                 info = await extractor.extract_request_info()
 
@@ -469,12 +509,11 @@ def patch_request_response():
 
                     return event_processor
 
-                sentry_scope._name = StarletteIntegration.identifier
                 sentry_scope.add_event_processor(
                     _make_request_event_processor(request, integration)
                 )
 
-                return await old_func(*args, **kwargs)
+                return response
 
             func = _sentry_async_func
 
@@ -619,6 +658,18 @@ class StarletteRequestExtractor:
                 client, content_length
             ):
                 request_info["data"] = AnnotatedValue.removed_because_over_size_limit()
+                return request_info
+
+            # Avoid hangs by not parsing body when ASGI stream is consumed
+            is_body_cached = (
+                "state" in self.request.scope
+                and "sentry_sdk.is_body_cached" in self.request.scope["state"]
+                and self.request.scope["state"]["sentry_sdk.is_body_cached"]
+            )
+            if not is_body_cached:
+                request_info["data"] = (
+                    AnnotatedValue.removed_because_body_consumed_and_not_cached()
+                )
                 return request_info
 
             # Add JSON body, if it is a JSON request

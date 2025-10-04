@@ -18,6 +18,7 @@ try:
     from sentry_sdk.integrations.starlette import (
         StarletteIntegration,
         StarletteRequestExtractor,
+        _patch_request,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
@@ -103,38 +104,43 @@ def patch_get_request_handler():
                 return await old_app(*args, **kwargs)
 
             request = args[0]
+            _patch_request(request)
 
             _set_transaction_name_and_source(
                 sentry_sdk.get_current_scope(), integration.transaction_style, request
             )
             sentry_scope = sentry_sdk.get_isolation_scope()
-            extractor = StarletteRequestExtractor(request)
-            info = await extractor.extract_request_info()
-
-            def _make_request_event_processor(req, integration):
-                # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
-                def event_processor(event, hint):
-                    # type: (Event, Dict[str, Any]) -> Event
-
-                    # Extract information from request
-                    request_info = event.get("request", {})
-                    if info:
-                        if "cookies" in info and should_send_default_pii():
-                            request_info["cookies"] = info["cookies"]
-                        if "data" in info:
-                            request_info["data"] = info["data"]
-                    event["request"] = deepcopy(request_info)
-
-                    return event
-
-                return event_processor
-
             sentry_scope._name = FastApiIntegration.identifier
-            sentry_scope.add_event_processor(
-                _make_request_event_processor(request, integration)
-            )
 
-            return await old_app(*args, **kwargs)
+            try:
+                response = await old_app(*args, **kwargs)
+            finally:
+                extractor = StarletteRequestExtractor(request)
+                info = await extractor.extract_request_info()
+
+                def _make_request_event_processor(req, integration):
+                    # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
+                    def event_processor(event, hint):
+                        # type: (Event, Dict[str, Any]) -> Event
+
+                        # Extract information from request
+                        request_info = event.get("request", {})
+                        if info:
+                            if "cookies" in info and should_send_default_pii():
+                                request_info["cookies"] = info["cookies"]
+                            if "data" in info:
+                                request_info["data"] = info["data"]
+                        event["request"] = deepcopy(request_info)
+
+                        return event
+
+                    return event_processor
+
+                sentry_scope.add_event_processor(
+                    _make_request_event_processor(request, integration)
+                )
+
+            return response
 
         return _sentry_app
 

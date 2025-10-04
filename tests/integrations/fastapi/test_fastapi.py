@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import pytest
@@ -23,6 +24,8 @@ FASTAPI_VERSION = parse_version(fastapi.__version__)
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
 from tests.integrations.starlette import test_starlette
+
+BODY_JSON = {"some": "json", "for": "testing", "nested": {"numbers": 123}}
 
 
 def fastapi_app_factory():
@@ -70,6 +73,29 @@ def fastapi_app_factory():
         }
 
     return app
+
+
+def test_stream_available_in_handler(sentry_init):
+    sentry_init(
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
+
+    app = FastAPI()
+
+    @app.post("/consume")
+    async def _consume_stream_body(request):
+        # Avoid cache by constructing new request
+        wrapped_request = Request(request.scope, request.receive)
+
+        assert await asyncio.wait_for(wrapped_request.json(), timeout=1.0) == BODY_JSON
+
+        return {"status": "ok"}
+
+    client = TestClient(app)
+    client.post(
+        "/consume",
+        json=BODY_JSON,
+    )
 
 
 @pytest.mark.asyncio
@@ -223,6 +249,7 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
 @pytest.mark.asyncio
 async def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(
+        default_integrations=False,
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
     )
