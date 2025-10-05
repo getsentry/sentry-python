@@ -64,8 +64,10 @@ def frame_has_n_plus_one_ignore(frame):
         return False
 
     # Look at the line itself and up to 3 lines above for comments
-    start = max(0, lineno - 1 - 3)
-    end = min(len(lines), lineno)
+    # Convert 1-based lineno to 0-based index
+    index = max(0, lineno - 1)
+    start = max(0, index - 3)
+    end = min(len(lines), index + 1)  # +1 because slice end is exclusive
     comment_block = "\n".join(lines[start:end]).lower()
 
     # tokens that indicate an N+1 ignore in a noqa or sentry comment
