@@ -86,6 +86,7 @@ __all__ = [
     "end_session",
     "set_transaction_name",
     "update_current_span",
+    "ignore_n_plus_one",
 ]
 
 
@@ -553,3 +554,31 @@ def update_current_span(op=None, name=None, attributes=None, data=None):
 
     if attributes is not None:
         current_span.update_data(attributes)
+
+
+def ignore_n_plus_one(func=None):
+    """
+    Can be used as a decorator or context manager to mark a block of code as
+    intentionally allowed to trigger N+1 style queries.
+
+    Usage as decorator:
+
+        @sentry_sdk.ignore_n_plus_one
+        def my_func(...):
+            ...
+
+    Or as context manager:
+
+        with sentry_sdk.ignore_n_plus_one():
+            ...
+    """
+    from sentry_sdk._n_plus_one import ignore_n_plus_one_context
+
+    if func is None:
+        return ignore_n_plus_one_context()
+
+    def wrapper(*args, **kwargs):
+        with ignore_n_plus_one_context():
+            return func(*args, **kwargs)
+
+    return wrapper

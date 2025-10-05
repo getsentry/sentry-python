@@ -53,6 +53,7 @@ __all__ = [  # noqa
     "end_session",
     "set_transaction_name",
     "update_current_span",
+    "ignore_n_plus_one",
 ]
 
 # Initialize the debug support after everything is loaded

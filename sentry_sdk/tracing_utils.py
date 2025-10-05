@@ -39,6 +39,54 @@ if TYPE_CHECKING:
 
     from types import FrameType
 
+from sentry_sdk._n_plus_one import is_ignoring_n_plus_one
+
+
+def frame_has_n_plus_one_ignore(frame):
+    # type: (FrameType) -> bool
+    """
+    Inspect the source file for the given frame and return True when a nearby
+    comment indicates that N+1 detection should ignore this location.
+    """
+    try:
+        fname = frame.f_code.co_filename
+        lineno = frame.f_lineno
+    except Exception:
+        return False
+
+    if not fname or not isinstance(fname, str) or not fname.endswith(".py"):
+        return False
+
+    try:
+        with open(fname, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+    except Exception:
+        return False
+
+    # Look at the line itself and up to 3 lines above for comments
+    start = max(0, lineno - 1 - 3)
+    end = min(len(lines), lineno)
+    comment_block = "\n".join(lines[start:end]).lower()
+
+    # tokens that indicate an N+1 ignore in a noqa or sentry comment
+    tokens = ("n+1", "nplus", "n_plus", "nplusone")
+
+    # If a noqa is used with explicit codes, users may write e.g.
+    # "# noqa: n_plus" — we support checking for the tokens above.
+    if "#" in comment_block:
+        for t in tokens:
+            if t in comment_block:
+                return True
+
+    # Check for sentry-specific ignore comments such as
+    # "# sentry-ignore-n-plus-one" or "# sentry: ignore n+1"
+    if "sentry" in comment_block and ("ignore" in comment_block or "no" in comment_block):
+        for t in tokens:
+            if t in comment_block:
+                return True
+
+    return False
+
 
 SENTRY_TRACE_REGEX = re.compile(
     "^[ \t]*"  # whitespace
@@ -299,6 +347,30 @@ def add_query_source(span):
             else:
                 in_app_path = filepath
             span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+
+        # First check the programmatic context flag for ignoring N+1s.
+        try:
+            if is_ignoring_n_plus_one():
+                span.set_tag("sentry.n_plus_one_ignore", "1")
+                span.set_data("sentry.n_plus_one_ignore", True)
+        except Exception:
+            pass
+
+        # Check the source file for an ignore marker (a "# noqa" style or
+        # a sentry-specific comment) on the line where the query originated
+        # or on a few lines above it. This provides a lightweight, opt-in way
+        # for users to mark locations that should be ignored by N+1 detectors
+        # that rely on the SDK-provided code location information.
+        try:
+            if frame_has_n_plus_one_ignore(frame):
+                # Mark the span so downstream processors (or the server)
+                # can choose to treat these queries as intentionally
+                # ignored for N+1 detection.
+                span.set_tag("sentry.n_plus_one_ignore", "1")
+                span.set_data("sentry.n_plus_one_ignore", True)
+        except Exception:
+            # Don't fail adding query source data if anything here breaks
+            pass
 
         try:
             code_function = frame.f_code.co_name
