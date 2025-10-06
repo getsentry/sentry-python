@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.40.0
+
+### Various fixes & improvements
+
+- fix(litestar): Copy request info to prevent cookies mutation (#4883) by @alexander-alderman-webb
+- ci: 🤖 Update test matrix with new releases (10/06) (#4890) by @github-actions
+- ci: 🤖 Update test matrix with new releases (10/06) (#4889) by @github-actions
+- feat(huggingface): Support 1.0.0rc2 (#4873) by @sentrivana
+- feat(integrations): add litellm integration (#4864) by @constantinius
+- feat(integrations): Add tracing to DramatiqIntegration (#4571) by @Igreh
+- fix(tests): Don't assume release is set (#4879) by @sentrivana
+- ci: 🤖 Update test matrix with new releases (10/02) (#4880) by @github-actions
+- fix(openai-agents): also emit spans for MCP tool calls done by the LLM (#4875) by @constantinius
+- feat: Option to not trace HTTP requests based on status codes (#4869) by @alexander-alderman-webb
+- fix(openai-agents): Move _set_agent_data call to ai_client_span function (#4876) by @constantinius
+- ci: 🤖 Update test matrix with new releases (09/29) (#4872) by @github-actions
+- build(deps): update shibuya requirement from <2025.9.22 (#4871) by @dependabot
+- feat: Add script to determine lowest supported versions (#4867) by @sentrivana
+- docs: Update CONTRIBUTING.md (#4870) by @sentrivana
+- ci: Replace `black` and `flake8` with `ruff`. (#4866) by @antonpirker
+- feat(toxgen): Generate `TESTPATH` for integrated test suites (#4863) by @sentrivana
+
 ## 2.39.0
 
 ### Various fixes & improvements
