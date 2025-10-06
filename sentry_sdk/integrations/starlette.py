@@ -506,7 +506,7 @@ def patch_request_response():
                     def event_processor(event, hint):
                         # type: (Event, Dict[str, Any]) -> Event
 
-                        # Extract information from request
+                        # Add info from request to event
                         request_info = event.get("request", {})
                         if info:
                             if "cookies" in info and should_send_default_pii():
@@ -573,7 +573,7 @@ def patch_request_response():
                     def event_processor(event, hint):
                         # type: (Event, dict[str, Any]) -> Event
 
-                        # Add info from request to event
+                        # Extract information from request
                         request_info = event.get("request", {})
                         if cookies:
                             request_info["cookies"] = cookies
