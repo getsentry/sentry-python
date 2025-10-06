@@ -106,7 +106,8 @@ def _make_event_processor(source):
         if should_send_default_pii():
             request_info = event.setdefault("request", {})
             request_info["api_target"] = "graphql"
-            request_info.setdefault("data", {})["query"] = source  # type: ignore
+            if isinstance(source, str):
+                request_info.setdefault("data", {})["query"] = source  # type: ignore
 
         elif event.get("request", {}).get("data"):
             del event["request"]["data"]
