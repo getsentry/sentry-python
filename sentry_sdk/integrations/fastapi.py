@@ -112,38 +112,44 @@ def patch_get_request_handler():
             sentry_scope = sentry_sdk.get_isolation_scope()
             sentry_scope._name = FastApiIntegration.identifier
 
-            def _make_request_event_processor(info):
+            def _make_cookies_event_processor(cookies):
                 # type: (Optional[Dict[str, Any]]) -> Callable[[Event, Dict[str, Any]], Event]
                 def event_processor(event, hint):
                     # type: (Event, Dict[str, Any]) -> Event
-
-                    # Extract information from request
-                    request_info = event.get("request", {})
-                    if info:
-                        if "cookies" in info and should_send_default_pii():
-                            request_info["cookies"] = info["cookies"]
-                        if "data" in info:
-                            request_info["data"] = info["data"]
-                    event["request"] = deepcopy(request_info)
+                    if cookies and should_send_default_pii():
+                        event.get("request", {})["cookies"] = deepcopy(cookies)
 
                     return event
 
                 return event_processor
 
+            def _make_request_body_event_processor(info):
+                # type: (Optional[Dict[str, Any]]) -> Callable[[Event, Dict[str, Any]], Event]
+                def event_processor(event, hint):
+                    # type: (Event, Dict[str, Any]) -> Event
+                    if info and "data" in info:
+                        event.get("request", {})["data"] = deepcopy(info["data"])
+
+                    return event
+
+                return event_processor
+
+            extractor = StarletteRequestExtractor(request)
+            cookies = extractor.extract_cookies_from_request()
+            sentry_scope.add_event_processor(_make_cookies_event_processor(cookies))
+
             try:
                 response = await old_app(*args, **kwargs)
             except Exception as exception:
-                extractor = StarletteRequestExtractor(request)
                 info = await extractor.extract_request_info()
-
-                sentry_scope.add_event_processor(_make_request_event_processor(info))
+                sentry_scope.add_event_processor(
+                    _make_request_body_event_processor(info)
+                )
 
                 raise exception
 
-            extractor = StarletteRequestExtractor(request)
             info = await extractor.extract_request_info()
-
-            sentry_scope.add_event_processor(_make_request_event_processor(info))
+            sentry_scope.add_event_processor(_make_request_body_event_processor(info))
 
             return response
 

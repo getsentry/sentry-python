@@ -975,16 +975,53 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
-def test_request_body_not_cached_with_exception(sentry_init, capture_events):
+def test_cookies_available(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration()],
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    async def _exception(request: Request):
+        logging.critical("Oh no!")
+        return starlette.responses.JSONResponse({"status": "Oh no!"})
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/exception", _exception, methods=["POST"]),
+        ],
+    )
+
+    client = TestClient(app)
+
+    client.post(
+        "/exception",
+        json=BODY_JSON,
+        cookies={
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        },
+    )
+
+    event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+
+
+def test_request_body_not_cached_exception(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+        send_default_pii=True,
     )
 
     events = capture_events()
 
     async def _exception(request):
         1 / 0
-        return {"error": "Oh no!"}
+        return starlette.responses.JSONResponse({"status": "Oh no!"})
 
     app = starlette.applications.Starlette(
         routes=[
@@ -998,17 +1035,26 @@ def test_request_body_not_cached_with_exception(sentry_init, capture_events):
         client.post(
             "/exception",
             json=BODY_JSON,
+            cookies={
+                "tasty_cookie": "strawberry",
+                "yummy_cookie": "choco",
+            },
         )
     except ZeroDivisionError:
         capture_exception()
 
     event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
     assert event["request"]["data"] == ""
 
 
-def test_request_body_cached_with_exception(sentry_init, capture_events):
+def test_request_body_cached_exception(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration()],
+        send_default_pii=True,
     )
 
     events = capture_events()
@@ -1016,7 +1062,7 @@ def test_request_body_cached_with_exception(sentry_init, capture_events):
     async def _exception(request):
         request.json()
         1 / 0
-        return {"error": "Oh no!"}
+        return starlette.responses.JSONResponse({"status": "Oh no!"})
 
     app = starlette.applications.Starlette(
         routes=[
@@ -1030,11 +1076,19 @@ def test_request_body_cached_with_exception(sentry_init, capture_events):
         client.post(
             "/exception",
             json=BODY_JSON,
+            cookies={
+                "tasty_cookie": "strawberry",
+                "yummy_cookie": "choco",
+            },
         )
     except ZeroDivisionError:
         capture_exception()
 
     event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
     assert event["request"]["data"] == BODY_JSON
 
 

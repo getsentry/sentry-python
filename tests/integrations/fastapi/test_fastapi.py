@@ -223,9 +223,46 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
+def test_cookies_available(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        send_default_pii=True,
+    )
+
+    app = FastAPI()
+
+    @app.post("/exception")
+    async def _exception(request: Request):
+        logging.critical("Oh no!")
+        return {"error": "Oh no!"}
+
+    events = capture_events()
+
+    client = TestClient(app)
+
+    try:
+        client.post(
+            "/exception",
+            json=BODY_JSON,
+            cookies={
+                "tasty_cookie": "strawberry",
+                "yummy_cookie": "choco",
+            },
+        )
+    except ZeroDivisionError:
+        capture_exception()
+
+    event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+
+
 def test_request_body_not_cached_with_exception(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
+        send_default_pii=True,
     )
 
     app = FastAPI()
@@ -243,17 +280,26 @@ def test_request_body_not_cached_with_exception(sentry_init, capture_events):
         client.post(
             "/exception",
             json=BODY_JSON,
+            cookies={
+                "tasty_cookie": "strawberry",
+                "yummy_cookie": "choco",
+            },
         )
     except ZeroDivisionError:
         capture_exception()
 
     event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
     assert event["request"]["data"] == ""
 
 
 def test_request_body_cached_with_exception(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
+        send_default_pii=True,
     )
 
     app = FastAPI()
@@ -272,11 +318,19 @@ def test_request_body_cached_with_exception(sentry_init, capture_events):
         client.post(
             "/exception",
             json=BODY_JSON,
+            cookies={
+                "tasty_cookie": "strawberry",
+                "yummy_cookie": "choco",
+            },
         )
     except ZeroDivisionError:
         capture_exception()
 
     event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
     assert event["request"]["data"] == BODY_JSON
 
 
