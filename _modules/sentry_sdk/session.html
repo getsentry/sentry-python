@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.session - sentry-python 2.39.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.session - sentry-python 2.40.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
-  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=d48c410d" />
+  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b1a1f93b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=bb284d7b" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,8 +46,8 @@ data-aria-dark="Switch to auto color mode">
 </button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
         <div class="hamburger">
           <span class="hamburger_1"></span>
-          <span class="hamburger_2 -translate-x-2"></span>
-          <span class="hamburger_3 -translate-x-1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
         </div>
       </button>
     </div>
@@ -240,49 +240,51 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="130">            <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">status</span>
 </span><span data-line="131">
 </span><span data-line="132">    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span>
-</span><span data-line="133">        <span class="bp">self</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[SessionStatus]</span>
-</span><span data-line="134">    <span class="p">):</span>
-</span><span data-line="135">        <span class="c1"># type: (...) -&gt; Any</span>
-</span><span data-line="136">        <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;ok&quot;</span><span class="p">:</span>
-</span><span data-line="137">            <span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;exited&quot;</span>
-</span><span data-line="138">        <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="139">            <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">status</span><span class="p">)</span>
-</span><span data-line="140">
-</span><span data-line="141">    <span class="k">def</span><span class="w"> </span><span class="nf">get_json_attrs</span><span class="p">(</span>
-</span><span data-line="142">        <span class="bp">self</span><span class="p">,</span> <span class="n">with_user_info</span><span class="o">=</span><span class="kc">True</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="143">    <span class="p">):</span>
-</span><span data-line="144">        <span class="c1"># type: (...) -&gt; Any</span>
-</span><span data-line="145">        <span class="n">attrs</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span data-line="146">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">release</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="147">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;release&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">release</span>
-</span><span data-line="148">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">environment</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="149">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;environment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">environment</span>
-</span><span data-line="150">        <span class="k">if</span> <span class="n">with_user_info</span><span class="p">:</span>
-</span><span data-line="151">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ip_address</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="152">                <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;ip_address&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ip_address</span>
-</span><span data-line="153">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="154">                <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;user_agent&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span>
-</span><span data-line="155">        <span class="k">return</span> <span class="n">attrs</span>
-</span><span data-line="156">
-</span><span data-line="157">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span data-line="158">        <span class="c1"># type: (...) -&gt; Any</span>
-</span><span data-line="159">        <span class="n">rv</span> <span class="o">=</span> <span class="p">{</span>
-</span><span data-line="160">            <span class="s2">&quot;sid&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sid</span><span class="p">),</span>
-</span><span data-line="161">            <span class="s2">&quot;init&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-</span><span data-line="162">            <span class="s2">&quot;started&quot;</span><span class="p">:</span> <span class="n">format_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">started</span><span class="p">),</span>
-</span><span data-line="163">            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">format_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">timestamp</span><span class="p">),</span>
-</span><span data-line="164">            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
-</span><span data-line="165">        <span class="p">}</span>  <span class="c1"># type: Dict[str, Any]</span>
-</span><span data-line="166">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
-</span><span data-line="167">            <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;errors&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span>
-</span><span data-line="168">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">did</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="169">            <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;did&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">did</span>
-</span><span data-line="170">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="171">            <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;duration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span>
-</span><span data-line="172">        <span class="n">attrs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_json_attrs</span><span class="p">()</span>
-</span><span data-line="173">        <span class="k">if</span> <span class="n">attrs</span><span class="p">:</span>
-</span><span data-line="174">            <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;attrs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">attrs</span>
-</span><span data-line="175">        <span class="k">return</span> <span class="n">rv</span></div>
+</span><span data-line="133">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="134">        <span class="n">status</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[SessionStatus]</span>
+</span><span data-line="135">    <span class="p">):</span>
+</span><span data-line="136">        <span class="c1"># type: (...) -&gt; Any</span>
+</span><span data-line="137">        <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;ok&quot;</span><span class="p">:</span>
+</span><span data-line="138">            <span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;exited&quot;</span>
+</span><span data-line="139">        <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="140">            <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">status</span><span class="p">)</span>
+</span><span data-line="141">
+</span><span data-line="142">    <span class="k">def</span><span class="w"> </span><span class="nf">get_json_attrs</span><span class="p">(</span>
+</span><span data-line="143">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="144">        <span class="n">with_user_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
+</span><span data-line="145">    <span class="p">):</span>
+</span><span data-line="146">        <span class="c1"># type: (...) -&gt; Any</span>
+</span><span data-line="147">        <span class="n">attrs</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span data-line="148">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">release</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="149">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;release&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">release</span>
+</span><span data-line="150">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">environment</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="151">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;environment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">environment</span>
+</span><span data-line="152">        <span class="k">if</span> <span class="n">with_user_info</span><span class="p">:</span>
+</span><span data-line="153">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ip_address</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="154">                <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;ip_address&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ip_address</span>
+</span><span data-line="155">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="156">                <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;user_agent&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_agent</span>
+</span><span data-line="157">        <span class="k">return</span> <span class="n">attrs</span>
+</span><span data-line="158">
+</span><span data-line="159">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="160">        <span class="c1"># type: (...) -&gt; Any</span>
+</span><span data-line="161">        <span class="n">rv</span> <span class="o">=</span> <span class="p">{</span>
+</span><span data-line="162">            <span class="s2">&quot;sid&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sid</span><span class="p">),</span>
+</span><span data-line="163">            <span class="s2">&quot;init&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="164">            <span class="s2">&quot;started&quot;</span><span class="p">:</span> <span class="n">format_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">started</span><span class="p">),</span>
+</span><span data-line="165">            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">format_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">timestamp</span><span class="p">),</span>
+</span><span data-line="166">            <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+</span><span data-line="167">        <span class="p">}</span>  <span class="c1"># type: Dict[str, Any]</span>
+</span><span data-line="168">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
+</span><span data-line="169">            <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;errors&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span>
+</span><span data-line="170">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">did</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="171">            <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;did&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">did</span>
+</span><span data-line="172">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="173">            <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;duration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span>
+</span><span data-line="174">        <span class="n">attrs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_json_attrs</span><span class="p">()</span>
+</span><span data-line="175">        <span class="k">if</span> <span class="n">attrs</span><span class="p">:</span>
+</span><span data-line="176">            <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;attrs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">attrs</span>
+</span><span data-line="177">        <span class="k">return</span> <span class="n">rv</span></div>
 
 </span></pre></div>
         </article><button class="back-to-top" type="button">
@@ -314,7 +316,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=0b836611"></script>
+      <script src="../../_static/documentation_options.js?v=3e4cc644"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=e730760c"></script></body>
