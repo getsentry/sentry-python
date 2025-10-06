@@ -244,7 +244,7 @@ def test_request_body_not_cached_with_exception(sentry_init, capture_events):
             "/exception",
             json=BODY_JSON,
         )
-    except Exception:
+    except ZeroDivisionError:
         capture_exception()
 
     event = events[0]
@@ -273,8 +273,7 @@ def test_request_body_cached_with_exception(sentry_init, capture_events):
             "/exception",
             json=BODY_JSON,
         )
-    except Exception:
-        print("capturing")
+    except ZeroDivisionError:
         capture_exception()
 
     event = events[0]
