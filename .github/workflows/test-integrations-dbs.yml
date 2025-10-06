@@ -22,107 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-dbs-latest:
-    name: DBs (latest)
-    timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.12","3.13"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-22.04]
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: sentry
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        # Maps tcp port 5432 on service container to the host
-        ports:
-          - 5432:5432
-    env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}
-      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
-      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-    # Use Docker container only for Python 3.6
-    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
-    steps:
-      - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v6
-        if: ${{ matrix.python-version != '3.6' }}
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-      - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.6
-      - name: Setup Test Env
-        run: |
-          pip install "coverage[toml]" tox
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test asyncpg latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest"
-      - name: Test clickhouse_driver latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest"
-      - name: Test pymongo latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest"
-      - name: Test redis latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest"
-      - name: Test redis_py_cluster_legacy latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy-latest"
-      - name: Test sqlalchemy latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-      - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
-        run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.5.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugins: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
-          verbose: true
-  test-dbs-pinned:
-    name: DBs (pinned)
+  test-dbs:
+    name: DBs
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -169,30 +70,30 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test asyncpg pinned
+      - name: Test asyncpg
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg"
-      - name: Test clickhouse_driver pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg"
+      - name: Test clickhouse_driver
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver"
-      - name: Test pymongo pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver"
+      - name: Test pymongo
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo"
-      - name: Test redis pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo"
+      - name: Test redis
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis"
-      - name: Test redis_py_cluster_legacy pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis"
+      - name: Test redis_py_cluster_legacy
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis_py_cluster_legacy"
-      - name: Test sqlalchemy pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy"
+      - name: Test sqlalchemy
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -221,13 +122,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned DBs tests passed
-    needs: test-dbs-pinned
+    name: All DBs tests passed
+    needs: test-dbs
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-dbs-pinned.result != 'success'
+        if: needs.test-dbs.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

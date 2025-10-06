@@ -167,6 +167,24 @@ def test_bad_chat(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
+def test_span_status_error(sentry_init, capture_events):
+    sentry_init(integrations=[CohereIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="test"):
+        client = Client(api_key="z")
+        HTTPXClient.request = mock.Mock(
+            side_effect=httpx.HTTPError("API rate limit reached")
+        )
+        with pytest.raises(httpx.HTTPError):
+            client.chat(model="some-model", message="hello")
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
+
+
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],

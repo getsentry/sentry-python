@@ -1,3 +1,5 @@
+import weakref
+
 import sentry_sdk
 from sentry_sdk.utils import ContextVar, logger
 from sentry_sdk.integrations import Integration
@@ -35,12 +37,24 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
+            last_seen = integration._last_seen.get(None)
+            if last_seen is not None:
+                # last_seen is either a weakref or the original instance
+                last_seen = (
+                    last_seen() if isinstance(last_seen, weakref.ref) else last_seen
+                )
+
             exc = exc_info[1]
-            if integration._last_seen.get(None) is exc:
+            if last_seen is exc:
                 logger.info("DedupeIntegration dropped duplicated error event %s", exc)
                 return None
 
-            integration._last_seen.set(exc)
+            # we can only weakref non builtin types
+            try:
+                integration._last_seen.set(weakref.ref(exc))
+            except TypeError:
+                integration._last_seen.set(exc)
+
             return event
 
     @staticmethod

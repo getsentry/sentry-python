@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: false
 ---
 # Integrations Guide
@@ -133,10 +133,10 @@ from sentry_sdk.integrations import Integration
 
 class MyIntegration(Integration):
     identifier = "my_integration"
-    
+
     def __init__(self, param=None):
         self.param = param
-    
+
     @staticmethod
     def setup_once():
         # Install hooks, monkey patches, etc.

@@ -44,16 +44,16 @@ def _make_erroneous_query(capture_events):
     with pytest.raises(TransportQueryError):
         _execute_mock_query(response_json)
 
-    assert (
-        len(events) == 1
-    ), "the sdk captured %d events, but 1 event was expected" % len(events)
+    assert len(events) == 1, (
+        "the sdk captured %d events, but 1 event was expected" % len(events)
+    )
 
     (event,) = events
     (exception,) = event["exception"]["values"]
 
-    assert (
-        exception["type"] == "TransportQueryError"
-    ), "%s was captured, but we expected a TransportQueryError" % exception(type)
+    assert exception["type"] == "TransportQueryError", (
+        "%s was captured, but we expected a TransportQueryError" % exception(type)
+    )
 
     assert "request" in event
 
@@ -79,12 +79,12 @@ def test_real_gql_request_no_error(sentry_init, capture_events):
 
     result = _execute_mock_query(response_json)
 
-    assert (
-        result == response_data
-    ), "client.execute returned a different value from what it received from the server"
-    assert (
-        len(events) == 0
-    ), "the sdk captured an event, even though the query was successful"
+    assert result == response_data, (
+        "client.execute returned a different value from what it received from the server"
+    )
+    assert len(events) == 0, (
+        "the sdk captured an event, even though the query was successful"
+    )
 
 
 def test_real_gql_request_with_error_no_pii(sentry_init, capture_events):

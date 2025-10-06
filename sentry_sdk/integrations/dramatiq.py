@@ -1,18 +1,31 @@
 import json
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration
+from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+    TransactionSource,
+)
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
 )
+from typing import TypeVar
 
-from dramatiq.broker import Broker  # type: ignore
-from dramatiq.message import Message  # type: ignore
-from dramatiq.middleware import Middleware, default_middleware  # type: ignore
-from dramatiq.errors import Retry  # type: ignore
+R = TypeVar("R")
+
+try:
+    from dramatiq.broker import Broker
+    from dramatiq.middleware import Middleware, default_middleware
+    from dramatiq.errors import Retry
+    from dramatiq.message import Message
+except ImportError:
+    raise DidNotEnable("Dramatiq is not installed")
 
 from typing import TYPE_CHECKING
 
@@ -34,10 +47,12 @@ class DramatiqIntegration(Integration):
     """
 
     identifier = "dramatiq"
+    origin = f"auto.queue.{identifier}"
 
     @staticmethod
     def setup_once():
         # type: () -> None
+
         _patch_dramatiq_broker()
 
 
@@ -85,22 +100,54 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
     DramatiqIntegration.
     """
 
-    def before_process_message(self, broker, message):
-        # type: (Broker, Message) -> None
+    SENTRY_HEADERS_NAME = "_sentry_headers"
+
+    def before_enqueue(self, broker, message, delay):
+        # type: (Broker, Message[R], int) -> None
         integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
         if integration is None:
             return
 
-        message._scope_manager = sentry_sdk.new_scope()
-        message._scope_manager.__enter__()
+        message.options[self.SENTRY_HEADERS_NAME] = {
+            BAGGAGE_HEADER_NAME: get_baggage(),
+            SENTRY_TRACE_HEADER_NAME: get_traceparent(),
+        }
 
-        scope = sentry_sdk.get_current_scope()
-        scope.set_transaction_name(message.actor_name)
+    def before_process_message(self, broker, message):
+        # type: (Broker, Message[R]) -> None
+        integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
+        if integration is None:
+            return
+
+        message._scope_manager = sentry_sdk.isolation_scope()
+        scope = message._scope_manager.__enter__()
+        scope.clear_breadcrumbs()
         scope.set_extra("dramatiq_message_id", message.message_id)
         scope.add_event_processor(_make_message_event_processor(message, integration))
 
+        sentry_headers = message.options.get(self.SENTRY_HEADERS_NAME) or {}
+        if "retries" in message.options:
+            # start new trace in case of retrying
+            sentry_headers = {}
+
+        transaction = continue_trace(
+            sentry_headers,
+            name=message.actor_name,
+            op=OP.QUEUE_TASK_DRAMATIQ,
+            source=TransactionSource.TASK,
+            origin=DramatiqIntegration.origin,
+        )
+        transaction.set_status(SPANSTATUS.OK)
+        sentry_sdk.start_transaction(
+            transaction,
+            name=message.actor_name,
+            op=OP.QUEUE_TASK_DRAMATIQ,
+            source=TransactionSource.TASK,
+        )
+        transaction.__enter__()
+
     def after_process_message(self, broker, message, *, result=None, exception=None):
-        # type: (Broker, Message, Any, Optional[Any], Optional[Exception]) -> None
+        # type: (Broker, Message[R], Optional[Any], Optional[Exception]) -> None
         integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
         if integration is None:
             return
@@ -108,27 +155,38 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         actor = broker.get_actor(message.actor_name)
         throws = message.options.get("throws") or actor.options.get("throws")
 
-        try:
-            if (
-                exception is not None
-                and not (throws and isinstance(exception, throws))
-                and not isinstance(exception, Retry)
-            ):
-                event, hint = event_from_exception(
-                    exception,
-                    client_options=sentry_sdk.get_client().options,
-                    mechanism={
-                        "type": DramatiqIntegration.identifier,
-                        "handled": False,
-                    },
-                )
-                sentry_sdk.capture_event(event, hint=hint)
-        finally:
-            message._scope_manager.__exit__(None, None, None)
+        scope_manager = message._scope_manager
+        transaction = sentry_sdk.get_current_scope().transaction
+        if not transaction:
+            return None
+
+        is_event_capture_required = (
+            exception is not None
+            and not (throws and isinstance(exception, throws))
+            and not isinstance(exception, Retry)
+        )
+        if not is_event_capture_required:
+            # normal transaction finish
+            transaction.__exit__(None, None, None)
+            scope_manager.__exit__(None, None, None)
+            return
+
+        event, hint = event_from_exception(
+            exception,  # type: ignore[arg-type]
+            client_options=sentry_sdk.get_client().options,
+            mechanism={
+                "type": DramatiqIntegration.identifier,
+                "handled": False,
+            },
+        )
+        sentry_sdk.capture_event(event, hint=hint)
+        # transaction error
+        transaction.__exit__(type(exception), exception, None)
+        scope_manager.__exit__(type(exception), exception, None)
 
 
 def _make_message_event_processor(message, integration):
-    # type: (Message, DramatiqIntegration) -> Callable[[Event, Hint], Optional[Event]]
+    # type: (Message[R], DramatiqIntegration) -> Callable[[Event, Hint], Optional[Event]]
 
     def inner(event, hint):
         # type: (Event, Hint) -> Optional[Event]
@@ -142,7 +200,7 @@ def _make_message_event_processor(message, integration):
 
 class DramatiqMessageExtractor:
     def __init__(self, message):
-        # type: (Message) -> None
+        # type: (Message[R]) -> None
         self.message_data = dict(message.asdict())
 
     def content_length(self):

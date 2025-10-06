@@ -119,14 +119,15 @@ class SentryWsgiMiddleware:
                             origin=self.span_origin,
                         )
 
-                    with (
+                    transaction_context = (
                         sentry_sdk.start_transaction(
                             transaction,
                             custom_sampling_context={"wsgi_environ": environ},
                         )
                         if transaction is not None
                         else nullcontext()
-                    ):
+                    )
+                    with transaction_context:
                         try:
                             response = self.app(
                                 environ,

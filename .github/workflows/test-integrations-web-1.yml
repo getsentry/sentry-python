@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-web_1-pinned:
-    name: Web 1 (pinned)
+  test-web_1:
+    name: Web 1
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -68,22 +68,22 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test django pinned
+      - name: Test django
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django"
-      - name: Test flask pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-django"
+      - name: Test flask
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-flask"
-      - name: Test starlette pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-flask"
+      - name: Test starlette
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlette"
-      - name: Test fastapi pinned
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlette"
+      - name: Test fastapi
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -112,13 +112,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned Web 1 tests passed
-    needs: test-web_1-pinned
+    name: All Web 1 tests passed
+    needs: test-web_1
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-web_1-pinned.result != 'success'
+        if: needs.test-web_1.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

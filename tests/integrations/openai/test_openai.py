@@ -416,6 +416,26 @@ def test_bad_chat_completion(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
+def test_span_status_error(sentry_init, capture_events):
+    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="test"):
+        client = OpenAI(api_key="z")
+        client.chat.completions._post = mock.Mock(
+            side_effect=OpenAIError("API rate limit reached")
+        )
+        with pytest.raises(OpenAIError):
+            client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
+
+
 @pytest.mark.asyncio
 async def test_bad_chat_completion_async(sentry_init, capture_events):
     sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)

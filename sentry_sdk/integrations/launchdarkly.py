@@ -44,7 +44,6 @@ class LaunchDarklyIntegration(Integration):
 
 
 class LaunchDarklyHook(Hook):
-
     @property
     def metadata(self):
         # type: () -> Metadata

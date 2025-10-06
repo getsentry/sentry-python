@@ -128,9 +128,7 @@ def serialize(event, **kwargs):
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
 
-    keep_request_bodies = (
-        kwargs.pop("max_request_body_size", None) == "always"
-    )  # type: bool
+    keep_request_bodies = kwargs.pop("max_request_body_size", None) == "always"  # type: bool
     max_value_length = kwargs.pop("max_value_length", None)  # type: Optional[int]
     is_vars = kwargs.pop("is_vars", False)
     custom_repr = kwargs.pop("custom_repr", None)  # type: Callable[..., Optional[str]]

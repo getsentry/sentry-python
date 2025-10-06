@@ -144,10 +144,10 @@ def test_monkey_patch_signature(f, args, kwargs):
     try:
         expected_signature = inspect.signature(f)
         test_signature = inspect.signature(f_temp)
-        assert (
-            expected_signature == test_signature
-        ), "Failed on {}, signature {} does not match {}".format(
-            f, expected_signature, test_signature
+        assert expected_signature == test_signature, (
+            "Failed on {}, signature {} does not match {}".format(
+                f, expected_signature, test_signature
+            )
         )
     except Exception:
         # expected to pass for py2.7

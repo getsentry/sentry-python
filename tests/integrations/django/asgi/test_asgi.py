@@ -432,9 +432,7 @@ async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_e
 PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "image.png")
 BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="image.png"\r\nContent-Type: image/png\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
     "{{image_data}}", base64.b64encode(open(PICTURE, "rb").read()).decode("utf-8")
-).encode(
-    "utf-8"
-)
+).encode("utf-8")
 BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 
 

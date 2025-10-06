@@ -11,7 +11,7 @@ from urllib.parse import quote, unquote
 import uuid
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     filename_for_module,
@@ -527,9 +527,7 @@ class PropagationContext:
             )
             return
 
-        self.dynamic_sampling_context["sample_rand"] = (
-            f"{sample_rand:.6f}"  # noqa: E231
-        )
+        self.dynamic_sampling_context["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
 
     def _sample_rand(self):
         # type: () -> Optional[str]
@@ -890,6 +888,19 @@ def get_current_span(scope=None):
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
+
+
+def set_span_errored(span=None):
+    # type: (Optional[Span]) -> None
+    """
+    Set the status of the current or given span to ERROR.
+    Also sets the status of the transaction (root span) to ERROR.
+    """
+    span = span or get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.ERROR)
+        if span.containing_transaction is not None:
+            span.containing_transaction.set_status(SPANSTATUS.ERROR)
 
 
 def _generate_sample_rand(

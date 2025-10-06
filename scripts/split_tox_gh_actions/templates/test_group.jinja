@@ -1,11 +1,11 @@
-  test-{{ lowercase_group }}-{{ category }}:
-    name: {{ group }} ({{ category }})
+  test-{{ lowercase_group }}:
+    name: {{ group }}
     timeout-minutes: 30
     runs-on: {% raw %}${{ matrix.os }}{% endraw %}
     strategy:
       fail-fast: false
       matrix:
-        python-version: [{{ py_versions.get(category)|join(",") }}]
+        python-version: [{{ py_versions|join(",") }}]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -75,14 +75,10 @@
           coverage erase
 
       {% for framework in frameworks %}
-      - name: Test {{ framework }} {{ category }}
+      - name: Test {{ framework }}
         run: |
           set -x # print commands that are executed
-          {% if category == "pinned" %}
-          ./scripts/runtox.sh --exclude-latest "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
-          {% elif category == "latest" %}
-          ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}-latest"
-          {% endif %}
+          ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
       {% endfor %}
 
       - name: Generate coverage XML (Python 3.6)
