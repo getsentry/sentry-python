@@ -573,7 +573,7 @@ def patch_request_response():
                     def event_processor(event, hint):
                         # type: (Event, dict[str, Any]) -> Event
 
-                        # Extract information from request
+                        # Add info from request to event
                         request_info = event.get("request", {})
                         if cookies:
                             request_info["cookies"] = cookies

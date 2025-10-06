@@ -223,7 +223,6 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
-@pytest.mark.asyncio
 def test_request_body_not_cached_with_exception(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
@@ -257,9 +256,7 @@ def test_request_body_cached_with_exception(sentry_init, capture_events):
         integrations=[StarletteIntegration(), FastApiIntegration()],
     )
 
-    app = FastAPI(debug=True)
-    app.user_middleware = []
-    app.middleware_stack = app.build_middleware_stack()
+    app = FastAPI()
 
     @app.post("/exception")
     async def _exception(request: Request):
