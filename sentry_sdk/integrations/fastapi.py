@@ -117,7 +117,7 @@ def patch_get_request_handler():
                 def event_processor(event, hint):
                     # type: (Event, Dict[str, Any]) -> Event
                     if cookies and should_send_default_pii():
-                        event.get("request", {})["cookies"] = deepcopy(cookies)
+                        event.setdefault("request", {})["cookies"] = deepcopy(cookies)
 
                     return event
 
@@ -128,7 +128,7 @@ def patch_get_request_handler():
                 def event_processor(event, hint):
                     # type: (Event, Dict[str, Any]) -> Event
                     if info and "data" in info:
-                        event.get("request", {})["data"] = deepcopy(info["data"])
+                        event.setdefault("request", {})["data"] = deepcopy(info["data"])
 
                     return event
 
