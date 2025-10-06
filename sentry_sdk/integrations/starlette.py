@@ -36,15 +36,26 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
-
+    from typing import (
+        Any,
+        Awaitable,
+        Callable,
+        Container,
+        Dict,
+        Optional,
+        Tuple,
+        Union,
+        Protocol,
+        TypeVar,
+    )
+    from types import CoroutineType
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
 try:
     import starlette  # type: ignore
     from starlette import __version__ as STARLETTE_VERSION
     from starlette.applications import Starlette  # type: ignore
-    from starlette.datastructures import UploadFile  # type: ignore
+    from starlette.datastructures import UploadFile, FormData  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
     from starlette.middleware.authentication import (  # type: ignore
         AuthenticationMiddleware,
@@ -54,6 +65,16 @@ try:
     from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
+
+if TYPE_CHECKING:
+    from contextlib import AbstractAsyncContextManager
+
+    T_co = TypeVar("T_co", covariant=True)
+
+    class AwaitableOrContextManager(
+        Awaitable[T_co], AbstractAsyncContextManager[T_co], Protocol[T_co]
+    ): ...
+
 
 try:
     # Starlette 0.20
@@ -426,29 +447,23 @@ def _patch_request(request):
     _original_json = request.json
     _original_form = request.form
 
-    def restore_original_methods():
-        # type: () -> None
-        request.body = _original_body
-        request.json = _original_json
-        request.form = _original_form
-
-    async def sentry_body():
-        # type: () -> bytes
+    @functools.wraps(_original_body)
+    def sentry_body():
+        # type: () -> CoroutineType[Any, Any, bytes]
         request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
-        restore_original_methods()
-        return await _original_body()
+        return _original_body()
 
-    async def sentry_json():
-        # type: () -> Any
+    @functools.wraps(_original_json)
+    def sentry_json():
+        # type: () -> CoroutineType[Any, Any, Any]
         request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
-        restore_original_methods()
-        return await _original_json()
+        return _original_json()
 
-    async def sentry_form():
-        # type: () -> Any
+    @functools.wraps(_original_form)
+    def sentry_form(*args, **kwargs):
+        # type: (*Any, **Any) -> AwaitableOrContextManager[FormData]
         request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
-        restore_original_methods()
-        return await _original_form()
+        return _original_form(*args, **kwargs)
 
     request.body = sentry_body
     request.json = sentry_json
