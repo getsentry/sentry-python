@@ -1060,7 +1060,7 @@ def test_request_body_cached_exception(sentry_init, capture_events):
     events = capture_events()
 
     async def _exception(request):
-        request.json()
+        await request.json()
         1 / 0
         return starlette.responses.JSONResponse({"status": "Oh no!"})
 
