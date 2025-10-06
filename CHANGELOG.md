@@ -5,7 +5,7 @@
 ### Various fixes & improvements
 
 - Add LiteLLM integration (#4864) by @constantinius
-  Once you've enabled the new LiteLLM integration, you can use the Sentry AI Agents Monitoring, a Sentry dashboard that helps you understand what's going on with your AI requests:
+  Once you've enabled the [new LiteLLM integration](https://docs.sentry.io/platforms/python/integrations/litellm/), you can use the Sentry AI Agents Monitoring, a Sentry dashboard that helps you understand what's going on with your AI requests:
   
   ```python
   import sentry_sdk
@@ -28,7 +28,7 @@
 - Add tracing to `DramatiqIntegration` (#4571) by @Igreh
 - Also emit spans for MCP tool calls done by the LLM (#4875) by @constantinius
 - Option to not trace HTTP requests based on status codes (#4869) by @alexander-alderman-webb
-  You can now disable transactions for incoming requests with specific HTTP status codes. The new `trace_ignore_status_codes` option accepts a `set` of status codes as integers. If a transaction wraps a request that results in one of the provided status codes, the transaction will be unsampled.
+  You can now disable transactions for incoming requests with specific HTTP status codes. The [new `trace_ignore_status_codes` option](https://docs.sentry.io/platforms/python/configuration/options/#trace_ignore_status_codes) accepts a `set` of status codes as integers. If a transaction wraps a request that results in one of the provided status codes, the transaction will be unsampled.
     
   ```python
   import sentry_sdk
