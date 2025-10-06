@@ -11,7 +11,7 @@ from sentry_sdk.utils import transaction_from_function
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict
+    from typing import Any, Callable, Dict, Optional
     from sentry_sdk._types import Event
 
 try:
@@ -112,33 +112,38 @@ def patch_get_request_handler():
             sentry_scope = sentry_sdk.get_isolation_scope()
             sentry_scope._name = FastApiIntegration.identifier
 
+            def _make_request_event_processor(info):
+                # type: (Optional[Dict[str, Any]]) -> Callable[[Event, Dict[str, Any]], Event]
+                def event_processor(event, hint):
+                    # type: (Event, Dict[str, Any]) -> Event
+
+                    # Extract information from request
+                    request_info = event.get("request", {})
+                    if info:
+                        if "cookies" in info and should_send_default_pii():
+                            request_info["cookies"] = info["cookies"]
+                        if "data" in info:
+                            request_info["data"] = info["data"]
+                    event["request"] = deepcopy(request_info)
+
+                    return event
+
+                return event_processor
+
             try:
                 response = await old_app(*args, **kwargs)
-            finally:
+            except Exception as exception:
                 extractor = StarletteRequestExtractor(request)
                 info = await extractor.extract_request_info()
 
-                def _make_request_event_processor(req, integration):
-                    # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
-                    def event_processor(event, hint):
-                        # type: (Event, Dict[str, Any]) -> Event
+                sentry_scope.add_event_processor(_make_request_event_processor(info))
 
-                        # Extract information from request
-                        request_info = event.get("request", {})
-                        if info:
-                            if "cookies" in info and should_send_default_pii():
-                                request_info["cookies"] = info["cookies"]
-                            if "data" in info:
-                                request_info["data"] = info["data"]
-                        event["request"] = deepcopy(request_info)
+                raise exception
 
-                        return event
+            extractor = StarletteRequestExtractor(request)
+            info = await extractor.extract_request_info()
 
-                    return event_processor
-
-                sentry_scope.add_event_processor(
-                    _make_request_event_processor(request, integration)
-                )
+            sentry_scope.add_event_processor(_make_request_event_processor(info))
 
             return response
 

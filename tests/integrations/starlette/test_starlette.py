@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, get_baggage, get_traceparent
+from sentry_sdk import capture_message, get_baggage, get_traceparent, capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
@@ -509,32 +509,6 @@ async def test_starletterequestextractor_extract_request_info_no_pii(sentry_init
     assert request_info["data"] == BODY_JSON
 
 
-def test_stream_available_in_handler(sentry_init):
-    sentry_init(
-        integrations=[StarletteIntegration()],
-    )
-
-    async def _consume_stream_body(request):
-        # Avoid cache by constructing new request
-        wrapped_request = Request(request.scope, request.receive)
-
-        assert await asyncio.wait_for(wrapped_request.json(), timeout=1.0) == BODY_JSON
-
-        return starlette.responses.JSONResponse({"status": "ok"})
-
-    app = starlette.applications.Starlette(
-        routes=[
-            starlette.routing.Route("/consume", _consume_stream_body, methods=["POST"]),
-        ],
-    )
-
-    client = TestClient(app)
-    client.post(
-        "/consume",
-        json=BODY_JSON,
-    )
-
-
 @pytest.mark.parametrize(
     "url,transaction_style,expected_transaction,expected_source",
     [
@@ -999,6 +973,69 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         transaction = item.payload.json
         trace_context = transaction["contexts"]["trace"]
         assert str(data["active"]) == trace_context["data"]["thread.id"]
+
+
+def test_request_body_not_cached_with_exception(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+    )
+
+    events = capture_events()
+
+    async def _exception(request):
+        1 / 0
+        return {"error": "Oh no!"}
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/exception", _exception, methods=["POST"]),
+        ],
+    )
+
+    client = TestClient(app)
+
+    try:
+        client.post(
+            "/exception",
+            json=BODY_JSON,
+        )
+    except ZeroDivisionError:
+        capture_exception()
+
+    event = events[0]
+    assert event["request"]["data"] == ""
+
+
+def test_request_body_cached_with_exception(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+    )
+
+    events = capture_events()
+
+    async def _exception(request):
+        request.json()
+        1 / 0
+        return {"error": "Oh no!"}
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/exception", _exception, methods=["POST"]),
+        ],
+    )
+
+    client = TestClient(app)
+
+    try:
+        client.post(
+            "/exception",
+            json=BODY_JSON,
+        )
+    except ZeroDivisionError:
+        capture_exception()
+
+    event = events[0]
+    assert event["request"]["data"] == BODY_JSON
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):

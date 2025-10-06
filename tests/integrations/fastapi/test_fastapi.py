@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 import sentry_sdk
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -73,29 +73,6 @@ def fastapi_app_factory():
         }
 
     return app
-
-
-def test_stream_available_in_handler(sentry_init):
-    sentry_init(
-        integrations=[StarletteIntegration(), FastApiIntegration()],
-    )
-
-    app = FastAPI()
-
-    @app.post("/consume")
-    async def _consume_stream_body(request):
-        # Avoid cache by constructing new request
-        wrapped_request = Request(request.scope, request.receive)
-
-        assert await asyncio.wait_for(wrapped_request.json(), timeout=1.0) == BODY_JSON
-
-        return {"status": "ok"}
-
-    client = TestClient(app)
-    client.post(
-        "/consume",
-        json=BODY_JSON,
-    )
 
 
 @pytest.mark.asyncio
@@ -244,6 +221,67 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         transaction = item.payload.json
         trace_context = transaction["contexts"]["trace"]
         assert str(data["active"]) == trace_context["data"]["thread.id"]
+
+
+@pytest.mark.asyncio
+def test_request_body_not_cached_with_exception(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
+
+    app = FastAPI()
+
+    @app.post("/exception")
+    async def _exception(request: Request):
+        1 / 0
+        return {"error": "Oh no!"}
+
+    events = capture_events()
+
+    client = TestClient(app)
+
+    try:
+        client.post(
+            "/exception",
+            json=BODY_JSON,
+        )
+    except Exception:
+        capture_exception()
+
+    event = events[0]
+    assert event["request"]["data"] == ""
+
+
+def test_request_body_cached_with_exception(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
+
+    app = FastAPI(debug=True)
+    app.user_middleware = []
+    app.middleware_stack = app.build_middleware_stack()
+
+    @app.post("/exception")
+    async def _exception(request: Request):
+        await request.json()
+        1 / 0
+        return {"error": "Oh no!"}
+
+    events = capture_events()
+
+    client = TestClient(app)
+
+    try:
+        client.post(
+            "/exception",
+            json=BODY_JSON,
+        )
+    except Exception:
+        print("capturing")
+        capture_exception()
+
+    event = events[0]
+    assert event["request"]["data"] == BODY_JSON
 
 
 @pytest.mark.asyncio

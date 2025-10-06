@@ -501,20 +501,15 @@ def patch_request_response():
                 sentry_scope = sentry_sdk.get_isolation_scope()
                 sentry_scope._name = StarletteIntegration.identifier
 
-                response = await old_func(*args, **kwargs)
-
-                extractor = StarletteRequestExtractor(request)
-                info = await extractor.extract_request_info()
-
-                def _make_request_event_processor(req, integration):
-                    # type: (Any, Any) -> Callable[[Event, dict[str, Any]], Event]
+                def _make_request_event_processor(info):
+                    # type: (Optional[Dict[str, Any]]) -> Callable[[Event, Dict[str, Any]], Event]
                     def event_processor(event, hint):
                         # type: (Event, Dict[str, Any]) -> Event
 
-                        # Add info from request to event
+                        # Extract information from request
                         request_info = event.get("request", {})
                         if info:
-                            if "cookies" in info:
+                            if "cookies" in info and should_send_default_pii():
                                 request_info["cookies"] = info["cookies"]
                             if "data" in info:
                                 request_info["data"] = info["data"]
@@ -524,9 +519,22 @@ def patch_request_response():
 
                     return event_processor
 
-                sentry_scope.add_event_processor(
-                    _make_request_event_processor(request, integration)
-                )
+                try:
+                    response = await old_func(*args, **kwargs)
+                except Exception as exception:
+                    extractor = StarletteRequestExtractor(request)
+                    info = await extractor.extract_request_info()
+
+                    sentry_scope.add_event_processor(
+                        _make_request_event_processor(info)
+                    )
+
+                    raise exception
+
+                extractor = StarletteRequestExtractor(request)
+                info = await extractor.extract_request_info()
+
+                sentry_scope.add_event_processor(_make_request_event_processor(info))
 
                 return response
 
