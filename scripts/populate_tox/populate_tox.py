@@ -770,3 +770,7 @@ def main() -> dict[str, list]:
     )
 
     return packages
+
+
+if __name__ == "__main__":
+    main()
