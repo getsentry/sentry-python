@@ -21,8 +21,8 @@ class GEN_AI_ALLOWED_MESSAGE_ROLES:
 GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING = {
     GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM: ["system"],
     GEN_AI_ALLOWED_MESSAGE_ROLES.USER: ["user"],
-    "assistant": ["assistant", "ai"],
-    "tool_call": ["tool_call"],
+    GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT: ["assistant", "ai"],
+    GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL_CALL: ["tool_call"],
 }
 
 # Convert reverse mapping to actual mapping for efficient lookups
