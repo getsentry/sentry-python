@@ -85,9 +85,7 @@ else:
             if (
                 # the co_varnames start with the frame's positional arguments
                 # and we expect the first to be `self` if its an instance method
-                co_varnames
-                and co_varnames[0] == "self"
-                and "self" in frame.f_locals
+                co_varnames and co_varnames[0] == "self" and "self" in frame.f_locals
             ):
                 for cls in type(frame.f_locals["self"]).__mro__:
                     if name in cls.__dict__:
@@ -101,9 +99,7 @@ else:
             if (
                 # the co_varnames start with the frame's positional arguments
                 # and we expect the first to be `cls` if its a class method
-                co_varnames
-                and co_varnames[0] == "cls"
-                and "cls" in frame.f_locals
+                co_varnames and co_varnames[0] == "cls" and "cls" in frame.f_locals
             ):
                 for cls in frame.f_locals["cls"].__mro__:
                     if name in cls.__dict__:

@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -200,9 +202,7 @@ def patch_http_route_handle():
             return await old_handle(self, scope, receive, send)
 
         sentry_scope = sentry_sdk.get_isolation_scope()
-        request = scope["app"].request_class(
-            scope=scope, receive=receive, send=send
-        )  # type: Request[Any, Any]
+        request = scope["app"].request_class(scope=scope, receive=receive, send=send)  # type: Request[Any, Any]
         extracted_request_data = ConnectionDataExtractor(
             parse_body=True, parse_query=True
         )(request)
@@ -239,7 +239,7 @@ def patch_http_route_handle():
 
             event.update(
                 {
-                    "request": request_info,
+                    "request": deepcopy(request_info),
                     "transaction": tx_name,
                     "transaction_info": tx_info,
                 }

@@ -208,9 +208,9 @@ def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
     t.join()
 
     # check if the initial scope data is not modified by the started thread
-    assert initial_iso_scope._tags == {
-        "initial_tag": "initial_value"
-    }, "The isolation scope in the main thread should not be modified by the started thread."
+    assert initial_iso_scope._tags == {"initial_tag": "initial_value"}, (
+        "The isolation scope in the main thread should not be modified by the started thread."
+    )
 
 
 @pytest.mark.parametrize(

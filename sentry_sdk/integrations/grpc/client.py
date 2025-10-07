@@ -19,7 +19,8 @@ except ImportError:
 
 
 class ClientInterceptor(
-    grpc.UnaryUnaryClientInterceptor, grpc.UnaryStreamClientInterceptor  # type: ignore
+    grpc.UnaryUnaryClientInterceptor,  # type: ignore
+    grpc.UnaryStreamClientInterceptor,  # type: ignore
 ):
     _is_intercepted = False
 
@@ -60,9 +61,7 @@ class ClientInterceptor(
                 client_call_details
             )
 
-            response = continuation(
-                client_call_details, request
-            )  # type: UnaryStreamCall
+            response = continuation(client_call_details, request)  # type: UnaryStreamCall
             # Setting code on unary-stream leads to execution getting stuck
             # span.set_data("code", response.code().name)
 

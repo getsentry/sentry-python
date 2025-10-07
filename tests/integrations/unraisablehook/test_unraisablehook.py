@@ -42,9 +42,7 @@ def test_unraisablehook(tmpdir, options, transport):
 
     undeletable = Undeletable()
     del undeletable
-    """.format(
-                transport=transport, options=options
-            )
+    """.format(transport=transport, options=options)
         )
     )
 

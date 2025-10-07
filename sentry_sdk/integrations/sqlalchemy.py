@@ -64,9 +64,7 @@ def _before_cursor_execute(
 @ensure_integration_enabled(SqlalchemyIntegration)
 def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     # type: (Any, Any, Any, Any, Any, *Any) -> None
-    ctx_mgr = getattr(
-        context, "_sentry_sql_span_manager", None
-    )  # type: Optional[ContextManager[Any]]
+    ctx_mgr = getattr(context, "_sentry_sql_span_manager", None)  # type: Optional[ContextManager[Any]]
 
     if ctx_mgr is not None:
         context._sentry_sql_span_manager = None
@@ -92,9 +90,7 @@ def _handle_error(context, *args):
     # _after_cursor_execute does not get called for crashing SQL stmts. Judging
     # from SQLAlchemy codebase it does seem like any error coming into this
     # handler is going to be fatal.
-    ctx_mgr = getattr(
-        execution_context, "_sentry_sql_span_manager", None
-    )  # type: Optional[ContextManager[Any]]
+    ctx_mgr = getattr(execution_context, "_sentry_sql_span_manager", None)  # type: Optional[ContextManager[Any]]
 
     if ctx_mgr is not None:
         execution_context._sentry_sql_span_manager = None

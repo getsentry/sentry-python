@@ -32,9 +32,7 @@ def test_excepthook(tmpdir, options, transport):
     frame_value = "LOL"
 
     1/0
-    """.format(
-                transport=transport, options=options
-            )
+    """.format(transport=transport, options=options)
         )
     )
 
@@ -75,9 +73,7 @@ def test_always_value_excepthook(tmpdir, options, transport):
     frame_value = "LOL"
 
     1/0
-    """.format(
-                transport=transport, options=options
-            )
+    """.format(transport=transport, options=options)
         )
     )
 

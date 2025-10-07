@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: false
 ---
 # Quick Reference
@@ -44,7 +44,7 @@ tox -e py3.12-django-v5.2.3
 
 ### Code Quality
 
-Our `linters` tox environment runs `black` for formatting, `flake8` for linting and `mypy` for type checking.
+Our `linters` tox environment runs `ruff-format` for formatting, `ruff-check` for linting and `mypy` for type checking.
 
 ```bash
 tox -e linters

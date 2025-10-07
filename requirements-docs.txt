@@ -1,5 +1,5 @@
 gevent
-shibuya<2025.9.22
+shibuya
 sphinx<8.2
 sphinx-autodoc-typehints[type_comments]>=1.8.0
 typing-extensions

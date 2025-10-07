@@ -90,7 +90,6 @@ def test_initialize_spark_integration_after_spark_context_init(
 
 @pytest.fixture
 def sentry_listener():
-
     listener = SentryListener()
 
     return listener
