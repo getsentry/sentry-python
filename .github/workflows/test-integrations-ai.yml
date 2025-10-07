@@ -82,6 +82,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-langgraph"
+      - name: Test google-genai
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-google-genai"
       - name: Test openai_agents
         run: |
           set -x # print commands that are executed
