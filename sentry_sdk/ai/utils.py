@@ -10,10 +10,17 @@ import sentry_sdk
 from sentry_sdk.utils import logger
 
 
+class GEN_AI_ALLOWED_MESSAGE_ROLES:
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL_CALL = "tool_call"
+
+
 # Gen AI message role reverse mapping showing allowed target roles and their source variants
 GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING = {
-    "system": ["system"],
-    "user": ["user"],
+    GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM: ["system"],
+    GEN_AI_ALLOWED_MESSAGE_ROLES.USER: ["user"],
     "assistant": ["assistant", "ai"],
     "tool_call": ["tool_call"],
 }
@@ -70,15 +77,8 @@ def normalize_message_roles(messages):
     Normalize roles in a list of messages to use standard gen_ai role values.
     Creates a deep copy to avoid modifying the original messages.
     """
-    if not messages:
-        return messages
-
     normalized_messages = []
     for message in messages:
-        if not isinstance(message, dict):
-            normalized_messages.append(message)
-            continue
-
         normalized_message = message.copy()
         if "role" in message:
             normalized_message["role"] = normalize_message_role(message["role"])

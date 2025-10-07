@@ -1,5 +1,9 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized, normalize_message_role
+from sentry_sdk.ai.utils import (
+    normalize_message_roles,
+    set_data_normalized,
+    normalize_message_role,
+)
 from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
@@ -121,7 +125,10 @@ def _set_input_data(span, get_response_kwargs):
                 request_messages.append({"role": "tool", "content": [message]})
 
     set_data_normalized(
-        span, SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages, unpack=False
+        span,
+        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+        normalize_message_roles(request_messages),
+        unpack=False,
     )
 
 
