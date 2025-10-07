@@ -61,6 +61,15 @@ class ThreadingIntegration(Integration):
             django_version = None
             channels_version = None
 
+        is_async_emulated_with_threads = (
+            sys.version_info < (3, 9)
+            and channels_version is not None
+            and channels_version < "4.0.0"
+            and django_version is not None
+            and django_version >= (3, 0)
+            and django_version < (4, 0)
+        )
+
         @wraps(old_start)
         def sentry_start(self, *a, **kw):
             # type: (Thread, *Any, **Any) -> Any
@@ -69,14 +78,7 @@ class ThreadingIntegration(Integration):
                 return old_start(self, *a, **kw)
 
             if integration.propagate_scope:
-                if (
-                    sys.version_info < (3, 9)
-                    and channels_version is not None
-                    and channels_version < "4.0.0"
-                    and django_version is not None
-                    and django_version >= (3, 0)
-                    and django_version < (4, 0)
-                ):
+                if is_async_emulated_with_threads:
                     warnings.warn(
                         "There is a known issue with Django channels 2.x and 3.x when using Python 3.8 or older. "
                         "(Async support is emulated using threads and some Sentry data may be leaked between those threads.) "
@@ -111,7 +113,9 @@ class ThreadingIntegration(Integration):
             return old_start(self, *a, **kw)
 
         Thread.start = sentry_start  # type: ignore
-        ThreadPoolExecutor.submit = _wrap_threadpool_executor_submit(ThreadPoolExecutor.submit)  # type: ignore
+        ThreadPoolExecutor.submit = _wrap_threadpool_executor_submit(
+            ThreadPoolExecutor.submit, is_async_emulated_with_threads
+        )  # type: ignore
 
 
 def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
@@ -137,8 +141,8 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
     return run  # type: ignore
 
 
-def _wrap_threadpool_executor_submit(func):
-    # type: (Callable[..., Future[T]]) -> Callable[..., Future[T]]
+def _wrap_threadpool_executor_submit(func, is_async_emulated_with_threads):
+    # type: (Callable[..., Future[T]], bool) -> Callable[..., Future[T]]
     """
     Wrap submit call to propagate scopes on task submission.
     """
@@ -150,7 +154,10 @@ def _wrap_threadpool_executor_submit(func):
         if integration is None:
             return func(self, fn, *args, **kwargs)
 
-        if integration.propagate_scope:
+        if integration.propagate_scope and is_async_emulated_with_threads:
+            isolation_scope = sentry_sdk.get_isolation_scope()
+            current_scope = sentry_sdk.get_current_scope()
+        elif integration.propagate_scope:
             isolation_scope = sentry_sdk.get_isolation_scope().fork()
             current_scope = sentry_sdk.get_current_scope().fork()
         else:
