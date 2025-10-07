@@ -14,7 +14,7 @@ class GEN_AI_ALLOWED_MESSAGE_ROLES:
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
-    TOOL_CALL = "tool_call"
+    TOOL_CALL = "tool"
 
 
 GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING = {
