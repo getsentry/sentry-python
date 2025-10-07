@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import (
+    GEN_AI_ALLOWED_MESSAGE_ROLES,
     normalize_message_roles,
     set_data_normalized,
     normalize_message_role,
@@ -104,7 +105,7 @@ def _set_input_data(span, get_response_kwargs):
     if system_instructions:
         request_messages.append(
             {
-                "role": "system",
+                "role": GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM,
                 "content": [{"type": "text", "text": system_instructions}],
             }
         )
@@ -120,9 +121,19 @@ def _set_input_data(span, get_response_kwargs):
             )
         else:
             if message.get("type") == "function_call":
-                request_messages.append({"role": "assistant", "content": [message]})
+                request_messages.append(
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT,
+                        "content": [message],
+                    }
+                )
             elif message.get("type") == "function_call_output":
-                request_messages.append({"role": "tool", "content": [message]})
+                request_messages.append(
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL_CALL,
+                        "content": [message],
+                    }
+                )
 
     set_data_normalized(
         span,

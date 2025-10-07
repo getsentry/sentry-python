@@ -180,7 +180,6 @@ def _wrap_pregel_invoke(f):
             ):
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
-                    # Normalize message roles to standard gen_ai values
                     normalized_input_messages = normalize_message_roles(input_messages)
                     set_data_normalized(
                         span,
@@ -232,7 +231,6 @@ def _wrap_pregel_ainvoke(f):
             ):
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
-                    # Normalize message roles to standard gen_ai values
                     normalized_input_messages = normalize_message_roles(input_messages)
                     set_data_normalized(
                         span,

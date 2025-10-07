@@ -182,7 +182,6 @@ def _set_input_data(span, kwargs, operation, integration):
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        # Normalize message roles to standard gen_ai values
         normalized_messages = normalize_message_roles(messages)
         set_data_normalized(
             span, SPANDATA.GEN_AI_REQUEST_MESSAGES, normalized_messages, unpack=False

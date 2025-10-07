@@ -144,7 +144,6 @@ def _set_input_data(span, kwargs, integration):
             else:
                 normalized_messages.append(message)
 
-        # Further normalize message roles to standard gen_ai values
         role_normalized_messages = normalize_message_roles(normalized_messages)
         set_data_normalized(
             span,

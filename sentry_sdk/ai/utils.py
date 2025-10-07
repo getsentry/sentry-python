@@ -17,7 +17,6 @@ class GEN_AI_ALLOWED_MESSAGE_ROLES:
     TOOL_CALL = "tool_call"
 
 
-# Gen AI message role reverse mapping showing allowed target roles and their source variants
 GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING = {
     GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM: ["system"],
     GEN_AI_ALLOWED_MESSAGE_ROLES.USER: ["user"],
@@ -25,7 +24,6 @@ GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING = {
     GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL_CALL: ["tool_call"],
 }
 
-# Convert reverse mapping to actual mapping for efficient lookups
 GEN_AI_MESSAGE_ROLE_MAPPING = {}
 for target_role, source_roles in GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING.items():
     for source_role in source_roles:

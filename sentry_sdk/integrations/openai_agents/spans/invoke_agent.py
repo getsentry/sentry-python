@@ -60,7 +60,6 @@ def invoke_agent_span(context, agent, kwargs):
             )
 
         if len(messages) > 0:
-            # Normalize message roles to standard gen_ai values
             normalized_messages = normalize_message_roles(messages)
             set_data_normalized(
                 span,
