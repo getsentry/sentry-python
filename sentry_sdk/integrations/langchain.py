@@ -4,7 +4,11 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
-from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
+from sentry_sdk.ai.utils import (
+    normalize_message_roles,
+    set_data_normalized,
+    get_start_span_function,
+)
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -209,8 +213,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
+                normalized_messages = normalize_message_roles(prompts)
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts, unpack=False
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
@@ -262,6 +270,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         normalized_messages.append(
                             self._normalize_langchain_message(message)
                         )
+                normalized_messages = normalize_message_roles(normalized_messages)
+
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -740,8 +750,12 @@ def _wrap_agent_executor_invoke(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
+                normalized_messages = normalize_message_roles([input])
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
 
             output = result.get("output")
@@ -791,8 +805,12 @@ def _wrap_agent_executor_stream(f):
             and should_send_default_pii()
             and integration.include_prompts
         ):
+            normalized_messages = normalize_message_roles([input])
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
 
         # Run the agent
