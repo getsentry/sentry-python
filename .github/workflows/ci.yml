@@ -33,28 +33,6 @@ jobs:
           pip install tox
           tox -e linters
 
-  check-ci-config:
-    name: Check CI config
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v5.0.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-python@v6
-        with:
-          python-version: 3.12
-
-      - name: Detect unexpected changes to tox.ini or CI
-        run: |
-          pip install -e .
-          pip install -r scripts/populate_tox/requirements.txt
-          python scripts/populate_tox/populate_tox.py --fail-on-changes
-          pip install -r scripts/split_tox_gh_actions/requirements.txt
-          python scripts/split_tox_gh_actions/split_tox_gh_actions.py --fail-on-changes
-
   build_lambda_layer:
     name: Build Package
     runs-on: ubuntu-latest

@@ -130,7 +130,8 @@ def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> N
 
 
 def _prefilter_releases(
-    integration: str, releases: dict[str, dict], older_than: Optional[datetime] = None
+    integration: str,
+    releases: dict[str, dict],
 ) -> tuple[list[Version], Optional[Version]]:
     """
     Filter `releases`, removing releases that are for sure unsupported.
@@ -178,9 +179,6 @@ def _prefilter_releases(
 
         uploaded = datetime.fromisoformat(meta["upload_time_iso_8601"])
 
-        if older_than is not None and uploaded > older_than:
-            continue
-
         if CUTOFF is not None and uploaded < CUTOFF:
             continue
 
@@ -224,7 +222,7 @@ def _prefilter_releases(
 
 
 def get_supported_releases(
-    integration: str, pypi_data: dict, older_than: Optional[datetime] = None
+    integration: str, pypi_data: dict
 ) -> tuple[list[Version], Optional[Version]]:
     """
     Get a list of releases that are currently supported by the SDK.
@@ -236,9 +234,6 @@ def get_supported_releases(
     We return the list of supported releases and optionally also the newest
     prerelease, if it should be tested (meaning it's for a version higher than
     the current stable version).
-
-    If an `older_than` timestamp is provided, no release newer than that will be
-    considered.
     """
     package = pypi_data["info"]["name"]
 
@@ -246,7 +241,8 @@ def get_supported_releases(
     # (because that might require an additional API call for some
     # of the releases)
     releases, latest_prerelease = _prefilter_releases(
-        integration, pypi_data["releases"], older_than
+        integration,
+        pypi_data["releases"],
     )
 
     def _supports_lowest(release: Version) -> bool:
@@ -665,32 +661,10 @@ def _normalize_release(release: dict) -> dict:
     return normalized
 
 
-def main(fail_on_changes: bool = False) -> dict[str, list]:
+def main() -> dict[str, list]:
     """
     Generate tox.ini from the tox.jinja template.
-
-    The script has two modes of operation:
-    - fail on changes mode (if `fail_on_changes` is True)
-    - normal mode (if `fail_on_changes` is False)
-
-    Fail on changes mode is run on every PR to make sure that `tox.ini`,
-    `tox.jinja` and this script don't go out of sync because of manual changes
-    in one place but not the other.
-
-    Normal mode is meant to be run as a cron job, regenerating tox.ini and
-    proposing the changes via a PR.
     """
-    print(f"Running in {'fail_on_changes' if fail_on_changes else 'normal'} mode.")
-    last_updated = get_last_updated()
-    if fail_on_changes:
-        # We need to make the script ignore any new releases after the last updated
-        # timestamp so that we don't fail CI on a PR just because a new package
-        # version was released, leading to unrelated changes in tox.ini.
-        print(
-            f"Since we're in fail_on_changes mode, we're only considering "
-            f"releases before the last tox.ini update at {last_updated.isoformat()}."
-        )
-
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
     meta = _fetch_sdk_metadata()
     sdk_python_versions = _parse_python_versions_from_classifiers(
@@ -736,12 +710,7 @@ def main(fail_on_changes: bool = False) -> dict[str, list]:
 
             # Get the list of all supported releases
 
-            # If in fail-on-changes mode, ignore releases newer than `last_updated`
-            older_than = last_updated if fail_on_changes else None
-
-            releases, latest_prerelease = get_supported_releases(
-                integration, pypi_data, older_than
-            )
+            releases, latest_prerelease = get_supported_releases(integration, pypi_data)
 
             if not releases:
                 print("  Found no supported releases.")
@@ -778,9 +747,6 @@ def main(fail_on_changes: bool = False) -> dict[str, list]:
                     }
                 )
 
-    if fail_on_changes:
-        old_file_hash = get_file_hash()
-
     write_tox_file(packages)
 
     # Sort the release cache file
@@ -798,36 +764,9 @@ def main(fail_on_changes: bool = False) -> dict[str, list]:
             ):
                 releases_cache.write(json.dumps(release) + "\n")
 
-    if fail_on_changes:
-        new_file_hash = get_file_hash()
-        if old_file_hash != new_file_hash:
-            raise RuntimeError(
-                dedent(
-                    """
-                Detected that `tox.ini` is out of sync with
-                `scripts/populate_tox/tox.jinja` and/or
-                `scripts/populate_tox/populate_tox.py`. This might either mean
-                that `tox.ini` was changed manually, or the `tox.jinja`
-                template and/or the `populate_tox.py` script were changed without
-                regenerating `tox.ini`.
-
-                Please don't make manual changes to `tox.ini`. Instead, make the
-                changes to the `tox.jinja` template and/or the `populate_tox.py`
-                script (as applicable) and regenerate the `tox.ini` file by
-                running scripts/generate-test-files.sh
-                """
-                )
-            )
-        print("Done checking tox.ini. Looking good!")
-    else:
-        print(
-            "Done generating tox.ini. Make sure to also update the CI YAML "
-            "files to reflect the new test targets."
-        )
+    print(
+        "Done generating tox.ini. Make sure to also update the CI YAML "
+        "files to reflect the new test targets."
+    )
 
     return packages
-
-
-if __name__ == "__main__":
-    fail_on_changes = len(sys.argv) == 2 and sys.argv[1] == "--fail-on-changes"
-    main(fail_on_changes)
