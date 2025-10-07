@@ -79,6 +79,9 @@ def normalize_message_roles(messages):
     """
     normalized_messages = []
     for message in messages:
+        if not isinstance(message, dict):
+            normalized_messages.append(message)
+            continue
         normalized_message = message.copy()
         if "role" in message:
             normalized_message["role"] = normalize_message_role(message["role"])
