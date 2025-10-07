@@ -113,9 +113,9 @@ class ThreadingIntegration(Integration):
             return old_start(self, *a, **kw)
 
         Thread.start = sentry_start  # type: ignore
-        ThreadPoolExecutor.submit = _wrap_threadpool_executor_submit(
+        ThreadPoolExecutor.submit = _wrap_threadpool_executor_submit(  # type: ignore
             ThreadPoolExecutor.submit, is_async_emulated_with_threads
-        )  # type: ignore
+        )
 
 
 def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
