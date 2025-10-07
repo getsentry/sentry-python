@@ -1,5 +1,6 @@
 import pytest
 from unittest import mock
+import json
 
 try:
     from unittest.mock import AsyncMock
@@ -926,8 +927,6 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
     # Parse the stored messages
-    import json
-
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     # Verify that "ai" role was mapped to "assistant"
