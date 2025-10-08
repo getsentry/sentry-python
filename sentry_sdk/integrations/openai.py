@@ -3,7 +3,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized, normalize_message_roles
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -182,8 +182,9 @@ def _set_input_data(span, kwargs, operation, integration):
         and should_send_default_pii()
         and integration.include_prompts
     ):
+        normalized_messages = normalize_message_roles(messages)
         set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, normalized_messages, unpack=False
         )
 
     # Input attributes: Common
