@@ -130,7 +130,7 @@ def _set_input_data(span, get_response_kwargs):
             elif message.get("type") == "function_call_output":
                 request_messages.append(
                     {
-                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL_CALL,
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
                         "content": [message],
                     }
                 )
