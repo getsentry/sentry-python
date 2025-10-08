@@ -3,34 +3,120 @@ import inspect
 from functools import wraps
 from .consts import ORIGIN, TOOL_ATTRIBUTES_MAP, GEN_AI_SYSTEM
 from typing import (
+    cast,
     TYPE_CHECKING,
+    Iterable,
     Any,
     Callable,
     List,
     Optional,
     Union,
+    TypedDict,
 )
 
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     safe_serialize,
 )
+from google.genai.types import GenerateContentConfig
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from google.genai.types import (
         GenerateContentResponse,
         ContentListUnion,
-        GenerateContentConfig,
         Tool,
         Model,
     )
+
+
+class UsageData(TypedDict):
+    """Structure for token usage data."""
+
+    input_tokens: int
+    input_tokens_cached: int
+    output_tokens: int
+    output_tokens_reasoning: int
+    total_tokens: int
+
+
+def extract_usage_data(response):
+    # type: (Union[GenerateContentResponse, dict[str, Any]]) -> UsageData
+    """Extract usage data from response into a structured format.
+
+    Args:
+        response: The GenerateContentResponse object or dictionary containing usage metadata
+
+    Returns:
+        UsageData: Dictionary with input_tokens, input_tokens_cached,
+                   output_tokens, and output_tokens_reasoning fields
+    """
+    usage_data = UsageData(
+        input_tokens=0,
+        input_tokens_cached=0,
+        output_tokens=0,
+        output_tokens_reasoning=0,
+        total_tokens=0,
+    )
+
+    # Handle dictionary response (from streaming)
+    if isinstance(response, dict):
+        usage = response.get("usage_metadata", {})
+        if not usage:
+            return usage_data
+
+        prompt_tokens = usage.get("prompt_token_count", 0) or 0
+        tool_use_prompt_tokens = usage.get("tool_use_prompt_token_count", 0) or 0
+        usage_data["input_tokens"] = prompt_tokens + tool_use_prompt_tokens
+
+        cached_tokens = usage.get("cached_content_token_count", 0) or 0
+        usage_data["input_tokens_cached"] = cached_tokens
+
+        reasoning_tokens = usage.get("thoughts_token_count", 0) or 0
+        usage_data["output_tokens_reasoning"] = reasoning_tokens
+
+        candidates_tokens = usage.get("candidates_token_count", 0) or 0
+        # python-genai reports output and reasoning tokens separately
+        usage_data["output_tokens"] = candidates_tokens + reasoning_tokens
+
+        total_tokens = usage.get("total_token_count", 0) or 0
+        usage_data["total_tokens"] = total_tokens
+
+        return usage_data
+
+    # Handle response object
+    if not hasattr(response, "usage_metadata"):
+        return usage_data
+
+    usage = response.usage_metadata
+
+    # Input tokens include both prompt and tool use prompt tokens
+    prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0
+    tool_use_prompt_tokens = getattr(usage, "tool_use_prompt_token_count", 0) or 0
+    usage_data["input_tokens"] = prompt_tokens + tool_use_prompt_tokens
+
+    # Cached input tokens
+    cached_tokens = getattr(usage, "cached_content_token_count", 0) or 0
+    usage_data["input_tokens_cached"] = cached_tokens
+
+    # Reasoning tokens
+    reasoning_tokens = getattr(usage, "thoughts_token_count", 0) or 0
+    usage_data["output_tokens_reasoning"] = reasoning_tokens
+
+    # output_tokens = candidates_tokens + reasoning_tokens
+    # google-genai reports output and reasoning tokens separately
+    candidates_tokens = getattr(usage, "candidates_token_count", 0) or 0
+    usage_data["output_tokens"] = candidates_tokens + reasoning_tokens
+
+    total_tokens = getattr(usage, "total_token_count", 0) or 0
+    usage_data["total_tokens"] = total_tokens
+
+    return usage_data
 
 
 def capture_exception(exc):
@@ -55,7 +141,7 @@ def get_model_name(model):
     return str(model)
 
 
-def _extract_contents_text(contents):
+def extract_contents_text(contents):
     # type: (ContentListUnion) -> Optional[str]
     """Extract text from contents parameter which can have various formats."""
     if contents is None:
@@ -70,7 +156,7 @@ def _extract_contents_text(contents):
         texts = []
         for item in contents:
             # Recursively extract text from each item
-            extracted = _extract_contents_text(item)
+            extracted = extract_contents_text(item)
             if extracted:
                 texts.append(extracted)
         return " ".join(texts) if texts else None
@@ -81,11 +167,11 @@ def _extract_contents_text(contents):
             return contents["text"]
         # Try to extract from parts if present in dict
         if "parts" in contents:
-            return _extract_contents_text(contents["parts"])
+            return extract_contents_text(contents["parts"])
 
     # Content object with parts - recurse into parts
     if hasattr(contents, "parts") and contents.parts:
-        return _extract_contents_text(contents.parts)
+        return extract_contents_text(contents.parts)
 
     # Direct text attribute
     if hasattr(contents, "text"):
@@ -95,7 +181,7 @@ def _extract_contents_text(contents):
 
 
 def _format_tools_for_span(tools):
-    # type: (Tool | Callable[..., Any]) -> Optional[List[dict[str, Any]]]
+    # type: (Iterable[Tool | Callable[..., Any]]) -> Optional[List[dict[str, Any]]]
     """Format tools parameter for span data."""
     formatted_tools = []
     for tool in tools:
@@ -135,7 +221,7 @@ def _format_tools_for_span(tools):
     return formatted_tools if formatted_tools else None
 
 
-def _extract_tool_calls(response):
+def extract_tool_calls(response):
     # type: (GenerateContentResponse) -> Optional[List[dict[str, Any]]]
     """Extract tool/function calls from response candidates and automatic function calling history."""
 
@@ -191,7 +277,7 @@ def _extract_tool_calls(response):
 
 
 def _capture_tool_input(args, kwargs, tool):
-    # type: (tuple, dict[str, Any], Tool) -> dict[str, Any]
+    # type: (tuple[Any, ...], dict[str, Any], Tool) -> dict[str, Any]
     """Capture tool input from args and kwargs."""
     tool_input = kwargs.copy() if kwargs else {}
 
@@ -239,6 +325,7 @@ def wrapped_tool(tool):
         # Async function
         @wraps(tool)
         async def async_wrapped(*args, **kwargs):
+            # type: (Any, Any) -> Any
             with _create_tool_span(tool_name, tool_doc) as span:
                 # Capture tool input
                 tool_input = _capture_tool_input(args, kwargs, tool)
@@ -266,6 +353,7 @@ def wrapped_tool(tool):
         # Sync function
         @wraps(tool)
         def sync_wrapped(*args, **kwargs):
+            # type: (Any, Any) -> Any
             with _create_tool_span(tool_name, tool_doc) as span:
                 # Capture tool input
                 tool_input = _capture_tool_input(args, kwargs, tool)
@@ -324,7 +412,7 @@ def _extract_response_text(response):
     return texts if texts else None
 
 
-def _extract_finish_reasons(response):
+def extract_finish_reasons(response):
     # type: (GenerateContentResponse) -> Optional[List[str]]
     """Extract finish reasons from response candidates."""
     if not response or not hasattr(response, "candidates"):
@@ -344,13 +432,47 @@ def _extract_finish_reasons(response):
 
 
 def set_span_data_for_request(span, integration, model, contents, kwargs):
-    # type: (Span, Integration, str, ContentListUnion, dict[str, Any]) -> None
+    # type: (Span, Any, str, ContentListUnion, dict[str, Any]) -> None
     """Set span data for the request."""
     span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
     span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
+    # Set streaming flag
+    if kwargs.get("stream", False):
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
     # Set model configuration parameters
     config = kwargs.get("config")
+
+    if config is None:
+        return
+
+    config = cast(GenerateContentConfig, config)
+
+    # Set input messages/prompts if PII is allowed
+    if should_send_default_pii() and integration.include_prompts:
+        messages = []
+
+        # Add system instruction if present
+        if hasattr(config, "system_instruction"):
+            system_instruction = config.system_instruction
+            if system_instruction:
+                system_text = extract_contents_text(system_instruction)
+                if system_text:
+                    messages.append({"role": "system", "content": system_text})
+
+        # Add user message
+        contents_text = extract_contents_text(contents)
+        if contents_text:
+            messages.append({"role": "user", "content": contents_text})
+
+        if messages:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                messages,
+                unpack=False,
+            )
 
     # Extract parameters directly from config (not nested under generation_config)
     for param, span_key in [
@@ -367,10 +489,6 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
             if value is not None:
                 span.set_data(span_key, value)
 
-    # Set streaming flag
-    if kwargs.get("stream", False):
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
-
     # Set tools if available
     if hasattr(config, "tools"):
         tools = config.tools
@@ -384,34 +502,9 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
                     unpack=False,
                 )
 
-    # Set input messages/prompts if PII is allowed
-    if should_send_default_pii() and integration.include_prompts:
-        messages = []
-
-        # Add system instruction if present
-        if hasattr(config, "system_instruction"):
-            system_instruction = config.system_instruction
-            if system_instruction:
-                system_text = _extract_contents_text(system_instruction)
-                if system_text:
-                    messages.append({"role": "system", "content": system_text})
-
-        # Add user message
-        contents_text = _extract_contents_text(contents)
-        if contents_text:
-            messages.append({"role": "user", "content": contents_text})
-
-        if messages:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                messages,
-                unpack=False,
-            )
-
 
 def set_span_data_for_response(span, integration, response):
-    # type: (Span, Integration, GenerateContentResponse) -> None
+    # type: (Span, Any, GenerateContentResponse) -> None
     """Set span data for the response."""
     if not response:
         return
@@ -424,13 +517,13 @@ def set_span_data_for_response(span, integration, response):
             span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts))
 
     # Extract and set tool calls
-    tool_calls = _extract_tool_calls(response)
+    tool_calls = extract_tool_calls(response)
     if tool_calls:
         # Tool calls should be JSON serialized
         span.set_data(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
 
     # Extract and set finish reasons
-    finish_reasons = _extract_finish_reasons(response)
+    finish_reasons = extract_finish_reasons(response)
     if finish_reasons:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
@@ -445,35 +538,26 @@ def set_span_data_for_response(span, integration, response):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_version)
 
     # Set token usage if available
-    if hasattr(response, "usage_metadata"):
-        usage = response.usage_metadata
+    usage_data = extract_usage_data(response)
 
-        # Input tokens should include both prompt and tool use prompt tokens
-        prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0
-        tool_use_prompt_tokens = getattr(usage, "tool_use_prompt_token_count", 0) or 0
-        if prompt_tokens or tool_use_prompt_tokens:
-            span.set_data(
-                SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
-                prompt_tokens + tool_use_prompt_tokens,
-            )
+    if usage_data["input_tokens"]:
+        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage_data["input_tokens"])
 
-        # Output tokens should include reasoning tokens
-        output_tokens = getattr(usage, "candidates_token_count", 0) or 0
-        reasoning_tokens = getattr(usage, "thoughts_token_count", 0) or 0
-        if output_tokens or reasoning_tokens:
-            span.set_data(
-                SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens + reasoning_tokens
-            )
+    if usage_data["input_tokens_cached"]:
+        span.set_data(
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+            usage_data["input_tokens_cached"],
+        )
 
-        if hasattr(usage, "total_token_count"):
-            span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_token_count)
-        if hasattr(usage, "cached_content_token_count"):
-            span.set_data(
-                SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
-                usage.cached_content_token_count,
-            )
-        if hasattr(usage, "thoughts_token_count"):
-            span.set_data(
-                SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
-                usage.thoughts_token_count,
-            )
+    if usage_data["output_tokens"]:
+        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage_data["output_tokens"])
+
+    if usage_data["output_tokens_reasoning"]:
+        span.set_data(
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            usage_data["output_tokens_reasoning"],
+        )
+
+    # Set total token count if available
+    if usage_data["total_tokens"]:
+        span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"])

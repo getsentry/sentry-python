@@ -26,11 +26,21 @@ def create_test_content(parts):
     return genai_types.Content(parts=parts, role="model")
 
 
-def create_test_candidate(content, finish_reason=None):
-    """Create a Candidate with content."""
+def create_test_candidate(content, finish_reason="default"):
+    """Create a Candidate with content.
+
+    Args:
+        content: The content for the candidate
+        finish_reason: Finish reason. Use "default" for STOP (for backwards compatibility),
+                      None for no finish reason (for streaming chunks), or a specific
+                      FinishReason value.
+    """
+    if finish_reason == "default":
+        finish_reason = genai_types.FinishReason.STOP
+
     return genai_types.Candidate(
         content=content,
-        finish_reason=finish_reason or genai_types.FinishReason.STOP,
+        finish_reason=finish_reason,
     )
 
 
@@ -163,6 +173,25 @@ def setup_mock_generate_content(mock_instance, return_value=None, side_effect=No
 
     # Bind the wrapped method to the mock instance
     mock_instance.generate_content = wrapped_method.__get__(
+        mock_instance, type(mock_instance)
+    )
+
+
+def setup_mock_generate_content_stream(mock_instance, stream_chunks):
+    """Helper to set up the mock generate_content_stream method with proper wrapping."""
+
+    # Create a generator function that yields the chunks
+    def mock_generate_content_stream(self, *args, **kwargs):
+        for chunk in stream_chunks:
+            yield chunk
+
+    # Apply the integration patch to our mock method
+    from sentry_sdk.integrations.google_genai import _wrap_generate_content_stream
+
+    wrapped_method = _wrap_generate_content_stream(mock_generate_content_stream)
+
+    # Bind the wrapped method to the mock instance
+    mock_instance.generate_content_stream = wrapped_method.__get__(
         mock_instance, type(mock_instance)
     )
 
@@ -434,6 +463,7 @@ def test_error_handling(sentry_init, capture_events, mock_models_instance):
 
 
 def test_streaming_generate_content(sentry_init, capture_events, mock_models_instance):
+    """Test streaming with generate_content_stream, verifying chunk accumulation."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -441,20 +471,131 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_models_ins
     )
     events = capture_events()
 
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
+    # Create streaming chunks - simulating a multi-chunk response
+    # Chunk 1: First part of text with partial usage metadata
+    chunk1 = create_test_response(
+        candidates=[
+            create_test_candidate(
+                content=create_test_content(parts=[create_test_part("Hello! ")]),
+                finish_reason=None,  # Not finished yet
+            )
+        ],
+        usage_metadata=create_test_usage_metadata(
+            prompt_token_count=10,
+            candidates_token_count=2,
+            total_token_count=0,  # Not set in intermediate chunks
+        ),
+        response_id="response-id-stream-123",
+        model_version="gemini-1.5-flash",
+    )
+
+    # Chunk 2: Second part of text with more usage metadata
+    chunk2 = create_test_response(
+        candidates=[
+            create_test_candidate(
+                content=create_test_content(parts=[create_test_part("How can I ")]),
+                finish_reason=None,
+            )
+        ],
+        usage_metadata=create_test_usage_metadata(
+            prompt_token_count=10,
+            candidates_token_count=3,
+            total_token_count=0,
+        ),
+    )
+
+    # Chunk 3: Final part with finish reason and complete usage metadata
+    chunk3 = create_test_response(
+        candidates=[
+            create_test_candidate(
+                content=create_test_content(
+                    parts=[create_test_part("help you today?")]
+                ),
+                finish_reason=genai_types.FinishReason.STOP,
+            )
+        ],
+        usage_metadata=create_test_usage_metadata(
+            prompt_token_count=10,
+            candidates_token_count=7,  # Total output tokens across all chunks
+            total_token_count=22,  # Final total from last chunk
+            cached_content_token_count=5,
+            thoughts_token_count=3,
+        ),
+    )
+
+    # Set up the streaming mock with our chunks
+    stream_chunks = [chunk1, chunk2, chunk3]
+    setup_mock_generate_content_stream(mock_models_instance, stream_chunks)
 
     with start_transaction(name="google_genai"):
         config = create_test_config()
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Stream me a response", config=config, stream=True
+        # Use the mock instance to get the stream
+        stream = mock_models_instance.generate_content_stream(
+            model="gemini-1.5-flash", contents="Stream me a response", config=config
         )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+        # Consume the stream (this is what users do with the integration wrapper)
+        collected_chunks = list(stream)
 
-    # Check that streaming flag is set
+    # Verify we got all chunks
+    assert len(collected_chunks) == 3
+    assert collected_chunks[0].candidates[0].content.parts[0].text == "Hello! "
+    assert collected_chunks[1].candidates[0].content.parts[0].text == "How can I "
+    assert collected_chunks[2].candidates[0].content.parts[0].text == "help you today?"
+
+    (event,) = events
+
+    # There should be 2 spans: invoke_agent and chat
+    assert len(event["spans"]) == 2
+    invoke_span = event["spans"][0]
+    chat_span = event["spans"][1]
+
+    # Check that streaming flag is set on both spans
     assert invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    # Verify accumulated response text (all chunks combined)
+    expected_full_text = "Hello! How can I help you today?"
+    # Response text is stored as a JSON string
+    chat_response_text = json.loads(chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])
+    invoke_response_text = json.loads(
+        invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    )
+    assert chat_response_text == [expected_full_text]
+    assert invoke_response_text == [expected_full_text]
+
+    # Verify finish reasons (only the final chunk has a finish reason)
+    # When there's a single finish reason, it's stored as a plain string (not JSON)
+    assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in chat_span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in invoke_span["data"]
+    assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
+    assert invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
+
+    # Verify token counts - should reflect accumulated values
+    # Input tokens: max of all chunks = 10
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+
+    # Output tokens: candidates (2 + 3 + 7 = 12) + reasoning (3) = 15
+    # Note: output_tokens includes both candidates and reasoning tokens
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
+
+    # Total tokens: from the last chunk
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 22
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 22
+
+    # Cached tokens: max of all chunks = 5
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
+
+    # Reasoning tokens: sum of thoughts_token_count = 3
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
+
+    # Verify model name
+    assert chat_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "gemini-1.5-flash"
 
 
 def test_different_content_formats(sentry_init, capture_events, mock_models_instance):

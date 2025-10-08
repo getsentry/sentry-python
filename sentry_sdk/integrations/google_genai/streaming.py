@@ -13,14 +13,19 @@ from sentry_sdk.utils import (
 from .utils import (
     get_model_name,
     wrapped_config_with_tools,
+    extract_tool_calls,
+    extract_finish_reasons,
+    extract_contents_text,
+    extract_usage_data,
 )
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
+    from google.genai.types import GenerateContentResponse
 
 
 def prepare_generate_content_args(args, kwargs):
-    # type: (tuple, dict[str, Any]) -> tuple[Any, Any, str]
+    # type: (tuple[Any, ...], dict[str, Any]) -> tuple[Any, Any, str]
     """Extract and prepare common arguments for generate_content methods."""
     model = args[0] if args else kwargs.get("model", "unknown")
     contents = args[1] if len(args) > 1 else kwargs.get("contents")
@@ -36,7 +41,7 @@ def prepare_generate_content_args(args, kwargs):
 
 
 def accumulate_streaming_response(chunks):
-    # type: (List[Any]) -> dict[str, Any]
+    # type: (List[GenerateContentResponse]) -> dict[str, Any]
     """Accumulate streaming chunks into a single response-like object."""
     accumulated_text = []
     finish_reasons = []
@@ -57,50 +62,17 @@ def accumulate_streaming_response(chunks):
                 if hasattr(candidate, "content") and hasattr(
                     candidate.content, "parts"
                 ):
-                    for part in candidate.content.parts:
-                        if hasattr(part, "text") and part.text:
-                            accumulated_text.append(part.text)
+                    extracted_text = extract_contents_text(candidate.content)
+                    if extracted_text:
+                        accumulated_text.append(extracted_text)
 
-                        # Extract function calls
-                        if hasattr(part, "function_call") and part.function_call:
-                            function_call = part.function_call
-                            tool_call = {
-                                "name": getattr(function_call, "name", None),
-                                "type": "function_call",
-                            }
-                            if hasattr(function_call, "args"):
-                                tool_call["arguments"] = safe_serialize(
-                                    function_call.args
-                                )
-                            tool_calls.append(tool_call)
+        extracted_finish_reasons = extract_finish_reasons(chunk)
+        if extracted_finish_reasons:
+            finish_reasons.extend(extracted_finish_reasons)
 
-                # Get finish reason from last chunk
-                if hasattr(candidate, "finish_reason") and candidate.finish_reason:
-                    reason = str(candidate.finish_reason)
-                    if "." in reason:
-                        reason = reason.split(".")[-1]
-                    if reason not in finish_reasons:
-                        finish_reasons.append(reason)
-
-        # Extract from automatic_function_calling_history
-        if (
-            hasattr(chunk, "automatic_function_calling_history")
-            and chunk.automatic_function_calling_history
-        ):
-            for content in chunk.automatic_function_calling_history:
-                if hasattr(content, "parts") and content.parts:
-                    for part in content.parts:
-                        if hasattr(part, "function_call") and part.function_call:
-                            function_call = part.function_call
-                            tool_call = {
-                                "name": getattr(function_call, "name", None),
-                                "type": "function_call",
-                            }
-                            if hasattr(function_call, "args"):
-                                tool_call["arguments"] = safe_serialize(
-                                    function_call.args
-                                )
-                            tool_calls.append(tool_call)
+        extracted_tool_calls = extract_tool_calls(chunk)
+        if extracted_tool_calls:
+            tool_calls.extend(extracted_tool_calls)
 
         # Accumulate token usage
         if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
@@ -141,12 +113,6 @@ def accumulate_streaming_response(chunks):
                 # Only use the final total_token_count from the last chunk
                 total_tokens = usage.total_token_count
 
-        # Get response metadata from first chunk with it
-        if response_id is None and hasattr(chunk, "response_id") and chunk.response_id:
-            response_id = chunk.response_id
-        if model is None and hasattr(chunk, "model_version") and chunk.model_version:
-            model = chunk.model_version
-
     # Create a synthetic response object with accumulated data
     accumulated_response = {
         "text": "".join(accumulated_text),
@@ -173,17 +139,17 @@ def accumulate_streaming_response(chunks):
 
     # Add optional token counts if present
     if total_tool_use_prompt_tokens > 0:
-        accumulated_response["usage_metadata"]["tool_use_prompt_token_count"] = (
-            total_tool_use_prompt_tokens
-        )
+        accumulated_response["usage_metadata"][
+            "tool_use_prompt_token_count"
+        ] = total_tool_use_prompt_tokens
     if total_cached_tokens > 0:
-        accumulated_response["usage_metadata"]["cached_content_token_count"] = (
-            total_cached_tokens
-        )
+        accumulated_response["usage_metadata"][
+            "cached_content_token_count"
+        ] = total_cached_tokens
     if total_reasoning_tokens > 0:
-        accumulated_response["usage_metadata"]["thoughts_token_count"] = (
-            total_reasoning_tokens
-        )
+        accumulated_response["usage_metadata"][
+            "thoughts_token_count"
+        ] = total_reasoning_tokens
 
     if response_id:
         accumulated_response["id"] = response_id
@@ -229,33 +195,27 @@ def set_span_data_for_streaming_response(span, integration, accumulated_response
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, accumulated_response["model"])
 
     # Set token usage
-    usage = accumulated_response.get("usage_metadata", {})
+    usage_data = extract_usage_data(accumulated_response)
 
-    # Input tokens should include both prompt and tool use prompt tokens
-    prompt_tokens = usage.get("prompt_token_count", 0)
-    tool_use_prompt_tokens = usage.get("tool_use_prompt_token_count", 0)
-    if prompt_tokens or tool_use_prompt_tokens:
-        span.set_data(
-            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens + tool_use_prompt_tokens
-        )
+    if usage_data["input_tokens"]:
+        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage_data["input_tokens"])
 
-    # Output tokens should include reasoning tokens
-    output_tokens = usage.get("candidates_token_count", 0)
-    reasoning_tokens = usage.get("thoughts_token_count", 0)
-    if output_tokens or reasoning_tokens:
-        span.set_data(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens + reasoning_tokens
-        )
-
-    if usage.get("total_token_count"):
-        span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage["total_token_count"])
-    if usage.get("cached_content_token_count"):
+    if usage_data["input_tokens_cached"]:
         span.set_data(
             SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
-            usage["cached_content_token_count"],
+            usage_data["input_tokens_cached"],
         )
-    if usage.get("thoughts_token_count"):
+
+    # Output tokens already include reasoning tokens from extract_usage_data
+    if usage_data["output_tokens"]:
+        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage_data["output_tokens"])
+
+    if usage_data["output_tokens_reasoning"]:
         span.set_data(
             SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
-            usage["thoughts_token_count"],
+            usage_data["output_tokens_reasoning"],
         )
+
+    # Set total token count if available
+    if usage_data["total_tokens"]:
+        span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"])
