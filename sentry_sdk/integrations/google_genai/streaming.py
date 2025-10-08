@@ -41,10 +41,10 @@ def accumulate_streaming_response(chunks):
 
     for chunk in chunks:
         # Extract text and tool calls
-        if hasattr(chunk, "candidates") and chunk.candidates:
+        if getattr(chunk, "candidates", None):
             for candidate in chunk.candidates:
-                if hasattr(candidate, "content") and hasattr(
-                    candidate.content, "parts"
+                if hasattr(candidate, "content") and getattr(
+                    candidate.content, "parts", []
                 ):
                     extracted_text = extract_contents_text(candidate.content)
                     if extracted_text:
@@ -59,41 +59,23 @@ def accumulate_streaming_response(chunks):
             tool_calls.extend(extracted_tool_calls)
 
         # Accumulate token usage
-        if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+        if getattr(chunk, "usage_metadata", None):
             usage = chunk.usage_metadata
-            if (
-                hasattr(usage, "prompt_token_count")
-                and usage.prompt_token_count is not None
-            ):
+            if getattr(usage, "prompt_token_count", None):
                 total_prompt_tokens = max(total_prompt_tokens, usage.prompt_token_count)
-            if (
-                hasattr(usage, "tool_use_prompt_token_count")
-                and usage.tool_use_prompt_token_count is not None
-            ):
+            if getattr(usage, "tool_use_prompt_token_count", None):
                 total_tool_use_prompt_tokens = max(
                     total_tool_use_prompt_tokens, usage.tool_use_prompt_token_count
                 )
-            if (
-                hasattr(usage, "candidates_token_count")
-                and usage.candidates_token_count is not None
-            ):
+            if getattr(usage, "candidates_token_count", None):
                 total_output_tokens += usage.candidates_token_count
-            if (
-                hasattr(usage, "cached_content_token_count")
-                and usage.cached_content_token_count is not None
-            ):
+            if getattr(usage, "cached_content_token_count", None):
                 total_cached_tokens = max(
                     total_cached_tokens, usage.cached_content_token_count
                 )
-            if (
-                hasattr(usage, "thoughts_token_count")
-                and usage.thoughts_token_count is not None
-            ):
+            if getattr(usage, "thoughts_token_count", None):
                 total_reasoning_tokens += usage.thoughts_token_count
-            if (
-                hasattr(usage, "total_token_count")
-                and usage.total_token_count is not None
-            ):
+            if getattr(usage, "total_token_count", None):
                 # Only use the final total_token_count from the last chunk
                 total_tokens = usage.total_token_count
 

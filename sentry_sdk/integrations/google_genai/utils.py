@@ -119,7 +119,7 @@ def extract_usage_data(response):
     return usage_data
 
 
-def capture_exception(exc):
+def _capture_exception(exc):
     # type: (Any) -> None
     """Capture exception with Google GenAI mechanism."""
     event, hint = event_from_exception(
@@ -170,7 +170,7 @@ def extract_contents_text(contents):
             return extract_contents_text(contents["parts"])
 
     # Content object with parts - recurse into parts
-    if hasattr(contents, "parts") and contents.parts:
+    if getattr(contents, "parts", None):
         return extract_contents_text(contents.parts)
 
     # Direct text attribute
@@ -236,7 +236,7 @@ def extract_tool_calls(response):
                 continue
 
             for part in candidate.content.parts:
-                if hasattr(part, "function_call") and part.function_call:
+                if getattr(part, "function_call", None):
                     function_call = part.function_call
                     tool_call = {
                         "name": getattr(function_call, "name", None),
@@ -251,16 +251,13 @@ def extract_tool_calls(response):
 
     # Extract from automatic_function_calling_history
     # This is the history of tool calls made by the model
-    if (
-        hasattr(response, "automatic_function_calling_history")
-        and response.automatic_function_calling_history
-    ):
+    if getattr(response, "automatic_function_calling_history", None):
         for content in response.automatic_function_calling_history:
-            if not hasattr(content, "parts") or not content.parts:
+            if not getattr(content, "parts", None):
                 continue
 
             for part in content.parts:
-                if hasattr(part, "function_call") and part.function_call:
+                if getattr(part, "function_call", None):
                     function_call = part.function_call
                     tool_call = {
                         "name": getattr(function_call, "name", None),
@@ -345,7 +342,7 @@ def wrapped_tool(tool):
 
                     return result
                 except Exception as exc:
-                    capture_exception(exc)
+                    _capture_exception(exc)
                     raise
 
         return async_wrapped
@@ -373,7 +370,7 @@ def wrapped_tool(tool):
 
                     return result
                 except Exception as exc:
-                    capture_exception(exc)
+                    _capture_exception(exc)
                     raise
 
         return sync_wrapped
@@ -384,7 +381,7 @@ def wrapped_config_with_tools(config):
     """Wrap tools in config to emit execute_tool spans. Tools are sometimes passed directly as
     callable functions as a part of the config object."""
 
-    if not config or not hasattr(config, "tools") or not config.tools:
+    if not config or not getattr(config, "tools", None):
         return config
 
     result = copy.copy(config)
@@ -406,7 +403,7 @@ def _extract_response_text(response):
             continue
 
         for part in candidate.content.parts:
-            if hasattr(part, "text") and part.text:
+            if getattr(part, "text", None):
                 texts.append(part.text)
 
     return texts if texts else None
@@ -420,7 +417,7 @@ def extract_finish_reasons(response):
 
     finish_reasons = []
     for candidate in response.candidates:
-        if hasattr(candidate, "finish_reason") and candidate.finish_reason:
+        if getattr(candidate, "finish_reason", None):
             # Convert enum value to string if necessary
             reason = str(candidate.finish_reason)
             # Remove enum prefix if present (e.g., "FinishReason.STOP" -> "STOP")
@@ -530,11 +527,11 @@ def set_span_data_for_response(span, integration, response):
         )
 
     # Set response ID if available
-    if hasattr(response, "response_id") and response.response_id:
+    if getattr(response, "response_id", None):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_ID, response.response_id)
 
     # Set response model if available
-    if hasattr(response, "model_version") and response.model_version:
+    if getattr(response, "model_version", None):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_version)
 
     # Set token usage if available

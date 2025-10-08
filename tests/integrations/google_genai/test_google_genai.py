@@ -2,12 +2,8 @@ import json
 import pytest
 from unittest import mock
 
-try:
-    from google import genai
-    from google.genai import types as genai_types
-except ImportError:
-    # If google.genai is not installed, skip the tests
-    pytest.skip("google-genai not installed", allow_module_level=True)
+from google import genai
+from google.genai import types as genai_types
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
