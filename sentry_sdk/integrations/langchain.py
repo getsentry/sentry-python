@@ -5,6 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
 from sentry_sdk.ai.utils import (
+    GEN_AI_ALLOWED_MESSAGE_ROLES,
     normalize_message_roles,
     set_data_normalized,
     get_start_span_function,
@@ -213,7 +214,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
-                normalized_messages = normalize_message_roles(prompts)
+                normalized_messages = [
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.USER,
+                        "content": {"type": "text", "text": prompt},
+                    }
+                    for prompt in prompts
+                ]
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
