@@ -59,35 +59,7 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
             content = last_message.get("content", "")
 
             if content and isinstance(content, str):
-                # Binary search to find the optimal content length
-                left, right = 0, len(content)
-                best_length = 0
-
-                while left <= right:
-                    mid = (left + right) // 2
-                    test_message = last_message.copy()
-                    test_message["content"] = content[:mid] + (
-                        "..." if mid < len(content) else ""
-                    )
-
-                    test_serialized = serialize(
-                        [test_message],
-                        is_vars=False,
-                        max_value_length=round(max_bytes * 0.8),
-                    )
-                    test_json = json.dumps(test_serialized, separators=(",", ":"))
-                    test_size = len(test_json.encode("utf-8"))
-
-                    if test_size <= max_bytes:
-                        best_length = mid
-                        left = mid + 1
-                    else:
-                        right = mid - 1
-
-                # Apply the truncation
-                if best_length < len(content):
-                    last_message["content"] = content[:best_length] + "..."
-
+                last_message["content"] = content[: max_bytes * 0.8] + "..."
                 truncated_messages[0] = last_message
 
     return truncated_messages
