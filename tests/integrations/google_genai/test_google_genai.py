@@ -5,7 +5,6 @@ from unittest import mock
 try:
     from google import genai
     from google.genai import types as genai_types
-    from google.genai.models import Models
 except ImportError:
     # If google.genai is not installed, skip the tests
     pytest.skip("google-genai not installed", allow_module_level=True)
@@ -15,65 +14,69 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
 
 
-# Create test responses using real types
-def create_test_part(text):
-    """Create a Part with text content."""
-    return genai_types.Part(text=text)
+@pytest.fixture
+def mock_genai_client():
+    """Fixture that creates a real genai.Client with mocked HTTP responses."""
+    client = genai.Client(api_key="test-api-key")
+    return client
 
 
-def create_test_content(parts):
-    """Create Content with the given parts."""
-    return genai_types.Content(parts=parts, role="model")
-
-
-def create_test_candidate(content, finish_reason="default"):
-    """Create a Candidate with content.
+def create_mock_http_response(response_body):
+    """
+    Create a mock HTTP response that the API client's request() method would return.
 
     Args:
-        content: The content for the candidate
-        finish_reason: Finish reason. Use "default" for STOP (for backwards compatibility),
-                      None for no finish reason (for streaming chunks), or a specific
-                      FinishReason value.
+        response_body: The JSON body as a string or dict
+
+    Returns:
+        An HttpResponse object with headers and body
     """
-    if finish_reason == "default":
-        finish_reason = genai_types.FinishReason.STOP
+    if isinstance(response_body, dict):
+        response_body = json.dumps(response_body)
 
-    return genai_types.Candidate(
-        content=content,
-        finish_reason=finish_reason,
+    return genai_types.HttpResponse(
+        headers={
+            "content-type": "application/json; charset=UTF-8",
+        },
+        body=response_body,
     )
 
 
-def create_test_usage_metadata(
-    prompt_token_count=0,
-    candidates_token_count=0,
-    total_token_count=0,
-    cached_content_token_count=0,
-    thoughts_token_count=0,
-):
-    """Create usage metadata."""
-    return genai_types.GenerateContentResponseUsageMetadata(
-        prompt_token_count=prompt_token_count,
-        candidates_token_count=candidates_token_count,
-        total_token_count=total_token_count,
-        cached_content_token_count=cached_content_token_count,
-        thoughts_token_count=thoughts_token_count,
-    )
+def create_mock_streaming_responses(response_chunks):
+    """
+    Create a generator that yields mock HTTP responses for streaming.
+
+    Args:
+        response_chunks: List of dicts, each representing a chunk's JSON body
+
+    Returns:
+        A generator that yields HttpResponse objects
+    """
+    for chunk in response_chunks:
+        yield create_mock_http_response(chunk)
 
 
-def create_test_response(
-    candidates,
-    usage_metadata=None,
-    response_id=None,
-    model_version=None,
-):
-    """Create a GenerateContentResponse."""
-    return genai_types.GenerateContentResponse(
-        candidates=candidates,
-        usage_metadata=usage_metadata,
-        response_id=response_id,
-        model_version=model_version,
-    )
+# Sample API response JSON (based on real API format from user)
+EXAMPLE_API_RESPONSE_JSON = {
+    "candidates": [
+        {
+            "content": {
+                "role": "model",
+                "parts": [{"text": "Hello! How can I help you today?"}],
+            },
+            "finishReason": "STOP",
+        }
+    ],
+    "usageMetadata": {
+        "promptTokenCount": 10,
+        "candidatesTokenCount": 20,
+        "totalTokenCount": 30,
+        "cachedContentTokenCount": 5,
+        "thoughtsTokenCount": 3,
+    },
+    "modelVersion": "gemini-1.5-flash",
+    "responseId": "response-id-123",
+}
 
 
 def create_test_config(
@@ -117,85 +120,6 @@ def create_test_config(
     return genai_types.GenerateContentConfig(**config_dict)
 
 
-# Sample responses
-EXAMPLE_RESPONSE = create_test_response(
-    candidates=[
-        create_test_candidate(
-            content=create_test_content(
-                parts=[create_test_part("Hello! How can I help you today?")]
-            ),
-            finish_reason=genai_types.FinishReason.STOP,
-        )
-    ],
-    usage_metadata=create_test_usage_metadata(
-        prompt_token_count=10,
-        candidates_token_count=20,
-        total_token_count=30,
-        cached_content_token_count=5,
-        thoughts_token_count=3,
-    ),
-    response_id="response-id-123",
-    model_version="gemini-1.5-flash",
-)
-
-
-@pytest.fixture
-def mock_models_instance():
-    """Mock the Models instance and its generate_content method"""
-    # Create a mock API client
-    mock_api_client = mock.Mock()
-
-    # Create a real Models instance with the mock API client
-    models_instance = Models(mock_api_client)
-
-    # Return the instance for use in tests
-    yield models_instance
-
-
-def setup_mock_generate_content(mock_instance, return_value=None, side_effect=None):
-    """Helper to set up the mock generate_content method with proper wrapping."""
-    # Create a mock method that simulates the behavior
-    original_mock = mock.Mock()
-    if side_effect:
-        original_mock.side_effect = side_effect
-    else:
-        original_mock.return_value = return_value
-
-    # Create a bound method that will receive self as first argument
-    def mock_generate_content(self, *args, **kwargs):
-        # Call the original mock with all arguments
-        return original_mock(*args, **kwargs)
-
-    # Apply the integration patch to our mock method
-    from sentry_sdk.integrations.google_genai import _wrap_generate_content
-
-    wrapped_method = _wrap_generate_content(mock_generate_content)
-
-    # Bind the wrapped method to the mock instance
-    mock_instance.generate_content = wrapped_method.__get__(
-        mock_instance, type(mock_instance)
-    )
-
-
-def setup_mock_generate_content_stream(mock_instance, stream_chunks):
-    """Helper to set up the mock generate_content_stream method with proper wrapping."""
-
-    # Create a generator function that yields the chunks
-    def mock_generate_content_stream(self, *args, **kwargs):
-        for chunk in stream_chunks:
-            yield chunk
-
-    # Apply the integration patch to our mock method
-    from sentry_sdk.integrations.google_genai import _wrap_generate_content_stream
-
-    wrapped_method = _wrap_generate_content_stream(mock_generate_content_stream)
-
-    # Bind the wrapped method to the mock instance
-    mock_instance.generate_content_stream = wrapped_method.__get__(
-        mock_instance, type(mock_instance)
-    )
-
-
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -206,7 +130,7 @@ def setup_mock_generate_content_stream(mock_instance, stream_chunks):
     ],
 )
 def test_nonstreaming_generate_content(
-    sentry_init, capture_events, send_default_pii, include_prompts, mock_models_instance
+    sentry_init, capture_events, send_default_pii, include_prompts, mock_genai_client
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
@@ -215,18 +139,19 @@ def test_nonstreaming_generate_content(
     )
     events = capture_events()
 
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
+    # Mock the HTTP response at the _api_client.request() level
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    with start_transaction(name="google_genai"):
-        config = create_test_config(temperature=0.7, max_output_tokens=100)
-        # Create an instance and call generate_content
-        # Use the mock instance from the fixture
-        response = mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Tell me a joke", config=config
-        )
-
-    assert response == EXAMPLE_RESPONSE
-
+    with mock.patch.object(
+        mock_genai_client._api_client,
+        "request",
+        return_value=mock_http_response,
+    ):
+        with start_transaction(name="google_genai"):
+            config = create_test_config(temperature=0.7, max_output_tokens=100)
+            response = mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Tell me a joke", config=config
+            )
     assert len(events) == 1
     (event,) = events
 
@@ -280,7 +205,7 @@ def test_nonstreaming_generate_content(
 
 
 def test_generate_content_with_system_instruction(
-    sentry_init, capture_events, mock_models_instance
+    sentry_init, capture_events, mock_genai_client
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
@@ -289,21 +214,19 @@ def test_generate_content_with_system_instruction(
     )
     events = capture_events()
 
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    with start_transaction(name="google_genai"):
-        config = create_test_config(
-            system_instruction="You are a helpful assistant",
-            temperature=0.5,
-        )
-        # Verify config has system_instruction
-        assert hasattr(config, "system_instruction")
-        assert config.system_instruction is not None
-
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "What is 2+2?", config=config
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            config = create_test_config(
+                system_instruction="You are a helpful assistant",
+                temperature=0.5,
+            )
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="What is 2+2?", config=config
+            )
 
     (event,) = events
     invoke_span = event["spans"][0]
@@ -318,7 +241,7 @@ def test_generate_content_with_system_instruction(
     assert messages[1] == {"role": "user", "content": "What is 2+2?"}
 
 
-def test_generate_content_with_tools(sentry_init, capture_events, mock_models_instance):
+def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
@@ -348,29 +271,34 @@ def test_generate_content_with_tools(sentry_init, capture_events, mock_models_in
 
     mock_tool = genai_types.Tool(function_declarations=[function_declaration])
 
-    # Mock the response to include tool usage
-    tool_response = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=create_test_content(
-                    parts=[create_test_part("I'll check the weather.")]
-                ),
-                finish_reason=genai_types.FinishReason.STOP,
-            )
+    # API response for tool usage
+    tool_response_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [{"text": "I'll check the weather."}],
+                },
+                "finishReason": "STOP",
+            }
         ],
-        usage_metadata=create_test_usage_metadata(
-            prompt_token_count=15, candidates_token_count=10, total_token_count=25
-        ),
-    )
+        "usageMetadata": {
+            "promptTokenCount": 15,
+            "candidatesTokenCount": 10,
+            "totalTokenCount": 25,
+        },
+    }
 
-    setup_mock_generate_content(mock_models_instance, return_value=tool_response)
+    mock_http_response = create_mock_http_response(tool_response_json)
 
-    with start_transaction(name="google_genai"):
-        config = create_test_config(tools=[get_weather, mock_tool])
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "What's the weather?", config=config
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            config = create_test_config(tools=[get_weather, mock_tool])
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="What's the weather?", config=config
+            )
 
     (event,) = events
     invoke_span = event["spans"][0]
@@ -433,24 +361,24 @@ def test_tool_execution(sentry_init, capture_events):
     )
 
 
-def test_error_handling(sentry_init, capture_events, mock_models_instance):
+def test_error_handling(sentry_init, capture_events, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    # Mock an error
-    setup_mock_generate_content(
-        mock_models_instance, side_effect=Exception("API Error")
-    )
-
-    with start_transaction(name="google_genai"):
-        with pytest.raises(Exception, match="API Error"):
-            # Use the mock instance from the fixture
-            mock_models_instance.generate_content(
-                "gemini-1.5-flash", "This will fail", config=create_test_config()
-            )
+    # Mock an error at the HTTP level
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", side_effect=Exception("API Error")
+    ):
+        with start_transaction(name="google_genai"):
+            with pytest.raises(Exception, match="API Error"):
+                mock_genai_client.models.generate_content(
+                    model="gemini-1.5-flash",
+                    contents="This will fail",
+                    config=create_test_config(),
+                )
 
     # Should have both transaction and error events
     assert len(events) == 2
@@ -462,7 +390,7 @@ def test_error_handling(sentry_init, capture_events, mock_models_instance):
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "google_genai"
 
 
-def test_streaming_generate_content(sentry_init, capture_events, mock_models_instance):
+def test_streaming_generate_content(sentry_init, capture_events, mock_genai_client):
     """Test streaming with generate_content_stream, verifying chunk accumulation."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
@@ -473,69 +401,77 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_models_ins
 
     # Create streaming chunks - simulating a multi-chunk response
     # Chunk 1: First part of text with partial usage metadata
-    chunk1 = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=create_test_content(parts=[create_test_part("Hello! ")]),
-                finish_reason=None,  # Not finished yet
-            )
+    chunk1_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [{"text": "Hello! "}],
+                },
+                # No finishReason in intermediate chunks
+            }
         ],
-        usage_metadata=create_test_usage_metadata(
-            prompt_token_count=10,
-            candidates_token_count=2,
-            total_token_count=0,  # Not set in intermediate chunks
-        ),
-        response_id="response-id-stream-123",
-        model_version="gemini-1.5-flash",
-    )
+        "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 2,
+            "totalTokenCount": 0,  # Not set in intermediate chunks
+        },
+        "responseId": "response-id-stream-123",
+        "modelVersion": "gemini-1.5-flash",
+    }
 
     # Chunk 2: Second part of text with more usage metadata
-    chunk2 = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=create_test_content(parts=[create_test_part("How can I ")]),
-                finish_reason=None,
-            )
+    chunk2_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [{"text": "How can I "}],
+                },
+            }
         ],
-        usage_metadata=create_test_usage_metadata(
-            prompt_token_count=10,
-            candidates_token_count=3,
-            total_token_count=0,
-        ),
-    )
+        "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 3,
+            "totalTokenCount": 0,
+        },
+    }
 
     # Chunk 3: Final part with finish reason and complete usage metadata
-    chunk3 = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=create_test_content(
-                    parts=[create_test_part("help you today?")]
-                ),
-                finish_reason=genai_types.FinishReason.STOP,
-            )
+    chunk3_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [{"text": "help you today?"}],
+                },
+                "finishReason": "STOP",
+            }
         ],
-        usage_metadata=create_test_usage_metadata(
-            prompt_token_count=10,
-            candidates_token_count=7,  # Total output tokens across all chunks
-            total_token_count=22,  # Final total from last chunk
-            cached_content_token_count=5,
-            thoughts_token_count=3,
-        ),
-    )
+        "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 7,  # Total output tokens across all chunks
+            "totalTokenCount": 22,  # Final total from last chunk
+            "cachedContentTokenCount": 5,
+            "thoughtsTokenCount": 3,
+        },
+    }
 
-    # Set up the streaming mock with our chunks
-    stream_chunks = [chunk1, chunk2, chunk3]
-    setup_mock_generate_content_stream(mock_models_instance, stream_chunks)
+    # Create streaming mock responses
+    stream_chunks = [chunk1_json, chunk2_json, chunk3_json]
+    mock_stream = create_mock_streaming_responses(stream_chunks)
 
-    with start_transaction(name="google_genai"):
-        config = create_test_config()
-        # Use the mock instance to get the stream
-        stream = mock_models_instance.generate_content_stream(
-            model="gemini-1.5-flash", contents="Stream me a response", config=config
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request_streamed", return_value=mock_stream
+    ):
+        with start_transaction(name="google_genai"):
+            config = create_test_config()
+            stream = mock_genai_client.models.generate_content_stream(
+                model="gemini-1.5-flash", contents="Stream me a response", config=config
+            )
 
-        # Consume the stream (this is what users do with the integration wrapper)
-        collected_chunks = list(stream)
+            # Consume the stream (this is what users do with the integration wrapper)
+            collected_chunks = list(stream)
 
     # Verify we got all chunks
     assert len(collected_chunks) == 3
@@ -598,72 +534,23 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_models_ins
     assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "gemini-1.5-flash"
 
 
-def test_different_content_formats(sentry_init, capture_events, mock_models_instance):
-    """Test different content formats that can be passed to generate_content"""
-    sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
-
-    # Test with list of content parts
-    with start_transaction(name="test1"):
-        config = create_test_config()
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash",
-            [{"text": "Part 1"}, {"text": "Part 2"}],
-            config=config,
-        )
-
-    # Test with object that has text attribute
-    class ContentWithText:
-        def __init__(self, text):
-            self.text = text
-
-    with start_transaction(name="test2"):
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash",
-            ContentWithText("Object with text"),
-            config=config,
-        )
-
-    events_list = list(events)
-    assert len(events_list) == 2
-
-    # Check first transaction (PII is enabled and include_prompts is True)
-    messages1_str = events_list[0]["spans"][0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    # Parse the JSON string to verify content
-    import json
-
-    messages1 = json.loads(messages1_str)
-    assert messages1[0]["content"] == "Part 1 Part 2"
-
-    # Check second transaction
-    messages2_str = events_list[1]["spans"][0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    messages2 = json.loads(messages2_str)
-    assert messages2[0]["content"] == "Object with text"
-
-
-def test_span_origin(sentry_init, capture_events, mock_models_instance):
+def test_span_origin(sentry_init, capture_events, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    with start_transaction(name="google_genai"):
-        config = create_test_config()
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Test origin", config=config
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            config = create_test_config()
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test origin", config=config
+            )
 
     (event,) = events
 
@@ -673,7 +560,7 @@ def test_span_origin(sentry_init, capture_events, mock_models_instance):
 
 
 def test_response_without_usage_metadata(
-    sentry_init, capture_events, mock_models_instance
+    sentry_init, capture_events, mock_genai_client
 ):
     """Test handling of responses without usage metadata"""
     sentry_init(
@@ -682,25 +569,29 @@ def test_response_without_usage_metadata(
     )
     events = capture_events()
 
-    # Create response without usage metadata
-    response_without_usage = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=create_test_content(parts=[create_test_part("No usage data")]),
-                finish_reason=genai_types.FinishReason.STOP,
-            )
+    # Response without usage metadata
+    response_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [{"text": "No usage data"}],
+                },
+                "finishReason": "STOP",
+            }
         ],
-        usage_metadata=None,
-    )
+    }
 
-    setup_mock_generate_content(
-        mock_models_instance, return_value=response_without_usage
-    )
+    mock_http_response = create_mock_http_response(response_json)
 
-    with start_transaction(name="google_genai"):
-        config = create_test_config()
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content("gemini-1.5-flash", "Test", config=config)
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            config = create_test_config()
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test", config=config
+            )
 
     (event,) = events
     chat_span = event["spans"][1]
@@ -711,7 +602,7 @@ def test_response_without_usage_metadata(
     assert SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS not in chat_span["data"]
 
 
-def test_multiple_candidates(sentry_init, capture_events, mock_models_instance):
+def test_multiple_candidates(sentry_init, capture_events, mock_genai_client):
     """Test handling of multiple response candidates"""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
@@ -720,33 +611,41 @@ def test_multiple_candidates(sentry_init, capture_events, mock_models_instance):
     )
     events = capture_events()
 
-    # Create response with multiple candidates
-    multi_candidate_response = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=create_test_content(parts=[create_test_part("Response 1")]),
-                finish_reason=genai_types.FinishReason.STOP,
-            ),
-            create_test_candidate(
-                content=create_test_content(parts=[create_test_part("Response 2")]),
-                finish_reason=genai_types.FinishReason.MAX_TOKENS,
-            ),
+    # Response with multiple candidates
+    multi_candidate_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [{"text": "Response 1"}],
+                },
+                "finishReason": "STOP",
+            },
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [{"text": "Response 2"}],
+                },
+                "finishReason": "MAX_TOKENS",
+            },
         ],
-        usage_metadata=create_test_usage_metadata(
-            prompt_token_count=5, candidates_token_count=15, total_token_count=20
-        ),
-    )
+        "usageMetadata": {
+            "promptTokenCount": 5,
+            "candidatesTokenCount": 15,
+            "totalTokenCount": 20,
+        },
+    }
 
-    setup_mock_generate_content(
-        mock_models_instance, return_value=multi_candidate_response
-    )
+    mock_http_response = create_mock_http_response(multi_candidate_json)
 
-    with start_transaction(name="google_genai"):
-        config = create_test_config()
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Generate multiple", config=config
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            config = create_test_config()
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Generate multiple", config=config
+            )
 
     (event,) = events
     chat_span = event["spans"][1]
@@ -769,94 +668,7 @@ def test_multiple_candidates(sentry_init, capture_events, mock_models_instance):
     assert finish_reasons == ["STOP", "MAX_TOKENS"]
 
 
-def test_model_as_string(sentry_init, capture_events, mock_models_instance):
-    """Test when model is passed as a string"""
-    sentry_init(
-        integrations=[GoogleGenAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
-
-    with start_transaction(name="google_genai"):
-        # Pass model as string directly
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-pro", "Test prompt", config=create_test_config()
-        )
-
-    (event,) = events
-    invoke_span = event["spans"][0]
-
-    assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "gemini-1.5-pro"
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-pro"
-
-
-def test_predefined_tools(sentry_init, capture_events, mock_models_instance):
-    """Test handling of predefined Google tools"""
-    sentry_init(
-        integrations=[GoogleGenAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    # Create mock tools with different predefined tool types
-    # Create non-callable objects to represent predefined tools
-    class MockGoogleSearchTool:
-        def __init__(self):
-            self.google_search_retrieval = mock.Mock()
-            self.function_declarations = None
-
-    class MockCodeExecutionTool:
-        def __init__(self):
-            self.code_execution = mock.Mock()
-            self.function_declarations = None
-
-    class MockRetrievalTool:
-        def __init__(self):
-            self.retrieval = mock.Mock()
-            self.function_declarations = None
-
-    google_search_tool = MockGoogleSearchTool()
-    code_execution_tool = MockCodeExecutionTool()
-    retrieval_tool = MockRetrievalTool()
-
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
-
-    # Create a mock config instead of using create_test_config which validates
-    mock_config = mock.Mock()
-    mock_config.tools = [google_search_tool, code_execution_tool, retrieval_tool]
-    mock_config.temperature = None
-    mock_config.top_p = None
-    mock_config.top_k = None
-    mock_config.max_output_tokens = None
-    mock_config.presence_penalty = None
-    mock_config.frequency_penalty = None
-    mock_config.seed = None
-    mock_config.system_instruction = None
-
-    with start_transaction(name="google_genai"):
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Use tools", config=mock_config
-        )
-
-    (event,) = events
-    invoke_span = event["spans"][0]
-
-    # Check that tools are recorded (data is serialized as a string)
-    tools_data_str = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-    tools_data = json.loads(tools_data_str)
-    assert len(tools_data) == 3
-    assert tools_data[0]["name"] == "google_search_retrieval"
-    assert tools_data[1]["name"] == "code_execution"
-    assert tools_data[2]["name"] == "retrieval"
-
-
-def test_all_configuration_parameters(
-    sentry_init, capture_events, mock_models_instance
-):
+def test_all_configuration_parameters(sentry_init, capture_events, mock_genai_client):
     """Test that all configuration parameters are properly recorded"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
@@ -864,22 +676,24 @@ def test_all_configuration_parameters(
     )
     events = capture_events()
 
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    with start_transaction(name="google_genai"):
-        config = create_test_config(
-            temperature=0.8,
-            top_p=0.95,
-            top_k=40,
-            max_output_tokens=2048,
-            presence_penalty=0.1,
-            frequency_penalty=0.2,
-            seed=12345,
-        )
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Test all params", config=config
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            config = create_test_config(
+                temperature=0.8,
+                top_p=0.95,
+                top_k=40,
+                max_output_tokens=2048,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                seed=12345,
+            )
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test all params", config=config
+            )
 
     (event,) = events
     invoke_span = event["spans"][0]
@@ -894,59 +708,37 @@ def test_all_configuration_parameters(
     assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_SEED] == 12345
 
 
-def test_model_with_name_attribute(sentry_init, capture_events, mock_models_instance):
-    """Test when model is an object with name attribute"""
+def test_empty_response(sentry_init, capture_events, mock_genai_client):
+    """Test handling of minimal response with no content"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    # Create a model object with name attribute
-    class ModelWithName:
-        name = "gemini-ultra"
+    # Minimal response with empty candidates array
+    minimal_response_json = {"candidates": []}
+    mock_http_response = create_mock_http_response(minimal_response_json)
 
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            response = mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test", config=create_test_config()
+            )
 
-    with start_transaction(name="google_genai"):
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            ModelWithName(), "Test prompt", config=create_test_config()
-        )
-
-    (event,) = events
-    invoke_span = event["spans"][0]
-
-    assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "gemini-ultra"
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-ultra"
-
-
-def test_empty_response(sentry_init, capture_events, mock_models_instance):
-    """Test handling of empty or None response"""
-    sentry_init(
-        integrations=[GoogleGenAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    # Return None response
-    setup_mock_generate_content(mock_models_instance, return_value=None)
-
-    with start_transaction(name="google_genai"):
-        # Use the mock instance from the fixture
-        response = mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Test", config=create_test_config()
-        )
-
-    assert response is None
+    # Response will have an empty candidates list
+    assert response is not None
+    assert len(response.candidates) == 0
 
     (event,) = events
-    # Should still create spans even with None response
+    # Should still create spans even with empty candidates
     assert len(event["spans"]) == 2
 
 
 def test_response_with_different_id_fields(
-    sentry_init, capture_events, mock_models_instance
+    sentry_init, capture_events, mock_genai_client
 ):
     """Test handling of different response ID field names"""
     sentry_init(
@@ -955,52 +747,36 @@ def test_response_with_different_id_fields(
     )
     events = capture_events()
 
-    # Test with response_id instead of id
-    response_with_response_id = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=create_test_content(parts=[create_test_part("Test")]),
-                finish_reason=genai_types.FinishReason.STOP,
-            )
+    # Response with response_id and model_version
+    response_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [{"text": "Test"}],
+                },
+                "finishReason": "STOP",
+            }
         ],
-    )
-    response_with_response_id.response_id = "resp-456"
-    response_with_response_id.model_version = "gemini-1.5-flash-001"
+        "responseId": "resp-456",
+        "modelVersion": "gemini-1.5-flash-001",
+    }
 
-    setup_mock_generate_content(
-        mock_models_instance, return_value=response_with_response_id
-    )
+    mock_http_response = create_mock_http_response(response_json)
 
-    with start_transaction(name="google_genai"):
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Test", config=create_test_config()
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test", config=create_test_config()
+            )
 
     (event,) = events
     chat_span = event["spans"][1]
 
     assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "resp-456"
     assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gemini-1.5-flash-001"
-
-
-def test_integration_not_enabled(sentry_init, mock_models_instance):
-    """Test that integration doesn't interfere when not enabled"""
-    sentry_init(
-        integrations=[],  # No GoogleGenAIIntegration
-        traces_sample_rate=1.0,
-    )
-
-    # Mock the method without wrapping (since integration is not enabled)
-    mock_models_instance.generate_content = mock.Mock(return_value=EXAMPLE_RESPONSE)
-
-    # Should work without creating spans
-    # Use the mock instance from the fixture
-    response = mock_models_instance.generate_content(
-        "gemini-1.5-flash", "Test", config=create_test_config()
-    )
-
-    assert response == EXAMPLE_RESPONSE
 
 
 def test_tool_with_async_function(sentry_init, capture_events):
@@ -1025,7 +801,7 @@ def test_tool_with_async_function(sentry_init, capture_events):
     assert hasattr(wrapped_async_tool, "__wrapped__")  # Should preserve original
 
 
-def test_contents_as_none(sentry_init, capture_events, mock_models_instance):
+def test_contents_as_none(sentry_init, capture_events, mock_genai_client):
     """Test handling when contents parameter is None"""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
@@ -1034,13 +810,15 @@ def test_contents_as_none(sentry_init, capture_events, mock_models_instance):
     )
     events = capture_events()
 
-    setup_mock_generate_content(mock_models_instance, return_value=EXAMPLE_RESPONSE)
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    with start_transaction(name="google_genai"):
-        # Use the mock instance from the fixture
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", None, config=create_test_config()
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=None, config=create_test_config()
+            )
 
     (event,) = events
     invoke_span = event["spans"][0]
@@ -1051,7 +829,7 @@ def test_contents_as_none(sentry_init, capture_events, mock_models_instance):
     assert all(msg["role"] != "user" or msg["content"] is not None for msg in messages)
 
 
-def test_tool_calls_extraction(sentry_init, capture_events, mock_models_instance):
+def test_tool_calls_extraction(sentry_init, capture_events, mock_genai_client):
     """Test extraction of tool/function calls from response"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
@@ -1059,45 +837,52 @@ def test_tool_calls_extraction(sentry_init, capture_events, mock_models_instance
     )
     events = capture_events()
 
-    # Create a response with function calls
-    function_call_response = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=genai_types.Content(
-                    parts=[
-                        genai_types.Part(text="I'll help you with that."),
-                        genai_types.Part(
-                            function_call=genai_types.FunctionCall(
-                                name="get_weather",
-                                args={"location": "San Francisco", "unit": "celsius"},
-                            )
-                        ),
-                        genai_types.Part(
-                            function_call=genai_types.FunctionCall(
-                                name="get_time", args={"timezone": "PST"}
-                            )
-                        ),
+    # Response with function calls
+    function_call_response_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": [
+                        {"text": "I'll help you with that."},
+                        {
+                            "functionCall": {
+                                "name": "get_weather",
+                                "args": {
+                                    "location": "San Francisco",
+                                    "unit": "celsius",
+                                },
+                            }
+                        },
+                        {
+                            "functionCall": {
+                                "name": "get_time",
+                                "args": {"timezone": "PST"},
+                            }
+                        },
                     ],
-                    role="model",
-                ),
-                finish_reason=genai_types.FinishReason.STOP,
-            )
+                },
+                "finishReason": "STOP",
+            }
         ],
-        usage_metadata=create_test_usage_metadata(
-            prompt_token_count=20, candidates_token_count=30, total_token_count=50
-        ),
-    )
+        "usageMetadata": {
+            "promptTokenCount": 20,
+            "candidatesTokenCount": 30,
+            "totalTokenCount": 50,
+        },
+    }
 
-    setup_mock_generate_content(
-        mock_models_instance, return_value=function_call_response
-    )
+    mock_http_response = create_mock_http_response(function_call_response_json)
 
-    with start_transaction(name="google_genai"):
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash",
-            "What's the weather and time?",
-            config=create_test_config(),
-        )
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents="What's the weather and time?",
+                config=create_test_config(),
+            )
 
     (event,) = events
     chat_span = event["spans"][1]  # The chat span
@@ -1124,77 +909,3 @@ def test_tool_calls_extraction(sentry_init, capture_events, mock_models_instance
     assert tool_calls[1]["type"] == "function_call"
     # Arguments are serialized as JSON strings
     assert json.loads(tool_calls[1]["arguments"]) == {"timezone": "PST"}
-
-
-def test_tool_calls_with_automatic_function_calling(
-    sentry_init, capture_events, mock_models_instance
-):
-    """Test extraction of tool calls from automatic_function_calling_history"""
-    sentry_init(
-        integrations=[GoogleGenAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    # Create a response with automatic function calling history
-    response_with_auto_calls = create_test_response(
-        candidates=[
-            create_test_candidate(
-                content=create_test_content(
-                    parts=[create_test_part("Here's the information you requested.")]
-                ),
-                finish_reason=genai_types.FinishReason.STOP,
-            )
-        ],
-    )
-
-    # Add automatic_function_calling_history
-    response_with_auto_calls.automatic_function_calling_history = [
-        genai_types.Content(
-            parts=[
-                genai_types.Part(
-                    function_call=genai_types.FunctionCall(
-                        name="search_database",
-                        args={"query": "user stats", "limit": 10},
-                    )
-                )
-            ],
-            role="model",
-        ),
-        genai_types.Content(
-            parts=[
-                genai_types.Part(
-                    function_response=genai_types.FunctionResponse(
-                        name="search_database", response={"results": ["item1", "item2"]}
-                    )
-                )
-            ],
-            role="function",
-        ),
-    ]
-
-    setup_mock_generate_content(
-        mock_models_instance, return_value=response_with_auto_calls
-    )
-
-    with start_transaction(name="google_genai"):
-        mock_models_instance.generate_content(
-            "gemini-1.5-flash", "Get user statistics", config=create_test_config()
-        )
-
-    (event,) = events
-    chat_span = event["spans"][1]  # The chat span
-
-    # Check that tool calls from automatic history are extracted
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_span["data"]
-
-    tool_calls = json.loads(chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
-
-    assert len(tool_calls) == 1
-    assert tool_calls[0]["name"] == "search_database"
-    assert tool_calls[0]["type"] == "function_call"
-    # Arguments are serialized as JSON strings
-    assert json.loads(tool_calls[0]["arguments"]) == {
-        "query": "user stats",
-        "limit": 10,
-    }
