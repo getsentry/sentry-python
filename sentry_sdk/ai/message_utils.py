@@ -4,17 +4,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
 
-try:
-    from sentry_sdk.serializer import serialize
-except ImportError:
-    # Fallback for cases where sentry_sdk isn't fully importable
-    def serialize(obj, **kwargs):
-        # type: (Any, **Any) -> Any
-        return obj
+from sentry_sdk.serializer import serialize
+from sentry_sdk._types import AnnotatedValue
 
-
-# Custom limit for gen_ai message serialization - 50% of MAX_EVENT_BYTES
-# to leave room for other event data while still being generous for messages
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 
 
@@ -50,21 +42,26 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
 
 
 def serialize_gen_ai_messages(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
-    # type: (Optional[List[Dict[str, Any]]], int) -> Optional[str]
+    # type: (Optional[Any], int) -> Optional[str]
     """
     Serialize and truncate gen_ai messages for storage in spans.
 
     This function handles the complete workflow of:
-    1. Truncating messages to fit within size limits
-    2. Serializing them using Sentry's serializer
+    1. Truncating messages to fit within size limits (if not already done)
+    2. Serializing them using Sentry's serializer (which processes AnnotatedValue for _meta)
     3. Converting to JSON string for storage
 
-    :param messages: List of message objects or None
+    :param messages: List of message objects, AnnotatedValue, or None
     :param max_bytes: Maximum allowed size in bytes for the serialized messages
     :returns: JSON string of serialized messages or None if input was None/empty
     """
     if not messages:
         return None
+
+    if isinstance(messages, AnnotatedValue):
+        serialized_messages = serialize(messages, is_vars=False)
+        return json.dumps(serialized_messages, separators=(",", ":"))
+
     truncated_messages = truncate_messages_by_size(messages, max_bytes)
     if not truncated_messages:
         return None
@@ -96,44 +93,31 @@ def get_messages_metadata(original_messages, truncated_messages):
 
 
 def truncate_and_serialize_messages(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
-    # type: (Optional[List[Dict[str, Any]]], int) -> Dict[str, Any]
+    # type: (Optional[List[Dict[str, Any]]], int) -> Any
     """
-    One-stop function for gen_ai integrations to truncate and serialize messages.
+    Truncate messages and return AnnotatedValue for automatic _meta creation.
 
-    This is the main function that gen_ai integrations should use. It handles the
-    complete workflow and returns both the serialized data and metadata.
-
-    Example usage:
-        from sentry_sdk.ai.message_utils import truncate_and_serialize_messages
-
-        result = truncate_and_serialize_messages(messages)
-        if result['serialized_data']:
-            span.set_data('gen_ai.request.messages', result['serialized_data'])
-        if result['metadata']['was_truncated']:
-            # Log warning about truncation if desired
-            pass
+    This function handles truncation and returns the truncated messages wrapped in an
+    AnnotatedValue (when truncation occurs) so that Sentry's serializer can automatically
+    create the appropriate _meta structure.
 
     :param messages: List of message objects or None
     :param max_bytes: Maximum allowed size in bytes for the serialized messages
-    :returns: Dictionary containing 'serialized_data', 'metadata', and 'original_size'
+    :returns: List of messages, AnnotatedValue (if truncated), or None
     """
     if not messages:
-        return {
-            "serialized_data": None,
-            "metadata": get_messages_metadata([], []),
-            "original_size": 0,
-        }
-
-    original_serialized = serialize(messages, is_vars=False)
-    original_json = json.dumps(original_serialized, separators=(",", ":"))
-    original_size = len(original_json.encode("utf-8"))
+        return None
 
     truncated_messages = truncate_messages_by_size(messages, max_bytes)
-    serialized_data = serialize_gen_ai_messages(truncated_messages, max_bytes)
-    metadata = get_messages_metadata(messages, truncated_messages)
+    if not truncated_messages:
+        return None
 
-    return {
-        "serialized_data": serialized_data,
-        "metadata": metadata,
-        "original_size": original_size,
-    }
+    original_count = len(messages)
+    truncated_count = len(truncated_messages)
+
+    if original_count != truncated_count:
+        return AnnotatedValue(
+            value=serialize_gen_ai_messages(truncated_messages),
+            metadata={"len": original_count},
+        )
+    return truncated_messages

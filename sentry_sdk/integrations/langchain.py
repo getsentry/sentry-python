@@ -223,11 +223,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     }
                     for prompt in prompts
                 ]
-                result = truncate_and_serialize_messages(prompts)
-                if result["serialized_data"]:
-                    span.set_data(
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES, result["serialized_data"]
-                    )
+                messages_data = truncate_and_serialize_messages(normalized_messages)
+                if messages_data is not None:
+                    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
@@ -279,11 +277,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                             self._normalize_langchain_message(message)
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
-                result = truncate_and_serialize_messages(normalized_messages)
-                if result["serialized_data"]:
-                    span.set_data(
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES, result["serialized_data"]
-                    )
+                messages_data = truncate_and_serialize_messages(normalized_messages)
+                if messages_data is not None:
+                    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
     def on_chat_model_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
@@ -757,11 +753,9 @@ def _wrap_agent_executor_invoke(f):
                 and integration.include_prompts
             ):
                 normalized_messages = normalize_message_roles([input])
-                result = truncate_and_serialize_messages(normalized_messages)
-                if result["serialized_data"]:
-                    span.set_data(
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES, result["serialized_data"]
-                    )
+                messages_data = truncate_and_serialize_messages(normalized_messages)
+                if messages_data is not None:
+                    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
             output = result.get("output")
             if (
@@ -811,11 +805,9 @@ def _wrap_agent_executor_stream(f):
             and integration.include_prompts
         ):
             normalized_messages = normalize_message_roles([input])
-            result = truncate_and_serialize_messages(normalized_messages)
-            if result["serialized_data"]:
-                span.set_data(
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES, result["serialized_data"]
-                )
+            messages_data = truncate_and_serialize_messages(normalized_messages)
+            if messages_data is not None:
+                span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
         # Run the agent
         result = f(self, *args, **kwargs)

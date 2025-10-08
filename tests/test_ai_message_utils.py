@@ -8,6 +8,8 @@ from sentry_sdk.ai.message_utils import (
     get_messages_metadata,
     truncate_and_serialize_messages,
 )
+from sentry_sdk._types import AnnotatedValue
+from sentry_sdk.serializer import serialize
 
 
 @pytest.fixture
@@ -407,3 +409,86 @@ class TestEdgeCases:
                 assert (
                     "Message 9" in last_kept_content or "Message 8" in last_kept_content
                 )
+
+
+class TestMetaSupport:
+    """Test that _meta entries are created correctly when truncation occurs"""
+
+    def test_annotated_value_returned_on_truncation(self, large_messages):
+        """Test that truncate_and_serialize_messages returns AnnotatedValue when truncation occurs"""
+        # Force truncation with a limit that will keep at least one message
+        # Each large message is ~30KB, so 50KB should keep 1-2 messages but force truncation
+        small_limit = 50_000  # 50KB to force truncation but keep some messages
+        result = truncate_and_serialize_messages(large_messages, max_bytes=small_limit)
+
+        # Should return an AnnotatedValue when truncation occurs
+        assert isinstance(result, AnnotatedValue)
+        assert result.metadata == {"len": len(large_messages)}
+
+        # The value should be the truncated messages
+        assert isinstance(result.value, list)
+        assert len(result.value) < len(large_messages)
+
+    def test_no_annotated_value_when_no_truncation(self, sample_messages):
+        """Test that truncate_and_serialize_messages returns plain list when no truncation occurs"""
+        result = truncate_and_serialize_messages(sample_messages)
+
+        # Should return plain list when no truncation occurs
+        assert not isinstance(result, AnnotatedValue)
+        assert isinstance(result, list)
+        assert len(result) == len(sample_messages)
+        assert result == sample_messages
+
+    def test_meta_structure_in_serialized_output(self, large_messages):
+        """Test that _meta structure is created correctly in serialized output"""
+        # Force truncation with a limit that will keep at least one message
+        small_limit = 50_000  # 50KB to force truncation but keep some messages
+        annotated_messages = truncate_and_serialize_messages(
+            large_messages, max_bytes=small_limit
+        )
+
+        # Simulate how the serializer would process this (like it does in actual span data)
+        test_data = {"gen_ai": {"request": {"messages": annotated_messages}}}
+
+        # Serialize using Sentry's serializer (which processes AnnotatedValue)
+        serialized = serialize(test_data, is_vars=False)
+
+        # Check that _meta structure was created
+        assert "_meta" in serialized
+        assert "gen_ai" in serialized["_meta"]
+        assert "request" in serialized["_meta"]["gen_ai"]
+        assert "messages" in serialized["_meta"]["gen_ai"]["request"]
+        assert serialized["_meta"]["gen_ai"]["request"]["messages"][""] == {
+            "len": len(large_messages)
+        }
+
+        # Check that the actual data is still there
+        assert "gen_ai" in serialized
+        assert "request" in serialized["gen_ai"]
+        assert "messages" in serialized["gen_ai"]["request"]
+        assert isinstance(serialized["gen_ai"]["request"]["messages"], list)
+        assert len(serialized["gen_ai"]["request"]["messages"]) < len(large_messages)
+
+    def test_serialize_gen_ai_messages_handles_annotated_value(self, large_messages):
+        """Test that serialize_gen_ai_messages handles AnnotatedValue input correctly"""
+        # Create an AnnotatedValue manually
+        truncated = large_messages[:2]  # Keep only first 2 messages
+        annotated = AnnotatedValue(
+            value=truncated, metadata={"len": len(large_messages)}
+        )
+
+        # serialize_gen_ai_messages should handle it
+        result = serialize_gen_ai_messages(annotated)
+
+        assert result is not None
+        parsed = json.loads(result)
+        assert isinstance(parsed, list)
+        assert len(parsed) == 2  # Only 2 messages kept
+
+    def test_empty_messages_no_annotated_value(self):
+        """Test that empty messages don't create AnnotatedValue"""
+        result = truncate_and_serialize_messages([])
+        assert result is None
+
+        result = truncate_and_serialize_messages(None)
+        assert result is None

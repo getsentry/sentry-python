@@ -182,11 +182,9 @@ def _wrap_pregel_invoke(f):
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
-                    result = truncate_and_serialize_messages(normalized_input_messages)
-                    if result["serialized_data"]:
-                        span.set_data(
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES, result["serialized_data"]
-                        )
+                    messages_data = truncate_and_serialize_messages(normalized_input_messages)
+                    if messages_data is not None:
+                        span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
             result = f(self, *args, **kwargs)
 
@@ -232,11 +230,9 @@ def _wrap_pregel_ainvoke(f):
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
-                    result = truncate_and_serialize_messages(normalized_input_messages)
-                    if result["serialized_data"]:
-                        span.set_data(
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES, result["serialized_data"]
-                        )
+                    messages_data = truncate_and_serialize_messages(normalized_input_messages)
+                    if messages_data is not None:
+                        span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
             result = await f(self, *args, **kwargs)
 
