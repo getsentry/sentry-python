@@ -561,3 +561,19 @@ def set_span_data_for_response(span, integration, response):
     # Set total token count if available
     if usage_data["total_tokens"]:
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"])
+
+
+def prepare_generate_content_args(args, kwargs):
+    # type: (tuple[Any, ...], dict[str, Any]) -> tuple[Any, Any, str]
+    """Extract and prepare common arguments for generate_content methods."""
+    model = args[0] if args else kwargs.get("model", "unknown")
+    contents = args[1] if len(args) > 1 else kwargs.get("contents")
+    model_name = get_model_name(model)
+
+    # Wrap config with tools
+    config = kwargs.get("config")
+    wrapped_config = wrapped_config_with_tools(config)
+    if wrapped_config is not config:
+        kwargs["config"] = wrapped_config
+
+    return model, contents, model_name

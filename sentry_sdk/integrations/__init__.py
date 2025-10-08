@@ -91,7 +91,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.flask.FlaskIntegration",
     "sentry_sdk.integrations.gql.GQLIntegration",
     "sentry_sdk.integrations.graphene.GrapheneIntegration",
-    "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration",
     "sentry_sdk.integrations.httpx.HttpxIntegration",
     "sentry_sdk.integrations.huey.HueyIntegration",
     "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration",

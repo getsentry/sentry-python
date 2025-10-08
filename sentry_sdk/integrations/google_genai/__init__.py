@@ -24,11 +24,11 @@ from .utils import (
     set_span_data_for_request,
     set_span_data_for_response,
     capture_exception,
+    prepare_generate_content_args,
 )
 from .streaming import (
     set_span_data_for_streaming_response,
     accumulate_streaming_response,
-    prepare_generate_content_args,
 )
 
 

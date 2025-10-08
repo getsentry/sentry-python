@@ -24,22 +24,6 @@ if TYPE_CHECKING:
     from google.genai.types import GenerateContentResponse
 
 
-def prepare_generate_content_args(args, kwargs):
-    # type: (tuple[Any, ...], dict[str, Any]) -> tuple[Any, Any, str]
-    """Extract and prepare common arguments for generate_content methods."""
-    model = args[0] if args else kwargs.get("model", "unknown")
-    contents = args[1] if len(args) > 1 else kwargs.get("contents")
-    model_name = get_model_name(model)
-
-    # Wrap config with tools
-    config = kwargs.get("config")
-    wrapped_config = wrapped_config_with_tools(config)
-    if wrapped_config is not config:
-        kwargs["config"] = wrapped_config
-
-    return model, contents, model_name
-
-
 def accumulate_streaming_response(chunks):
     # type: (List[GenerateContentResponse]) -> dict[str, Any]
     """Accumulate streaming chunks into a single response-like object."""
