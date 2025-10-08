@@ -14,10 +14,13 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
     # type: (List[Dict[str, Any]], int) -> List[Dict[str, Any]]
     """
     Truncate messages by removing the oldest ones until the serialized size is within limits.
+    If the last message is still too large, truncate its content instead of removing it entirely.
 
     This function prioritizes keeping the most recent messages while ensuring the total
     serialized size stays under the specified byte limit. It uses the Sentry serializer
     to get accurate size estimates that match what will actually be sent.
+
+    Always preserves at least one message, even if content needs to be truncated.
 
     :param messages: List of message objects (typically with 'role' and 'content' keys)
     :param max_bytes: Maximum allowed size in bytes for the serialized messages
@@ -28,15 +31,64 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
 
     truncated_messages = list(messages)
 
-    while truncated_messages:
-        serialized = serialize(truncated_messages, is_vars=False)
+    # First, remove older messages until we're under the limit or have only one message left
+    while len(truncated_messages) > 1:
+        serialized = serialize(
+            truncated_messages, is_vars=False, max_value_length=round(max_bytes * 0.8)
+        )
         serialized_json = json.dumps(serialized, separators=(",", ":"))
         current_size = len(serialized_json.encode("utf-8"))
 
         if current_size <= max_bytes:
             break
 
-        truncated_messages.pop(0)
+        truncated_messages.pop(0)  # Remove oldest message
+
+    # If we still have one message but it's too large, truncate its content
+    # This ensures we always preserve at least one message
+    if len(truncated_messages) == 1:
+        serialized = serialize(
+            truncated_messages, is_vars=False, max_value_length=round(max_bytes * 0.8)
+        )
+        serialized_json = json.dumps(serialized, separators=(",", ":"))
+        current_size = len(serialized_json.encode("utf-8"))
+
+        if current_size > max_bytes:
+            # Truncate the content of the last message
+            last_message = truncated_messages[0].copy()
+            content = last_message.get("content", "")
+
+            if content and isinstance(content, str):
+                # Binary search to find the optimal content length
+                left, right = 0, len(content)
+                best_length = 0
+
+                while left <= right:
+                    mid = (left + right) // 2
+                    test_message = last_message.copy()
+                    test_message["content"] = content[:mid] + (
+                        "..." if mid < len(content) else ""
+                    )
+
+                    test_serialized = serialize(
+                        [test_message],
+                        is_vars=False,
+                        max_value_length=round(max_bytes * 0.8),
+                    )
+                    test_json = json.dumps(test_serialized, separators=(",", ":"))
+                    test_size = len(test_json.encode("utf-8"))
+
+                    if test_size <= max_bytes:
+                        best_length = mid
+                        left = mid + 1
+                    else:
+                        right = mid - 1
+
+                # Apply the truncation
+                if best_length < len(content):
+                    last_message["content"] = content[:best_length] + "..."
+
+                truncated_messages[0] = last_message
 
     return truncated_messages
 
@@ -59,51 +111,33 @@ def serialize_gen_ai_messages(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
         return None
 
     if isinstance(messages, AnnotatedValue):
-        serialized_messages = serialize(messages, is_vars=False)
+        serialized_messages = serialize(
+            messages, is_vars=False, max_value_length=round(max_bytes * 0.8)
+        )
         return json.dumps(serialized_messages, separators=(",", ":"))
 
     truncated_messages = truncate_messages_by_size(messages, max_bytes)
     if not truncated_messages:
         return None
-    serialized_messages = serialize(truncated_messages, is_vars=False)
+    serialized_messages = serialize(
+        truncated_messages, is_vars=False, max_value_length=round(max_bytes * 0.8)
+    )
 
     return json.dumps(serialized_messages, separators=(",", ":"))
-
-
-def get_messages_metadata(original_messages, truncated_messages):
-    # type: (List[Dict[str, Any]], List[Dict[str, Any]]) -> Dict[str, Any]
-    """
-    Generate metadata about message truncation for debugging/monitoring.
-
-    :param original_messages: The original list of messages
-    :param truncated_messages: The truncated list of messages
-    :returns: Dictionary with metadata about the truncation
-    """
-    original_count = len(original_messages) if original_messages else 0
-    truncated_count = len(truncated_messages) if truncated_messages else 0
-
-    metadata = {
-        "original_count": original_count,
-        "truncated_count": truncated_count,
-        "messages_removed": original_count - truncated_count,
-        "was_truncated": original_count != truncated_count,
-    }
-
-    return metadata
 
 
 def truncate_and_serialize_messages(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
     # type: (Optional[List[Dict[str, Any]]], int) -> Any
     """
-    Truncate messages and return AnnotatedValue for automatic _meta creation.
+    Truncate messages and return serialized string or AnnotatedValue for automatic _meta creation.
 
-    This function handles truncation and returns the truncated messages wrapped in an
-    AnnotatedValue (when truncation occurs) so that Sentry's serializer can automatically
-    create the appropriate _meta structure.
+    This function handles truncation and always returns serialized JSON strings. When truncation
+    occurs, it wraps the serialized string in an AnnotatedValue so that Sentry's serializer can
+    automatically create the appropriate _meta structure.
 
     :param messages: List of message objects or None
     :param max_bytes: Maximum allowed size in bytes for the serialized messages
-    :returns: List of messages, AnnotatedValue (if truncated), or None
+    :returns: JSON string, AnnotatedValue containing JSON string (if truncated), or None
     """
     if not messages:
         return None
@@ -112,12 +146,20 @@ def truncate_and_serialize_messages(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
     if not truncated_messages:
         return None
 
+    # Always serialize to JSON string
+    serialized_json = serialize_gen_ai_messages(truncated_messages, max_bytes)
+    if not serialized_json:
+        return None
+
     original_count = len(messages)
     truncated_count = len(truncated_messages)
 
+    # If truncation occurred, wrap the serialized string in AnnotatedValue for _meta
     if original_count != truncated_count:
         return AnnotatedValue(
-            value=serialize_gen_ai_messages(truncated_messages),
+            value=serialized_json,
             metadata={"len": original_count},
         )
-    return truncated_messages
+
+    # No truncation, return plain serialized string
+    return serialized_json

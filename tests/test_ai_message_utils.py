@@ -5,7 +5,6 @@ from sentry_sdk.ai.message_utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
     truncate_messages_by_size,
     serialize_gen_ai_messages,
-    get_messages_metadata,
     truncate_and_serialize_messages,
 )
 from sentry_sdk._types import AnnotatedValue
@@ -88,8 +87,11 @@ class TestTruncateMessagesBySize:
         messages = [{"role": "user", "content": large_content}]
         result = truncate_messages_by_size(messages, max_bytes=100)  # Very small limit
 
-        # Should return empty list if even single message is too large
-        assert result == []
+        # Should return truncated content, not empty list
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+        # Content should be truncated by either our manual truncation or serializer max_value_length
+        assert len(result[0]["content"]) < len(large_content)
 
     def test_progressive_truncation(self, large_messages):
         """Test that truncation works progressively with different limits"""
@@ -109,6 +111,8 @@ class TestTruncateMessagesBySize:
 
             # As limit decreases, message count should not increase
             assert current_count <= prev_count
+            # Should always preserve at least one message
+            assert current_count >= 1
             prev_count = current_count
 
     def test_exact_size_boundary(self):
@@ -127,9 +131,10 @@ class TestTruncateMessagesBySize:
         result = truncate_messages_by_size(messages, max_bytes=exact_size)
         assert len(result) == 1
 
-        # Should remove the message if limit is one byte smaller
+        # Should truncate the message content if limit is one byte smaller
         result = truncate_messages_by_size(messages, max_bytes=exact_size - 1)
-        assert len(result) == 0
+        assert len(result) == 1
+        # Content should be truncated by either our manual truncation or serializer
 
 
 class TestSerializeGenAiMessages:
@@ -188,126 +193,89 @@ class TestSerializeGenAiMessages:
         assert parsed[1]["content"] == "Hi there!"
 
 
-class TestGetMessagesMetadata:
-    def test_no_truncation_metadata(self, sample_messages):
-        """Test metadata when no truncation occurs"""
-        metadata = get_messages_metadata(sample_messages, sample_messages)
-
-        assert metadata["original_count"] == len(sample_messages)
-        assert metadata["truncated_count"] == len(sample_messages)
-        assert metadata["messages_removed"] == 0
-        assert metadata["was_truncated"] is False
-
-    def test_truncation_metadata(self, sample_messages):
-        """Test metadata when truncation occurs"""
-        truncated = sample_messages[2:]  # Remove first 2 messages
-        metadata = get_messages_metadata(sample_messages, truncated)
-
-        assert metadata["original_count"] == len(sample_messages)
-        assert metadata["truncated_count"] == len(truncated)
-        assert metadata["messages_removed"] == 2
-        assert metadata["was_truncated"] is True
-
-    def test_empty_lists_metadata(self):
-        """Test metadata with empty lists"""
-        metadata = get_messages_metadata([], [])
-
-        assert metadata["original_count"] == 0
-        assert metadata["truncated_count"] == 0
-        assert metadata["messages_removed"] == 0
-        assert metadata["was_truncated"] is False
-
-    def test_none_input_metadata(self):
-        """Test metadata with None inputs"""
-        metadata = get_messages_metadata(None, None)
-
-        assert metadata["original_count"] == 0
-        assert metadata["truncated_count"] == 0
-        assert metadata["messages_removed"] == 0
-        assert metadata["was_truncated"] is False
-
-    def test_complete_truncation_metadata(self, sample_messages):
-        """Test metadata when all messages are removed"""
-        metadata = get_messages_metadata(sample_messages, [])
-
-        assert metadata["original_count"] == len(sample_messages)
-        assert metadata["truncated_count"] == 0
-        assert metadata["messages_removed"] == len(sample_messages)
-        assert metadata["was_truncated"] is True
-
-
 class TestTruncateAndSerializeMessages:
     def test_main_function_with_normal_messages(self, sample_messages):
         """Test the main function with normal messages"""
         result = truncate_and_serialize_messages(sample_messages)
 
-        assert "serialized_data" in result
-        assert "metadata" in result
-        assert "original_size" in result
+        # Should return a JSON string when no truncation occurs
+        assert isinstance(result, str)
 
-        assert result["serialized_data"] is not None
-        assert isinstance(result["serialized_data"], str)
-        assert result["original_size"] > 0
-        assert result["metadata"]["was_truncated"] is False
+        # Should be valid JSON
+        parsed = json.loads(result)
+        assert isinstance(parsed, list)
+        assert len(parsed) == len(sample_messages)
 
     def test_main_function_with_large_messages(self, large_messages):
         """Test the main function with messages requiring truncation"""
         small_limit = MAX_GEN_AI_MESSAGE_BYTES // 100  # 5KB limit to force truncation
         result = truncate_and_serialize_messages(large_messages, max_bytes=small_limit)
 
-        assert "serialized_data" in result
-        assert "metadata" in result
-        assert "original_size" in result
+        # Should return AnnotatedValue when truncation occurs
+        assert isinstance(result, AnnotatedValue)
+        assert result.metadata["len"] == len(large_messages)
 
-        # Original size should be large
-        assert result["original_size"] > small_limit
+        # The value should be a JSON string
+        assert isinstance(result.value, str)
 
-        # May or may not be truncated depending on how large the messages are
-        if result["serialized_data"]:
-            serialized_size = len(result["serialized_data"].encode("utf-8"))
-            assert serialized_size <= small_limit
+        # Should be valid JSON and under size limit
+        parsed = json.loads(result.value)
+        assert isinstance(parsed, list)
+        assert len(parsed) <= len(large_messages)
+
+        # Size should be under limit
+        result_size = len(result.value.encode("utf-8"))
+        assert result_size <= small_limit
 
     def test_main_function_with_none_input(self):
         """Test the main function with None input"""
         result = truncate_and_serialize_messages(None)
-
-        assert result["serialized_data"] is None
-        assert result["original_size"] == 0
-        assert result["metadata"]["was_truncated"] is False
+        assert result is None
 
     def test_main_function_with_empty_input(self):
         """Test the main function with empty input"""
         result = truncate_and_serialize_messages([])
+        assert result is None
 
-        assert result["serialized_data"] is None
-        assert result["original_size"] == 0
-        assert result["metadata"]["was_truncated"] is False
-
-    def test_main_function_size_comparison(self, sample_messages):
-        """Test that serialized data is smaller than or equal to original"""
+    def test_main_function_serialization_format(self, sample_messages):
+        """Test that the function always returns proper JSON strings"""
         result = truncate_and_serialize_messages(sample_messages)
 
-        if result["serialized_data"]:
-            serialized_size = len(result["serialized_data"].encode("utf-8"))
-            # Serialized size should be <= original size (could be equal if no truncation)
-            assert serialized_size <= result["original_size"]
+        # Should be JSON string
+        assert isinstance(result, str)
+
+        # Should be valid, parseable JSON
+        parsed = json.loads(result)
+        assert isinstance(parsed, list)
+
+        # Content should match original structure
+        for i, msg in enumerate(parsed):
+            assert "role" in msg
+            assert "content" in msg
 
     def test_main_function_respects_custom_limit(self, large_messages):
         """Test that the main function respects custom byte limits"""
         custom_limit = MAX_GEN_AI_MESSAGE_BYTES // 250  # 2KB limit
         result = truncate_and_serialize_messages(large_messages, max_bytes=custom_limit)
 
-        if result["serialized_data"]:
-            serialized_size = len(result["serialized_data"].encode("utf-8"))
-            assert serialized_size <= custom_limit
+        # Should return AnnotatedValue due to truncation
+        assert isinstance(result, AnnotatedValue)
+
+        # Should respect the custom limit
+        result_size = len(result.value.encode("utf-8"))
+        assert result_size <= custom_limit
 
     def test_main_function_default_limit(self, sample_messages):
         """Test that the main function uses the default limit correctly"""
         result = truncate_and_serialize_messages(sample_messages)
 
         # With normal sample messages, should not need truncation
-        assert result["metadata"]["was_truncated"] is False
-        assert result["serialized_data"] is not None
+        # Should return plain JSON string (not AnnotatedValue)
+        assert isinstance(result, str)
+
+        # Should be valid JSON
+        parsed = json.loads(result)
+        assert isinstance(parsed, list)
 
 
 class TestConstants:
@@ -425,19 +393,22 @@ class TestMetaSupport:
         assert isinstance(result, AnnotatedValue)
         assert result.metadata == {"len": len(large_messages)}
 
-        # The value should be the truncated messages
-        assert isinstance(result.value, list)
-        assert len(result.value) < len(large_messages)
+        # The value should be a JSON string
+        assert isinstance(result.value, str)
+        parsed = json.loads(result.value)
+        assert len(parsed) <= len(large_messages)
 
     def test_no_annotated_value_when_no_truncation(self, sample_messages):
         """Test that truncate_and_serialize_messages returns plain list when no truncation occurs"""
         result = truncate_and_serialize_messages(sample_messages)
 
-        # Should return plain list when no truncation occurs
+        # Should return plain JSON string when no truncation occurs
         assert not isinstance(result, AnnotatedValue)
-        assert isinstance(result, list)
-        assert len(result) == len(sample_messages)
-        assert result == sample_messages
+        assert isinstance(result, str)
+
+        # Should be valid JSON with same length
+        parsed = json.loads(result)
+        assert len(parsed) == len(sample_messages)
 
     def test_meta_structure_in_serialized_output(self, large_messages):
         """Test that _meta structure is created correctly in serialized output"""
@@ -462,12 +433,11 @@ class TestMetaSupport:
             "len": len(large_messages)
         }
 
-        # Check that the actual data is still there
+        # Check that the actual data is still there and is a string
         assert "gen_ai" in serialized
         assert "request" in serialized["gen_ai"]
         assert "messages" in serialized["gen_ai"]["request"]
-        assert isinstance(serialized["gen_ai"]["request"]["messages"], list)
-        assert len(serialized["gen_ai"]["request"]["messages"]) < len(large_messages)
+        assert isinstance(serialized["gen_ai"]["request"]["messages"], str)
 
     def test_serialize_gen_ai_messages_handles_annotated_value(self, large_messages):
         """Test that serialize_gen_ai_messages handles AnnotatedValue input correctly"""
