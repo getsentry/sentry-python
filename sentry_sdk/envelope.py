@@ -285,6 +285,8 @@ class Item:
             return "error"
         elif ty == "log":
             return "log_item"
+        elif ty == "trace_metric":
+            return "trace_metric"
         elif ty == "client_report":
             return "internal"
         elif ty == "profile":

@@ -25,6 +25,7 @@ from sentry_sdk.utils import (
     logger,
     get_before_send_log,
     has_logs_enabled,
+    has_trace_metrics_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -184,6 +185,7 @@ class BaseClient:
         self.monitor = None  # type: Optional[Monitor]
         self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
         self.log_batcher = None  # type: Optional[LogBatcher]
+        self.trace_metrics_batcher = None  # type: Optional[TraceMetricsBatcher]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -217,6 +219,10 @@ class BaseClient:
 
     def _capture_experimental_log(self, log):
         # type: (Log) -> None
+        pass
+
+    def _capture_trace_metric(self, metric):
+        # type: (TraceMetric) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -387,6 +393,13 @@ class _Client(BaseClient):
                 from sentry_sdk._log_batcher import LogBatcher
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
+
+            self.trace_metrics_batcher = None
+
+            if has_trace_metrics_enabled(self.options):
+                from sentry_sdk._trace_metrics_batcher import TraceMetricsBatcher
+
+                self.trace_metrics_batcher = TraceMetricsBatcher(capture_func=_capture_envelope)
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -967,6 +980,56 @@ class _Client(BaseClient):
         if self.log_batcher:
             self.log_batcher.add(log)
 
+    def _capture_trace_metric(self, metric):
+        # type: (Optional[TraceMetric]) -> None
+        if not has_trace_metrics_enabled(self.options) or metric is None:
+            return
+
+        current_scope = sentry_sdk.get_current_scope()
+        isolation_scope = sentry_sdk.get_isolation_scope()
+
+        metric["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
+        metric["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
+
+        environment = self.options.get("environment")
+        if environment is not None and "sentry.environment" not in metric["attributes"]:
+            metric["attributes"]["sentry.environment"] = environment
+
+        release = self.options.get("release")
+        if release is not None and "sentry.release" not in metric["attributes"]:
+            metric["attributes"]["sentry.release"] = release
+
+        if isolation_scope._user is not None:
+            for metric_attribute, user_attribute in (
+                ("user.id", "id"),
+                ("user.name", "username"),
+                ("user.email", "email"),
+            ):
+                if (
+                    user_attribute in isolation_scope._user
+                    and metric_attribute not in metric["attributes"]
+                ):
+                    metric["attributes"][metric_attribute] = isolation_scope._user[
+                        user_attribute
+                    ]
+
+        debug = self.options.get("debug", False)
+        if debug:
+            logger.debug(
+                f"[Sentry Trace Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
+            )
+
+        from sentry_sdk.utils import get_before_send_trace_metric
+        before_send_trace_metric = get_before_send_trace_metric(self.options)
+        if before_send_trace_metric is not None:
+            metric = before_send_trace_metric(metric, {})
+
+        if metric is None:
+            return
+
+        if self.trace_metrics_batcher:
+            self.trace_metrics_batcher.add(metric)
+
     def capture_session(
         self,
         session,  # type: Session
@@ -1023,6 +1086,8 @@ class _Client(BaseClient):
                 self.metrics_aggregator.kill()
             if self.log_batcher is not None:
                 self.log_batcher.kill()
+            if self.trace_metrics_batcher is not None:
+                self.trace_metrics_batcher.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -1049,6 +1114,8 @@ class _Client(BaseClient):
                 self.metrics_aggregator.flush()
             if self.log_batcher is not None:
                 self.log_batcher.flush()
+            if self.trace_metrics_batcher is not None:
+                self.trace_metrics_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
