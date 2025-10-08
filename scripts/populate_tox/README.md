@@ -14,7 +14,7 @@ combination of hardcoded and generated entries.
 
 The `populate_tox.py` script fills out the auto-generated part of that template.
 It does this by querying PyPI for each framework's package and its metadata and
-then determining which versions make sense to test to get good coverage.
+then determining which versions it makes sense to test to get good coverage.
 
 By default, the lowest supported and latest version of a framework are always
 tested, with a number of releases in between:
@@ -22,17 +22,16 @@ tested, with a number of releases in between:
 - If the package doesn't have multiple majors, we pick two versions in between
   lowest and highest.
 
-#### Caveats
+Each test suite requires at least some configuration to be added to
+`TEST_SUITE_CONFIG` in `scripts/populate_tox/config.py`. If you're adding a new
+integration, check out the [Add a new test suite](#add-a-new-test-suite) section.
 
-- Make sure the integration name is the same everywhere. If it consists of
-  multiple words, use an underscore instead of a hyphen.
+## Test suite config
 
-## Defining constraints
-
-The `TEST_SUITE_CONFIG` dictionary defines, for each integration test suite,
-the main package (framework, library) to test with; any additional test
-dependencies, optionally gated behind specific conditions; and optionally
-the Python versions to test on.
+The `TEST_SUITE_CONFIG` dictionary in `scripts/populate_tox/config.py` defines,
+for each integration test suite, the main package (framework, library) to test
+with; any additional test dependencies, optionally gated behind specific
+conditions; and optionally the Python versions to test on.
 
 Constraints are defined using the format specified below. The following sections
 describe each key.
@@ -58,7 +57,7 @@ in [packaging.specifiers](https://packaging.pypa.io/en/stable/specifiers.html).
 
 ### `package`
 
-The name of the third party package as it's listed on PyPI. The script will
+The name of the third-party package as it's listed on PyPI. The script will
 be picking different versions of this package to test.
 
 This key is mandatory.
@@ -69,7 +68,7 @@ The test dependencies of the test suite. They're defined as a dictionary of
 `rule: [package1, package2, ...]` key-value pairs. All packages
 in the package list of a rule will be installed as long as the rule applies.
 
-`rule`s are predefined. Each `rule` must be one of the following:
+Each `rule` must be one of the following:
   - `*`: packages will be always installed
   - a version specifier on the main package (e.g. `<=0.32`): packages will only
     be installed if the main package falls into the version bounds specified
@@ -77,7 +76,7 @@ in the package list of a rule will be installed as long as the rule applies.
     installed if the Python version matches one from the list
 
 Rules can be used to specify version bounds on older versions of the main
-package's dependencies, for example. If e.g. Flask tests generally need
+package's dependencies, for example. If Flask tests generally need
 Werkzeug and don't care about its version, but Flask older than 3.0 needs
 a specific Werkzeug version to work, you can say:
 
@@ -176,7 +175,7 @@ be expressed like so:
 ### `integration_name`
 
 Sometimes, the name of the test suite doesn't match the name of the integration.
-For example, we have the `openai_base` and `openai_notiktoken` test suites, both
+For example, we have the `openai-base` and `openai-notiktoken` test suites, both
 of which are actually testing the `openai` integration. If this is the case, you
 can use the `integration_name` key to define the name of the integration. If not
 provided, it will default to the name of the test suite.
@@ -193,6 +192,11 @@ greater than 2, as the oldest and latest supported versions will always be
 picked. Additionally, if there is a recent prerelease, it'll also always be
 picked (this doesn't count towards `num_versions`).
 
+For instance, `num_versions` set to `2` will only test the first supported and
+the last release of the package. `num_versions` equal to `3` will test the first
+supported, the last release, and one release in between; `num_versions` set to `4`
+will test an additional release in between. In all these cases, if there is
+a recent prerelease, it'll be picked as well in addition to the picked versions.
 
 ## How-Tos
 
@@ -202,9 +206,10 @@ picked (this doesn't count towards `num_versions`).
    in `integrations/__init__.py`. This should be the lowest version of the
    framework that we can guarantee works with the SDK. If you've just added the
    integration, you should generally set this to the latest version of the framework
-   at the time.
+   at the time, unless you've verified the integration works for earlier versions
+   as well.
 2. Add the integration and any constraints to `TEST_SUITE_CONFIG`. See the
-   "Defining constraints" section for the format.
+   [Test suite config](#test-suite-config) section for the format.
 3. Add the integration to one of the groups in the `GROUPS` dictionary in
    `scripts/split_tox_gh_actions/split_tox_gh_actions.py`.
 4. Run `scripts/generate-test-files.sh` and commit the changes.
