@@ -103,6 +103,65 @@ def _patch_graph_nodes():
 
     ModelRequestNode.run = wrapped_model_request_run  # type: ignore
 
+    # Patch ModelRequestNode.stream for streaming requests
+    original_model_request_stream = ModelRequestNode.stream
+
+    def create_wrapped_stream(original_stream_method):
+        # type: (Callable[..., Any]) -> Callable[..., Any]
+        """Create a wrapper for ModelRequestNode.stream that creates chat spans."""
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        @wraps(original_stream_method)
+        async def wrapped_model_request_stream(self, ctx):
+            # type: (Any, Any) -> Any
+            # Extract data from context
+            model = None
+            model_settings = None
+            if hasattr(ctx, "deps"):
+                model = getattr(ctx.deps, "model", None)
+                model_settings = getattr(ctx.deps, "model_settings", None)
+
+            # Build full message list: history + current request
+            messages = []
+
+            # Add message history
+            if hasattr(ctx, "state") and hasattr(ctx.state, "message_history"):
+                messages.extend(ctx.state.message_history)
+
+            # Add current request
+            current_request = getattr(self, "request", None)
+            if current_request:
+                messages.append(current_request)
+
+            # Create chat span for streaming request
+            import sentry_sdk
+
+            span = ai_client_span(messages, None, model, model_settings)
+            span.__enter__()
+
+            try:
+                # Call the original stream method
+                async with original_stream_method(self, ctx) as stream:
+                    yield stream
+
+                # After streaming completes, update span with response data
+                # The ModelRequestNode stores the final response in _result
+                model_response = None
+                if hasattr(self, "_result") and self._result is not None:
+                    # _result is a NextNode containing the model_response
+                    if hasattr(self._result, "model_response"):
+                        model_response = self._result.model_response
+
+                update_ai_client_span(span, model_response)
+            finally:
+                # Close the span after streaming completes
+                span.__exit__(None, None, None)
+
+        return wrapped_model_request_stream
+
+    ModelRequestNode.stream = create_wrapped_stream(original_model_request_stream)  # type: ignore
+
     # Patch CallToolsNode to close invoke_agent span when done
     original_call_tools_run = CallToolsNode.run
 
