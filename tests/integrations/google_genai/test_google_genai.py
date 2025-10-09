@@ -410,7 +410,7 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
         "usageMetadata": {
             "promptTokenCount": 10,
             "candidatesTokenCount": 2,
-            "totalTokenCount": 0,  # Not set in intermediate chunks
+            "totalTokenCount": 12,  # Not set in intermediate chunks
         },
         "responseId": "response-id-stream-123",
         "modelVersion": "gemini-1.5-flash",
@@ -429,7 +429,7 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
         "usageMetadata": {
             "promptTokenCount": 10,
             "candidatesTokenCount": 3,
-            "totalTokenCount": 0,
+            "totalTokenCount": 13,
         },
     }
 
@@ -446,8 +446,8 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
         ],
         "usageMetadata": {
             "promptTokenCount": 10,
-            "candidatesTokenCount": 7,  # Total output tokens across all chunks
-            "totalTokenCount": 22,  # Final total from last chunk
+            "candidatesTokenCount": 7,
+            "totalTokenCount": 25,
             "cachedContentTokenCount": 5,
             "thoughtsTokenCount": 3,
         },
@@ -505,8 +505,8 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
 
     # Verify token counts - should reflect accumulated values
     # Input tokens: max of all chunks = 10
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 30
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 30
 
     # Output tokens: candidates (2 + 3 + 7 = 12) + reasoning (3) = 15
     # Note: output_tokens includes both candidates and reasoning tokens
@@ -514,8 +514,8 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
     assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
 
     # Total tokens: from the last chunk
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 22
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 22
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 50
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 50
 
     # Cached tokens: max of all chunks = 5
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
