@@ -47,7 +47,7 @@ def test_metrics_disabled_by_default(sentry_init, capture_envelopes):
 
 
 def test_metrics_basics(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableMetrics": True})
+    sentry_init(_experiments={"enable_metrics": True})
     envelopes = capture_envelopes()
 
     _metrics.count("test.counter", 1)
@@ -78,7 +78,7 @@ def test_metrics_basics(sentry_init, capture_envelopes):
 
 
 def test_metrics_experimental_option(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableMetrics": True})
+    sentry_init(_experiments={"enable_metrics": True})
     envelopes = capture_envelopes()
 
     _metrics.count("test.counter", 5)
@@ -95,7 +95,7 @@ def test_metrics_experimental_option(sentry_init, capture_envelopes):
 
 def test_metrics_with_attributes(sentry_init, capture_envelopes):
     sentry_init(
-        _experiments={"enableMetrics": True}, release="1.0.0", environment="test"
+        _experiments={"enable_metrics": True}, release="1.0.0", environment="test"
     )
     envelopes = capture_envelopes()
 
@@ -115,7 +115,7 @@ def test_metrics_with_attributes(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_user(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableMetrics": True})
+    sentry_init(_experiments={"enable_metrics": True})
     envelopes = capture_envelopes()
 
     sentry_sdk.set_user(
@@ -134,7 +134,7 @@ def test_metrics_with_user(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_span(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableMetrics": True}, traces_sample_rate=1.0)
+    sentry_init(_experiments={"enable_metrics": True}, traces_sample_rate=1.0)
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_span(op="test", name="test-span"):
@@ -175,7 +175,7 @@ def test_metrics_before_send(sentry_init, capture_envelopes):
 
     sentry_init(
         _experiments={
-            "enableMetrics": True,
+            "enable_metrics": True,
             "before_send_metric": _before_metric,
         },
     )
