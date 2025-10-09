@@ -147,7 +147,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio"],
         },
-        "python": ">=3.8",
+        "python": ">=3.9",
     },
     "graphene": {
         "package": "graphene",

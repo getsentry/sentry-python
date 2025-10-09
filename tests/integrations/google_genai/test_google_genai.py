@@ -145,7 +145,7 @@ def test_nonstreaming_generate_content(
     ):
         with start_transaction(name="google_genai"):
             config = create_test_config(temperature=0.7, max_output_tokens=100)
-            response = mock_genai_client.models.generate_content(
+            mock_genai_client.models.generate_content(
                 model="gemini-1.5-flash", contents="Tell me a joke", config=config
             )
     assert len(events) == 1
