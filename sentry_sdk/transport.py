@@ -171,17 +171,7 @@ def _parse_rate_limits(header, now=None):
 
             retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
-                if category == "metric_bucket":
-                    try:
-                        namespaces = parameters[4].split(";")
-                    except IndexError:
-                        namespaces = []
-
-                    if not namespaces or "custom" in namespaces:
-                        yield category, retry_after  # type: ignore
-
-                else:
-                    yield category, retry_after  # type: ignore
+                yield category, retry_after  # type: ignore
         except (LookupError, ValueError):
             continue
 
@@ -417,12 +407,6 @@ class BaseHttpTransport(Transport):
         # type: (str) -> bool
         def _disabled(bucket):
             # type: (Any) -> bool
-
-            # The envelope item type used for metrics is statsd
-            # whereas the rate limit category is metric_bucket
-            if bucket == "statsd":
-                bucket = "metric_bucket"
-
             ts = self._disabled_until.get(bucket)
             return ts is not None and ts > datetime.now(timezone.utc)
 
