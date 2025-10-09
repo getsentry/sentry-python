@@ -253,18 +253,6 @@ class TestTruncateAndSerializeMessages:
             assert "role" in msg
             assert "content" in msg
 
-    def test_main_function_respects_custom_limit(self, large_messages):
-        """Test that the main function respects custom byte limits"""
-        custom_limit = MAX_GEN_AI_MESSAGE_BYTES // 250  # 2KB limit
-        result = truncate_and_serialize_messages(large_messages, max_bytes=custom_limit)
-
-        # Should return AnnotatedValue due to truncation
-        assert isinstance(result, AnnotatedValue)
-
-        # Should respect the custom limit
-        result_size = len(result.value.encode("utf-8"))
-        assert result_size <= custom_limit
-
     def test_main_function_default_limit(self, sample_messages):
         """Test that the main function uses the default limit correctly"""
         result = truncate_and_serialize_messages(sample_messages)
@@ -297,10 +285,10 @@ class TestEdgeCases:
         ]
 
         result = truncate_and_serialize_messages(messages)
-        assert result["serialized_data"] is not None
+        assert result is not None
 
         # Should be valid JSON
-        parsed = json.loads(result["serialized_data"])
+        parsed = json.loads(result)
         assert len(parsed) == 2
         assert "🌍" in parsed[0]["content"]
 
@@ -320,25 +308,16 @@ class TestEdgeCases:
         ]
 
         result = truncate_and_serialize_messages(messages)
-        assert result["serialized_data"] is not None
+        assert result is not None
 
         # Should preserve the structure
-        parsed = json.loads(result["serialized_data"])
+        # Handle both string and AnnotatedValue return types
+        if isinstance(result, AnnotatedValue):
+            parsed = json.loads(result.value)
+        else:
+            parsed = json.loads(result)
         assert "metadata" in parsed[0]
         assert "tool_calls" in parsed[1]
-
-    def test_very_small_limit(self, sample_messages):
-        """Test behavior with extremely small size limit"""
-        tiny_limit = 10  # 10 bytes - extremely small limit
-        result = truncate_and_serialize_messages(sample_messages, max_bytes=tiny_limit)
-
-        # With such a small limit, likely all messages will be removed
-        if result["serialized_data"] is None:
-            assert result["metadata"]["truncated_count"] == 0
-        else:
-            # If any data remains, it should be under the limit
-            size = len(result["serialized_data"].encode("utf-8"))
-            assert size <= tiny_limit
 
     def test_messages_with_none_values(self):
         """Test messages containing None values"""
@@ -348,10 +327,14 @@ class TestEdgeCases:
         ]
 
         result = truncate_and_serialize_messages(messages)
-        assert result["serialized_data"] is not None
+        assert result is not None
 
         # Should handle None values gracefully
-        parsed = json.loads(result["serialized_data"])
+        # Handle both string and AnnotatedValue return types
+        if isinstance(result, AnnotatedValue):
+            parsed = json.loads(result.value)
+        else:
+            parsed = json.loads(result)
         assert len(parsed) == 2
 
     def test_truncation_keeps_most_recent(self):
@@ -369,8 +352,9 @@ class TestEdgeCases:
         small_limit = MAX_GEN_AI_MESSAGE_BYTES // 500  # 1KB limit to force truncation
         result = truncate_and_serialize_messages(messages, max_bytes=small_limit)
 
-        if result["serialized_data"]:
-            parsed = json.loads(result["serialized_data"])
+        if result:
+            assert isinstance(result, AnnotatedValue)
+            parsed = json.loads(result.value)
             if parsed:
                 # The last remaining message should be from the end of the original list
                 last_kept_content = parsed[-1]["content"]

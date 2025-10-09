@@ -59,7 +59,7 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
             content = last_message.get("content", "")
 
             if content and isinstance(content, str):
-                last_message["content"] = content[: max_bytes * 0.8] + "..."
+                last_message["content"] = content[: int(max_bytes * 0.8)] + "..."
                 truncated_messages[0] = last_message
 
     return truncated_messages
