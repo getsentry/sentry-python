@@ -121,7 +121,7 @@ class TestTruncateMessagesBySize:
         messages = [{"role": "user", "content": "test"}]
 
         # Get the exact serialized size
-        from sentry_sdk.ai.message_utils import serialize
+        from sentry_sdk.serializer import serialize
 
         serialized = serialize(messages, is_vars=False)
         json_str = json.dumps(serialized, separators=(",", ":"))

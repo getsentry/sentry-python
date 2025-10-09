@@ -4,6 +4,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     normalize_message_role,
+    truncate_and_serialize_messages,
 )
 from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
@@ -135,12 +136,10 @@ def _set_input_data(span, get_response_kwargs):
                     }
                 )
 
-    set_data_normalized(
-        span,
-        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-        normalize_message_roles(request_messages),
-        unpack=False,
-    )
+    role_normalized_messages = normalize_message_roles(request_messages)
+    messages_data = truncate_and_serialize_messages(role_normalized_messages)
+    if messages_data is not None:
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
 
 def _set_output_data(span, result):

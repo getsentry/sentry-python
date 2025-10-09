@@ -24,6 +24,9 @@ from sentry_sdk.integrations.litellm import (
     _success_callback,
     _failure_callback,
 )
+from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
+from sentry_sdk._types import AnnotatedValue
+from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import package_version
 
 
@@ -545,3 +548,115 @@ def test_message_dict_extraction(sentry_init, capture_events):
 
     # Should have extracted the response message
     assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
+
+
+def test_litellm_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in LiteLLM integration."""
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    # Create messages that will definitely exceed size limits
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )  # ~64KB
+    large_messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": large_content},
+    ]
+
+    kwargs = {
+        "model": "gpt-3.5-turbo",
+        "messages": large_messages,
+    }
+
+    # Mock the response for success callback
+    mock_response = MockCompletionResponse()
+
+    # Simulate the integration flow
+    _input_callback(kwargs)
+    _success_callback(
+        kwargs,
+        mock_response,
+        datetime.now(),
+        datetime.now(),
+    )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    # Should have gen_ai request messages (as string)
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    # Should be valid JSON
+    import json
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+
+    # Should have fewer or equal messages than original (due to truncation)
+    assert len(parsed_messages) <= len(large_messages)
+
+    # Size should be under the limit
+    result_size = len(messages_data.encode("utf-8"))
+    assert result_size <= MAX_GEN_AI_MESSAGE_BYTES
+
+
+def test_litellm_single_large_message_preservation(sentry_init, capture_events):
+    """Test that a single very large message gets preserved with truncated content."""
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    # Create one huge message that exceeds the limit
+    huge_content = (
+        "This is an extremely long message that will definitely exceed size limits. "
+        * 2000
+    )  # ~150KB
+    messages = [{"role": "user", "content": huge_content}]
+
+    kwargs = {
+        "model": "gpt-3.5-turbo",
+        "messages": messages,
+    }
+
+    # Mock the response
+    mock_response = MockCompletionResponse()
+
+    # Simulate the integration flow
+    _input_callback(kwargs)
+    _success_callback(
+        kwargs,
+        mock_response,
+        datetime.now(),
+        datetime.now(),
+    )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    # Should still have the message (not removed entirely)
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    # Should be valid JSON with exactly one message
+    import json
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+
+    # The message should have truncated content
+    assert parsed_messages[0]["role"] == "user"
+    assert len(parsed_messages[0]["content"]) < len(huge_content)

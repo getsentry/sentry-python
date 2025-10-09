@@ -9,9 +9,8 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     get_start_span_function,
+    truncate_and_serialize_messages,
 )
-from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
-from sentry_sdk.ai.message_utils import truncate_and_serialize_messages
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii

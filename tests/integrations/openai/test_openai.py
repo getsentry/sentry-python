@@ -39,6 +39,9 @@ from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
 )
+from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
+from sentry_sdk._types import AnnotatedValue
+from sentry_sdk.serializer import serialize
 
 from unittest import mock  # python 3.3 and above
 
@@ -1451,6 +1454,7 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
 
 def test_openai_message_role_mapping(sentry_init, capture_events):
     """Test that OpenAI integration properly maps message roles like 'ai' to 'assistant'"""
+
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -1460,7 +1464,6 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
 
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
-
     # Test messages with mixed roles including "ai" that should be mapped to "assistant"
     test_messages = [
         {"role": "system", "content": "You are helpful."},
@@ -1471,11 +1474,9 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
 
     with start_transaction(name="openai tx"):
         client.chat.completions.create(model="test-model", messages=test_messages)
-
+    # Verify that the span was created correctly
     (event,) = events
     span = event["spans"][0]
-
-    # Verify that the span was created correctly
     assert span["op"] == "gen_ai.chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
@@ -1500,3 +1501,113 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     # Verify no "ai" roles remain
     roles = [msg["role"] for msg in stored_messages]
     assert "ai" not in roles
+
+
+def test_openai_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in OpenAI integration."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    # Create messages that will definitely exceed size limits
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )  # ~64KB
+    large_messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": large_content},
+    ]
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=large_messages,
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Should have gen_ai request messages (as string)
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    # Should be valid JSON
+    import json
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+
+    # Should have fewer messages than original (due to truncation)
+    assert len(parsed_messages) <= len(large_messages)
+
+    # Should have _meta entry indicating truncation
+    if "_meta" in event and len(parsed_messages) < len(large_messages):
+        meta_path = event["_meta"]
+        # Navigate through the meta structure to find the messages metadata
+        if (
+            "spans" in meta_path
+            and "0" in meta_path["spans"]
+            and "data" in meta_path["spans"]["0"]
+        ):
+            span_meta = meta_path["spans"]["0"]["data"]
+            if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_meta:
+                messages_meta = span_meta[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+                assert "len" in messages_meta.get("", {})
+
+
+def test_openai_single_large_message_content_truncation(sentry_init, capture_events):
+    """Test that a single very large message gets content truncated, not removed entirely."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    # Create one huge message that exceeds the limit
+    huge_content = (
+        "This is an extremely long message that will definitely exceed size limits. "
+        * 2000
+    )  # ~150KB
+    messages = [{"role": "user", "content": huge_content}]
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=messages,
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Should still have the message (not removed entirely)
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    # Should be valid JSON with exactly one message
+    import json
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+
+    # The message should have truncated content
+    assert parsed_messages[0]["role"] == "user"
+    assert len(parsed_messages[0]["content"]) < len(huge_content)
+
+    # Size should be under the limit
+    result_size = len(messages_data.encode("utf-8"))
+    assert result_size <= MAX_GEN_AI_MESSAGE_BYTES

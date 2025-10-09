@@ -1,6 +1,7 @@
-import pytest
-from unittest import mock
 import json
+from unittest import mock
+
+import pytest
 
 try:
     from unittest.mock import AsyncMock
@@ -41,15 +42,17 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk import start_transaction, start_span
+from sentry_sdk import start_span, start_transaction
+from sentry_sdk._types import AnnotatedValue
+from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
-    _set_output_data,
     _collect_ai_data,
+    _set_output_data,
 )
+from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import package_version
-
 
 ANTHROPIC_VERSION = package_version("anthropic")
 
@@ -883,6 +886,10 @@ def test_set_output_data_with_input_json_delta(sentry_init):
 
 def test_anthropic_message_role_mapping(sentry_init, capture_events):
     """Test that Anthropic integration properly maps message roles like 'ai' to 'assistant'"""
+
+
+def test_anthropic_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Anthropic integration."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -945,3 +952,105 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
     # Verify no "ai" roles remain
     roles = [msg["role"] for msg in stored_messages]
     assert "ai" not in roles
+    client = Anthropic(api_key="test-api-key")
+
+    # Create messages that will definitely exceed size limits
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )  # ~64KB
+    large_messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": large_content},
+    ]
+
+    with mock.patch.object(client.messages, "create") as mock_create:
+        mock_create.return_value = Message(
+            id="test",
+            content=[TextBlock(text="Hello", type="text")],
+            model="claude-3",
+            role="assistant",
+            type="message",
+            usage=Usage(input_tokens=10, output_tokens=20),
+        )
+
+        with start_transaction(name="anthropic tx"):
+            client.messages.create(
+                model="claude-3-sonnet-20240229",
+                messages=large_messages,
+                max_tokens=100,
+            )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Should have gen_ai request messages (as string)
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+
+    # Should have fewer or equal messages than original (due to truncation)
+    assert len(parsed_messages) <= len(large_messages)
+
+    # Size should be under the limit
+    result_size = len(messages_data.encode("utf-8"))
+    assert result_size <= MAX_GEN_AI_MESSAGE_BYTES
+
+
+def test_anthropic_single_large_message_preservation(sentry_init, capture_events):
+    """Test that a single very large message gets preserved with truncated content."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = Anthropic(api_key="test-api-key")
+
+    # Create one huge message that exceeds the limit
+    huge_content = (
+        "This is an extremely long message that will definitely exceed size limits. "
+        * 2000
+    )  # ~150KB
+    messages = [{"role": "user", "content": huge_content}]
+
+    with mock.patch.object(client.messages, "create") as mock_create:
+        mock_create.return_value = Message(
+            id="test",
+            content=[TextBlock(text="Hello", type="text")],
+            model="claude-3",
+            role="assistant",
+            type="message",
+            usage=Usage(input_tokens=100, output_tokens=50),
+        )
+
+        with start_transaction(name="anthropic tx"):
+            client.messages.create(
+                model="claude-3-sonnet-20240229",
+                messages=messages,
+                max_tokens=100,
+            )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Should still have the message (not removed entirely)
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    # Should be valid JSON with exactly one message
+    import json
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+
+    # The message should have truncated content
+    assert parsed_messages[0]["role"] == "user"
+    assert len(parsed_messages[0]["content"]) < len(huge_content)

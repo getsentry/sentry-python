@@ -3,7 +3,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized, truncate_and_serialize_messages
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -103,9 +103,11 @@ def _wrap_huggingface_task(f, op):
 
         # Input attributes
         if should_send_default_pii() and integration.include_prompts:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
-            )
+            # Convert prompt to message format if it's a string
+            messages = [prompt] if isinstance(prompt, str) else prompt
+            messages_data = truncate_and_serialize_messages(messages)
+            if messages_data is not None:
+                span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
         attribute_mapping = {
             "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,

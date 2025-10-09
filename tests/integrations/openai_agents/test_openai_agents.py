@@ -4,8 +4,12 @@ import pytest
 from unittest.mock import MagicMock, patch
 import os
 
+import sentry_sdk
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import safe_serialize
+from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
+from sentry_sdk._types import AnnotatedValue
+from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import parse_version
 
 import agents
@@ -1077,3 +1081,129 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
         # Verify no "ai" roles remain in any message
         for message in stored_messages:
             assert message["role"] != "ai"
+
+
+def test_openai_agents_message_truncation(
+    sentry_init, capture_events, mock_model_response
+):
+    """Test that large messages are truncated properly in OpenAI Agents integration."""
+    # Create messages that will definitely exceed size limits
+    large_system_prompt = (
+        "This is a very long system prompt that will exceed our size limits. " * 1000
+    )  # ~64KB
+    large_user_message = (
+        "This is a very long user message that will exceed our size limits. " * 1000
+    )  # ~64KB
+
+    agent = Agent(
+        name="test_agent",
+        model="gpt-4",
+        instructions=large_system_prompt,
+    )
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = agents.Runner.run_sync(
+                agent, large_user_message, run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (event,) = events
+    spans = event["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    # Should have gen_ai request messages (as string)
+    assert "gen_ai.request.messages" in invoke_agent_span["data"]
+    messages_data = invoke_agent_span["data"]["gen_ai.request.messages"]
+    assert isinstance(messages_data, str)
+
+    # Should be valid JSON
+    import json
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+
+    # Should have some messages (system + user)
+    assert len(parsed_messages) >= 1
+
+    # Size should be under the limit
+    result_size = len(messages_data.encode("utf-8"))
+    assert result_size <= MAX_GEN_AI_MESSAGE_BYTES
+
+    # Messages should be truncated from original large content
+    total_original_size = len(large_system_prompt) + len(large_user_message)
+    total_parsed_size = sum(len(str(msg)) for msg in parsed_messages)
+    assert total_parsed_size < total_original_size
+
+
+def test_openai_agents_single_large_message_preservation(
+    sentry_init, capture_events, mock_model_response
+):
+    """Test that a single very large message gets preserved with truncated content."""
+    # Create one huge message that exceeds the limit
+    huge_content = (
+        "This is an extremely long message that will definitely exceed size limits. "
+        * 2000
+    )  # ~150KB
+
+    agent = Agent(
+        name="test_agent",
+        model="gpt-4",
+        instructions="You are helpful.",  # Keep this small
+    )
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = agents.Runner.run_sync(
+                agent, huge_content, run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (event,) = events
+    spans = event["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    # Should still have the messages (not removed entirely)
+    assert "gen_ai.request.messages" in invoke_agent_span["data"]
+    messages_data = invoke_agent_span["data"]["gen_ai.request.messages"]
+    assert isinstance(messages_data, str)
+
+    # Should be valid JSON with at least one message
+    import json
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) >= 1
+
+    # The user message content should be truncated
+    user_message = next(
+        (msg for msg in parsed_messages if msg.get("role") == "user"), None
+    )
+    if user_message and "content" in user_message:
+        assert len(user_message["content"]) < len(huge_content)

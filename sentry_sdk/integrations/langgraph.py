@@ -2,8 +2,11 @@ from functools import wraps
 from typing import Any, Callable, List, Optional
 
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized, normalize_message_roles
-from sentry_sdk.ai.message_utils import truncate_and_serialize_messages
+from sentry_sdk.ai.utils import (
+    set_data_normalized,
+    normalize_message_roles,
+    truncate_and_serialize_messages,
+)
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -182,7 +185,9 @@ def _wrap_pregel_invoke(f):
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
-                    messages_data = truncate_and_serialize_messages(normalized_input_messages)
+                    messages_data = truncate_and_serialize_messages(
+                        normalized_input_messages
+                    )
                     if messages_data is not None:
                         span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
@@ -230,7 +235,9 @@ def _wrap_pregel_ainvoke(f):
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
-                    messages_data = truncate_and_serialize_messages(normalized_input_messages)
+                    messages_data = truncate_and_serialize_messages(
+                        normalized_input_messages
+                    )
                     if messages_data is not None:
                         span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
