@@ -1,18 +1,16 @@
-import re
-from typing import TYPE_CHECKING
 from unittest import mock
-
-import httpx
 import pytest
+import re
 import responses
+import httpx
+
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
-from sentry_sdk._types import AnnotatedValue
-from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
-from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
-from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import package_version
+from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
+
+from typing import TYPE_CHECKING
 
 try:
     from huggingface_hub.utils._errors import HfHubHTTPError
