@@ -31,6 +31,32 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
+def _get_model_name(model_obj):
+    # type: (Any) -> str | None
+    """Extract model name from a model object.
+
+    Args:
+        model_obj: Model object to extract name from
+
+    Returns:
+        Model name string or None if not found
+    """
+    if not model_obj:
+        return None
+
+    if hasattr(model_obj, "model_name"):
+        return model_obj.model_name
+    elif hasattr(model_obj, "name"):
+        try:
+            return model_obj.name()
+        except Exception:
+            return str(model_obj)
+    elif isinstance(model_obj, str):
+        return model_obj
+    else:
+        return str(model_obj)
+
+
 def _set_agent_data(span, agent):
     # type: (sentry_sdk.tracing.Span, Any) -> None
     """Set agent-related data on a span.
@@ -75,19 +101,8 @@ def _set_model_data(span, model, model_settings):
         if hasattr(model_obj, "system"):
             span.set_data(SPANDATA.GEN_AI_SYSTEM, model_obj.system)
 
-        model_name = None
-        if hasattr(model_obj, "model_name"):
-            model_name = model_obj.model_name
-        elif hasattr(model_obj, "name"):
-            try:
-                model_name = model_obj.name()
-            except Exception:
-                model_name = str(model_obj)
-        elif isinstance(model_obj, str):
-            model_name = model_obj
-        else:
-            model_name = str(model_obj)
-
+        # Set model name
+        model_name = _get_model_name(model_obj)
         if model_name:
             span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
@@ -147,6 +162,20 @@ def _set_input_messages(span, messages):
 
     try:
         formatted_messages = []
+        system_prompt = None
+
+        # Extract system prompt from any ModelRequest with instructions
+        for msg in messages:
+            if hasattr(msg, "instructions") and msg.instructions:
+                system_prompt = msg.instructions
+                break
+
+        # Add system prompt as first message if present
+        if system_prompt:
+            formatted_messages.append(
+                {"role": "system", "content": [{"type": "text", "text": system_prompt}]}
+            )
+
         for msg in messages:
             if hasattr(msg, "parts"):
                 for part in msg.parts:
@@ -157,11 +186,33 @@ def _set_input_messages(span, messages):
                         elif (
                             "Assistant" in part.__class__.__name__
                             or "Text" in part.__class__.__name__
+                            or "ToolCall" in part.__class__.__name__
                         ):
                             role = "assistant"
+                        elif "ToolReturn" in part.__class__.__name__:
+                            role = "tool"
 
                     content = []
-                    if hasattr(part, "content"):
+                    tool_calls = None
+                    tool_call_id = None
+
+                    # Handle ToolCallPart (assistant requesting tool use)
+                    if "ToolCall" in part.__class__.__name__:
+                        tool_call_data = {}
+                        if hasattr(part, "tool_name"):
+                            tool_call_data["name"] = part.tool_name
+                        if hasattr(part, "args"):
+                            tool_call_data["arguments"] = safe_serialize(part.args)
+                        if tool_call_data:
+                            tool_calls = [tool_call_data]
+                    # Handle ToolReturnPart (tool result)
+                    elif "ToolReturn" in part.__class__.__name__:
+                        if hasattr(part, "tool_name"):
+                            tool_call_id = part.tool_name
+                        if hasattr(part, "content"):
+                            content.append({"type": "text", "text": str(part.content)})
+                    # Handle regular content
+                    elif hasattr(part, "content"):
                         if isinstance(part.content, str):
                             content.append({"type": "text", "text": part.content})
                         elif isinstance(part.content, list):
@@ -173,8 +224,16 @@ def _set_input_messages(span, messages):
                         else:
                             content.append({"type": "text", "text": str(part.content)})
 
-                    if content:
-                        formatted_messages.append({"role": role, "content": content})
+                    # Add message if we have content or tool calls
+                    if content or tool_calls:
+                        message = {"role": role}
+                        if content:
+                            message["content"] = content
+                        if tool_calls:
+                            message["tool_calls"] = tool_calls
+                        if tool_call_id:
+                            message["tool_call_id"] = tool_call_id
+                        formatted_messages.append(message)
 
         if formatted_messages:
             set_data_normalized(
@@ -202,8 +261,8 @@ def _set_output_data(span, response):
             tool_calls = []
 
             for part in response.parts:
-                if hasattr(part, "content") and hasattr(part, "__class__"):
-                    if "Text" in part.__class__.__name__:
+                if hasattr(part, "__class__"):
+                    if "Text" in part.__class__.__name__ and hasattr(part, "content"):
                         texts.append(part.content)
                     elif "ToolCall" in part.__class__.__name__:
                         tool_call_data = {

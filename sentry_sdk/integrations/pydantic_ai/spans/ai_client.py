@@ -3,6 +3,7 @@ from sentry_sdk.consts import OP, SPANDATA
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
+    _get_model_name,
     _set_agent_data,
     _set_model_data,
     _set_usage_data,
@@ -16,22 +17,22 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def ai_client_span(model_request, agent, model, model_settings):
+def ai_client_span(messages, agent, model, model_settings):
     # type: (Any, Any, Any, Any) -> sentry_sdk.tracing.Span
-    """Create a span for an AI client call (model request)."""
+    """Create a span for an AI client call (model request).
+
+    Args:
+        messages: Full conversation history (list of messages)
+        agent: Agent object
+        model: Model object
+        model_settings: Model settings
+    """
     # Determine model name for span description
     model_obj = model
     if agent and hasattr(agent, "model"):
         model_obj = agent.model
 
-    model_name = "unknown"
-    if model_obj:
-        if hasattr(model_obj, "model_name"):
-            model_name = model_obj.model_name
-        elif isinstance(model_obj, str):
-            model_name = model_obj
-        else:
-            model_name = str(model_obj)
+    model_name = _get_model_name(model_obj) or "unknown"
 
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
@@ -83,9 +84,9 @@ def ai_client_span(model_request, agent, model, model_settings):
             # If we can't extract tools, just skip it
             pass
 
-    # Set input messages if available
-    if model_request and hasattr(model_request, "parts"):
-        _set_input_messages(span, [model_request])
+    # Set input messages (full conversation history)
+    if messages:
+        _set_input_messages(span, messages)
 
     return span
 

@@ -32,10 +32,8 @@ def _patch_model_request():
         @wraps(original_request)
         async def wrapped_request(self, messages, *args, **kwargs):
             # type: (Any, Any, *Any, **Any) -> Any
-            # Extract the first message to use as the request
-            model_request = messages[0] if messages else None
-
-            with ai_client_span(model_request, None, self, None) as span:
+            # Pass all messages (full conversation history)
+            with ai_client_span(messages, None, self, None) as span:
                 result = await original_request(self, messages, *args, **kwargs)
                 update_ai_client_span(span, result)
                 return result

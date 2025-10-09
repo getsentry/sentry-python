@@ -78,9 +78,19 @@ def _patch_graph_nodes():
             model = getattr(ctx.deps, "model", None)
             model_settings = getattr(ctx.deps, "model_settings", None)
 
-        model_request = getattr(self, "request", None)
+        # Build full message list: history + current request
+        messages = []
 
-        with ai_client_span(model_request, None, model, model_settings) as span:
+        # Add message history
+        if hasattr(ctx, "state") and hasattr(ctx.state, "message_history"):
+            messages.extend(ctx.state.message_history)
+
+        # Add current request
+        current_request = getattr(self, "request", None)
+        if current_request:
+            messages.append(current_request)
+
+        with ai_client_span(messages, None, model, model_settings) as span:
             result = await original_model_request_run(self, ctx)
 
             # Extract response from result if available
