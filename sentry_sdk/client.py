@@ -976,6 +976,17 @@ class _Client(BaseClient):
         if release is not None and "sentry.release" not in metric["attributes"]:
             metric["attributes"]["sentry.release"] = release
 
+        span = sentry_sdk.get_current_span()
+        trace_id = "00000000-0000-0000-0000-000000000000"
+
+        if span:
+            metric["trace_id"] = span.trace_id or trace_id
+            metric["span_id"] = span.span_id or None
+        else:
+            propagation_context = isolation_scope.get_active_propagation_context()
+            if propagation_context:
+                metric["trace_id"] = propagation_context.trace_id or trace_id
+
         if isolation_scope._user is not None:
             for metric_attribute, user_attribute in (
                 ("user.id", "id"),

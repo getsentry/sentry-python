@@ -248,7 +248,7 @@ if TYPE_CHECKING:
         "Metric",
         {
             "timestamp": float,
-            "trace_id": str,
+            "trace_id": Optional[str],
             "span_id": Optional[str],
             "name": str,
             "type": MetricType,

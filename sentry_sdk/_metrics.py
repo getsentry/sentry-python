@@ -21,7 +21,6 @@ def _capture_metric(
     attributes=None,  # type: Optional[dict[str, Any]]
 ):
     # type: (...) -> None
-
     client = sentry_sdk.get_client()
 
     attrs = {}  # type: dict[str, Union[str, bool, float, int]]
@@ -38,25 +37,10 @@ def _capture_metric(
                 else safe_repr(v)
             )
 
-    span = sentry_sdk.get_current_span()
-    trace_id = "00000000-0000-0000-0000-000000000000"
-    span_id = None
-
-    if span:
-        trace_context = span.get_trace_context()
-        trace_id = trace_context.get("trace_id", trace_id)
-        span_id = trace_context.get("span_id")
-    else:
-        scope = sentry_sdk.get_current_scope()
-        if scope:
-            propagation_context = scope._propagation_context
-            if propagation_context:
-                trace_id = propagation_context.trace_id or trace_id
-
     metric = {
         "timestamp": time.time(),
-        "trace_id": trace_id,
-        "span_id": span_id,
+        "trace_id": None,
+        "span_id": None,
         "name": name,
         "type": metric_type,
         "value": float(value),
