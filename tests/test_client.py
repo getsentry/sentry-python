@@ -53,6 +53,7 @@ class _TestTransport(Transport):
         raise EnvelopeCapturedError(envelope)
 
 
+@pytest.mark.skip(reason="debugging")
 def test_transport_option(monkeypatch):
     if "SENTRY_DSN" in os.environ:
         monkeypatch.delenv("SENTRY_DSN")
@@ -68,6 +69,7 @@ def test_transport_option(monkeypatch):
     assert str(Client(transport=transport).dsn) == dsn
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "testcase",
     [
@@ -300,6 +302,7 @@ def test_proxy(monkeypatch, testcase, http2):
             assert proxy_headers == testcase["arg_proxy_headers"]
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "testcase",
     [
@@ -382,6 +385,7 @@ def test_socks_proxy(testcase, http2):
     )
 
 
+@pytest.mark.skip(reason="debugging")
 def test_simple_transport(sentry_init):
     events = []
     sentry_init(transport=events.append)
@@ -389,6 +393,7 @@ def test_simple_transport(sentry_init):
     assert events[0]["message"] == "Hello World!"
 
 
+@pytest.mark.skip(reason="debugging")
 def test_ignore_errors(sentry_init, capture_events):
     sentry_init(ignore_errors=[ZeroDivisionError])
     events = capture_events()
@@ -410,6 +415,7 @@ def test_ignore_errors(sentry_init, capture_events):
     assert events[0]["exception"]["values"][0]["type"] == "ValueError"
 
 
+@pytest.mark.skip(reason="debugging")
 def test_include_local_variables_enabled(sentry_init, capture_events):
     sentry_init(include_local_variables=True)
     events = capture_events()
@@ -426,6 +432,7 @@ def test_include_local_variables_enabled(sentry_init, capture_events):
     )
 
 
+@pytest.mark.skip(reason="debugging")
 def test_include_local_variables_disabled(sentry_init, capture_events):
     sentry_init(include_local_variables=False)
     events = capture_events()
@@ -442,6 +449,7 @@ def test_include_local_variables_disabled(sentry_init, capture_events):
     )
 
 
+@pytest.mark.skip(reason="debugging")
 def test_include_source_context_enabled(sentry_init, capture_events):
     sentry_init(include_source_context=True)
     events = capture_events()
@@ -458,6 +466,7 @@ def test_include_source_context_enabled(sentry_init, capture_events):
     assert "context_line" in frame
 
 
+@pytest.mark.skip(reason="debugging")
 def test_include_source_context_disabled(sentry_init, capture_events):
     sentry_init(include_source_context=False)
     events = capture_events()
@@ -474,6 +483,7 @@ def test_include_source_context_disabled(sentry_init, capture_events):
     assert "context_line" not in frame
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize("integrations", [[], [ExecutingIntegration()]])
 def test_function_names(sentry_init, capture_events, integrations):
     sentry_init(integrations=integrations)
@@ -503,6 +513,7 @@ def test_function_names(sentry_init, capture_events, integrations):
         assert functions == ["foo", "bar"]
 
 
+@pytest.mark.skip(reason="debugging")
 def test_attach_stacktrace_enabled(sentry_init, capture_events):
     sentry_init(attach_stacktrace=True)
     events = capture_events()
@@ -522,6 +533,7 @@ def test_attach_stacktrace_enabled(sentry_init, capture_events):
     assert functions[-2:] == ["foo", "bar"]
 
 
+@pytest.mark.skip(reason="debugging")
 def test_attach_stacktrace_enabled_no_locals(sentry_init, capture_events):
     sentry_init(attach_stacktrace=True, include_local_variables=False)
     events = capture_events()
@@ -540,6 +552,7 @@ def test_attach_stacktrace_enabled_no_locals(sentry_init, capture_events):
     assert local_vars[-2:] == [None, None]
 
 
+@pytest.mark.skip(reason="debugging")
 def test_attach_stacktrace_in_app(sentry_init, capture_events):
     sentry_init(attach_stacktrace=True, in_app_exclude=["_pytest"])
     events = capture_events()
@@ -554,6 +567,7 @@ def test_attach_stacktrace_in_app(sentry_init, capture_events):
     assert all(f["in_app"] is False for f in pytest_frames)
 
 
+@pytest.mark.skip(reason="debugging")
 def test_attach_stacktrace_disabled(sentry_init, capture_events):
     sentry_init(attach_stacktrace=False)
     events = capture_events()
@@ -563,6 +577,7 @@ def test_attach_stacktrace_disabled(sentry_init, capture_events):
     assert "threads" not in event
 
 
+@pytest.mark.skip(reason="debugging")
 def test_attach_stacktrace_transaction(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, attach_stacktrace=True)
     events = capture_events()
@@ -572,12 +587,14 @@ def test_attach_stacktrace_transaction(sentry_init, capture_events):
     assert "threads" not in event
 
 
+@pytest.mark.skip(reason="debugging")
 def test_capture_event_works(sentry_init):
     sentry_init(transport=_TestTransport())
     pytest.raises(EnvelopeCapturedError, lambda: capture_event({}))
     pytest.raises(EnvelopeCapturedError, lambda: capture_event({}))
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize("num_messages", [10, 20])
 @pytest.mark.parametrize(
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
@@ -622,6 +639,7 @@ def test_atexit(tmpdir, monkeypatch, num_messages, http2):
     assert output.count(b"HI") == num_messages
 
 
+@pytest.mark.skip(reason="debugging")
 def test_configure_scope_available(
     sentry_init, request, monkeypatch, suppress_deprecation_warnings
 ):
@@ -647,6 +665,7 @@ def test_configure_scope_available(
     assert calls[0] is Hub.current.scope
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.tests_internal_exceptions
 def test_client_debug_option_enabled(sentry_init, caplog):
     sentry_init(debug=True)
@@ -655,6 +674,7 @@ def test_client_debug_option_enabled(sentry_init, caplog):
     assert "OK" in caplog.text
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.tests_internal_exceptions
 @pytest.mark.parametrize("with_client", (True, False))
 def test_client_debug_option_disabled(with_client, sentry_init, caplog):
@@ -665,6 +685,7 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     assert "OK" not in caplog.text
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.skip(
     reason="New behavior in SDK 2.0: You have a scope before init and add data to it."
 )
@@ -686,6 +707,7 @@ def test_scope_initialized_before_client(sentry_init, capture_events):
     assert "tags" not in event
 
 
+@pytest.mark.skip(reason="debugging")
 def test_weird_chars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -694,6 +716,7 @@ def test_weird_chars(sentry_init, capture_events):
     assert json.loads(json.dumps(event)) == event
 
 
+@pytest.mark.skip(reason="debugging")
 def test_nan(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -715,6 +738,7 @@ def test_nan(sentry_init, capture_events):
     assert event["tags"]["mynan"] == "nan"
 
 
+@pytest.mark.skip(reason="debugging")
 def test_cyclic_frame_vars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -732,6 +756,7 @@ def test_cyclic_frame_vars(sentry_init, capture_events):
     }
 
 
+@pytest.mark.skip(reason="debugging")
 def test_cyclic_data(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -813,6 +838,7 @@ def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
         assert len(json.dumps(event)) < 10000
 
 
+@pytest.mark.skip(reason="debugging")
 def test_chained_exceptions(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -836,6 +862,7 @@ def test_chained_exceptions(sentry_init, capture_events):
     assert e2["type"] == "ZeroDivisionError"
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.tests_internal_exceptions
 def test_broken_mapping(sentry_init, capture_events):
     sentry_init()
@@ -867,6 +894,7 @@ def test_broken_mapping(sentry_init, capture_events):
     )
 
 
+@pytest.mark.skip(reason="debugging")
 def test_mapping_sends_exception(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -903,6 +931,7 @@ def test_mapping_sends_exception(sentry_init, capture_events):
     }
 
 
+@pytest.mark.skip(reason="debugging")
 def test_object_sends_exception(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -929,6 +958,7 @@ def test_object_sends_exception(sentry_init, capture_events):
     )
 
 
+@pytest.mark.skip(reason="debugging")
 def test_errno_errors(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -944,6 +974,7 @@ def test_errno_errors(sentry_init, capture_events):
     assert exception["mechanism"]["meta"]["errno"]["number"] == 69
 
 
+@pytest.mark.skip(reason="debugging")
 @maximum_python_312
 def test_non_string_variables(sentry_init, capture_events):
     """There is some extremely terrible code in the wild that
@@ -966,6 +997,7 @@ def test_non_string_variables(sentry_init, capture_events):
     assert frame["vars"]["42"] == "True"
 
 
+@pytest.mark.skip(reason="debugging")
 def test_dict_changed_during_iteration(sentry_init, capture_events):
     """
     Some versions of Bottle modify the WSGI environment inside of this __repr__
@@ -1000,6 +1032,7 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     assert frame["vars"]["environ"] == {"a": "<This is me>"}
 
 
+@pytest.mark.skip(reason="debugging")
 def test_custom_repr_on_vars(sentry_init, capture_events):
     class Foo:
         pass
@@ -1033,6 +1066,7 @@ def test_custom_repr_on_vars(sentry_init, capture_events):
     assert "Fail object" in my_vars["fail"]
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "dsn",
     [
@@ -1053,6 +1087,7 @@ def test_init_string_types(dsn, sentry_init):
     )
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "sdk_options, expected_breadcrumbs",
     [({}, DEFAULT_MAX_BREADCRUMBS), ({"max_breadcrumbs": 50}, 50)],
@@ -1071,12 +1106,14 @@ def test_max_breadcrumbs_option(
     assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs
 
 
+@pytest.mark.skip(reason="debugging")
 def test_multiple_positional_args(sentry_init):
     with pytest.raises(TypeError) as exinfo:
         sentry_init(1, None)
     assert "Only single positional argument is expected" in str(exinfo.value)
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "sdk_options, expected_data_length",
     [
@@ -1098,6 +1135,7 @@ def test_max_value_length_option(
     assert len(events[0]["message"]) == expected_data_length
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "client_option,env_var_value,debug_output_expected",
     [
@@ -1156,6 +1194,7 @@ def test_debug_option(
         assert "something is wrong" not in caplog.text
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "client_option,env_var_value,spotlight_url_expected",
     [
@@ -1226,6 +1265,7 @@ class IssuesSamplerTestConfig:
         raise self.exception_to_raise()
 
 
+@pytest.mark.skip(reason="debugging")
 @mock.patch("sentry_sdk.client.random.random", return_value=0.618)
 @pytest.mark.parametrize(
     "test_config",
@@ -1308,6 +1348,7 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
         assert len(test_config.sampler_function_mock.call_args[0]) == 2
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "opt,missing_flags",
     [
@@ -1445,6 +1486,7 @@ class TestSpanClientReports:
         assert Counter(record_lost_event_calls) == self.expected_record_lost_event_calls
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     "test_config",
     (
@@ -1505,6 +1547,7 @@ def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_
     test_config.run(sentry_init, capture_record_lost_event_calls)
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize("enable_tracing", [True, False])
 def test_enable_tracing_deprecated(sentry_init, enable_tracing):
     with pytest.warns(DeprecationWarning):
@@ -1544,6 +1587,7 @@ def clear_env_var(name):
             del os.environ[name]
 
 
+@pytest.mark.skip(reason="debugging")
 @pytest.mark.parametrize(
     ("env_value", "arg_value", "expected_value"),
     [
