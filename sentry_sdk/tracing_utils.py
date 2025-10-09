@@ -219,6 +219,7 @@ def _should_be_included(
 
 
 def add_source(span, project_root, in_app_include, in_app_exclude):
+    # type: (sentry_sdk.tracing.Span, Optional[str], Optional[list[str]], Optional[list[str]]) -> None
     """
     Adds OTel compatible source code information to the span
     """

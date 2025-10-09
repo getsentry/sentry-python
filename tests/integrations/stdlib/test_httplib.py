@@ -601,7 +601,7 @@ def test_request_source_if_duration_over_threshold(sentry_init, capture_events):
 
     assert (
         data.get(SPANDATA.CODE_FUNCTION)
-        == "test_query_source_if_duration_over_threshold"
+        == "test_request_source_if_duration_over_threshold"
     )
 
 
