@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.envelope - sentry-python 2.40.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.envelope - sentry-python 2.41.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b1a1f93b" />
@@ -398,14 +398,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="285">            <span class="k">return</span> <span class="s2">&quot;error&quot;</span>
 </span><span data-line="286">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;log&quot;</span><span class="p">:</span>
 </span><span data-line="287">            <span class="k">return</span> <span class="s2">&quot;log_item&quot;</span>
-</span><span data-line="288">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;client_report&quot;</span><span class="p">:</span>
-</span><span data-line="289">            <span class="k">return</span> <span class="s2">&quot;internal&quot;</span>
-</span><span data-line="290">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;profile&quot;</span><span class="p">:</span>
-</span><span data-line="291">            <span class="k">return</span> <span class="s2">&quot;profile&quot;</span>
-</span><span data-line="292">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;profile_chunk&quot;</span><span class="p">:</span>
-</span><span data-line="293">            <span class="k">return</span> <span class="s2">&quot;profile_chunk&quot;</span>
-</span><span data-line="294">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;statsd&quot;</span><span class="p">:</span>
-</span><span data-line="295">            <span class="k">return</span> <span class="s2">&quot;metric_bucket&quot;</span>
+</span><span data-line="288">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;trace_metric&quot;</span><span class="p">:</span>
+</span><span data-line="289">            <span class="k">return</span> <span class="s2">&quot;trace_metric&quot;</span>
+</span><span data-line="290">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;client_report&quot;</span><span class="p">:</span>
+</span><span data-line="291">            <span class="k">return</span> <span class="s2">&quot;internal&quot;</span>
+</span><span data-line="292">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;profile&quot;</span><span class="p">:</span>
+</span><span data-line="293">            <span class="k">return</span> <span class="s2">&quot;profile&quot;</span>
+</span><span data-line="294">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;profile_chunk&quot;</span><span class="p">:</span>
+</span><span data-line="295">            <span class="k">return</span> <span class="s2">&quot;profile_chunk&quot;</span>
 </span><span data-line="296">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span><span class="p">:</span>
 </span><span data-line="297">            <span class="k">return</span> <span class="s2">&quot;monitor&quot;</span>
 </span><span data-line="298">        <span class="k">else</span><span class="p">:</span>
@@ -470,7 +470,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="354">            <span class="c1"># if no length was specified we need to read up to the end of line</span>
 </span><span data-line="355">            <span class="c1"># and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)</span>
 </span><span data-line="356">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span data-line="357">        <span class="k">if</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;event&quot;</span><span class="p">,</span> <span class="s2">&quot;transaction&quot;</span><span class="p">,</span> <span class="s2">&quot;metric_buckets&quot;</span><span class="p">):</span>
+</span><span data-line="357">        <span class="k">if</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;event&quot;</span><span class="p">,</span> <span class="s2">&quot;transaction&quot;</span><span class="p">):</span>
 </span><span data-line="358">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">parse_json</span><span class="p">(</span><span class="n">payload</span><span class="p">)))</span>
 </span><span data-line="359">        <span class="k">else</span><span class="p">:</span>
 </span><span data-line="360">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
@@ -514,7 +514,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=3e4cc644"></script>
+      <script src="../../_static/documentation_options.js?v=4f998c1d"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=e730760c"></script></body>
