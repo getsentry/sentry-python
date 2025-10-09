@@ -6,6 +6,9 @@ time without prior notice.
 import time
 from typing import Any, Optional, TYPE_CHECKING
 
+import sentry_sdk
+from sentry_sdk.utils import safe_repr
+
 if TYPE_CHECKING:
     from sentry_sdk._types import Metric
 
@@ -18,10 +21,8 @@ def _capture_metric(
     attributes=None,  # type: Optional[dict[str, Any]]
 ):
     # type: (...) -> None
-    from sentry_sdk.api import get_client, get_current_scope, get_current_span
-    from sentry_sdk.utils import safe_repr
 
-    client = get_client()
+    client = sentry_sdk.get_client()
 
     attrs = {}  # type: dict[str, Union[str, bool, float, int]
     if attributes:
@@ -37,7 +38,7 @@ def _capture_metric(
                 else safe_repr(v)
             )
 
-    span = get_current_span()
+    span = sentry_sdk.get_current_span()
     trace_id = "00000000-0000-0000-0000-000000000000"
     span_id = None
 
@@ -46,11 +47,11 @@ def _capture_metric(
         trace_id = trace_context.get("trace_id", trace_id)
         span_id = trace_context.get("span_id")
     else:
-        scope = get_current_scope()
+        scope = sentry_sdk.get_current_scope()
         if scope:
             propagation_context = scope._propagation_context
             if propagation_context:
-                trace_id = propagation_context.get("trace_id", trace_id)
+                trace_id = propagation_context.trace_id or trace_id
 
     metric = {
         "timestamp": time.time(),
