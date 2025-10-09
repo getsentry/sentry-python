@@ -559,6 +559,7 @@ def test_litellm_message_truncation(sentry_init, capture_events):
         send_default_pii=True,
     )
     events = capture_events()
+
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
     )
@@ -569,24 +570,26 @@ def test_litellm_message_truncation(sentry_init, capture_events):
         {"role": "user", "content": large_content},
     ]
 
-    kwargs = {
-        "model": "gpt-3.5-turbo",
-        "messages": large_messages,
-    }
-
     mock_response = MockCompletionResponse()
-    _input_callback(kwargs)
-    _success_callback(
-        kwargs,
-        mock_response,
-        datetime.now(),
-        datetime.now(),
-    )
+
+    with start_transaction(name="litellm test"):
+        kwargs = {
+            "model": "gpt-3.5-turbo",
+            "messages": large_messages,
+        }
+
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs,
+            mock_response,
+            datetime.now(),
+            datetime.now(),
+        )
 
     (event,) = events
     (span,) = event["spans"]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
@@ -613,24 +616,26 @@ def test_litellm_single_large_message_preservation(sentry_init, capture_events):
     )
     messages = [{"role": "user", "content": huge_content}]
 
-    kwargs = {
-        "model": "gpt-3.5-turbo",
-        "messages": messages,
-    }
-
     mock_response = MockCompletionResponse()
-    _input_callback(kwargs)
-    _success_callback(
-        kwargs,
-        mock_response,
-        datetime.now(),
-        datetime.now(),
-    )
+
+    with start_transaction(name="litellm test"):
+        kwargs = {
+            "model": "gpt-3.5-turbo",
+            "messages": messages,
+        }
+
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs,
+            mock_response,
+            datetime.now(),
+            datetime.now(),
+        )
 
     (event,) = events
     (span,) = event["spans"]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
