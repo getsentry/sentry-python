@@ -142,7 +142,7 @@ TEST_SUITE_CONFIG = {
         "package": "gql[all]",
         "num_versions": 2,
     },
-    "google-genai": {
+    "google_genai": {
         "package": "google-genai",
         "deps": {
             "*": ["pytest-asyncio"],

@@ -78,7 +78,7 @@ GROUPS = {
         "openai-base",
         "openai-notiktoken",
         "langgraph",
-        "google-genai",
+        "google_genai",
         "openai_agents",
         "huggingface_hub",
     ],
