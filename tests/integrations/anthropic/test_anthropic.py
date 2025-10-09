@@ -913,12 +913,11 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
 
     client.messages._post = mock.Mock(return_value=mock_messages_create())
 
-    # Test messages with mixed roles including "ai" that should be mapped to "assistant"
     test_messages = [
         {"role": "system", "content": "You are helpful."},
         {"role": "user", "content": "Hello"},
-        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
-        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
+        {"role": "ai", "content": "Hi there!"},
+        {"role": "assistant", "content": "How can I help?"},
     ]
 
     with start_transaction(name="anthropic tx"):
@@ -928,33 +927,23 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
 
     (event,) = events
     span = event["spans"][0]
-
-    # Verify that the span was created correctly
     assert span["op"] == "gen_ai.chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
-    # Parse the stored messages
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
-    # Verify that "ai" role was mapped to "assistant"
     assert len(stored_messages) == 4
     assert stored_messages[0]["role"] == "system"
     assert stored_messages[1]["role"] == "user"
-    assert (
-        stored_messages[2]["role"] == "assistant"
-    )  # "ai" should be mapped to "assistant"
-    assert stored_messages[3]["role"] == "assistant"  # should stay "assistant"
+    assert stored_messages[2]["role"] == "assistant"
+    assert stored_messages[3]["role"] == "assistant"
 
-    # Verify content is preserved
     assert stored_messages[2]["content"] == "Hi there!"
     assert stored_messages[3]["content"] == "How can I help?"
 
-    # Verify no "ai" roles remain
     roles = [msg["role"] for msg in stored_messages]
     assert "ai" not in roles
     client = Anthropic(api_key="test-api-key")
 
-    # Create messages that will definitely exceed size limits
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
     )  # ~64KB
@@ -984,19 +973,15 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
 
     (event,) = events
     span = event["spans"][0]
-
-    # Should have gen_ai request messages (as string)
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-
-    # Should have fewer or equal messages than original (due to truncation)
     assert len(parsed_messages) <= len(large_messages)
 
-    # Size should be under the limit
     result_size = len(messages_data.encode("utf-8"))
     assert result_size <= MAX_GEN_AI_MESSAGE_BYTES
 
@@ -1012,11 +997,10 @@ def test_anthropic_single_large_message_preservation(sentry_init, capture_events
 
     client = Anthropic(api_key="test-api-key")
 
-    # Create one huge message that exceeds the limit
     huge_content = (
         "This is an extremely long message that will definitely exceed size limits. "
         * 2000
-    )  # ~150KB
+    )
     messages = [{"role": "user", "content": huge_content}]
 
     with mock.patch.object(client.messages, "create") as mock_create:
@@ -1039,18 +1023,12 @@ def test_anthropic_single_large_message_preservation(sentry_init, capture_events
     (event,) = events
     span = event["spans"][0]
 
-    # Should still have the message (not removed entirely)
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
-    # Should be valid JSON with exactly one message
-    import json
-
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
     assert len(parsed_messages) == 1
-
-    # The message should have truncated content
     assert parsed_messages[0]["role"] == "user"
     assert len(parsed_messages[0]["content"]) < len(huge_content)

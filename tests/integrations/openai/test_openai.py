@@ -1,3 +1,4 @@
+import json
 import pytest
 
 from sentry_sdk.utils import package_version
@@ -1515,10 +1516,9 @@ def test_openai_message_truncation(sentry_init, capture_events):
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    # Create messages that will definitely exceed size limits
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
-    )  # ~64KB
+    )
     large_messages = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": large_content},
@@ -1534,25 +1534,17 @@ def test_openai_message_truncation(sentry_init, capture_events):
 
     (event,) = events
     span = event["spans"][0]
-
-    # Should have gen_ai request messages (as string)
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
-    # Should be valid JSON
-    import json
-
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-
-    # Should have fewer messages than original (due to truncation)
     assert len(parsed_messages) <= len(large_messages)
 
-    # Should have _meta entry indicating truncation
     if "_meta" in event and len(parsed_messages) < len(large_messages):
         meta_path = event["_meta"]
-        # Navigate through the meta structure to find the messages metadata
         if (
             "spans" in meta_path
             and "0" in meta_path["spans"]
@@ -1576,11 +1568,10 @@ def test_openai_single_large_message_content_truncation(sentry_init, capture_eve
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    # Create one huge message that exceeds the limit
     huge_content = (
         "This is an extremely long message that will definitely exceed size limits. "
         * 2000
-    )  # ~150KB
+    )
     messages = [{"role": "user", "content": huge_content}]
 
     with start_transaction(name="openai tx"):
@@ -1591,23 +1582,16 @@ def test_openai_single_large_message_content_truncation(sentry_init, capture_eve
 
     (event,) = events
     span = event["spans"][0]
-
-    # Should still have the message (not removed entirely)
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
-
-    # Should be valid JSON with exactly one message
-    import json
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
     assert len(parsed_messages) == 1
-
-    # The message should have truncated content
     assert parsed_messages[0]["role"] == "user"
     assert len(parsed_messages[0]["content"]) < len(huge_content)
 
-    # Size should be under the limit
     result_size = len(messages_data.encode("utf-8"))
     assert result_size <= MAX_GEN_AI_MESSAGE_BYTES

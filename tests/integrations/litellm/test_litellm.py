@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest import mock
 from datetime import datetime
@@ -558,11 +559,9 @@ def test_litellm_message_truncation(sentry_init, capture_events):
         send_default_pii=True,
     )
     events = capture_events()
-
-    # Create messages that will definitely exceed size limits
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
-    )  # ~64KB
+    )
     large_messages = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": large_content},
@@ -575,10 +574,7 @@ def test_litellm_message_truncation(sentry_init, capture_events):
         "messages": large_messages,
     }
 
-    # Mock the response for success callback
     mock_response = MockCompletionResponse()
-
-    # Simulate the integration flow
     _input_callback(kwargs)
     _success_callback(
         kwargs,
@@ -589,22 +585,15 @@ def test_litellm_message_truncation(sentry_init, capture_events):
 
     (event,) = events
     (span,) = event["spans"]
-
-    # Should have gen_ai request messages (as string)
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
-    # Should be valid JSON
-    import json
-
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-
-    # Should have fewer or equal messages than original (due to truncation)
     assert len(parsed_messages) <= len(large_messages)
 
-    # Size should be under the limit
     result_size = len(messages_data.encode("utf-8"))
     assert result_size <= MAX_GEN_AI_MESSAGE_BYTES
 
@@ -618,11 +607,10 @@ def test_litellm_single_large_message_preservation(sentry_init, capture_events):
     )
     events = capture_events()
 
-    # Create one huge message that exceeds the limit
     huge_content = (
         "This is an extremely long message that will definitely exceed size limits. "
         * 2000
-    )  # ~150KB
+    )
     messages = [{"role": "user", "content": huge_content}]
 
     kwargs = {
@@ -630,10 +618,7 @@ def test_litellm_single_large_message_preservation(sentry_init, capture_events):
         "messages": messages,
     }
 
-    # Mock the response
     mock_response = MockCompletionResponse()
-
-    # Simulate the integration flow
     _input_callback(kwargs)
     _success_callback(
         kwargs,
@@ -644,19 +629,13 @@ def test_litellm_single_large_message_preservation(sentry_init, capture_events):
 
     (event,) = events
     (span,) = event["spans"]
-
-    # Should still have the message (not removed entirely)
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
-
-    # Should be valid JSON with exactly one message
-    import json
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
     assert len(parsed_messages) == 1
-
-    # The message should have truncated content
     assert parsed_messages[0]["role"] == "user"
     assert len(parsed_messages[0]["content"]) < len(huge_content)
