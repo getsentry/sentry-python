@@ -985,7 +985,7 @@ class _Client(BaseClient):
             metric["span_id"] = span.span_id
         else:
             propagation_context = isolation_scope.get_active_propagation_context()
-            if propagation_context:
+            if propagation_context and propagation_context.trace_id:
                 metric["trace_id"] = propagation_context.trace_id
 
         if isolation_scope._user is not None:
