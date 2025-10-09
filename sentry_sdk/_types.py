@@ -254,7 +254,7 @@ if TYPE_CHECKING:
             "type": MetricType,
             "value": float,
             "unit": Optional[str],
-            "attributes": dict[str, MetricAttributeValue],
+            "attributes": dict[str, str | bool | float | int],
         },
     )
 

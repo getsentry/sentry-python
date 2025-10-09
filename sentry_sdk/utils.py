@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    from sentry_sdk._types import Event, ExcInfo, Log, Hint
+    from sentry_sdk._types import Event, ExcInfo, Log, Hint, Metric
 
     P = ParamSpec("P")
     R = TypeVar("R")

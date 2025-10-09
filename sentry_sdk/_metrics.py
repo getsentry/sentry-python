@@ -4,18 +4,18 @@ time without prior notice.
 """
 
 import time
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING, Union
 
 import sentry_sdk
 from sentry_sdk.utils import safe_repr
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Metric
+    from sentry_sdk._types import Metric, MetricType
 
 
 def _capture_metric(
     name,  # type: str
-    metric_type,  # type: str
+    metric_type,  # type: MetricType
     value,  # type: float
     unit=None,  # type: Optional[str]
     attributes=None,  # type: Optional[dict[str, Any]]

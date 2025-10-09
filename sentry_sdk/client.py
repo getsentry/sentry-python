@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
     from sentry_sdk._log_batcher import LogBatcher
+    from sentry_sdk._metrics_batcher import MetricsBatcher
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 

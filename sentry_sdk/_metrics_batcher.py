@@ -2,7 +2,7 @@ import os
 import random
 import threading
 from datetime import datetime, timezone
-from typing import Optional, List, Callable, TYPE_CHECKING, Any
+from typing import Optional, List, Callable, TYPE_CHECKING, Any, Union
 
 from sentry_sdk.utils import format_timestamp, safe_repr
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
