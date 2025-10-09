@@ -171,7 +171,7 @@ def extract_contents_text(contents):
 
     # Content object with parts - recurse into parts
     if getattr(contents, "parts", None):
-        return extract_contents_text(contents.parts)  # type: ignore
+        return extract_contents_text(contents.parts)
 
     # Direct text attribute
     if hasattr(contents, "text"):
@@ -229,13 +229,13 @@ def extract_tool_calls(response):
 
     # Extract from candidates, sometimes tool calls are nested under the content.parts object
     if getattr(response, "candidates", []):
-        for candidate in response.candidates:  # type: ignore
+        for candidate in response.candidates:
             if not hasattr(candidate, "content") or not getattr(
                 candidate.content, "parts", []
             ):
                 continue
 
-            for part in candidate.content.parts:  # type: ignore
+            for part in candidate.content.parts:
                 if getattr(part, "function_call", None):
                     function_call = part.function_call
                     tool_call = {
@@ -245,7 +245,7 @@ def extract_tool_calls(response):
 
                     # Extract arguments if available
                     if getattr(function_call, "args", None):
-                        tool_call["arguments"] = safe_serialize(function_call.args)  # type: ignore
+                        tool_call["arguments"] = safe_serialize(function_call.args)
 
                     tool_calls.append(tool_call)
 

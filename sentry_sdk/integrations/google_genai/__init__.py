@@ -15,7 +15,6 @@ from sentry_sdk.tracing import SPANSTATUS
 
 
 try:
-    from google import genai
     from google.genai.models import Models, AsyncModels
 except ImportError:
     raise DidNotEnable("google-genai not installed")

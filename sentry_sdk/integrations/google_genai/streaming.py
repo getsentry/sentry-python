@@ -30,12 +30,12 @@ class AccumulatedResponse(TypedDict):
     model: Optional[str]
     text: str
     finish_reasons: List[str]
-    tool_calls: List[str]
+    tool_calls: List[dict[str, Any]]
     usage_metadata: UsageData
 
 
 def accumulate_streaming_response(chunks):
-    # type: (List[GenerateContentResponse]) -> dict[str, Any]
+    # type: (List[GenerateContentResponse]) -> AccumulatedResponse
     """Accumulate streaming chunks into a single response-like object."""
     accumulated_text = []
     finish_reasons = []
