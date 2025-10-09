@@ -291,8 +291,6 @@ class Item:
             return "profile"
         elif ty == "profile_chunk":
             return "profile_chunk"
-        elif ty == "statsd":
-            return "metric_bucket"
         elif ty == "check_in":
             return "monitor"
         else:
@@ -354,7 +352,7 @@ class Item:
             # if no length was specified we need to read up to the end of line
             # and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)
             payload = f.readline().rstrip(b"\n")
-        if headers.get("type") in ("event", "transaction", "metric_buckets"):
+        if headers.get("type") in ("event", "transaction"):
             rv = cls(headers=headers, payload=PayloadRef(json=parse_json(payload)))
         else:
             rv = cls(headers=headers, payload=payload)

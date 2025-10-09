@@ -276,7 +276,6 @@ class Span:
         "hub",
         "_context_manager_state",
         "_containing_transaction",
-        "_local_aggregator",
         "scope",
         "origin",
         "name",
@@ -345,7 +344,6 @@ class Span:
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
-        self._local_aggregator = None  # type: Optional[LocalAggregator]
 
         self.update_active_thread()
         self.set_profiler_id(get_profiler_id())
@@ -382,13 +380,6 @@ class Span:
     def span_id(self, value):
         # type: (str) -> None
         self._span_id = value
-
-    def _get_local_aggregator(self):
-        # type: (...) -> LocalAggregator
-        rv = self._local_aggregator
-        if rv is None:
-            rv = self._local_aggregator = LocalAggregator()
-        return rv
 
     def __repr__(self):
         # type: () -> str
@@ -740,11 +731,6 @@ class Span:
 
         if self.status:
             self._tags["status"] = self.status
-
-        if self._local_aggregator is not None:
-            metrics_summary = self._local_aggregator.to_json()
-            if metrics_summary:
-                rv["_metrics_summary"] = metrics_summary
 
         if len(self._measurements) > 0:
             rv["measurements"] = self._measurements
@@ -1122,13 +1108,6 @@ class Transaction(Span):
 
         event["measurements"] = self._measurements
 
-        # This is here since `to_json` is not invoked.  This really should
-        # be gone when we switch to onlyspans.
-        if self._local_aggregator is not None:
-            metrics_summary = self._local_aggregator.to_json()
-            if metrics_summary:
-                event["_metrics_summary"] = metrics_summary
-
         return scope.capture_event(event)
 
     def set_measurement(self, name, value, unit=""):
@@ -1505,8 +1484,3 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
-
-with warnings.catch_warnings():
-    # The code in this file which uses `LocalAggregator` is only called from the deprecated `metrics` module.
-    warnings.simplefilter("ignore", DeprecationWarning)
-    from sentry_sdk.metrics import LocalAggregator
