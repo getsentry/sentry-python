@@ -1,7 +1,7 @@
 import json
 import pytest
 
-from sentry_sdk.ai.message_utils import (
+from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
     truncate_messages_by_size,
     serialize_gen_ai_messages,
