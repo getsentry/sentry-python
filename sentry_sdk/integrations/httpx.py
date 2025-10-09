@@ -114,7 +114,7 @@ def _install_httpx_async_client():
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        with sentry_sdk.start_span(
+        with start_span(
             op=OP.HTTP_CLIENT,
             name="%s %s"
             % (
