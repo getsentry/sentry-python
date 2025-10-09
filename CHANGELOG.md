@@ -4,13 +4,15 @@
 
 ### Various fixes & improvements
 
-- feat(metrics): Add trace metrics behind an experiments flag (#4898) by @k-fish
-- ref: Remove "experimental" from log func name (#4901) by @sentrivana
+- feat: Add `concurrent.futures` patch to threading integration (#4770) by @alexander-alderman-webb
+  
+  The SDK now makes sure to automatically preserve span relationships when using `ThreadPoolExecutor`.
 - chore: Remove old metrics code (#4899) by @sentrivana
-- ci: Bump Python version for linting (#4897) by @sentrivana
-- feat: Add concurrent.futures patch to threading integration (#4770) by @alexander-alderman-webb
-- fix(ai): add mapping for gen_ai message roles (#4884) by @shellmayr
-- ci: Remove toxgen check (#4892) by @sentrivana
+
+  Removed all code related to the deprecated experimental metrics feature (`sentry_sdk.metrics`).
+- ref: Remove "experimental" from log function name (#4901) by @sentrivana
+- fix(ai): Add mapping for gen_ai message roles (#4884) by @shellmayr
+- feat(metrics): Add trace metrics behind an experiments flag (#4898) by @k-fish
 
 ## 2.40.0
 
