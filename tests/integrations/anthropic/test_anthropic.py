@@ -886,10 +886,6 @@ def test_set_output_data_with_input_json_delta(sentry_init):
 
 def test_anthropic_message_role_mapping(sentry_init, capture_events):
     """Test that Anthropic integration properly maps message roles like 'ai' to 'assistant'"""
-
-
-def test_anthropic_message_truncation(sentry_init, capture_events):
-    """Test that large messages are truncated properly in Anthropic integration."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -898,9 +894,8 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
     events = capture_events()
 
     client = Anthropic(api_key="z")
-
-    def mock_messages_create(*args, **kwargs):
-        return Message(
+    client.messages._post = mock.Mock(
+        return_value=Message(
             id="msg_1",
             content=[TextBlock(text="Hi there!", type="text")],
             model="claude-3-opus",
@@ -910,8 +905,7 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
             type="message",
             usage=Usage(input_tokens=10, output_tokens=5),
         )
-
-    client.messages._post = mock.Mock(return_value=mock_messages_create())
+    )
 
     test_messages = [
         {"role": "system", "content": "You are helpful."},
@@ -926,7 +920,8 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
         )
 
     (event,) = events
-    span = event["spans"][0]
+    (span,) = event["spans"]
+
     assert span["op"] == "gen_ai.chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
@@ -942,20 +937,20 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
 
     roles = [msg["role"] for msg in stored_messages]
     assert "ai" not in roles
+
+
+def test_anthropic_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Anthropic integration."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
     client = Anthropic(api_key="test-api-key")
-
-    large_content = (
-        "This is a very long message that will exceed our size limits. " * 1000
-    )  # ~64KB
-    large_messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": large_content},
-        {"role": "assistant", "content": large_content},
-        {"role": "user", "content": large_content},
-    ]
-
-    with mock.patch.object(client.messages, "create") as mock_create:
-        mock_create.return_value = Message(
+    client.messages._post = mock.Mock(
+        return_value=Message(
             id="test",
             content=[TextBlock(text="Hello", type="text")],
             model="claude-3",
@@ -963,18 +958,28 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
             type="message",
             usage=Usage(input_tokens=10, output_tokens=20),
         )
+    )
 
-        with start_transaction(name="anthropic tx"):
-            client.messages.create(
-                model="claude-3-sonnet-20240229",
-                messages=large_messages,
-                max_tokens=100,
-            )
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    large_messages = [
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": large_content},
+    ]
+
+    with start_transaction(name="anthropic tx"):
+        client.messages.create(
+            model="claude-3-sonnet-20240229",
+            messages=large_messages,
+            max_tokens=100,
+        )
 
     (event,) = events
-    span = event["spans"][0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    (span,) = event["spans"]
 
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
@@ -996,15 +1001,8 @@ def test_anthropic_single_large_message_preservation(sentry_init, capture_events
     events = capture_events()
 
     client = Anthropic(api_key="test-api-key")
-
-    huge_content = (
-        "This is an extremely long message that will definitely exceed size limits. "
-        * 2000
-    )
-    messages = [{"role": "user", "content": huge_content}]
-
-    with mock.patch.object(client.messages, "create") as mock_create:
-        mock_create.return_value = Message(
+    client.messages._post = mock.Mock(
+        return_value=Message(
             id="test",
             content=[TextBlock(text="Hello", type="text")],
             model="claude-3",
@@ -1012,16 +1010,23 @@ def test_anthropic_single_large_message_preservation(sentry_init, capture_events
             type="message",
             usage=Usage(input_tokens=100, output_tokens=50),
         )
+    )
 
-        with start_transaction(name="anthropic tx"):
-            client.messages.create(
-                model="claude-3-sonnet-20240229",
-                messages=messages,
-                max_tokens=100,
-            )
+    huge_content = (
+        "This is an extremely long message that will definitely exceed size limits. "
+        * 2000
+    )
+    messages = [{"role": "user", "content": huge_content}]
+
+    with start_transaction(name="anthropic tx"):
+        client.messages.create(
+            model="claude-3-sonnet-20240229",
+            messages=messages,
+            max_tokens=100,
+        )
 
     (event,) = events
-    span = event["spans"][0]
+    (span,) = event["spans"]
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
