@@ -252,7 +252,6 @@ def test_envelope_item_data_category_mapping():
         ("client_report", "internal"),
         ("profile", "profile"),
         ("profile_chunk", "profile_chunk"),
-        ("statsd", "metric_bucket"),
         ("check_in", "monitor"),
         ("unknown_type", "default"),
     ]

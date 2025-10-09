@@ -61,7 +61,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Event, Hint, SDKInfo, Log
     from sentry_sdk.integrations import Integration
-    from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
@@ -182,7 +181,6 @@ class BaseClient:
 
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
-        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
         self.log_batcher = None  # type: Optional[LogBatcher]
 
     def __getstate__(self, *args, **kwargs):
@@ -215,7 +213,7 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def _capture_experimental_log(self, log):
+    def _capture_log(self, log):
         # type: (Log) -> None
         pass
 
@@ -361,26 +359,6 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
-            experiments = self.options.get("_experiments", {})
-            if experiments.get("enable_metrics", True):
-                # Context vars are not working correctly on Python <=3.6
-                # with gevent.
-                metrics_supported = not is_gevent() or PY37
-                if metrics_supported:
-                    from sentry_sdk.metrics import MetricsAggregator
-
-                    self.metrics_aggregator = MetricsAggregator(
-                        capture_func=_capture_envelope,
-                        enable_code_locations=bool(
-                            experiments.get("metric_code_locations", True)
-                        ),
-                    )
-                else:
-                    logger.info(
-                        "Metrics not supported on Python 3.6 and lower with gevent."
-                    )
-
             self.log_batcher = None
 
             if has_logs_enabled(self.options):
@@ -467,7 +445,6 @@ class _Client(BaseClient):
 
         if (
             self.monitor
-            or self.metrics_aggregator
             or self.log_batcher
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, BaseHttpTransport)
@@ -900,7 +877,7 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_experimental_log(self, log):
+    def _capture_log(self, log):
         # type: (Optional[Log]) -> None
         if not has_logs_enabled(self.options) or log is None:
             return
@@ -1019,8 +996,6 @@ class _Client(BaseClient):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.kill()
             if self.log_batcher is not None:
                 self.log_batcher.kill()
             if self.monitor:
@@ -1045,8 +1020,6 @@ class _Client(BaseClient):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self.session_flusher.flush()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.flush()
             if self.log_batcher is not None:
                 self.log_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
