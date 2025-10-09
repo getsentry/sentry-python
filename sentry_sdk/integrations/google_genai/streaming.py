@@ -95,7 +95,7 @@ def accumulate_streaming_response(chunks):
 
 
 def set_span_data_for_streaming_response(span, integration, accumulated_response):
-    # type: (Span, Any, dict[str, Any]) -> None
+    # type: (Span, Any, AccumulatedResponse) -> None
     """Set span data for accumulated streaming response."""
     # Set response text
     if (

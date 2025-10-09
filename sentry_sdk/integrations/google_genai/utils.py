@@ -256,7 +256,7 @@ def extract_tool_calls(response):
             if not getattr(content, "parts", None):
                 continue
 
-            for part in content.parts:
+            for part in getattr(content, "parts", []):
                 if getattr(part, "function_call", None):
                     function_call = part.function_call
                     tool_call = {
@@ -416,7 +416,7 @@ def extract_finish_reasons(response):
         return None
 
     finish_reasons = []
-    for candidate in response.candidates:
+    for candidate in getattr(response, "candidates", []):
         if getattr(candidate, "finish_reason", None):
             # Convert enum value to string if necessary
             reason = str(candidate.finish_reason)
