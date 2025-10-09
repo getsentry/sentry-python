@@ -234,31 +234,31 @@ if TYPE_CHECKING:
         },
     )
 
-    TraceMetricType = Literal["counter", "gauge", "distribution"]
+    MetricType = Literal["counter", "gauge", "distribution"]
 
-    TraceMetricAttributeValue = TypedDict(
-        "TraceMetricAttributeValue",
+    MetricAttributeValue = TypedDict(
+        "MetricAttributeValue",
         {
             "value": Union[str, bool, float, int],
             "type": Literal["string", "boolean", "double", "integer"],
         },
     )
 
-    TraceMetric = TypedDict(
-        "TraceMetric",
+    Metric = TypedDict(
+        "Metric",
         {
             "timestamp": float,
             "trace_id": str,
             "span_id": Optional[str],
             "name": str,
-            "type": TraceMetricType,
+            "type": MetricType,
             "value": float,
             "unit": Optional[str],
-            "attributes": dict[str, TraceMetricAttributeValue],
+            "attributes": dict[str, MetricAttributeValue],
         },
     )
 
-    TraceMetricProcessor = Callable[[TraceMetric, Hint], Optional[TraceMetric]]
+    MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
 
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]

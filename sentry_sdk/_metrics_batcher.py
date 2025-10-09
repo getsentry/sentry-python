@@ -8,10 +8,10 @@ from sentry_sdk.utils import format_timestamp, safe_repr
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import TraceMetric
+    from sentry_sdk._types import Metric
 
 
-class TraceMetricsBatcher:
+class MetricsBatcher:
     MAX_METRICS_BEFORE_FLUSH = 100
     FLUSH_WAIT_TIME = 5.0
 
@@ -20,7 +20,7 @@ class TraceMetricsBatcher:
         capture_func,  # type: Callable[[Envelope], None]
     ):
         # type: (...) -> None
-        self._metric_buffer = []  # type: List[TraceMetric]
+        self._metric_buffer = []  # type: List[Metric]
         self._capture_func = capture_func
         self._running = True
         self._lock = threading.Lock()
@@ -65,7 +65,7 @@ class TraceMetricsBatcher:
 
     def add(
         self,
-        metric,  # type: TraceMetric
+        metric,  # type: Metric
     ):
         # type: (...) -> None
         if not self._ensure_thread() or self._flusher is None:
@@ -91,9 +91,9 @@ class TraceMetricsBatcher:
 
     @staticmethod
     def _metric_to_transport_format(metric):
-        # type: (TraceMetric) -> Any
+        # type: (Metric) -> Any
         def format_attribute(val):
-            # type: (int | float | str | bool) -> Any
+            # type: (Union[int, float, str, bool]) -> Any
             if isinstance(val, bool):
                 return {"value": val, "type": "boolean"}
             if isinstance(val, int):
@@ -154,4 +154,3 @@ class TraceMetricsBatcher:
 
         self._capture_func(envelope)
         return envelope
-

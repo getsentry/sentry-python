@@ -2015,16 +2015,16 @@ def get_before_send_log(options):
     )
 
 
-def has_trace_metrics_enabled(options):
+def has_metrics_enabled(options):
     # type: (Optional[dict[str, Any]]) -> bool
     if options is None:
         return False
 
-    return bool(options["_experiments"].get("enableMetrics", False))
+    return bool(options["_experiments"].get("enable_metrics", False))
 
 
 def get_before_send_metric(options):
-    # type: (Optional[dict[str, Any]]) -> Optional[Callable[[TraceMetric, Hint], Optional[TraceMetric]]]
+    # type: (Optional[dict[str, Any]]) -> Optional[Callable[[Metric, Hint], Optional[Metric]]]
     if options is None:
         return None
 

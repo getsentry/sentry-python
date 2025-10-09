@@ -26,7 +26,7 @@ from sentry_sdk.utils import (
     get_before_send_log,
     get_before_send_metric,
     has_logs_enabled,
-    has_trace_metrics_enabled,
+    has_metrics_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -61,7 +61,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo, Log
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
@@ -184,7 +184,7 @@ class BaseClient:
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
         self.log_batcher = None  # type: Optional[LogBatcher]
-        self.trace_metrics_batcher = None  # type: Optional[TraceMetricsBatcher]
+        self.metrics_batcher = None  # type: Optional[MetricsBatcher]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -220,8 +220,8 @@ class BaseClient:
         # type: (Log) -> None
         pass
 
-    def _capture_trace_metric(self, metric):
-        # type: (TraceMetric) -> None
+    def _capture_metric(self, metric):
+        # type: (Metric) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -373,12 +373,12 @@ class _Client(BaseClient):
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
 
-            self.trace_metrics_batcher = None
+            self.metrics_batcher = None
 
-            if has_trace_metrics_enabled(self.options):
-                from sentry_sdk._trace_metrics_batcher import TraceMetricsBatcher
+            if has_metrics_enabled(self.options):
+                from sentry_sdk._metrics_batcher import MetricsBatcher
 
-                self.trace_metrics_batcher = TraceMetricsBatcher(capture_func=_capture_envelope)
+                self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -958,12 +958,11 @@ class _Client(BaseClient):
         if self.log_batcher:
             self.log_batcher.add(log)
 
-    def _capture_trace_metric(self, metric):
-        # type: (Optional[TraceMetric]) -> None
-        if not has_trace_metrics_enabled(self.options) or metric is None:
+    def _capture_metric(self, metric):
+        # type: (Optional[Metric]) -> None
+        if not has_metrics_enabled(self.options) or metric is None:
             return
 
-        current_scope = sentry_sdk.get_current_scope()
         isolation_scope = sentry_sdk.get_isolation_scope()
 
         metric["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
@@ -1004,8 +1003,8 @@ class _Client(BaseClient):
         if metric is None:
             return
 
-        if self.trace_metrics_batcher:
-            self.trace_metrics_batcher.add(metric)
+        if self.metrics_batcher:
+            self.metrics_batcher.add(metric)
 
     def capture_session(
         self,
@@ -1061,8 +1060,8 @@ class _Client(BaseClient):
             self.session_flusher.kill()
             if self.log_batcher is not None:
                 self.log_batcher.kill()
-            if self.trace_metrics_batcher is not None:
-                self.trace_metrics_batcher.kill()
+            if self.metrics_batcher is not None:
+                self.metrics_batcher.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -1087,8 +1086,8 @@ class _Client(BaseClient):
             self.session_flusher.flush()
             if self.log_batcher is not None:
                 self.log_batcher.flush()
-            if self.trace_metrics_batcher is not None:
-                self.trace_metrics_batcher.flush()
+            if self.metrics_batcher is not None:
+                self.metrics_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):

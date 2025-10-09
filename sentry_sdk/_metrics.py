@@ -2,10 +2,10 @@ import time
 from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import TraceMetric
+    from sentry_sdk._types import Metric
 
 
-def _capture_trace_metric(
+def _capture_metric(
     name,  # type: str
     metric_type,  # type: str
     value,  # type: float
@@ -35,7 +35,7 @@ def _capture_trace_metric(
     span = get_current_span()
     trace_id = "00000000-0000-0000-0000-000000000000"
     span_id = None
-    
+
     if span:
         trace_context = span.get_trace_context()
         trace_id = trace_context.get("trace_id", trace_id)
@@ -56,9 +56,9 @@ def _capture_trace_metric(
         "value": float(value),
         "unit": unit,
         "attributes": attrs,
-    }  # type: TraceMetric
+    }  # type: Metric
 
-    client._capture_trace_metric(metric)
+    client._capture_metric(metric)
 
 
 def count(
@@ -68,7 +68,7 @@ def count(
     attributes=None,  # type: Optional[dict[str, Any]]
 ):
     # type: (...) -> None
-    _capture_trace_metric(name, "counter", value, unit, attributes)
+    _capture_metric(name, "counter", value, unit, attributes)
 
 
 def gauge(
@@ -78,7 +78,7 @@ def gauge(
     attributes=None,  # type: Optional[dict[str, Any]]
 ):
     # type: (...) -> None
-    _capture_trace_metric(name, "gauge", value, unit, attributes)
+    _capture_metric(name, "gauge", value, unit, attributes)
 
 
 def distribution(
@@ -88,4 +88,4 @@ def distribution(
     attributes=None,  # type: Optional[dict[str, Any]]
 ):
     # type: (...) -> None
-    _capture_trace_metric(name, "distribution", value, unit, attributes)
+    _capture_metric(name, "distribution", value, unit, attributes)
