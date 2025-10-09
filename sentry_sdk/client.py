@@ -213,7 +213,7 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def _capture_experimental_log(self, log):
+    def _capture_log(self, log):
         # type: (Log) -> None
         pass
 
@@ -877,7 +877,7 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_experimental_log(self, log):
+    def _capture_log(self, log):
         # type: (Optional[Log]) -> None
         if not has_logs_enabled(self.options) or log is None:
             return
