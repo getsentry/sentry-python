@@ -163,7 +163,7 @@ def test_metrics_tracing_without_performance(sentry_init, capture_envelopes):
 
     assert metrics[0]["trace_id"] is not None
     assert metrics[0]["trace_id"] != "00000000-0000-0000-0000-000000000000"
-    assert metrics[0]["span_id"] is not None
+    assert metrics[0]["span_id"] is None
 
 
 def test_metrics_before_send(sentry_init, capture_envelopes):
