@@ -75,7 +75,6 @@ def accumulate_streaming_response(chunks):
         total_reasoning_tokens += extracted_usage_data["output_tokens_reasoning"]
         total_tokens += extracted_usage_data["total_tokens"]
 
-    # Create a synthetic response object with accumulated data
     accumulated_response = AccumulatedResponse(
         text="".join(accumulated_text),
         finish_reasons=finish_reasons,
@@ -97,7 +96,6 @@ def accumulate_streaming_response(chunks):
 def set_span_data_for_streaming_response(span, integration, accumulated_response):
     # type: (Span, Any, AccumulatedResponse) -> None
     """Set span data for accumulated streaming response."""
-    # Set response text
     if (
         should_send_default_pii()
         and integration.include_prompts
@@ -108,7 +106,6 @@ def set_span_data_for_streaming_response(span, integration, accumulated_response
             safe_serialize([accumulated_response["text"]]),
         )
 
-    # Set finish reasons
     if accumulated_response.get("finish_reasons"):
         set_data_normalized(
             span,
@@ -116,14 +113,12 @@ def set_span_data_for_streaming_response(span, integration, accumulated_response
             accumulated_response["finish_reasons"],
         )
 
-    # Set tool calls
     if accumulated_response.get("tool_calls"):
         span.set_data(
             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             safe_serialize(accumulated_response["tool_calls"]),
         )
 
-    # Set response ID and model
     if accumulated_response.get("id"):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_ID, accumulated_response["id"])
     if accumulated_response.get("model"):
@@ -141,7 +136,6 @@ def set_span_data_for_streaming_response(span, integration, accumulated_response
             accumulated_response["usage_metadata"]["input_tokens_cached"],
         )
 
-    # Output tokens already include reasoning tokens from extract_usage_data
     if accumulated_response["usage_metadata"]["output_tokens"]:
         span.set_data(
             SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
@@ -154,7 +148,6 @@ def set_span_data_for_streaming_response(span, integration, accumulated_response
             accumulated_response["usage_metadata"]["output_tokens_reasoning"],
         )
 
-    # Set total token count if available
     if accumulated_response["usage_metadata"]["total_tokens"]:
         span.set_data(
             SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,

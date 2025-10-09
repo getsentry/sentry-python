@@ -82,6 +82,7 @@ def extract_usage_data(response):
 
         candidates_tokens = usage.get("candidates_token_count", 0) or 0
         # python-genai reports output and reasoning tokens separately
+        # reasoning should be sub-category of output tokens
         usage_data["output_tokens"] = candidates_tokens + reasoning_tokens
 
         total_tokens = usage.get("total_token_count", 0) or 0
@@ -89,7 +90,6 @@ def extract_usage_data(response):
 
         return usage_data
 
-    # Handle response object
     if not hasattr(response, "usage_metadata"):
         return usage_data
 
@@ -209,7 +209,7 @@ def _format_tools_for_span(tools):
             # Check for predefined tool attributes - each of these tools
             # is an attribute of the tool object, by default set to None
             for attr_name, description in TOOL_ATTRIBUTES_MAP.items():
-                if hasattr(tool, attr_name) and getattr(tool, attr_name) is not None:
+                if getattr(tool, attr_name, None):
                     formatted_tools.append(
                         {
                             "name": attr_name,
@@ -434,11 +434,9 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
     span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
     span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-    # Set streaming flag
     if kwargs.get("stream", False):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-    # Set model configuration parameters
     config = kwargs.get("config")
 
     if config is None:
@@ -506,35 +504,29 @@ def set_span_data_for_response(span, integration, response):
     if not response:
         return
 
-    # Extract and set response text
     if should_send_default_pii() and integration.include_prompts:
         response_texts = _extract_response_text(response)
         if response_texts:
             # Format as JSON string array as per documentation
             span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts))
 
-    # Extract and set tool calls
     tool_calls = extract_tool_calls(response)
     if tool_calls:
         # Tool calls should be JSON serialized
         span.set_data(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
 
-    # Extract and set finish reasons
     finish_reasons = extract_finish_reasons(response)
     if finish_reasons:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
         )
 
-    # Set response ID if available
     if getattr(response, "response_id", None):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_ID, response.response_id)
 
-    # Set response model if available
     if getattr(response, "model_version", None):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_version)
 
-    # Set token usage if available
     usage_data = extract_usage_data(response)
 
     if usage_data["input_tokens"]:
@@ -555,7 +547,6 @@ def set_span_data_for_response(span, integration, response):
             usage_data["output_tokens_reasoning"],
         )
 
-    # Set total token count if available
     if usage_data["total_tokens"]:
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"])
 
@@ -567,7 +558,6 @@ def prepare_generate_content_args(args, kwargs):
     contents = args[1] if len(args) > 1 else kwargs.get("contents")
     model_name = get_model_name(model)
 
-    # Wrap config with tools
     config = kwargs.get("config")
     wrapped_config = wrapped_config_with_tools(config)
     if wrapped_config is not config:
