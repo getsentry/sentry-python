@@ -336,7 +336,6 @@ def add_http_request_source(span):
 
     duration = span.timestamp - span.start_timestamp
     threshold = client.options.get("http_request_source_threshold_ms", 0)
-    print("division: ", duration / timedelta(milliseconds=1), threshold)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 
     if not slow_query:
