@@ -31,6 +31,31 @@ def _patch_graph_nodes():
     CallToolsNode -> Handles tool calls (spans created in tool patching)
     """
 
+    def _extract_span_data(node, ctx):
+        # type: (Any, Any) -> tuple[list[Any], Any, Any]
+        """Extract common data needed for creating chat spans.
+
+        Returns:
+            Tuple of (messages, model, model_settings)
+        """
+        # Extract model and settings from context
+        model = None
+        model_settings = None
+        if hasattr(ctx, "deps"):
+            model = getattr(ctx.deps, "model", None)
+            model_settings = getattr(ctx.deps, "model_settings", None)
+
+        # Build full message list: history + current request
+        messages = []
+        if hasattr(ctx, "state") and hasattr(ctx.state, "message_history"):
+            messages.extend(ctx.state.message_history)
+
+        current_request = getattr(node, "request", None)
+        if current_request:
+            messages.append(current_request)
+
+        return messages, model, model_settings
+
     # Patch UserPromptNode to create invoke_agent spans
     original_user_prompt_run = UserPromptNode.run
 
@@ -71,24 +96,7 @@ def _patch_graph_nodes():
     @wraps(original_model_request_run)
     async def wrapped_model_request_run(self, ctx):
         # type: (Any, Any) -> Any
-        # Extract data from context
-        model = None
-        model_settings = None
-        if hasattr(ctx, "deps"):
-            model = getattr(ctx.deps, "model", None)
-            model_settings = getattr(ctx.deps, "model_settings", None)
-
-        # Build full message list: history + current request
-        messages = []
-
-        # Add message history
-        if hasattr(ctx, "state") and hasattr(ctx.state, "message_history"):
-            messages.extend(ctx.state.message_history)
-
-        # Add current request
-        current_request = getattr(self, "request", None)
-        if current_request:
-            messages.append(current_request)
+        messages, model, model_settings = _extract_span_data(self, ctx)
 
         with ai_client_span(messages, None, model, model_settings) as span:
             result = await original_model_request_run(self, ctx)
@@ -115,24 +123,7 @@ def _patch_graph_nodes():
         @wraps(original_stream_method)
         async def wrapped_model_request_stream(self, ctx):
             # type: (Any, Any) -> Any
-            # Extract data from context
-            model = None
-            model_settings = None
-            if hasattr(ctx, "deps"):
-                model = getattr(ctx.deps, "model", None)
-                model_settings = getattr(ctx.deps, "model_settings", None)
-
-            # Build full message list: history + current request
-            messages = []
-
-            # Add message history
-            if hasattr(ctx, "state") and hasattr(ctx.state, "message_history"):
-                messages.extend(ctx.state.message_history)
-
-            # Add current request
-            current_request = getattr(self, "request", None)
-            if current_request:
-                messages.append(current_request)
+            messages, model, model_settings = _extract_span_data(self, ctx)
 
             # Create chat span for streaming request
             import sentry_sdk
