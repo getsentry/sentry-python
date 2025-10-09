@@ -87,12 +87,9 @@ def accumulate_streaming_response(chunks):
             output_tokens_reasoning=total_reasoning_tokens,
             total_tokens=total_tokens,
         ),
+        id=response_id,
+        model=model,
     )
-
-    if response_id:
-        accumulated_response["id"] = response_id
-    if model:
-        accumulated_response["model"] = model
 
     return accumulated_response
 
