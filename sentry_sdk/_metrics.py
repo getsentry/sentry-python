@@ -18,7 +18,7 @@ def _capture_metric(
 
     client = get_client()
 
-    attrs = {}  # type: dict[str, str | bool | float | int]
+    attrs = {}  # type: dict[str, Union[str, bool, float, int]
     if attributes:
         for k, v in attributes.items():
             attrs[k] = (
