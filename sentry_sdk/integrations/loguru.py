@@ -193,7 +193,7 @@ def loguru_sentry_logs_handler(message):
     if record.get("name"):
         attrs["logger.name"] = record["name"]
 
-    client._capture_experimental_log(
+    client._capture_log(
         {
             "severity_text": otel_severity_text,
             "severity_number": otel_severity_number,

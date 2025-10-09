@@ -1,7 +1,6 @@
 # The TEST_SUITE_CONFIG dictionary defines, for each integration test suite,
-# the main package (framework, library) to test with; any additional test
-# dependencies, optionally gated behind specific conditions; and optionally
-# the Python versions to test on.
+# at least the main package (framework, library) to test with. Additional
+# test dependencies, Python versions to test on, etc. can also be defined here.
 #
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
