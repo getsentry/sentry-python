@@ -2020,14 +2020,12 @@ def has_trace_metrics_enabled(options):
     if options is None:
         return False
 
-    return bool(options["_experiments"].get("enableTraceMetrics", False))
+    return bool(options["_experiments"].get("enableMetrics", False))
 
 
-def get_before_send_trace_metric(options):
+def get_before_send_metric(options):
     # type: (Optional[dict[str, Any]]) -> Optional[Callable[[TraceMetric, Hint], Optional[TraceMetric]]]
     if options is None:
         return None
 
-    return options.get("before_send_trace_metric") or options["_experiments"].get(
-        "before_send_trace_metric"
-    )
+    return options["_experiments"].get("before_send_metric")

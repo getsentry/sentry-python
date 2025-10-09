@@ -24,6 +24,7 @@ from sentry_sdk.utils import (
     is_gevent,
     logger,
     get_before_send_log,
+    get_before_send_metric,
     has_logs_enabled,
     has_trace_metrics_enabled,
 )
@@ -1016,13 +1017,12 @@ class _Client(BaseClient):
         debug = self.options.get("debug", False)
         if debug:
             logger.debug(
-                f"[Sentry Trace Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
+                f"[Sentry Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
             )
 
-        from sentry_sdk.utils import get_before_send_trace_metric
-        before_send_trace_metric = get_before_send_trace_metric(self.options)
-        if before_send_trace_metric is not None:
-            metric = before_send_trace_metric(metric, {})
+        before_send_metric = get_before_send_metric(self.options)
+        if before_send_metric is not None:
+            metric = before_send_metric(metric, {})
 
         if metric is None:
             return

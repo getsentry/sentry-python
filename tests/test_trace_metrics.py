@@ -52,7 +52,7 @@ def test_trace_metrics_disabled_by_default(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_trace_metrics_basics(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableTraceMetrics": True})
+    sentry_init(_experiments={"enableMetrics": True})
     envelopes = capture_envelopes()
 
     sentry_sdk.trace_metrics.count("test.counter", 1)
@@ -84,7 +84,7 @@ def test_trace_metrics_basics(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_trace_metrics_experimental_option(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableTraceMetrics": True})
+    sentry_init(_experiments={"enableMetrics": True})
     envelopes = capture_envelopes()
 
     sentry_sdk.trace_metrics.count("test.counter", 5)
@@ -101,13 +101,13 @@ def test_trace_metrics_experimental_option(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_trace_metrics_with_attributes(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableTraceMetrics": True}, release="1.0.0", environment="test")
+    sentry_init(
+        _experiments={"enableMetrics": True}, release="1.0.0", environment="test"
+    )
     envelopes = capture_envelopes()
 
     sentry_sdk.trace_metrics.count(
-        "test.counter", 
-        1, 
-        attributes={"endpoint": "/api/test", "status": "success"}
+        "test.counter", 1, attributes={"endpoint": "/api/test", "status": "success"}
     )
 
     get_client().flush()
@@ -123,10 +123,12 @@ def test_trace_metrics_with_attributes(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_trace_metrics_with_user(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableTraceMetrics": True})
+    sentry_init(_experiments={"enableMetrics": True})
     envelopes = capture_envelopes()
 
-    sentry_sdk.set_user({"id": "user-123", "email": "test@example.com", "username": "testuser"})
+    sentry_sdk.set_user(
+        {"id": "user-123", "email": "test@example.com", "username": "testuser"}
+    )
     sentry_sdk.trace_metrics.count("test.user.counter", 1)
 
     get_client().flush()
@@ -141,7 +143,7 @@ def test_trace_metrics_with_user(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_trace_metrics_with_span(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enableTraceMetrics": True}, traces_sample_rate=1.0)
+    sentry_init(_experiments={"enableMetrics": True}, traces_sample_rate=1.0)
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_span(op="test", name="test-span") as span:
@@ -182,7 +184,10 @@ def test_trace_metrics_before_send(sentry_init, capture_envelopes):
         return record
 
     sentry_init(
-        _experiments={"enableTraceMetrics": True, "before_send_trace_metric": _before_metric},
+        _experiments={
+            "enableMetrics": True,
+            "before_send_metric": _before_metric,
+        },
     )
     envelopes = capture_envelopes()
 
@@ -195,4 +200,3 @@ def test_trace_metrics_before_send(sentry_init, capture_envelopes):
     assert len(metrics) == 1
     assert metrics[0]["name"] == "test.keep"
     assert before_metric_called
-
