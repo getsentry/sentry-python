@@ -525,18 +525,17 @@ def test_no_request_source_if_duration_too_short(sentry_init, capture_events):
 
     already_patched_putrequest = HTTPConnection.putrequest
 
-    def overwrite_timestamps_putrequest(self, *args, **kwargs):
-        already_patched_putrequest(self, *args, **kwargs)
-        span = self._sentrysdk_span
-        span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-        span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
-
-    HTTPConnection.putrequest = overwrite_timestamps_putrequest
+    class HttpConnectionWithPatchedSpan(HTTPConnection):
+        def putrequest(self, *args, **kwargs) -> None:
+            already_patched_putrequest(self, *args, **kwargs)
+            span = self._sentrysdk_span  # type: ignore
+            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
 
     events = capture_events()
 
     with start_transaction(name="foo"):
-        conn = HTTPConnection("localhost", port=PORT)
+        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
 
@@ -555,25 +554,24 @@ def test_no_request_source_if_duration_too_short(sentry_init, capture_events):
 
 def test_request_source_if_duration_over_threshold(sentry_init, capture_events):
     sentry_init(
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
 
     already_patched_putrequest = HTTPConnection.putrequest
 
-    def overwrite_timestamps_putrequest(self, *args, **kwargs):
-        already_patched_putrequest(self, *args, **kwargs)
-        span = self._sentrysdk_span
-        span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-        span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
-
-    HTTPConnection.putrequest = overwrite_timestamps_putrequest
+    class HttpConnectionWithPatchedSpan(HTTPConnection):
+        def putrequest(self, *args, **kwargs) -> None:
+            already_patched_putrequest(self, *args, **kwargs)
+            span = self._sentrysdk_span  # type: ignore
+            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
 
     events = capture_events()
 
     with start_transaction(name="foo"):
-        conn = HTTPConnection("localhost", port=PORT)
+        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
 
