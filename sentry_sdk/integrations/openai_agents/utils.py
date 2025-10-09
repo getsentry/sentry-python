@@ -1,5 +1,10 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import (
+    GEN_AI_ALLOWED_MESSAGE_ROLES,
+    normalize_message_roles,
+    set_data_normalized,
+    normalize_message_role,
+)
 from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
@@ -94,35 +99,47 @@ def _set_input_data(span, get_response_kwargs):
     # type: (sentry_sdk.tracing.Span, dict[str, Any]) -> None
     if not should_send_default_pii():
         return
+    request_messages = []
 
-    messages_by_role = {
-        "system": [],
-        "user": [],
-        "assistant": [],
-        "tool": [],
-    }  # type: (dict[str, list[Any]])
     system_instructions = get_response_kwargs.get("system_instructions")
     if system_instructions:
-        messages_by_role["system"].append({"type": "text", "text": system_instructions})
+        request_messages.append(
+            {
+                "role": GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM,
+                "content": [{"type": "text", "text": system_instructions}],
+            }
+        )
 
     for message in get_response_kwargs.get("input", []):
         if "role" in message:
-            messages_by_role[message.get("role")].append(
-                {"type": "text", "text": message.get("content")}
+            normalized_role = normalize_message_role(message.get("role"))
+            request_messages.append(
+                {
+                    "role": normalized_role,
+                    "content": [{"type": "text", "text": message.get("content")}],
+                }
             )
         else:
             if message.get("type") == "function_call":
-                messages_by_role["assistant"].append(message)
+                request_messages.append(
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT,
+                        "content": [message],
+                    }
+                )
             elif message.get("type") == "function_call_output":
-                messages_by_role["tool"].append(message)
-
-    request_messages = []
-    for role, messages in messages_by_role.items():
-        if len(messages) > 0:
-            request_messages.append({"role": role, "content": messages})
+                request_messages.append(
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
+                        "content": [message],
+                    }
+                )
 
     set_data_normalized(
-        span, SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages, unpack=False
+        span,
+        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+        normalize_message_roles(request_messages),
+        unpack=False,
     )
 
 
