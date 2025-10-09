@@ -51,7 +51,7 @@ def accumulate_streaming_response(chunks):
     for chunk in chunks:
         # Extract text and tool calls
         if getattr(chunk, "candidates", None):
-            for candidate in chunk.candidates:
+            for candidate in getattr(chunk, "candidates", []):
                 if hasattr(candidate, "content") and getattr(
                     candidate.content, "parts", []
                 ):

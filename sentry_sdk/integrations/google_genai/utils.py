@@ -394,7 +394,7 @@ def _extract_response_text(response):
     # type: (GenerateContentResponse) -> Optional[List[str]]
     """Extract text from response candidates."""
 
-    if not response or not hasattr(response, "candidates"):
+    if not response or not getattr(response, "candidates", []):
         return None
 
     texts = []
@@ -412,11 +412,11 @@ def _extract_response_text(response):
 def extract_finish_reasons(response):
     # type: (GenerateContentResponse) -> Optional[List[str]]
     """Extract finish reasons from response candidates."""
-    if not response or not hasattr(response, "candidates"):
+    if not response or not getattr(response, "candidates", []):
         return None
 
     finish_reasons = []
-    for candidate in getattr(response, "candidates", []):
+    for candidate in response.candidates:
         if getattr(candidate, "finish_reason", None):
             # Convert enum value to string if necessary
             reason = str(candidate.finish_reason)
