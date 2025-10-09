@@ -555,8 +555,8 @@ def test_no_request_source_if_duration_too_short(sentry_init, capture_events):
 def test_request_source_if_duration_over_threshold(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-        enable_db_query_source=True,
-        db_query_source_threshold_ms=100,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=100,
     )
 
     already_patched_putrequest = HTTPConnection.putrequest
