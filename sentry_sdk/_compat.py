@@ -1,18 +1,39 @@
 import sys
+import asyncio
+import inspect
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import TypeVar
+    from typing import Callable
 
     T = TypeVar("T")
+    _F = TypeVar("_F", bound=Callable[..., Any])
 
 
 PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
 PY38 = sys.version_info[0] == 3 and sys.version_info[1] >= 8
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
+
+
+# Python 3.12 deprecates asyncio.iscoroutinefunction() as an alias for
+# inspect.iscoroutinefunction(), whilst also removing the _is_coroutine marker.
+# The latter is replaced with the inspect.markcoroutinefunction decorator.
+# Until 3.12 is the minimum supported Python version, provide a shim.
+# This was adapted from https://github.com/django/asgiref/blob/main/asgiref/sync.py
+if hasattr(inspect, "markcoroutinefunction"):
+    iscoroutinefunction = inspect.iscoroutinefunction
+    markcoroutinefunction = inspect.markcoroutinefunction
+else:
+    iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
+
+    def markcoroutinefunction(func):
+        # type: (_F) -> _F
+        func._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore
+        return func
 
 
 def with_metaclass(meta, *bases):

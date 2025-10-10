@@ -13,6 +13,7 @@ import inspect
 from django.core.handlers.wsgi import WSGIRequest
 
 import sentry_sdk
+from sentry_sdk._compat import iscoroutinefunction, markcoroutinefunction
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -35,20 +36,7 @@ if TYPE_CHECKING:
     _F = TypeVar("_F", bound=Callable[..., Any])
 
 
-# Python 3.12 deprecates asyncio.iscoroutinefunction() as an alias for
-# inspect.iscoroutinefunction(), whilst also removing the _is_coroutine marker.
-# The latter is replaced with the inspect.markcoroutinefunction decorator.
-# Until 3.12 is the minimum supported Python version, provide a shim.
-# This was copied from https://github.com/django/asgiref/blob/main/asgiref/sync.py
-if hasattr(inspect, "markcoroutinefunction"):
-    iscoroutinefunction = inspect.iscoroutinefunction
-    markcoroutinefunction = inspect.markcoroutinefunction
-else:
-    iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
 
-    def markcoroutinefunction(func: "_F") -> "_F":
-        func._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore
-        return func
 
 
 def _make_asgi_request_event_processor(request):
