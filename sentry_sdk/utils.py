@@ -1501,6 +1501,20 @@ class TimeoutThread(threading.Thread):
         # type: () -> None
         self._stop_event.set()
 
+    def _capture_exception(self):
+        # type: () -> ExcInfo
+        exc_info = sys.exc_info()
+
+        client = sentry_sdk.get_client()
+        event, hint = event_from_exception(
+            exc_info,
+            client_options=client.options,
+            mechanism={"type": "threading", "handled": False},
+        )
+        sentry_sdk.capture_event(event, hint=hint)
+
+        return exc_info
+
     def run(self):
         # type: () -> None
 
@@ -1515,18 +1529,19 @@ class TimeoutThread(threading.Thread):
         if integer_configured_timeout < self.configured_timeout:
             integer_configured_timeout = integer_configured_timeout + 1
 
-        from sentry_sdk.scope import use_isolation_scope, use_scope
-
         if self.isolation_scope is not None and self.current_scope is not None:
-            with use_isolation_scope(self.isolation_scope):
-                with use_scope(self.current_scope):
-                    # with use_scope(self.current_scope):
-                    # Raising Exception after timeout duration is reached
-                    raise ServerlessTimeoutWarning(
-                        "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                            integer_configured_timeout
+            with sentry_sdk.scope.use_isolation_scope(self.isolation_scope):
+                with sentry_sdk.scope.use_scope(self.current_scope):
+                    try:
+                        # with use_scope(self.current_scope):
+                        # Raising Exception after timeout duration is reached
+                        raise ServerlessTimeoutWarning(
+                            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                                integer_configured_timeout
+                            )
                         )
-                    )
+                    except Exception:
+                        reraise(*self._capture_exception())
 
 
 def to_base64(original):
