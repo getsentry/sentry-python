@@ -1,3 +1,5 @@
+import os
+import datetime
 import asyncio
 import json
 
@@ -18,7 +20,8 @@ from aiohttp.web_exceptions import (
 )
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.integrations.aiohttp import AioHttpIntegration
+from sentry_sdk.integrations.aiohttp import AioHttpIntegration, create_trace_config
+from sentry_sdk.consts import SPANDATA
 from tests.conftest import ApproxDict
 
 
@@ -631,6 +634,347 @@ async def test_outgoing_trace_headers_append_to_baggage(
                 resp.request_info.headers["baggage"]
                 == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
             )
+
+
+@pytest.mark.asyncio
+async def test_request_source_disabled(
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=False,
+        http_request_source_threshold_ms=0,
+    )
+
+    # server for making span request
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    async def hello(request):
+        span_client = await aiohttp_client(raw_server)
+        await span_client.get("/")
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    await client.get("/")
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO not in data
+    assert SPANDATA.CODE_NAMESPACE not in data
+    assert SPANDATA.CODE_FILEPATH not in data
+    assert SPANDATA.CODE_FUNCTION not in data
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enable_http_request_source", [None, True])
+async def test_request_source_enabled(
+    sentry_init,
+    aiohttp_raw_server,
+    aiohttp_client,
+    capture_events,
+    enable_http_request_source,
+):
+    sentry_options = {
+        "integrations": [AioHttpIntegration()],
+        "traces_sample_rate": 1.0,
+        "http_request_source_threshold_ms": 0,
+    }
+    if enable_http_request_source is not None:
+        sentry_options["enable_http_request_source"] = enable_http_request_source
+
+    sentry_init(**sentry_options)
+
+    # server for making span request
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    async def hello(request):
+        span_client = await aiohttp_client(raw_server)
+        await span_client.get("/")
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    await client.get("/")
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+
+@pytest.mark.asyncio
+async def test_request_source(
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=0,
+    )
+
+    # server for making span request
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    async def handler_with_outgoing_request(request):
+        span_client = await aiohttp_client(raw_server)
+        await span_client.get("/")
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/", handler_with_outgoing_request)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    await client.get("/")
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert (
+        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.aiohttp.test_aiohttp"
+    )
+    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+        "tests/integrations/aiohttp/test_aiohttp.py"
+    )
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    assert data.get(SPANDATA.CODE_FUNCTION) == "handler_with_outgoing_request"
+
+
+@pytest.mark.asyncio
+async def test_request_source_with_module_in_search_path(
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+):
+    """
+    Test that request source is relative to the path of the module it ran in
+    """
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=0,
+    )
+
+    # server for making span request
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    from aiohttp_helpers.helpers import get_request_with_client
+
+    async def handler_with_outgoing_request(request):
+        span_client = await aiohttp_client(raw_server)
+        await get_request_with_client(span_client, "/")
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/", handler_with_outgoing_request)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    await client.get("/")
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "aiohttp_helpers.helpers"
+    assert data.get(SPANDATA.CODE_FILEPATH) == "aiohttp_helpers/helpers.py"
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_client"
+
+
+@pytest.mark.asyncio
+async def test_no_request_source_if_duration_too_short(
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=100,
+    )
+
+    # server for making span request
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    async def handler_with_outgoing_request(request):
+        span_client = await aiohttp_client(raw_server)
+        await span_client.get("/")
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/", handler_with_outgoing_request)
+
+    events = capture_events()
+
+    def fake_create_trace_context(*args, **kwargs):
+        trace_context = create_trace_config()
+
+        async def overwrite_timestamps(session, trace_config_ctx, params):
+            span = trace_config_ctx.span
+            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+
+        trace_context.on_request_end.insert(0, overwrite_timestamps)
+
+        return trace_context
+
+    with mock.patch(
+        "sentry_sdk.integrations.aiohttp.create_trace_config",
+        fake_create_trace_context,
+    ):
+        client = await aiohttp_client(app)
+        await client.get("/")
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO not in data
+    assert SPANDATA.CODE_NAMESPACE not in data
+    assert SPANDATA.CODE_FILEPATH not in data
+    assert SPANDATA.CODE_FUNCTION not in data
+
+
+@pytest.mark.asyncio
+async def test_request_source_if_duration_over_threshold(
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=100,
+    )
+
+    # server for making span request
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    async def handler_with_outgoing_request(request):
+        span_client = await aiohttp_client(raw_server)
+        await span_client.get("/")
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/", handler_with_outgoing_request)
+
+    events = capture_events()
+
+    def fake_create_trace_context(*args, **kwargs):
+        trace_context = create_trace_config()
+
+        async def overwrite_timestamps(session, trace_config_ctx, params):
+            span = trace_config_ctx.span
+            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+
+        trace_context.on_request_end.insert(0, overwrite_timestamps)
+
+        return trace_context
+
+    with mock.patch(
+        "sentry_sdk.integrations.aiohttp.create_trace_config",
+        fake_create_trace_context,
+    ):
+        client = await aiohttp_client(app)
+        await client.get("/")
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert (
+        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.aiohttp.test_aiohttp"
+    )
+    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+        "tests/integrations/aiohttp/test_aiohttp.py"
+    )
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    assert data.get(SPANDATA.CODE_FUNCTION) == "handler_with_outgoing_request"
 
 
 @pytest.mark.asyncio
