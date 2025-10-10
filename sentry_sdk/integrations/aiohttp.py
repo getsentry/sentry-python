@@ -279,7 +279,8 @@ def create_trace_config():
         span.set_data("reason", params.response.reason)
         span.finish()
 
-        add_http_request_source(span)
+        with capture_internal_exceptions():
+            add_http_request_source(span)
 
     trace_config = TraceConfig()
 
