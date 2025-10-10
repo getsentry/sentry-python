@@ -128,9 +128,7 @@ def serialize(event, **kwargs):
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
 
-    keep_request_bodies = (
-        kwargs.pop("max_request_body_size", None) == "always"
-    )  # type: bool
+    keep_request_bodies = kwargs.pop("max_request_body_size", None) == "always"  # type: bool
     max_value_length = kwargs.pop("max_value_length", None)  # type: Optional[int]
     is_vars = kwargs.pop("is_vars", False)
     custom_repr = kwargs.pop("custom_repr", None)  # type: Callable[..., Optional[str]]
@@ -182,6 +180,16 @@ def serialize(event, **kwargs):
             if p0 == "extra":
                 return True
 
+        except IndexError:
+            return None
+
+        return False
+
+    def _is_span_attribute():
+        # type: () -> Optional[bool]
+        try:
+            if path[0] == "spans" and path[2] == "data":
+                return True
         except IndexError:
             return None
 
@@ -282,7 +290,8 @@ def serialize(event, **kwargs):
                 )
             return None
 
-        if is_databag and global_repr_processors:
+        is_span_attribute = _is_span_attribute()
+        if (is_databag or is_span_attribute) and global_repr_processors:
             hints = {"memo": memo, "remaining_depth": remaining_depth}
             for processor in global_repr_processors:
                 result = processor(obj, hints)

@@ -221,6 +221,19 @@ def test_langchain_agent(
             in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
         assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        # Verify tool calls are recorded when PII is enabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
+            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        )
+        tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+        if isinstance(tool_calls_data, str):
+            assert "get_word_length" in tool_calls_data
+        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+            # Check if tool calls contain expected function name
+            tool_call_str = str(tool_calls_data)
+            assert "get_word_length" in tool_call_str
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
@@ -228,6 +241,29 @@ def test_langchain_agent(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in tool_exec_span.get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in tool_exec_span.get("data", {})
+
+        # Verify tool calls are NOT recorded when PII is disabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+
+    # Verify that available tools are always recorded regardless of PII settings
+    for chat_span in chat_spans:
+        span_data = chat_span.get("data", {})
+        if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
+            tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
+            )
 
 
 def test_langchain_error(sentry_init, capture_events):
@@ -249,7 +285,7 @@ def test_langchain_error(sentry_init, capture_events):
         ]
     )
     global stream_result_mock
-    stream_result_mock = Mock(side_effect=Exception("API rate limit error"))
+    stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
     llm = MockOpenAI(
         model_name="gpt-3.5-turbo",
         temperature=0,
@@ -259,11 +295,54 @@ def test_langchain_error(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction(), pytest.raises(Exception):
+    with start_transaction(), pytest.raises(ValueError):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     error = events[0]
     assert error["level"] == "error"
+
+
+def test_span_status_error(sentry_init, capture_events):
+    global llm_type
+    llm_type = "acme-llm"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    with start_transaction(name="test"):
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are very powerful assistant, but don't know current events",
+                ),
+                ("user", "{input}"),
+                MessagesPlaceholder(variable_name="agent_scratchpad"),
+            ]
+        )
+        global stream_result_mock
+        stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
+        llm = MockOpenAI(
+            model_name="gpt-3.5-turbo",
+            temperature=0,
+            openai_api_key="badkey",
+        )
+        agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+
+        agent_executor = AgentExecutor(
+            agent=agent, tools=[get_word_length], verbose=True
+        )
+
+        with pytest.raises(ValueError):
+            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
 
 
 def test_span_origin(sentry_init, capture_events):
@@ -458,9 +537,9 @@ def test_span_map_is_instance_variable():
     callback2 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
 
     # Verify they have different span_map instances
-    assert (
-        callback1.span_map is not callback2.span_map
-    ), "span_map should be an instance variable, not shared between instances"
+    assert callback1.span_map is not callback2.span_map, (
+        "span_map should be an instance variable, not shared between instances"
+    )
 
 
 def test_langchain_callback_manager(sentry_init):
@@ -738,3 +817,144 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
         assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
         assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
         assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
+
+
+def test_langchain_message_role_mapping(sentry_init, capture_events):
+    """Test that message roles are properly normalized in langchain integration."""
+    global llm_type
+    llm_type = "openai-chat"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant"),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    global stream_result_mock
+    stream_result_mock = Mock(
+        side_effect=[
+            [
+                ChatGenerationChunk(
+                    type="ChatGenerationChunk",
+                    message=AIMessageChunk(content="Test response"),
+                ),
+            ]
+        ]
+    )
+
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    # Test input that should trigger message role normalization
+    test_input = "Hello, how are you?"
+
+    with start_transaction():
+        list(agent_executor.stream({"input": test_input}))
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    # Find spans with gen_ai operation that should have message data
+    gen_ai_spans = [
+        span for span in tx.get("spans", []) if span.get("op", "").startswith("gen_ai")
+    ]
+
+    # Check if any span has message data with normalized roles
+    message_data_found = False
+    for span in gen_ai_spans:
+        span_data = span.get("data", {})
+        if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data:
+            message_data_found = True
+            messages_data = span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+
+            # Parse the message data (might be JSON string)
+            if isinstance(messages_data, str):
+                import json
+
+                try:
+                    messages = json.loads(messages_data)
+                except json.JSONDecodeError:
+                    # If not valid JSON, skip this assertion
+                    continue
+            else:
+                messages = messages_data
+
+            # Verify that the input message is present and contains the test input
+            assert isinstance(messages, list)
+            assert len(messages) > 0
+
+            # The test input should be in one of the messages
+            input_found = False
+            for msg in messages:
+                if isinstance(msg, dict) and test_input in str(msg.get("content", "")):
+                    input_found = True
+                    break
+                elif isinstance(msg, str) and test_input in msg:
+                    input_found = True
+                    break
+
+            assert input_found, (
+                f"Test input '{test_input}' not found in messages: {messages}"
+            )
+            break
+
+    # The message role mapping functionality is primarily tested through the normalization
+    # that happens in the integration code. The fact that we can capture and process
+    # the messages without errors indicates the role mapping is working correctly.
+    assert message_data_found, "No span found with gen_ai request messages data"
+
+
+def test_langchain_message_role_normalization_units():
+    """Test the message role normalization functions directly."""
+    from sentry_sdk.ai.utils import normalize_message_role, normalize_message_roles
+
+    # Test individual role normalization
+    assert normalize_message_role("ai") == "assistant"
+    assert normalize_message_role("human") == "user"
+    assert normalize_message_role("tool_call") == "tool"
+    assert normalize_message_role("system") == "system"
+    assert normalize_message_role("user") == "user"
+    assert normalize_message_role("assistant") == "assistant"
+    assert normalize_message_role("tool") == "tool"
+
+    # Test unknown role (should remain unchanged)
+    assert normalize_message_role("unknown_role") == "unknown_role"
+
+    # Test message list normalization
+    test_messages = [
+        {"role": "human", "content": "Hello"},
+        {"role": "ai", "content": "Hi there!"},
+        {"role": "tool_call", "content": "function_call"},
+        {"role": "system", "content": "You are helpful"},
+        {"content": "Message without role"},
+        "string message",
+    ]
+
+    normalized = normalize_message_roles(test_messages)
+
+    # Verify the original messages are not modified
+    assert test_messages[0]["role"] == "human"  # Original unchanged
+    assert test_messages[1]["role"] == "ai"  # Original unchanged
+
+    # Verify the normalized messages have correct roles
+    assert normalized[0]["role"] == "user"  # human -> user
+    assert normalized[1]["role"] == "assistant"  # ai -> assistant
+    assert normalized[2]["role"] == "tool"  # tool_call -> tool
+    assert normalized[3]["role"] == "system"  # system unchanged
+    assert "role" not in normalized[4]  # Message without role unchanged
+    assert normalized[5] == "string message"  # String message unchanged

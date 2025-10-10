@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         Log,
         MonitorConfig,
         SamplingContext,
+        Metric,
     )
 else:
     from typing import Any
@@ -35,6 +36,7 @@ else:
     Log = Any
     MonitorConfig = Any
     SamplingContext = Any
+    Metric = Any
 
 
 __all__ = (
@@ -46,4 +48,5 @@ __all__ = (
     "Log",
     "MonitorConfig",
     "SamplingContext",
+    "Metric",
 )

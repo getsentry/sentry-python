@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: false
 ---
 # Testing Guide
@@ -65,10 +65,10 @@ def test_flask_integration(sentry_init, capture_events):
     # Test setup
     sentry_init(integrations=[FlaskIntegration()])
     events = capture_events()
-    
+
     # Test execution
     # ... test code ...
-    
+
     # Assertions
     assert len(events) == 1
     assert events[0]["exception"]["values"][0]["type"] == "ValueError"

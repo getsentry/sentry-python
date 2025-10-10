@@ -1,7 +1,6 @@
 # The TEST_SUITE_CONFIG dictionary defines, for each integration test suite,
-# the main package (framework, library) to test with; any additional test
-# dependencies, optionally gated behind specific conditions; and optionally
-# the Python versions to test on.
+# at least the main package (framework, library) to test with. Additional
+# test dependencies, Python versions to test on, etc. can also be defined here.
 #
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
@@ -28,6 +27,7 @@ TEST_SUITE_CONFIG = {
             "*": ["fastapi", "flask", "httpx"],
         },
         "python": ">=3.8",
+        "num_versions": 2,
     },
     "arq": {
         "package": "arq",
@@ -35,6 +35,7 @@ TEST_SUITE_CONFIG = {
             "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
             "<=0.23": ["pydantic<2"],
         },
+        "num_versions": 2,
     },
     "asyncpg": {
         "package": "asyncpg",
@@ -46,6 +47,7 @@ TEST_SUITE_CONFIG = {
     "beam": {
         "package": "apache-beam",
         "python": ">=3.7",
+        "num_versions": 2,
     },
     "boto3": {
         "package": "boto3",
@@ -71,9 +73,11 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-chalice"],
         },
+        "num_versions": 2,
     },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
+        "num_versions": 2,
     },
     "cohere": {
         "package": "cohere",
@@ -100,6 +104,7 @@ TEST_SUITE_CONFIG = {
     },
     "dramatiq": {
         "package": "dramatiq",
+        "num_versions": 2,
     },
     "falcon": {
         "package": "falcon",
@@ -135,6 +140,7 @@ TEST_SUITE_CONFIG = {
     },
     "gql": {
         "package": "gql[all]",
+        "num_versions": 2,
     },
     "graphene": {
         "package": "graphene",
@@ -150,13 +156,33 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.7",
     },
+    "httpx": {
+        "package": "httpx",
+        "deps": {
+            "*": ["anyio<4.0.0"],
+            ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
+            ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
+            ">=0.19,<0.21": ["pytest-httpx==0.14.0"],
+            ">=0.21,<0.23": ["pytest-httpx==0.19.0"],
+            ">=0.23,<0.24": ["pytest-httpx==0.21.0"],
+            ">=0.24,<0.25": ["pytest-httpx==0.22.0"],
+            ">=0.25,<0.26": ["pytest-httpx==0.25.0"],
+            ">=0.26,<0.27": ["pytest-httpx==0.28.0"],
+            ">=0.27,<0.28": ["pytest-httpx==0.30.0"],
+            ">=0.28,<0.29": ["pytest-httpx==0.35.0"],
+        },
+        "python": {
+            ">=0.28": ">=3.9",
+        },
+    },
     "huey": {
         "package": "huey",
+        "num_versions": 2,
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
         "deps": {
-            "*": ["responses"],
+            "*": ["responses", "pytest-httpx"],
         },
     },
     "langchain-base": {
@@ -184,6 +210,10 @@ TEST_SUITE_CONFIG = {
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
+        "num_versions": 2,
+    },
+    "litellm": {
+        "package": "litellm",
     },
     "litestar": {
         "package": "litestar",
@@ -194,6 +224,7 @@ TEST_SUITE_CONFIG = {
     },
     "loguru": {
         "package": "loguru",
+        "num_versions": 2,
     },
     "openai-base": {
         "package": "openai",
@@ -222,6 +253,11 @@ TEST_SUITE_CONFIG = {
     },
     "openfeature": {
         "package": "openfeature-sdk",
+        "num_versions": 2,
+    },
+    "pure_eval": {
+        "package": "pure_eval",
+        "num_versions": 2,
     },
     "pymongo": {
         "package": "pymongo",
@@ -248,12 +284,50 @@ TEST_SUITE_CONFIG = {
             ],
             "py3.8": ["taskgroup==0.0.0a4"],
         },
+        "num_versions": 2,
+    },
+    "ray": {
+        "package": "ray",
+        "python": ">=3.9",
+        "num_versions": 2,
+    },
+    "redis": {
+        "package": "redis",
+        "deps": {
+            "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
+            ">=4.0,<5.0": ["fakeredis<2.31.0"],
+            "py3.6,py3.7,py3.8": ["fakeredis<2.26.0"],
+            "py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13": ["pytest-asyncio"],
+        },
     },
     "redis_py_cluster_legacy": {
         "package": "redis-py-cluster",
+        "num_versions": 2,
     },
     "requests": {
         "package": "requests",
+        "num_versions": 2,
+    },
+    "rq": {
+        "package": "rq",
+        "deps": {
+            # https://github.com/jamesls/fakeredis/issues/245
+            # https://github.com/cunla/fakeredis-py/issues/341
+            "*": ["fakeredis<2.28.0"],
+            "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
+            ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
+            "py3.6,py3.7": ["fakeredis!=2.26.0"],
+        },
+    },
+    "sanic": {
+        "package": "sanic",
+        "deps": {
+            "*": ["websockets<11.0", "aiohttp"],
+            ">=22": ["sanic-testing"],
+            "py3.6": ["aiocontextvars==0.2.1"],
+            "py3.8": ["tracerite<1.1.2"],
+        },
+        "num_versions": 4,
     },
     "spark": {
         "package": "pyspark",
@@ -293,12 +367,14 @@ TEST_SUITE_CONFIG = {
         },
         "python": "<=3.11",
         "include": "!=2.0.0a1,!=2.0.0a2",  # these are not relevant as there will never be a stable 2.0 release (starlite continues as litestar)
+        "num_versions": 2,
     },
     "statsig": {
         "package": "statsig",
         "deps": {
             "*": ["typing_extensions"],
         },
+        "num_versions": 2,
     },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
@@ -306,6 +382,7 @@ TEST_SUITE_CONFIG = {
             "*": ["httpx"],
             "<=0.262.5": ["pydantic<2.11"],
         },
+        "num_versions": 2,
     },
     "tornado": {
         "package": "tornado",
@@ -316,6 +393,7 @@ TEST_SUITE_CONFIG = {
             ],  # https://github.com/tornadoweb/tornado/pull/3382
             "py3.6": ["aiocontextvars"],
         },
+        "num_versions": 2,
     },
     "trytond": {
         "package": "trytond",
@@ -326,8 +404,10 @@ TEST_SUITE_CONFIG = {
     },
     "typer": {
         "package": "typer",
+        "num_versions": 2,
     },
     "unleash": {
         "package": "UnleashClient",
+        "num_versions": 2,
     },
 }

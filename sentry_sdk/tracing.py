@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Union
     from typing import TypeVar
+    from typing import Set
 
     from typing_extensions import TypedDict, Unpack
 
@@ -275,7 +276,6 @@ class Span:
         "hub",
         "_context_manager_state",
         "_containing_transaction",
-        "_local_aggregator",
         "scope",
         "origin",
         "name",
@@ -344,7 +344,6 @@ class Span:
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
-        self._local_aggregator = None  # type: Optional[LocalAggregator]
 
         self.update_active_thread()
         self.set_profiler_id(get_profiler_id())
@@ -382,13 +381,6 @@ class Span:
         # type: (str) -> None
         self._span_id = value
 
-    def _get_local_aggregator(self):
-        # type: (...) -> LocalAggregator
-        rv = self._local_aggregator
-        if rv is None:
-            rv = self._local_aggregator = LocalAggregator()
-        return rv
-
     def __repr__(self):
         # type: () -> str
         return (
@@ -416,7 +408,8 @@ class Span:
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None and should_be_treated_as_error(ty, value):
-            self.set_status(SPANSTATUS.INTERNAL_ERROR)
+            if self.status != SPANSTATUS.ERROR:
+                self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         with capture_internal_exceptions():
             scope, old_span = self._context_manager_state
@@ -739,11 +732,6 @@ class Span:
         if self.status:
             self._tags["status"] = self.status
 
-        if self._local_aggregator is not None:
-            metrics_summary = self._local_aggregator.to_json()
-            if metrics_summary:
-                rv["_metrics_summary"] = metrics_summary
-
         if len(self._measurements) > 0:
             rv["measurements"] = self._measurements
 
@@ -969,6 +957,12 @@ class Transaction(Span):
 
         return scope_or_hub
 
+    def _get_log_representation(self):
+        # type: () -> str
+        return "{op}transaction <{name}>".format(
+            op=("<" + self.op + "> " if self.op else ""), name=self.name
+        )
+
     def finish(
         self,
         scope=None,  # type: Optional[sentry_sdk.Scope]
@@ -997,9 +991,7 @@ class Transaction(Span):
 
         # For backwards compatibility, we must handle the case where `scope`
         # or `hub` could both either be a `Scope` or a `Hub`.
-        scope = self._get_scope_from_finish_args(
-            scope, hub
-        )  # type: Optional[sentry_sdk.Scope]
+        scope = self._get_scope_from_finish_args(scope, hub)  # type: Optional[sentry_sdk.Scope]
 
         scope = scope or self.scope or sentry_sdk.get_current_scope()
         client = sentry_sdk.get_client()
@@ -1039,6 +1031,32 @@ class Transaction(Span):
             self.name = "<unlabeled transaction>"
 
         super().finish(scope, end_timestamp)
+
+        status_code = self._data.get(SPANDATA.HTTP_STATUS_CODE)
+        if (
+            status_code is not None
+            and status_code in client.options["trace_ignore_status_codes"]
+        ):
+            logger.debug(
+                "[Tracing] Discarding {transaction_description} because the HTTP status code {status_code} is matched by trace_ignore_status_codes: {trace_ignore_status_codes}".format(
+                    transaction_description=self._get_log_representation(),
+                    status_code=self._data[SPANDATA.HTTP_STATUS_CODE],
+                    trace_ignore_status_codes=client.options[
+                        "trace_ignore_status_codes"
+                    ],
+                )
+            )
+            if client.transport:
+                client.transport.record_lost_event(
+                    "event_processor", data_category="transaction"
+                )
+
+                num_spans = len(self._span_recorder.spans) + 1
+                client.transport.record_lost_event(
+                    "event_processor", data_category="span", quantity=num_spans
+                )
+
+            self.sampled = False
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -1089,13 +1107,6 @@ class Transaction(Span):
             self._profile = None
 
         event["measurements"] = self._measurements
-
-        # This is here since `to_json` is not invoked.  This really should
-        # be gone when we switch to onlyspans.
-        if self._local_aggregator is not None:
-            metrics_summary = self._local_aggregator.to_json()
-            if metrics_summary:
-                event["_metrics_summary"] = metrics_summary
 
         return scope.capture_event(event)
 
@@ -1187,9 +1198,7 @@ class Transaction(Span):
         """
         client = sentry_sdk.get_client()
 
-        transaction_description = "{op}transaction <{name}>".format(
-            op=("<" + self.op + "> " if self.op else ""), name=self.name
-        )
+        transaction_description = self._get_log_representation()
 
         # nothing to do if tracing is disabled
         if not has_tracing_enabled(client.options):
@@ -1208,8 +1217,8 @@ class Transaction(Span):
         sample_rate = (
             client.options["traces_sampler"](sampling_context)
             if callable(client.options.get("traces_sampler"))
+            # default inheritance behavior
             else (
-                # default inheritance behavior
                 sampling_context["parent_sampled"]
                 if sampling_context["parent_sampled"] is not None
                 else client.options["traces_sample_rate"]
@@ -1475,8 +1484,3 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
-
-with warnings.catch_warnings():
-    # The code in this file which uses `LocalAggregator` is only called from the deprecated `metrics` module.
-    warnings.simplefilter("ignore", DeprecationWarning)
-    from sentry_sdk.metrics import LocalAggregator

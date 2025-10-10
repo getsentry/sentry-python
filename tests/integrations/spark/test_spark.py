@@ -28,11 +28,12 @@ def sentry_init_with_reset(sentry_init):
     _processed_integrations.discard("spark")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def create_spark_context():
     conf = SparkConf().set("spark.driver.bindAddress", "127.0.0.1")
-    yield lambda: SparkContext(conf=conf, appName="Testing123")
-    SparkContext._active_spark_context.stop()
+    sc = SparkContext(conf=conf, appName="Testing123")
+    yield lambda: sc
+    sc.stop()
 
 
 def test_set_app_properties(create_spark_context):
@@ -61,12 +62,18 @@ def test_start_sentry_listener(create_spark_context):
 def test_initialize_spark_integration_before_spark_context_init(
     mock_patch_spark_context_init,
     sentry_init_with_reset,
-    create_spark_context,
 ):
-    sentry_init_with_reset()
-    create_spark_context()
+    # As we are using the same SparkContext connection for the whole session,
+    # we clean it during this test.
+    original_context = SparkContext._active_spark_context
+    SparkContext._active_spark_context = None
 
-    mock_patch_spark_context_init.assert_called_once()
+    try:
+        sentry_init_with_reset()
+        mock_patch_spark_context_init.assert_called_once()
+    finally:
+        # Restore the original one.
+        SparkContext._active_spark_context = original_context
 
 
 @patch("sentry_sdk.integrations.spark.spark_driver._activate_integration")
@@ -83,7 +90,6 @@ def test_initialize_spark_integration_after_spark_context_init(
 
 @pytest.fixture
 def sentry_listener():
-
     listener = SentryListener()
 
     return listener

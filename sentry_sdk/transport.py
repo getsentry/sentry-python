@@ -171,17 +171,7 @@ def _parse_rate_limits(header, now=None):
 
             retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
-                if category == "metric_bucket":
-                    try:
-                        namespaces = parameters[4].split(";")
-                    except IndexError:
-                        namespaces = []
-
-                    if not namespaces or "custom" in namespaces:
-                        yield category, retry_after  # type: ignore
-
-                else:
-                    yield category, retry_after  # type: ignore
+                yield category, retry_after  # type: ignore
         except (LookupError, ValueError):
             continue
 
@@ -203,9 +193,7 @@ class BaseHttpTransport(Transport):
         self._disabled_until = {}  # type: Dict[Optional[EventDataCategory], datetime]
         # We only use this Retry() class for the `get_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
-        self._discarded_events = defaultdict(
-            int
-        )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
+        self._discarded_events = defaultdict(int)  # type: DefaultDict[Tuple[EventDataCategory, str], int]
         self._last_client_report_sent = time.time()
 
         self._pool = self._make_pool()
@@ -419,12 +407,6 @@ class BaseHttpTransport(Transport):
         # type: (str) -> bool
         def _disabled(bucket):
             # type: (Any) -> bool
-
-            # The envelope item type used for metrics is statsd
-            # whereas the rate limit category is metric_bucket
-            if bucket == "statsd":
-                bucket = "metric_bucket"
-
             ts = self._disabled_until.get(bucket)
             return ts is not None and ts > datetime.now(timezone.utc)
 
@@ -549,7 +531,8 @@ class BaseHttpTransport(Transport):
         raise NotImplementedError()
 
     def capture_envelope(
-        self, envelope  # type: Envelope
+        self,
+        envelope,  # type: Envelope
     ):
         # type: (...) -> None
         def send_envelope_wrapper():
@@ -862,14 +845,16 @@ class _FunctionTransport(Transport):
     """
 
     def __init__(
-        self, func  # type: Callable[[Event], None]
+        self,
+        func,  # type: Callable[[Event], None]
     ):
         # type: (...) -> None
         Transport.__init__(self)
         self._func = func
 
     def capture_event(
-        self, event  # type: Event
+        self,
+        event,  # type: Event
     ):
         # type: (...) -> None
         self._func(event)
@@ -891,9 +876,7 @@ def make_transport(options):
     use_http2_transport = options.get("_experiments", {}).get("transport_http2", False)
 
     # By default, we use the http transport class
-    transport_cls = (
-        Http2Transport if use_http2_transport else HttpTransport
-    )  # type: Type[Transport]
+    transport_cls = Http2Transport if use_http2_transport else HttpTransport  # type: Type[Transport]
 
     if isinstance(ref_transport, Transport):
         return ref_transport

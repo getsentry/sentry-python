@@ -1,6 +1,8 @@
 from unittest import mock
 import pytest
+import re
 import responses
+import httpx
 
 from huggingface_hub import InferenceClient
 
@@ -32,17 +34,49 @@ else:
     )
 
 
+def _add_mock_response(
+    httpx_mock, rsps, method, url, json=None, status=200, body=None, headers=None
+):
+    # HF v1+ uses httpx for making requests to their API, while <1 uses requests.
+    # Since we have to test both, we need mocks for both httpx and requests.
+    if HF_VERSION >= (1, 0, 0):
+        httpx_mock.add_response(
+            method=method,
+            url=url,
+            json=json,
+            content=body,
+            status_code=status,
+            headers=headers,
+            is_optional=True,
+            is_reusable=True,
+        )
+    else:
+        rsps.add(
+            method=method,
+            url=url,
+            json=json,
+            body=body,
+            status=status,
+            headers=headers,
+        )
+
+
 @pytest.fixture
-def mock_hf_text_generation_api():
+def mock_hf_text_generation_api(httpx_mock):
     # type: () -> Any
     """Mock HuggingFace text generation API"""
+
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
-        # Mock model info endpoint
-        rsps.add(
-            responses.GET,
-            MODEL_ENDPOINT.format(model_name=model_name),
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
+            re.compile(
+                MODEL_ENDPOINT.format(model_name=model_name)
+                + r"(\?expand=inferenceProviderMapping)?"
+            ),
             json={
                 "id": model_name,
                 "pipeline_tag": "text-generation",
@@ -57,9 +91,10 @@ def mock_hf_text_generation_api():
             status=200,
         )
 
-        # Mock text generation endpoint
-        rsps.add(
-            responses.POST,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "POST",
             INFERENCE_ENDPOINT.format(model_name=model_name),
             json={
                 "generated_text": "[mocked] Hello! How can i help you?",
@@ -73,61 +108,78 @@ def mock_hf_text_generation_api():
             status=200,
         )
 
-        yield rsps
+        if HF_VERSION >= (1, 0, 0):
+            yield httpx_mock
+        else:
+            yield rsps
 
 
 @pytest.fixture
-def mock_hf_api_with_errors():
+def mock_hf_api_with_errors(httpx_mock):
     # type: () -> Any
     """Mock HuggingFace API that always raises errors for any request"""
+
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint with error
-        rsps.add(
-            responses.GET,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
             MODEL_ENDPOINT.format(model_name=model_name),
             json={"error": "Model not found"},
             status=404,
         )
 
         # Mock text generation endpoint with error
-        rsps.add(
-            responses.POST,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "POST",
             INFERENCE_ENDPOINT.format(model_name=model_name),
             json={"error": "Internal server error", "message": "Something went wrong"},
             status=500,
         )
 
         # Mock chat completion endpoint with error
-        rsps.add(
-            responses.POST,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "POST",
             INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
             json={"error": "Internal server error", "message": "Something went wrong"},
             status=500,
         )
 
         # Catch-all pattern for any other model requests
-        rsps.add(
-            responses.GET,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
             "https://huggingface.co/api/models/test-model-error",
             json={"error": "Generic model error"},
             status=500,
         )
 
-        yield rsps
+        if HF_VERSION >= (1, 0, 0):
+            yield httpx_mock
+        else:
+            yield rsps
 
 
 @pytest.fixture
-def mock_hf_text_generation_api_streaming():
+def mock_hf_text_generation_api_streaming(httpx_mock):
     # type: () -> Any
     """Mock streaming HuggingFace text generation API"""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
-        rsps.add(
-            responses.GET,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
             MODEL_ENDPOINT.format(model_name=model_name),
             json={
                 "id": model_name,
@@ -146,8 +198,10 @@ def mock_hf_text_generation_api_streaming():
         # Mock text generation endpoint for streaming
         streaming_response = b'data:{"token":{"id":1, "special": false, "text": "the mocked "}}\n\ndata:{"token":{"id":2, "special": false, "text": "model response"}, "details":{"finish_reason": "length", "generated_tokens": 10, "seed": 0}}\n\n'
 
-        rsps.add(
-            responses.POST,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "POST",
             INFERENCE_ENDPOINT.format(model_name=model_name),
             body=streaming_response,
             status=200,
@@ -158,19 +212,24 @@ def mock_hf_text_generation_api_streaming():
             },
         )
 
-        yield rsps
+        if HF_VERSION >= (1, 0, 0):
+            yield httpx_mock
+        else:
+            yield rsps
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api():
+def mock_hf_chat_completion_api(httpx_mock):
     # type: () -> Any
     """Mock HuggingFace chat completion API"""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
-        rsps.add(
-            responses.GET,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
             MODEL_ENDPOINT.format(model_name=model_name),
             json={
                 "id": model_name,
@@ -187,8 +246,10 @@ def mock_hf_chat_completion_api():
         )
 
         # Mock chat completion endpoint
-        rsps.add(
-            responses.POST,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "POST",
             INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
             json={
                 "id": "xyz-123",
@@ -214,19 +275,24 @@ def mock_hf_chat_completion_api():
             status=200,
         )
 
-        yield rsps
+        if HF_VERSION >= (1, 0, 0):
+            yield httpx_mock
+        else:
+            yield rsps
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_tools():
+def mock_hf_chat_completion_api_tools(httpx_mock):
     # type: () -> Any
     """Mock HuggingFace chat completion API with tool calls."""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
-        rsps.add(
-            responses.GET,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
             MODEL_ENDPOINT.format(model_name=model_name),
             json={
                 "id": model_name,
@@ -243,8 +309,10 @@ def mock_hf_chat_completion_api_tools():
         )
 
         # Mock chat completion endpoint
-        rsps.add(
-            responses.POST,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "POST",
             INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
             json={
                 "id": "xyz-123",
@@ -279,19 +347,24 @@ def mock_hf_chat_completion_api_tools():
             status=200,
         )
 
-        yield rsps
+        if HF_VERSION >= (1, 0, 0):
+            yield httpx_mock
+        else:
+            yield rsps
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_streaming():
+def mock_hf_chat_completion_api_streaming(httpx_mock):
     # type: () -> Any
     """Mock streaming HuggingFace chat completion API"""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
-        rsps.add(
-            responses.GET,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
             MODEL_ENDPOINT.format(model_name=model_name),
             json={
                 "id": model_name,
@@ -313,8 +386,10 @@ def mock_hf_chat_completion_api_streaming():
             b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"model response"},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
         )
 
-        rsps.add(
-            responses.POST,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "POST",
             INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
             body=streaming_chat_response,
             status=200,
@@ -325,19 +400,24 @@ def mock_hf_chat_completion_api_streaming():
             },
         )
 
-        yield rsps
+        if HF_VERSION >= (1, 0, 0):
+            yield httpx_mock
+        else:
+            yield rsps
 
 
 @pytest.fixture
-def mock_hf_chat_completion_api_streaming_tools():
+def mock_hf_chat_completion_api_streaming_tools(httpx_mock):
     # type: () -> Any
     """Mock streaming HuggingFace chat completion API with tool calls."""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
         # Mock model info endpoint
-        rsps.add(
-            responses.GET,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "GET",
             MODEL_ENDPOINT.format(model_name=model_name),
             json={
                 "id": model_name,
@@ -359,8 +439,10 @@ def mock_hf_chat_completion_api_streaming_tools():
             b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","tool_calls": [{"id": "call_123","type": "function","function": {"name": "get_weather", "arguments": {"location": "Paris"}}}]},"index":0,"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
         )
 
-        rsps.add(
-            responses.POST,
+        _add_mock_response(
+            httpx_mock,
+            rsps,
+            "POST",
             INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
             body=streaming_chat_response,
             status=200,
@@ -371,9 +453,13 @@ def mock_hf_chat_completion_api_streaming_tools():
             },
         )
 
-        yield rsps
+        if HF_VERSION >= (1, 0, 0):
+            yield httpx_mock
+        else:
+            yield rsps
 
 
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation(
@@ -401,7 +487,18 @@ def test_text_generation(
         )
 
     (transaction,) = events
-    (span,) = transaction["spans"]
+
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
 
     assert span["op"] == "gen_ai.generate_text"
     assert span["description"] == "generate_text test-model"
@@ -431,6 +528,7 @@ def test_text_generation(
     assert "gen_ai.response.model" not in span["data"]
 
 
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation_streaming(
@@ -459,7 +557,18 @@ def test_text_generation_streaming(
             pass
 
     (transaction,) = events
-    (span,) = transaction["spans"]
+
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
 
     assert span["op"] == "gen_ai.generate_text"
     assert span["description"] == "generate_text test-model"
@@ -489,6 +598,7 @@ def test_text_generation_streaming(
     assert "gen_ai.response.model" not in span["data"]
 
 
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion(
@@ -515,7 +625,18 @@ def test_chat_completion(
         )
 
     (transaction,) = events
-    (span,) = transaction["spans"]
+
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
@@ -549,6 +670,7 @@ def test_chat_completion(
     assert span["data"] == expected_data
 
 
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming(
@@ -577,7 +699,18 @@ def test_chat_completion_streaming(
         )
 
     (transaction,) = events
-    (span,) = transaction["spans"]
+
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
@@ -611,6 +744,7 @@ def test_chat_completion_streaming(
     assert span["data"] == expected_data
 
 
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 def test_chat_completion_api_error(
     sentry_init, capture_events, mock_hf_api_with_errors
 ):
@@ -634,7 +768,17 @@ def test_chat_completion_api_error(
     assert error["exception"]["values"][0]["mechanism"]["type"] == "huggingface_hub"
     assert not error["exception"]["values"][0]["mechanism"]["handled"]
 
-    (span,) = transaction["spans"]
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
@@ -654,6 +798,40 @@ def test_chat_completion_api_error(
     assert span["data"] == expected_data
 
 
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors):
+    # type: (Any, Any, Any) -> None
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    client = InferenceClient(model="test-model")
+
+    with sentry_sdk.start_transaction(name="test"):
+        with pytest.raises(HfHubHTTPError):
+            client.chat_completion(
+                messages=[{"role": "user", "content": "Hello!"}],
+            )
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
+    assert span["tags"]["status"] == "error"
+
+    assert transaction["contexts"]["trace"]["status"] == "error"
+
+
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_with_tools(
@@ -696,7 +874,18 @@ def test_chat_completion_with_tools(
         )
 
     (transaction,) = events
-    (span,) = transaction["spans"]
+
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
@@ -731,6 +920,7 @@ def test_chat_completion_with_tools(
     assert span["data"] == expected_data
 
 
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming_with_tools(
@@ -776,7 +966,18 @@ def test_chat_completion_streaming_with_tools(
         )
 
     (transaction,) = events
-    (span,) = transaction["spans"]
+
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
+
+    assert span is not None
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"

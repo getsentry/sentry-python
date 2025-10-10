@@ -4,12 +4,16 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
-from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
+from sentry_sdk.ai.utils import (
+    GEN_AI_ALLOWED_MESSAGE_ROLES,
+    normalize_message_roles,
+    set_data_normalized,
+    get_start_span_function,
+)
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import _get_value
+from sentry_sdk.tracing_utils import _get_value, set_span_errored
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
 from typing import TYPE_CHECKING
@@ -26,6 +30,7 @@ if TYPE_CHECKING:
         Union,
     )
     from uuid import UUID
+    from sentry_sdk.tracing import Span
 
 
 try:
@@ -116,7 +121,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span_data = self.span_map[run_id]
             span = span_data.span
-            span.set_status("unknown")
+            set_span_errored(span)
 
             sentry_sdk.capture_exception(error, span.scope)
 
@@ -209,8 +214,18 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
+                normalized_messages = [
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.USER,
+                        "content": {"type": "text", "text": prompt},
+                    }
+                    for prompt in prompts
+                ]
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts, unpack=False
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
@@ -262,6 +277,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         normalized_messages.append(
                             self._normalize_langchain_message(message)
                         )
+                normalized_messages = normalize_message_roles(normalized_messages)
+
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -322,14 +339,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     pass
 
                 try:
-                    tool_calls = getattr(generation.message, "tool_calls", None)
-                    if tool_calls is not None and tool_calls != []:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                            tool_calls,
-                            unpack=False,
-                        )
+                    if should_send_default_pii() and self.include_prompts:
+                        tool_calls = getattr(generation.message, "tool_calls", None)
+                        if tool_calls is not None and tool_calls != []:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                                tool_calls,
+                                unpack=False,
+                            )
                 except AttributeError:
                     pass
 
@@ -553,7 +571,6 @@ def _simplify_langchain_tools(tools):
     for tool in tools:
         try:
             if isinstance(tool, dict):
-
                 if "function" in tool and isinstance(tool["function"], dict):
                     func = tool["function"]
                     simplified_tool = {
@@ -740,8 +757,12 @@ def _wrap_agent_executor_invoke(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
+                normalized_messages = normalize_message_roles([input])
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
 
             output = result.get("output")
@@ -791,8 +812,12 @@ def _wrap_agent_executor_stream(f):
             and should_send_default_pii()
             and integration.include_prompts
         ):
+            normalized_messages = normalize_message_roles([input])
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
 
         # Run the agent

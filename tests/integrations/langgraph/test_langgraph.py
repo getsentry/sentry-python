@@ -333,7 +333,6 @@ def test_pregel_ainvoke(sentry_init, capture_events, send_default_pii, include_p
 
     async def run_test():
         with start_transaction():
-
             wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
             result = await wrapped_ainvoke(pregel, test_state)
             return result
@@ -394,7 +393,6 @@ def test_pregel_invoke_error(sentry_init, capture_events):
         raise Exception("Graph execution failed")
 
     with start_transaction(), pytest.raises(Exception, match="Graph execution failed"):
-
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
         wrapped_invoke(pregel, test_state)
 
@@ -426,7 +424,6 @@ def test_pregel_ainvoke_error(sentry_init, capture_events):
         with start_transaction(), pytest.raises(
             Exception, match="Async graph execution failed"
         ):
-
             wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
             await wrapped_ainvoke(pregel, test_state)
 
@@ -482,7 +479,6 @@ def test_pregel_invoke_with_different_graph_names(
 
     pregel = MockPregelInstance(graph_name) if graph_name else MockPregelInstance()
     if not graph_name:
-
         delattr(pregel, "name")
         delattr(pregel, "graph_name")
 
@@ -490,7 +486,6 @@ def test_pregel_invoke_with_different_graph_names(
         return {"result": "test"}
 
     with start_transaction():
-
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
         wrapped_invoke(pregel, {"messages": []})
 
@@ -630,3 +625,74 @@ def test_extraction_functions_complex_scenario(sentry_init, capture_events):
     assert tool_calls_data[0]["function"]["name"] == "search"
     assert tool_calls_data[1]["id"] == "call_multi_2"
     assert tool_calls_data[1]["function"]["name"] == "calculate"
+
+
+def test_langgraph_message_role_mapping(sentry_init, capture_events):
+    """Test that Langgraph integration properly maps message roles like 'ai' to 'assistant'"""
+    sentry_init(
+        integrations=[LanggraphIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    # Mock a langgraph message with mixed roles
+    class MockMessage:
+        def __init__(self, content, message_type="human"):
+            self.content = content
+            self.type = message_type
+
+    # Create mock state with messages having different roles
+    state_data = {
+        "messages": [
+            MockMessage("System prompt", "system"),
+            MockMessage("Hello", "human"),
+            MockMessage("Hi there!", "ai"),  # Should be mapped to "assistant"
+            MockMessage("How can I help?", "assistant"),  # Should stay "assistant"
+        ]
+    }
+
+    compiled_graph = MockCompiledGraph("test_graph")
+    pregel = MockPregelInstance(compiled_graph)
+
+    with start_transaction(name="langgraph tx"):
+        # Use the wrapped invoke function directly
+        from sentry_sdk.integrations.langgraph import _wrap_pregel_invoke
+
+        wrapped_invoke = _wrap_pregel_invoke(
+            lambda self, state_data: {"result": "success"}
+        )
+        wrapped_invoke(pregel, state_data)
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Verify that the span was created correctly
+    assert span["op"] == "gen_ai.invoke_agent"
+
+    # If messages were captured, verify role mapping
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]:
+        import json
+
+        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+        # Find messages with specific content to verify role mapping
+        ai_message = next(
+            (msg for msg in stored_messages if msg.get("content") == "Hi there!"), None
+        )
+        assistant_message = next(
+            (msg for msg in stored_messages if msg.get("content") == "How can I help?"),
+            None,
+        )
+
+        if ai_message:
+            # "ai" should have been mapped to "assistant"
+            assert ai_message["role"] == "assistant"
+
+        if assistant_message:
+            # "assistant" should stay "assistant"
+            assert assistant_message["role"] == "assistant"
+
+        # Verify no "ai" roles remain
+        roles = [msg["role"] for msg in stored_messages if "role" in msg]
+        assert "ai" not in roles

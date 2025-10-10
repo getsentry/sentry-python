@@ -894,7 +894,8 @@ class Scope:
         self._contexts[key] = value
 
     def remove_context(
-        self, key  # type: str
+        self,
+        key,  # type: str
     ):
         # type: (...) -> None
         """Removes a context."""
@@ -910,7 +911,8 @@ class Scope:
         self._extras[key] = value
 
     def remove_extra(
-        self, key  # type: str
+        self,
+        key,  # type: str
     ):
         # type: (...) -> None
         """Removes a specific extra key."""
@@ -1321,7 +1323,8 @@ class Scope:
         self._force_auto_session_tracking = None
 
     def add_event_processor(
-        self, func  # type: EventProcessor
+        self,
+        func,  # type: EventProcessor
     ):
         # type: (...) -> None
         """Register a scope local event processor on the scope.

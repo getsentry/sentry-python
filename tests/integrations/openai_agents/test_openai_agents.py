@@ -6,6 +6,7 @@ import os
 
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import safe_serialize
+from sentry_sdk.utils import parse_version
 
 import agents
 from agents import (
@@ -15,10 +16,12 @@ from agents import (
     ModelSettings,
 )
 from agents.items import (
+    McpCall,
     ResponseOutputMessage,
     ResponseOutputText,
     ResponseFunctionToolCall,
 )
+from agents.version import __version__ as OPENAI_AGENTS_VERSION
 
 from openai.types.responses.response_usage import (
     InputTokensDetails,
@@ -437,24 +440,28 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         ai_client_span2,
     ) = spans
 
-    available_tools = safe_serialize(
-        [
-            {
-                "name": "simple_test_tool",
-                "description": "A simple tool",
-                "params_json_schema": {
-                    "properties": {"message": {"title": "Message", "type": "string"}},
-                    "required": ["message"],
-                    "title": "simple_test_tool_args",
-                    "type": "object",
-                    "additionalProperties": False,
-                },
-                "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
-                "strict_json_schema": True,
-                "is_enabled": True,
-            }
-        ]
-    )
+    available_tools = [
+        {
+            "name": "simple_test_tool",
+            "description": "A simple tool",
+            "params_json_schema": {
+                "properties": {"message": {"title": "Message", "type": "string"}},
+                "required": ["message"],
+                "title": "simple_test_tool_args",
+                "type": "object",
+                "additionalProperties": False,
+            },
+            "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
+            "strict_json_schema": True,
+            "is_enabled": True,
+        }
+    ]
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
+        available_tools[0].update(
+            {"tool_input_guardrails": None, "tool_output_guardrails": None}
+        )
+
+    available_tools = safe_serialize(available_tools)
 
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
@@ -658,6 +665,333 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
+async def test_span_status_error(sentry_init, capture_events, test_agent):
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.side_effect = ValueError("Model Error")
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            with pytest.raises(ValueError, match="Model Error"):
+                await agents.Runner.run(
+                    test_agent, "Test input", run_config=test_run_config
+                )
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_mcp_tool_execution_spans(sentry_init, capture_events, test_agent):
+    """
+    Test that MCP (Model Context Protocol) tool calls create execute_tool spans.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a McpCall object
+            mcp_call = McpCall(
+                id="mcp_call_123",
+                name="test_mcp_tool",
+                arguments='{"query": "search term"}',
+                output="MCP tool executed successfully",
+                error=None,
+                type="mcp_call",
+                server_label="test_server",
+            )
+
+            # Create a ModelResponse with an McpCall in the output
+            mcp_response = ModelResponse(
+                output=[mcp_call],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=10,
+                    output_tokens=5,
+                    total_tokens=15,
+                ),
+                response_id="resp_mcp_123",
+            )
+
+            # Final response after MCP tool execution
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="Task completed using MCP tool",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=15,
+                    output_tokens=10,
+                    total_tokens=25,
+                ),
+                response_id="resp_final_123",
+            )
+
+            mock_get_response.side_effect = [mcp_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            await agents.Runner.run(
+                test_agent,
+                "Please use MCP tool",
+                run_config=test_run_config,
+            )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # Find the MCP execute_tool span
+    mcp_tool_span = None
+    for span in spans:
+        if (
+            span.get("description") == "execute_tool test_mcp_tool"
+            and span.get("data", {}).get("gen_ai.tool.type") == "mcp"
+        ):
+            mcp_tool_span = span
+            break
+
+    # Verify the MCP tool span was created
+    assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+    assert mcp_tool_span["description"] == "execute_tool test_mcp_tool"
+    assert mcp_tool_span["data"]["gen_ai.tool.type"] == "mcp"
+    assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
+    assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "search term"}'
+    assert (
+        mcp_tool_span["data"]["gen_ai.tool.output"] == "MCP tool executed successfully"
+    )
+
+    # Verify no error status since error was None
+    assert mcp_tool_span.get("tags", {}).get("status") != "error"
+
+
+@pytest.mark.asyncio
+async def test_mcp_tool_execution_with_error(sentry_init, capture_events, test_agent):
+    """
+    Test that MCP tool calls with errors are tracked with error status.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a McpCall object with an error
+            mcp_call_with_error = McpCall(
+                id="mcp_call_error_123",
+                name="failing_mcp_tool",
+                arguments='{"query": "test"}',
+                output=None,
+                error="MCP tool execution failed",
+                type="mcp_call",
+                server_label="test_server",
+            )
+
+            # Create a ModelResponse with a failing McpCall
+            mcp_response = ModelResponse(
+                output=[mcp_call_with_error],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=10,
+                    output_tokens=5,
+                    total_tokens=15,
+                ),
+                response_id="resp_mcp_error_123",
+            )
+
+            # Final response after error
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="The MCP tool encountered an error",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=15,
+                    output_tokens=10,
+                    total_tokens=25,
+                ),
+                response_id="resp_final_error_123",
+            )
+
+            mock_get_response.side_effect = [mcp_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            await agents.Runner.run(
+                test_agent,
+                "Please use failing MCP tool",
+                run_config=test_run_config,
+            )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # Find the MCP execute_tool span with error
+    mcp_tool_span = None
+    for span in spans:
+        if (
+            span.get("description") == "execute_tool failing_mcp_tool"
+            and span.get("data", {}).get("gen_ai.tool.type") == "mcp"
+        ):
+            mcp_tool_span = span
+            break
+
+    # Verify the MCP tool span was created with error status
+    assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+    assert mcp_tool_span["description"] == "execute_tool failing_mcp_tool"
+    assert mcp_tool_span["data"]["gen_ai.tool.type"] == "mcp"
+    assert mcp_tool_span["data"]["gen_ai.tool.name"] == "failing_mcp_tool"
+    assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "test"}'
+    assert mcp_tool_span["data"]["gen_ai.tool.output"] is None
+
+    # Verify error status was set
+    assert mcp_tool_span["tags"]["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_mcp_tool_execution_without_pii(sentry_init, capture_events, test_agent):
+    """
+    Test that MCP tool input/output are not included when send_default_pii is False.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a McpCall object
+            mcp_call = McpCall(
+                id="mcp_call_pii_123",
+                name="test_mcp_tool",
+                arguments='{"query": "sensitive data"}',
+                output="Result with sensitive info",
+                error=None,
+                type="mcp_call",
+                server_label="test_server",
+            )
+
+            # Create a ModelResponse with an McpCall
+            mcp_response = ModelResponse(
+                output=[mcp_call],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=10,
+                    output_tokens=5,
+                    total_tokens=15,
+                ),
+                response_id="resp_mcp_123",
+            )
+
+            # Final response
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="Task completed",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=15,
+                    output_tokens=10,
+                    total_tokens=25,
+                ),
+                response_id="resp_final_123",
+            )
+
+            mock_get_response.side_effect = [mcp_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,  # PII disabled
+            )
+
+            events = capture_events()
+
+            await agents.Runner.run(
+                test_agent,
+                "Please use MCP tool",
+                run_config=test_run_config,
+            )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # Find the MCP execute_tool span
+    mcp_tool_span = None
+    for span in spans:
+        if (
+            span.get("description") == "execute_tool test_mcp_tool"
+            and span.get("data", {}).get("gen_ai.tool.type") == "mcp"
+        ):
+            mcp_tool_span = span
+            break
+
+    # Verify the MCP tool span was created but without input/output
+    assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+    assert mcp_tool_span["description"] == "execute_tool test_mcp_tool"
+    assert mcp_tool_span["data"]["gen_ai.tool.type"] == "mcp"
+    assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
+
+    # Verify input and output are not included when send_default_pii is False
+    assert "gen_ai.tool.input" not in mcp_tool_span["data"]
+    assert "gen_ai.tool.output" not in mcp_tool_span["data"]
+
+
+@pytest.mark.asyncio
 async def test_multiple_agents_asyncio(
     sentry_init, capture_events, test_agent, mock_model_response
 ):
@@ -697,3 +1031,49 @@ async def test_multiple_agents_asyncio(
     assert txn2["transaction"] == "test_agent workflow"
     assert txn3["type"] == "transaction"
     assert txn3["transaction"] == "test_agent workflow"
+
+
+def test_openai_agents_message_role_mapping(sentry_init, capture_events):
+    """Test that OpenAI Agents integration properly maps message roles like 'ai' to 'assistant'"""
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    # Test input messages with mixed roles including "ai"
+    test_input = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello"},
+        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
+        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
+    ]
+
+    get_response_kwargs = {"input": test_input}
+
+    from sentry_sdk.integrations.openai_agents.utils import _set_input_data
+    from sentry_sdk import start_span
+
+    with start_span(op="test") as span:
+        _set_input_data(span, get_response_kwargs)
+
+    # Verify that messages were processed and roles were mapped
+    from sentry_sdk.consts import SPANDATA
+
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
+        import json
+
+        stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+        # Verify roles were properly mapped
+        found_assistant_roles = 0
+        for message in stored_messages:
+            if message["role"] == "assistant":
+                found_assistant_roles += 1
+
+        # Should have 2 assistant roles (1 from original "assistant", 1 from mapped "ai")
+        assert found_assistant_roles == 2
+
+        # Verify no "ai" roles remain in any message
+        for message in stored_messages:
+            assert message["role"] != "ai"

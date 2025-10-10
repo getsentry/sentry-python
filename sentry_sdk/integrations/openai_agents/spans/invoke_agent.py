@@ -1,5 +1,9 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
+from sentry_sdk.ai.utils import (
+    get_start_span_function,
+    set_data_normalized,
+    normalize_message_roles,
+)
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
@@ -56,8 +60,12 @@ def invoke_agent_span(context, agent, kwargs):
             )
 
         if len(messages) > 0:
+            normalized_messages = normalize_message_roles(messages)
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
 
     _set_agent_data(span, agent)

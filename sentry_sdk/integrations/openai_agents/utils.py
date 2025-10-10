@@ -1,8 +1,14 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.ai.utils import (
+    GEN_AI_ALLOWED_MESSAGE_ROLES,
+    normalize_message_roles,
+    set_data_normalized,
+    normalize_message_role,
+)
+from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 from typing import TYPE_CHECKING
@@ -20,6 +26,8 @@ except ImportError:
 
 def _capture_exception(exc):
     # type: (Any) -> None
+    set_span_errored()
+
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -91,35 +99,47 @@ def _set_input_data(span, get_response_kwargs):
     # type: (sentry_sdk.tracing.Span, dict[str, Any]) -> None
     if not should_send_default_pii():
         return
+    request_messages = []
 
-    messages_by_role = {
-        "system": [],
-        "user": [],
-        "assistant": [],
-        "tool": [],
-    }  # type: (dict[str, list[Any]])
     system_instructions = get_response_kwargs.get("system_instructions")
     if system_instructions:
-        messages_by_role["system"].append({"type": "text", "text": system_instructions})
+        request_messages.append(
+            {
+                "role": GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM,
+                "content": [{"type": "text", "text": system_instructions}],
+            }
+        )
 
     for message in get_response_kwargs.get("input", []):
         if "role" in message:
-            messages_by_role[message.get("role")].append(
-                {"type": "text", "text": message.get("content")}
+            normalized_role = normalize_message_role(message.get("role"))
+            request_messages.append(
+                {
+                    "role": normalized_role,
+                    "content": [{"type": "text", "text": message.get("content")}],
+                }
             )
         else:
             if message.get("type") == "function_call":
-                messages_by_role["assistant"].append(message)
+                request_messages.append(
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT,
+                        "content": [message],
+                    }
+                )
             elif message.get("type") == "function_call_output":
-                messages_by_role["tool"].append(message)
-
-    request_messages = []
-    for role, messages in messages_by_role.items():
-        if len(messages) > 0:
-            request_messages.append({"role": role, "content": messages})
+                request_messages.append(
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
+                        "content": [message],
+                    }
+                )
 
     set_data_normalized(
-        span, SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages, unpack=False
+        span,
+        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+        normalize_message_roles(request_messages),
+        unpack=False,
     )
 
 
@@ -153,3 +173,27 @@ def _set_output_data(span, result):
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )
+
+
+def _create_mcp_execute_tool_spans(span, result):
+    # type: (sentry_sdk.tracing.Span, agents.Result) -> None
+    for output in result.output:
+        if output.__class__.__name__ == "McpCall":
+            with sentry_sdk.start_span(
+                op=OP.GEN_AI_EXECUTE_TOOL,
+                description=f"execute_tool {output.name}",
+                start_timestamp=span.start_timestamp,
+            ) as execute_tool_span:
+                set_data_normalized(execute_tool_span, SPANDATA.GEN_AI_TOOL_TYPE, "mcp")
+                set_data_normalized(
+                    execute_tool_span, SPANDATA.GEN_AI_TOOL_NAME, output.name
+                )
+                if should_send_default_pii():
+                    execute_tool_span.set_data(
+                        SPANDATA.GEN_AI_TOOL_INPUT, output.arguments
+                    )
+                    execute_tool_span.set_data(
+                        SPANDATA.GEN_AI_TOOL_OUTPUT, output.output
+                    )
+                if output.error:
+                    execute_tool_span.set_status(SPANSTATUS.ERROR)

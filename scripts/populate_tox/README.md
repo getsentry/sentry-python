@@ -14,28 +14,27 @@ combination of hardcoded and generated entries.
 
 The `populate_tox.py` script fills out the auto-generated part of that template.
 It does this by querying PyPI for each framework's package and its metadata and
-then determining which versions make sense to test to get good coverage.
+then determining which versions it makes sense to test to get good coverage.
 
-The lowest supported and latest version of a framework are always tested, with
-a number of releases in between:
-- If the package has majors, we pick the highest version of each major. For the
-  latest major, we also pick the lowest version in that major.
+By default, the lowest supported and latest version of a framework are always
+tested, with a number of releases in between:
+- If the package has majors, we pick the highest version of each major.
 - If the package doesn't have multiple majors, we pick two versions in between
   lowest and highest.
 
-#### Caveats
+Each test suite requires at least some configuration to be added to
+`TEST_SUITE_CONFIG` in `scripts/populate_tox/config.py`. If you're adding a new
+integration, check out the [Add a new test suite](#add-a-new-test-suite) section.
 
-- Make sure the integration name is the same everywhere. If it consists of
-  multiple words, use an underscore instead of a hyphen.
+## Test suite config
 
-## Defining constraints
+The `TEST_SUITE_CONFIG` dictionary in `scripts/populate_tox/config.py` defines,
+for each integration test suite, the main package (framework, library) to test
+with; any additional test dependencies, optionally gated behind specific
+conditions; and optionally the Python versions to test on.
 
-The `TEST_SUITE_CONFIG` dictionary defines, for each integration test suite,
-the main package (framework, library) to test with; any additional test
-dependencies, optionally gated behind specific conditions; and optionally
-the Python versions to test on.
-
-Constraints are defined using the format specified below. The following sections describe each key.
+Constraints are defined using the format specified below. The following sections
+describe each key.
 
 ```
 integration_name: {
@@ -44,8 +43,10 @@ integration_name: {
          rule1: [package1, package2, ...],
          rule2: [package3, package4, ...],
      },
-     "python": python_version_specifier,
+     "python": python_version_specifier | dict[package_version_specifier, python_version_specifier],
      "include": package_version_specifier,
+     "integration_name": integration_name,
+     "num_versions": int,
 }
 ```
 
@@ -56,7 +57,7 @@ in [packaging.specifiers](https://packaging.pypa.io/en/stable/specifiers.html).
 
 ### `package`
 
-The name of the third party package as it's listed on PyPI. The script will
+The name of the third-party package as it's listed on PyPI. The script will
 be picking different versions of this package to test.
 
 This key is mandatory.
@@ -67,7 +68,7 @@ The test dependencies of the test suite. They're defined as a dictionary of
 `rule: [package1, package2, ...]` key-value pairs. All packages
 in the package list of a rule will be installed as long as the rule applies.
 
-`rule`s are predefined. Each `rule` must be one of the following:
+Each `rule` must be one of the following:
   - `*`: packages will be always installed
   - a version specifier on the main package (e.g. `<=0.32`): packages will only
     be installed if the main package falls into the version bounds specified
@@ -75,7 +76,7 @@ in the package list of a rule will be installed as long as the rule applies.
     installed if the Python version matches one from the list
 
 Rules can be used to specify version bounds on older versions of the main
-package's dependencies, for example. If e.g. Flask tests generally need
+package's dependencies, for example. If Flask tests generally need
 Werkzeug and don't care about its version, but Flask older than 3.0 needs
 a specific Werkzeug version to work, you can say:
 
@@ -101,14 +102,18 @@ Python versions, you can say:
     ...
 }
 ```
+
 This key is optional.
 
 ### `python`
 
 Sometimes, the whole test suite should only run on specific Python versions.
-This can be achieved via the `python` key, which expects a version specifier.
+This can be achieved via the `python` key. There are two variants how to define
+the Python versions to run the test suite on.
 
-For example, if you want AIOHTTP tests to only run on Python 3.7+, you can say:
+If you want the test suite to only be run on specific Python versions, you can
+set `python` to a version specifier. For example, if you want AIOHTTP tests to
+only run on Python 3.7+, you can say:
 
 ```python
 "aiohttp": {
@@ -117,22 +122,36 @@ For example, if you want AIOHTTP tests to only run on Python 3.7+, you can say:
 }
 ```
 
+If the Python version to use is dependent on the version of the package under
+test, you can use the more expressive dictionary variant. For instance, while
+HTTPX v0.28 supports Python 3.8, a test dependency of ours, `pytest-httpx`,
+doesn't. If you want to specify that HTTPX test suite should not be run on
+a Python version older than 3.9 if the HTTPX version is 0.28 or higher, you can
+say:
+
+```python
+"httpx": {
+    "python": {
+        # run the test suite for httpx v0.28+ on Python 3.9+ only
+        ">=0.28": ">=3.9",
+    },
+}
+```
+
 The `python` key is optional, and when possible, it should be omitted. The script
-should automatically detect which Python versions the package supports.
-However, if a package has broken
-metadata or the SDK is explicitly not supporting some packages on specific
-Python versions (because of, for example, broken context vars), the `python`
-key can be used.
+should automatically detect which Python versions the package supports. However,
+if a package has broken metadata or the SDK is explicitly not supporting some
+packages on specific Python versions, the `python` key can be used.
 
 ### `include`
 
-Sometimes we only want to consider testing some specific versions of packages.
-For example, the Starlite package has two alpha prereleases of version 2.0.0, but
-we do not want to test these, since Starlite 2.0 was renamed to Litestar.
+Sometimes we only want to test specific versions of packages. For example, the
+Starlite package has two alpha prereleases of version 2.0.0, but we do not want
+to test these, since Starlite 2.0 was renamed to Litestar.
 
 The value of the `include` key expects a version specifier defining which
 versions should be considered for testing. For example, since we only want to test
-versions below 2.x in Starlite, we can use
+versions below 2.x in Starlite, we can use:
 
 ```python
 "starlite": {
@@ -156,11 +175,28 @@ be expressed like so:
 ### `integration_name`
 
 Sometimes, the name of the test suite doesn't match the name of the integration.
-For example, we have the `openai_base` and `openai_notiktoken` test suites, both
-of which are actually testing the `openai` integration. If this is the case, you can use the `integration_name` key to define the name of the integration. If not provided, it will default to the name of the test suite.
+For example, we have the `openai-base` and `openai-notiktoken` test suites, both
+of which are actually testing the `openai` integration. If this is the case, you
+can use the `integration_name` key to define the name of the integration. If not
+provided, it will default to the name of the test suite.
 
-Linking an integration to a test suite allows the script to access integration configuration like for example the minimum version defined in `sentry_sdk/integrations/__init__.py`.
+Linking an integration to a test suite allows the script to access integration
+configuration like, for example, the minimum supported version defined in
+`sentry_sdk/integrations/__init__.py`.
 
+### `num_versions`
+
+With this option you can tweak the default version picking behavior by specifying
+how many package versions should be tested. It accepts an integer equal to or
+greater than 2, as the oldest and latest supported versions will always be
+picked. Additionally, if there is a recent prerelease, it'll also always be
+picked (this doesn't count towards `num_versions`).
+
+For instance, `num_versions` set to `2` will only test the first supported and
+the last release of the package. `num_versions` equal to `3` will test the first
+supported, the last release, and one release in between; `num_versions` set to `4`
+will test an additional release in between. In all these cases, if there is
+a recent prerelease, it'll be picked as well in addition to the picked versions.
 
 ## How-Tos
 
@@ -170,33 +206,10 @@ Linking an integration to a test suite allows the script to access integration c
    in `integrations/__init__.py`. This should be the lowest version of the
    framework that we can guarantee works with the SDK. If you've just added the
    integration, you should generally set this to the latest version of the framework
-   at the time.
+   at the time, unless you've verified the integration works for earlier versions
+   as well.
 2. Add the integration and any constraints to `TEST_SUITE_CONFIG`. See the
-   "Defining constraints" section for the format.
+   [Test suite config](#test-suite-config) section for the format.
 3. Add the integration to one of the groups in the `GROUPS` dictionary in
    `scripts/split_tox_gh_actions/split_tox_gh_actions.py`.
-4. Add the `TESTPATH` for the test suite in `tox.jinja`'s `setenv` section.
-5. Run `scripts/generate-test-files.sh` and commit the changes.
-
-### Migrate a test suite to populate_tox.py
-
-A handful of integration test suites are still hardcoded. The goal is to migrate
-them all to `populate_tox.py` over time.
-
-1. Remove the integration from the `IGNORE` list in `populate_tox.py`.
-2. Remove the hardcoded entries for the integration from the `envlist` and `deps` sections of `tox.jinja`.
-3. Run `scripts/generate-test-files.sh`.
-4. Run the test suite, either locally or by creating a PR.
-5. Address any test failures that happen.
-
-You might have to introduce additional version bounds on the dependencies of the
-package. Try to determine the source of the failure and address it.
-
-Common scenarios:
-- An old version of the tested package installs a dependency without defining
-  an upper version bound on it. A new version of the dependency is installed that
-  is incompatible with the package. In this case you need to determine which
-  versions of the dependency don't contain the breaking change and restrict this
-  in `TEST_SUITE_CONFIG`.
-- Tests are failing on an old Python version. In this case first double-check
-  whether we were even testing them on that version in the original `tox.ini`.
+4. Run `scripts/generate-test-files.sh` and commit the changes.
