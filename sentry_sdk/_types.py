@@ -234,6 +234,32 @@ if TYPE_CHECKING:
         },
     )
 
+    MetricType = Literal["counter", "gauge", "distribution"]
+
+    MetricAttributeValue = TypedDict(
+        "MetricAttributeValue",
+        {
+            "value": Union[str, bool, float, int],
+            "type": Literal["string", "boolean", "double", "integer"],
+        },
+    )
+
+    Metric = TypedDict(
+        "Metric",
+        {
+            "timestamp": float,
+            "trace_id": Optional[str],
+            "span_id": Optional[str],
+            "name": str,
+            "type": MetricType,
+            "value": float,
+            "unit": Optional[str],
+            "attributes": dict[str, str | bool | float | int],
+        },
+    )
+
+    MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
+
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]
 
@@ -268,6 +294,7 @@ if TYPE_CHECKING:
         "monitor",
         "span",
         "log_item",
+        "trace_metric",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
