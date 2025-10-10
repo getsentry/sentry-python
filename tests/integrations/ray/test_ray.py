@@ -100,6 +100,9 @@ def test_tracing_in_ray_tasks(task_options):
     else:
         example_task = ray.remote(example_task)
 
+    # Function name shouldn't be overwritten by Sentry wrapper
+    assert example_task._function_name == "tests.integrations.ray.test_ray.example_task"
+
     with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
         worker_envelopes = ray.get(example_task.remote())
 
