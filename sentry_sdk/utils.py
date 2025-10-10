@@ -1529,12 +1529,11 @@ class TimeoutThread(threading.Thread):
         if integer_configured_timeout < self.configured_timeout:
             integer_configured_timeout = integer_configured_timeout + 1
 
+        # Raising Exception after timeout duration is reached
         if self.isolation_scope is not None and self.current_scope is not None:
             with sentry_sdk.scope.use_isolation_scope(self.isolation_scope):
                 with sentry_sdk.scope.use_scope(self.current_scope):
                     try:
-                        # with use_scope(self.current_scope):
-                        # Raising Exception after timeout duration is reached
                         raise ServerlessTimeoutWarning(
                             "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
                                 integer_configured_timeout
