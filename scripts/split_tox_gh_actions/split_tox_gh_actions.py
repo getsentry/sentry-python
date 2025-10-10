@@ -72,15 +72,15 @@ GROUPS = {
     "AI": [
         "anthropic",
         "cohere",
+        "google_genai",
+        "huggingface_hub",
         "langchain-base",
         "langchain-notiktoken",
+        "langgraph",
         "litellm",
         "openai-base",
         "openai-notiktoken",
-        "langgraph",
-        "google_genai",
         "openai_agents",
-        "huggingface_hub",
     ],
     "Cloud": [
         "aws_lambda",
