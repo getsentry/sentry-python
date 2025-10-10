@@ -83,12 +83,12 @@ def _patch_graph_nodes():
         span = invoke_agent_span(user_prompt, agent, model, model_settings)
         # Store span in context for later use
         if hasattr(ctx, "state"):
-            ctx.state._sentry_invoke_span = span  # type: ignore
+            ctx.state._sentry_invoke_span = span
 
         result = await original_user_prompt_run(self, ctx)
         return result
 
-    UserPromptNode.run = wrapped_user_prompt_run  # type: ignore
+    UserPromptNode.run = wrapped_user_prompt_run  # type: ignore[method-assign]
 
     # Patch ModelRequestNode to create ai_client spans
     original_model_request_run = ModelRequestNode.run

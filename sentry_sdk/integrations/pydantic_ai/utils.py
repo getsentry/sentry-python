@@ -9,7 +9,7 @@ from sentry_sdk.utils import event_from_exception, safe_serialize
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, List, Dict
     from pydantic_ai.usage import RequestUsage
 
 try:
@@ -213,7 +213,7 @@ def _set_input_messages(span, messages):
                         elif "ToolReturn" in part.__class__.__name__:
                             role = "tool"
 
-                    content = []
+                    content = []  # type: List[Dict[str, Any] | str]
                     tool_calls = None
                     tool_call_id = None
 
@@ -247,7 +247,7 @@ def _set_input_messages(span, messages):
 
                     # Add message if we have content or tool calls
                     if content or tool_calls:
-                        message = {"role": role}
+                        message = {"role": role}  # type: Dict[str, Any]
                         if content:
                             message["content"] = content
                         if tool_calls:

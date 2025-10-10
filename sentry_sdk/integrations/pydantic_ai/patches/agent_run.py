@@ -9,7 +9,7 @@ from ..utils import _capture_exception
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Optional
 
 try:
     import pydantic_ai
@@ -25,8 +25,8 @@ class _StreamingContextManagerWrapper:
         self.agent = agent
         self.original_ctx_manager = original_ctx_manager
         self.is_streaming = is_streaming
-        self._isolation_scope = None
-        self._workflow_span = None
+        self._isolation_scope = None  # type: Any
+        self._workflow_span = None  # type: Optional[sentry_sdk.tracing.Span]
 
     async def __aenter__(self):
         # type: () -> Any
@@ -217,6 +217,6 @@ def _patch_agent_run():
 
     # Wrap and apply patches for streaming methods
     Agent.run_stream = _create_streaming_wrapper(original_run_stream)  # type: ignore
-    Agent.run_stream_events = _create_streaming_events_wrapper(
+    Agent.run_stream_events = _create_streaming_events_wrapper(  # type: ignore[method-assign]
         original_run_stream_events
-    )  # type: ignore
+    )
