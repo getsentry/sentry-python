@@ -1484,11 +1484,17 @@ class TimeoutThread(threading.Thread):
     waiting_time and raises a custom ServerlessTimeout exception.
     """
 
-    def __init__(self, waiting_time, configured_timeout):
-        # type: (float, int) -> None
+    def __init__(
+        self, waiting_time, configured_timeout, isolation_scope=None, current_scope=None
+    ):
+        # type: (float, int, Optional[Scope], Optional[Scope]) -> None
         threading.Thread.__init__(self)
         self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
+
+        self.isolation_scope = isolation_scope
+        self.current_scope = current_scope
+
         self._stop_event = threading.Event()
 
     def stop(self):
@@ -1509,12 +1515,17 @@ class TimeoutThread(threading.Thread):
         if integer_configured_timeout < self.configured_timeout:
             integer_configured_timeout = integer_configured_timeout + 1
 
-        # Raising Exception after timeout duration is reached
-        raise ServerlessTimeoutWarning(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                integer_configured_timeout
-            )
-        )
+        from sentry_sdk.scope import use_isolation_scope, use_scope
+
+        with use_isolation_scope(self.isolation_scope):
+            with use_scope(self.current_scope):
+                # with use_scope(self.current_scope):
+                # Raising Exception after timeout duration is reached
+                raise ServerlessTimeoutWarning(
+                    "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                        integer_configured_timeout
+                    )
+                )
 
 
 def to_base64(original):
