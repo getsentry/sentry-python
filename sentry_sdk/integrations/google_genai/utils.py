@@ -15,6 +15,7 @@ from typing import (
 )
 
 import sentry_sdk
+from sentry_sdk._compat import iscoroutinefunction
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
@@ -318,7 +319,7 @@ def wrapped_tool(tool):
     tool_name = getattr(tool, "__name__", "unknown")
     tool_doc = tool.__doc__
 
-    if inspect.iscoroutinefunction(tool):
+    if iscoroutinefunction(tool):
         # Async function
         @wraps(tool)
         async def async_wrapped(*args, **kwargs):

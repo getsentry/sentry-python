@@ -10,6 +10,7 @@ from copy import deepcopy
 from functools import partial
 
 import sentry_sdk
+from sentry_sdk._compat import iscoroutinefunction
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations._asgi_common import (
@@ -76,10 +77,10 @@ def _looks_like_asgi3(app):
     if inspect.isclass(app):
         return hasattr(app, "__await__")
     elif inspect.isfunction(app):
-        return asyncio.iscoroutinefunction(app)
+        return iscoroutinefunction(app)
     else:
         call = getattr(app, "__call__", None)  # noqa
-        return asyncio.iscoroutinefunction(call)
+        return iscoroutinefunction(call)
 
 
 class SentryAsgiMiddleware:
