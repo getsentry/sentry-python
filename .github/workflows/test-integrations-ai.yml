@@ -58,6 +58,14 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere"
+      - name: Test google_genai
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-google_genai"
+      - name: Test huggingface_hub
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub"
       - name: Test langchain-base
         run: |
           set -x # print commands that are executed
@@ -66,6 +74,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-notiktoken"
+      - name: Test langgraph
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-langgraph"
       - name: Test litellm
         run: |
           set -x # print commands that are executed
@@ -78,22 +90,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-notiktoken"
-      - name: Test langgraph
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langgraph"
-      - name: Test google_genai
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-google_genai"
       - name: Test openai_agents
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-openai_agents"
-      - name: Test huggingface_hub
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub"
       - name: Test pydantic_ai
         run: |
           set -x # print commands that are executed
