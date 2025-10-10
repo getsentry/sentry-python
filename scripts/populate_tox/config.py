@@ -268,6 +268,9 @@ TEST_SUITE_CONFIG = {
     },
     "pydantic_ai": {
         "package": "pydantic-ai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
     },
     "pymongo": {
         "package": "pymongo",
