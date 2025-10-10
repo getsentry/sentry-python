@@ -81,6 +81,7 @@ GROUPS = {
         "google_genai",
         "openai_agents",
         "huggingface_hub",
+        "pydantic_ai",
     ],
     "Cloud": [
         "aws_lambda",
