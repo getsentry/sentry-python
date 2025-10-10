@@ -637,15 +637,24 @@ async def test_outgoing_trace_headers_append_to_baggage(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("enable_http_request_source", [None, False])
 async def test_request_source_disabled(
-    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+    sentry_init,
+    aiohttp_raw_server,
+    aiohttp_client,
+    capture_events,
+    enable_http_request_source,
 ):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        enable_http_request_source=False,
-        http_request_source_threshold_ms=0,
-    )
+    sentry_options = {
+        "integrations": [AioHttpIntegration()],
+        "traces_sample_rate": 1.0,
+        "http_request_source_threshold_ms": 0,
+    }
+
+    if enable_http_request_source is not None:
+        sentry_options["enable_http_request_source"] = enable_http_request_source
+
+    sentry_init(**sentry_options)
 
     # server for making span request
     async def handler(request):
@@ -680,21 +689,18 @@ async def test_request_source_disabled(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("enable_http_request_source", [None, True])
 async def test_request_source_enabled(
     sentry_init,
     aiohttp_raw_server,
     aiohttp_client,
     capture_events,
-    enable_http_request_source,
 ):
     sentry_options = {
         "integrations": [AioHttpIntegration()],
         "traces_sample_rate": 1.0,
+        "enable_http_request_source": True,
         "http_request_source_threshold_ms": 0,
     }
-    if enable_http_request_source is not None:
-        sentry_options["enable_http_request_source"] = enable_http_request_source
 
     sentry_init(**sentry_options)
 
