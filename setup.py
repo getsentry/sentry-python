@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.40.0",
+    version="2.41.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -85,6 +85,7 @@ setup(
         "statsig": ["statsig>=0.55.3"],
         "tornado": ["tornado>=6"],
         "unleash": ["UnleashClient>=6.0.1"],
+        "google-genai": ["google-genai>=1.29.0"],
     },
     entry_points={
         "opentelemetry_propagator": [

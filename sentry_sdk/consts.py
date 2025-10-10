@@ -52,11 +52,10 @@ if TYPE_CHECKING:
         Hint,
         Log,
         MeasurementUnit,
+        Metric,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
-        MetricTags,
-        MetricValue,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -77,13 +76,10 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
-            "enable_metrics": Optional[bool],
-            "before_emit_metric": Optional[
-                Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
-            ],
-            "metric_code_locations": Optional[bool],
             "enable_logs": Optional[bool],
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
+            "enable_metrics": Optional[bool],
+            "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
         },
         total=False,
     )
@@ -1343,4 +1339,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.40.0"
+VERSION = "2.41.0"

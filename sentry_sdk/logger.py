@@ -46,7 +46,7 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     }
 
     # noinspection PyProtectedMember
-    client._capture_experimental_log(
+    client._capture_log(
         {
             "severity_text": severity_text,
             "severity_number": severity_number,
