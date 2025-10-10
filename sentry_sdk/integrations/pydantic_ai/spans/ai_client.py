@@ -27,7 +27,7 @@ def ai_client_span(messages, agent, model, model_settings):
         model: Model object
         model_settings: Model settings
     """
-    # Determine model name for span description
+    # Determine model name for span name
     model_obj = model
     if agent and hasattr(agent, "model"):
         model_obj = agent.model
@@ -36,7 +36,7 @@ def ai_client_span(messages, agent, model, model_settings):
 
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
-        description=f"chat {model_name}",
+        name=f"chat {model_name}",
         origin=SPAN_ORIGIN,
     )
 
