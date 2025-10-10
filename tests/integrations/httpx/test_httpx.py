@@ -1,8 +1,11 @@
+import os
+import datetime
 import asyncio
 from unittest import mock
 
 import httpx
 import pytest
+from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
@@ -391,6 +394,312 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock)
     assert "url" not in event["breadcrumbs"]["values"][0]["data"]
     assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
     assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_request_source_disabled(sentry_init, capture_events, httpx_client, httpx_mock):
+    httpx_mock.add_response()
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=False,
+        http_request_source_threshold_ms=0,
+    )
+
+    events = capture_events()
+
+    url = "http://example.com/"
+
+    with start_transaction(name="test_transaction"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO not in data
+    assert SPANDATA.CODE_NAMESPACE not in data
+    assert SPANDATA.CODE_FILEPATH not in data
+    assert SPANDATA.CODE_FUNCTION not in data
+
+
+@pytest.mark.parametrize("enable_http_request_source", [None, True])
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_request_source_enabled(
+    sentry_init, capture_events, enable_http_request_source, httpx_client, httpx_mock
+):
+    httpx_mock.add_response()
+    sentry_options = {
+        "integrations": [HttpxIntegration()],
+        "traces_sample_rate": 1.0,
+        "http_request_source_threshold_ms": 0,
+    }
+    if enable_http_request_source is not None:
+        sentry_options["enable_http_request_source"] = enable_http_request_source
+
+    sentry_init(**sentry_options)
+
+    events = capture_events()
+
+    url = "http://example.com/"
+
+    with start_transaction(name="test_transaction"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_request_source(sentry_init, capture_events, httpx_client, httpx_mock):
+    httpx_mock.add_response()
+
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=0,
+    )
+
+    events = capture_events()
+
+    url = "http://example.com/"
+
+    with start_transaction(name="test_transaction"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.httpx.test_httpx"
+    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+        "tests/integrations/httpx/test_httpx.py"
+    )
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    assert data.get(SPANDATA.CODE_FUNCTION) == "test_request_source"
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_request_source_with_module_in_search_path(
+    sentry_init, capture_events, httpx_client, httpx_mock
+):
+    """
+    Test that request source is relative to the path of the module it ran in
+    """
+    httpx_mock.add_response()
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=0,
+    )
+
+    events = capture_events()
+
+    url = "http://example.com/"
+
+    with start_transaction(name="test_transaction"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            from httpx_helpers.helpers import async_get_request_with_client
+
+            asyncio.get_event_loop().run_until_complete(
+                async_get_request_with_client(httpx_client, url)
+            )
+        else:
+            from httpx_helpers.helpers import get_request_with_client
+
+            get_request_with_client(httpx_client, url)
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "httpx_helpers.helpers"
+    assert data.get(SPANDATA.CODE_FILEPATH) == "httpx_helpers/helpers.py"
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    if asyncio.iscoroutinefunction(httpx_client.get):
+        assert data.get(SPANDATA.CODE_FUNCTION) == "async_get_request_with_client"
+    else:
+        assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_client"
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_no_request_source_if_duration_too_short(
+    sentry_init, capture_events, httpx_client, httpx_mock
+):
+    httpx_mock.add_response()
+
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=100,
+    )
+
+    events = capture_events()
+
+    url = "http://example.com/"
+
+    with start_transaction(name="test_transaction"):
+
+        @contextmanager
+        def fake_start_span(*args, **kwargs):
+            with sentry_sdk.start_span(*args, **kwargs) as span:
+                pass
+            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            yield span
+
+        with mock.patch(
+            "sentry_sdk.integrations.httpx.start_span",
+            fake_start_span,
+        ):
+            if asyncio.iscoroutinefunction(httpx_client.get):
+                asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+            else:
+                httpx_client.get(url)
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO not in data
+    assert SPANDATA.CODE_NAMESPACE not in data
+    assert SPANDATA.CODE_FILEPATH not in data
+    assert SPANDATA.CODE_FUNCTION not in data
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_request_source_if_duration_over_threshold(
+    sentry_init, capture_events, httpx_client, httpx_mock
+):
+    httpx_mock.add_response()
+
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=100,
+    )
+
+    events = capture_events()
+
+    url = "http://example.com/"
+
+    with start_transaction(name="test_transaction"):
+
+        @contextmanager
+        def fake_start_span(*args, **kwargs):
+            with sentry_sdk.start_span(*args, **kwargs) as span:
+                pass
+            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+            yield span
+
+        with mock.patch(
+            "sentry_sdk.integrations.httpx.start_span",
+            fake_start_span,
+        ):
+            if asyncio.iscoroutinefunction(httpx_client.get):
+                asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+            else:
+                httpx_client.get(url)
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.httpx.test_httpx"
+    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+        "tests/integrations/httpx/test_httpx.py"
+    )
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    assert (
+        data.get(SPANDATA.CODE_FUNCTION)
+        == "test_request_source_if_duration_over_threshold"
+    )
 
 
 @pytest.mark.parametrize(

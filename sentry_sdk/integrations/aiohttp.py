@@ -22,7 +22,7 @@ from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
 )
-from sentry_sdk.tracing_utils import should_propagate_trace
+from sentry_sdk.tracing_utils import should_propagate_trace, add_http_request_source
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -278,6 +278,8 @@ def create_trace_config():
         span.set_http_status(int(params.response.status))
         span.set_data("reason", params.response.reason)
         span.finish()
+
+        add_http_request_source(span)
 
     trace_config = TraceConfig()
 
