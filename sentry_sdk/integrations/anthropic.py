@@ -6,6 +6,7 @@ from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     set_data_normalized,
     normalize_message_roles,
+    truncate_and_serialize_messages,
     get_start_span_function,
 )
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
@@ -145,12 +146,9 @@ def _set_input_data(span, kwargs, integration):
                 normalized_messages.append(message)
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
-        set_data_normalized(
-            span,
-            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-            role_normalized_messages,
-            unpack=False,
-        )
+        serialized_messages = truncate_and_serialize_messages(role_normalized_messages)
+        if serialized_messages is not None:
+            span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, serialized_messages)
 
     set_data_normalized(
         span, SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False)
