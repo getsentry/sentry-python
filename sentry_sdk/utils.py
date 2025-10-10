@@ -1487,7 +1487,7 @@ class TimeoutThread(threading.Thread):
     def __init__(
         self, waiting_time, configured_timeout, isolation_scope=None, current_scope=None
     ):
-        # type: (float, int, Optional[Scope], Optional[Scope]) -> None
+        # type: (float, int, Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope]) -> None
         threading.Thread.__init__(self)
         self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
@@ -1542,6 +1542,12 @@ class TimeoutThread(threading.Thread):
                         )
                     except Exception:
                         reraise(*self._capture_exception())
+
+        raise ServerlessTimeoutWarning(
+            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                integer_configured_timeout
+            )
+        )
 
 
 def to_base64(original):
