@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    from sentry_sdk._types import Event, ExcInfo, Log, Hint
+    from sentry_sdk._types import Event, ExcInfo, Log, Hint, Metric
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -2013,3 +2013,19 @@ def get_before_send_log(options):
     return options.get("before_send_log") or options["_experiments"].get(
         "before_send_log"
     )
+
+
+def has_metrics_enabled(options):
+    # type: (Optional[dict[str, Any]]) -> bool
+    if options is None:
+        return False
+
+    return bool(options["_experiments"].get("enable_metrics", False))
+
+
+def get_before_send_metric(options):
+    # type: (Optional[dict[str, Any]]) -> Optional[Callable[[Metric, Hint], Optional[Metric]]]
+    if options is None:
+        return None
+
+    return options["_experiments"].get("before_send_metric")

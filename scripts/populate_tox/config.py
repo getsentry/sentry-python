@@ -142,6 +142,13 @@ TEST_SUITE_CONFIG = {
         "package": "gql[all]",
         "num_versions": 2,
     },
+    "google_genai": {
+        "package": "google-genai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.9",
+    },
     "graphene": {
         "package": "graphene",
         "deps": {
