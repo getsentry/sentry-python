@@ -16,6 +16,18 @@ except ImportError:
 
 class PydanticAIIntegration(Integration):
     identifier = "pydantic_ai"
+    origin = f"auto.ai.{identifier}"
+
+    def __init__(self, include_prompts=True):
+        # type: (bool) -> None
+        """
+        Initialize the Pydantic AI integration.
+
+        Args:
+            include_prompts: Whether to include prompts and messages in span data.
+                Requires send_default_pii=True. Defaults to True.
+        """
+        self.include_prompts = include_prompts
 
     @staticmethod
     def setup_once():

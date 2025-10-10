@@ -19,6 +19,27 @@ except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
 
+def _should_send_prompts():
+    # type: () -> bool
+    """
+    Check if prompts should be sent to Sentry.
+
+    This checks both send_default_pii and the include_prompts integration setting.
+    """
+    if not should_send_default_pii():
+        return False
+
+    # Get the integration instance from the client
+    integration = sentry_sdk.get_client().get_integration(
+        pydantic_ai.__name__.split(".")[0]
+    )
+
+    if integration is None:
+        return False
+
+    return getattr(integration, "include_prompts", True)
+
+
 def _capture_exception(exc):
     # type: (Any) -> None
     set_span_errored()
@@ -154,7 +175,7 @@ def _set_usage_data(span, usage):
 def _set_input_messages(span, messages):
     # type: (sentry_sdk.tracing.Span, Any) -> None
     """Set input messages data on a span."""
-    if not should_send_default_pii():
+    if not _should_send_prompts():
         return
 
     if not messages:
@@ -247,7 +268,7 @@ def _set_input_messages(span, messages):
 def _set_output_data(span, response):
     # type: (sentry_sdk.tracing.Span, Any) -> None
     """Set output data on a span."""
-    if not should_send_default_pii():
+    if not _should_send_prompts():
         return
 
     if not response:

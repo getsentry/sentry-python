@@ -1,10 +1,9 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data, _set_model_data
+from ..utils import _set_agent_data, _set_model_data, _should_send_prompts
 
 from typing import TYPE_CHECKING
 
@@ -65,8 +64,8 @@ def invoke_agent_span(user_prompt, agent, model, model_settings):
             # If we can't extract tools, just skip it
             pass
 
-    # Add user prompt and system prompts if available and PII is allowed
-    if should_send_default_pii():
+    # Add user prompt and system prompts if available and prompts are enabled
+    if _should_send_prompts():
         messages = []
 
         # Add system prompts (both instructions and system_prompt)
@@ -135,7 +134,7 @@ def invoke_agent_span(user_prompt, agent, model, model_settings):
 def update_invoke_agent_span(span, output):
     # type: (sentry_sdk.tracing.Span, Any) -> None
     """Update and close the invoke agent span."""
-    if span and should_send_default_pii() and output:
+    if span and _should_send_prompts() and output:
         output_text = str(output) if not isinstance(output, str) else output
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_text, unpack=False
