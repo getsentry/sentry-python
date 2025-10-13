@@ -114,9 +114,7 @@ def patch_scaffold_route():
         def decorator(old_func):
             # type: (Any) -> Any
 
-            if inspect.isfunction(old_func) and not iscoroutinefunction(
-                old_func
-            ):
+            if inspect.isfunction(old_func) and not iscoroutinefunction(old_func):
 
                 @wraps(old_func)
                 @ensure_integration_enabled(QuartIntegration, old_func)

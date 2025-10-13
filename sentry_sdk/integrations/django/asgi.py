@@ -36,9 +36,6 @@ if TYPE_CHECKING:
     _F = TypeVar("_F", bound=Callable[..., Any])
 
 
-
-
-
 def _make_asgi_request_event_processor(request):
     # type: (ASGIRequest) -> EventProcessor
     def asgi_request_event_processor(event, hint):

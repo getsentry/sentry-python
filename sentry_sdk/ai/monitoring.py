@@ -1,7 +1,6 @@
 import inspect
 from functools import wraps
 
-from sentry_sdk._compat import iscoroutinefunction
 from sentry_sdk.consts import SPANDATA
 import sentry_sdk.utils
 from sentry_sdk import start_span
@@ -90,7 +89,7 @@ def ai_track(description, **span_kwargs):
                         _ai_pipeline_name.set(None)
                     return res
 
-        if iscoroutinefunction(f):
+        if inspect.iscoroutinefunction(f):
             return wraps(f)(async_wrapped)  # type: ignore
         else:
             return wraps(f)(sync_wrapped)  # type: ignore

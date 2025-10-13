@@ -11,7 +11,6 @@ from urllib.parse import quote, unquote
 import uuid
 
 import sentry_sdk
-from sentry_sdk._compat import iscoroutinefunction
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -913,7 +912,7 @@ def create_span_decorator(
         except Exception:
             pass
 
-        if iscoroutinefunction(f):
+        if inspect.iscoroutinefunction(f):
             return async_wrapper
         else:
             return sync_wrapper

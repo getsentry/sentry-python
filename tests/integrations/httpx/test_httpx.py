@@ -1,6 +1,7 @@
 import os
 import datetime
 import asyncio
+import inspect
 from unittest import mock
 
 import httpx
@@ -9,7 +10,6 @@ from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk._compat import iscoroutinefunction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
 from tests.conftest import ApproxDict
@@ -33,7 +33,7 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
     with start_transaction():
         events = capture_events()
 
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             response = asyncio.get_event_loop().run_until_complete(
                 httpx_client.get(url)
             )
@@ -87,7 +87,7 @@ def test_crumb_capture_client_error(
     with start_transaction():
         events = capture_events()
 
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             response = asyncio.get_event_loop().run_until_complete(
                 httpx_client.get(url)
             )
@@ -138,7 +138,7 @@ def test_outgoing_trace_headers(sentry_init, httpx_client, httpx_mock):
         op="greeting.sniff",
         trace_id="01234567890123456789012345678901",
     ) as transaction:
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             response = asyncio.get_event_loop().run_until_complete(
                 httpx_client.get(url)
             )
@@ -181,7 +181,7 @@ def test_outgoing_trace_headers_append_to_baggage(
             op="greeting.sniff",
             trace_id="01234567890123456789012345678901",
         ) as transaction:
-            if iscoroutinefunction(httpx_client.get):
+            if inspect.iscoroutinefunction(httpx_client.get):
                 response = asyncio.get_event_loop().run_until_complete(
                     httpx_client.get(url, headers={"baGGage": "custom=data"})
                 )
@@ -334,7 +334,7 @@ def test_option_trace_propagation_targets(
 
     # Must be in a transaction to propagate headers
     with sentry_sdk.start_transaction():
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:
             httpx_client.get(url)
@@ -421,7 +421,7 @@ def test_request_source_disabled(
     url = "http://example.com/"
 
     with start_transaction(name="test_transaction"):
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:
             httpx_client.get(url)
@@ -458,7 +458,7 @@ def test_request_source_enabled(sentry_init, capture_events, httpx_client, httpx
     url = "http://example.com/"
 
     with start_transaction(name="test_transaction"):
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:
             httpx_client.get(url)
@@ -495,7 +495,7 @@ def test_request_source(sentry_init, capture_events, httpx_client, httpx_mock):
     url = "http://example.com/"
 
     with start_transaction(name="test_transaction"):
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:
             httpx_client.get(url)
@@ -548,7 +548,7 @@ def test_request_source_with_module_in_search_path(
     url = "http://example.com/"
 
     with start_transaction(name="test_transaction"):
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             from httpx_helpers.helpers import async_get_request_with_client
 
             asyncio.get_event_loop().run_until_complete(
@@ -579,7 +579,7 @@ def test_request_source_with_module_in_search_path(
     is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
     assert is_relative_path
 
-    if iscoroutinefunction(httpx_client.get):
+    if inspect.iscoroutinefunction(httpx_client.get):
         assert data.get(SPANDATA.CODE_FUNCTION) == "async_get_request_with_client"
     else:
         assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_client"
@@ -619,7 +619,7 @@ def test_no_request_source_if_duration_too_short(
             "sentry_sdk.integrations.httpx.start_span",
             fake_start_span,
         ):
-            if iscoroutinefunction(httpx_client.get):
+            if inspect.iscoroutinefunction(httpx_client.get):
                 asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
             else:
                 httpx_client.get(url)
@@ -671,7 +671,7 @@ def test_request_source_if_duration_over_threshold(
             "sentry_sdk.integrations.httpx.start_span",
             fake_start_span,
         ):
-            if iscoroutinefunction(httpx_client.get):
+            if inspect.iscoroutinefunction(httpx_client.get):
                 asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
             else:
                 httpx_client.get(url)
@@ -721,7 +721,7 @@ def test_span_origin(sentry_init, capture_events, httpx_client, httpx_mock):
     url = "http://example.com/"
 
     with start_transaction(name="test_transaction"):
-        if iscoroutinefunction(httpx_client.get):
+        if inspect.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:
             httpx_client.get(url)

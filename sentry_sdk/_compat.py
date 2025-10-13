@@ -2,7 +2,7 @@ import sys
 import asyncio
 import inspect
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from typing import Any
@@ -11,6 +11,10 @@ if TYPE_CHECKING:
 
     T = TypeVar("T")
     _F = TypeVar("_F", bound=Callable[..., Any])
+
+# Public shim symbols with precise types so mypy accepts branch assignments
+iscoroutinefunction: "Callable[[Any], bool]"
+markcoroutinefunction: "Callable[[ _F ], _F]"
 
 
 PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
@@ -28,11 +32,26 @@ if hasattr(inspect, "markcoroutinefunction"):
     iscoroutinefunction = inspect.iscoroutinefunction
     markcoroutinefunction = inspect.markcoroutinefunction
 else:
-    iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
+    iscoroutinefunction = asyncio.iscoroutinefunction
 
     def markcoroutinefunction(func):
         # type: (_F) -> _F
-        func._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore
+        # Prior to Python 3.12, asyncio exposed a private `_is_coroutine`
+        # marker used by asyncio.iscoroutinefunction(). This attribute was
+        # removed in Python 3.11. If it's not available, fall back to a no-op,
+        # which preserves behavior of inspect.iscoroutinefunction for our
+        # supported versions while avoiding AttributeError.
+        try:
+            marker = getattr(asyncio.coroutines, "_is_coroutine")
+        except Exception:
+            # No marker available on this Python version; return function as-is.
+            return func
+
+        try:  # pragma: no cover - defensive
+            func._is_coroutine = marker  # type: ignore[attr-defined]
+        except Exception:
+            # If assignment fails for any reason, leave func unchanged.
+            pass
         return func
 
 
