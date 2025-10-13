@@ -55,6 +55,10 @@ __all__ = [  # noqa
     "update_current_span",
 ]
 
+# Public convenience submodule for performance helpers
+from sentry_sdk import performance as performance
+__all__.append("performance")
+
 # Initialize the debug support after everything is loaded
 from sentry_sdk.debug import init_debug_support
 
