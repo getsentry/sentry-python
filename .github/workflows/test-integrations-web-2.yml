@@ -9,7 +9,19 @@ on:
       - master
       - release/**
       - potel-base
+    # Avoid running tests when only documentation files change
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
   pull_request:
+    # Avoid running tests when only documentation files change
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
 concurrency:
