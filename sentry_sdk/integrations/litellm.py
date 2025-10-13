@@ -18,11 +18,6 @@ try:
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
-_CALL_TYPE_TO_OPERATION = {
-    "embedding": "embeddings",
-    "completion": "chat",
-}
-
 
 def _get_metadata_dict(kwargs):
     # type: (Dict[str, Any]) -> Dict[str, Any]
@@ -54,10 +49,10 @@ def _input_callback(kwargs):
         provider = "unknown"
 
     call_type = kwargs.get("call_type", None)
-    if call_type not in _CALL_TYPE_TO_OPERATION:
-        return
-
-    operation = _CALL_TYPE_TO_OPERATION[call_type]
+    if call_type == "embedding":
+        operation = "embeddings"
+    else:
+        operation = "chat"
 
     # Start a new span/transaction
     span = get_start_span_function()(
