@@ -1,6 +1,7 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_model_data, _should_send_prompts
@@ -36,8 +37,6 @@ def invoke_agent_span(user_prompt, agent, model, model_settings):
     # Add available tools if present
     if agent and hasattr(agent, "_function_toolset"):
         try:
-            from sentry_sdk.utils import safe_serialize
-
             tools = []
             # Get tools from the function toolset
             if hasattr(agent._function_toolset, "tools"):

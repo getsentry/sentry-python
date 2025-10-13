@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 try:
     import pydantic_ai
+    from pydantic_ai.agent import Agent
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
@@ -202,8 +203,6 @@ def _patch_agent_run():
     This patches both non-streaming (run, run_sync) and streaming
     (run_stream, run_stream_events) methods.
     """
-    # Import here to avoid circular imports
-    from pydantic_ai.agent import Agent
 
     # Store original methods
     original_run = Agent.run
