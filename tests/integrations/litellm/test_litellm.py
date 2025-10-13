@@ -216,7 +216,7 @@ def test_embeddings_create(sentry_init, capture_events):
             "model": "text-embedding-ada-002",
             "input": "Hello!",
             "messages": messages,
-            "call_type": "embeddings",
+            "call_type": "embedding",
         }
 
         _input_callback(kwargs)
