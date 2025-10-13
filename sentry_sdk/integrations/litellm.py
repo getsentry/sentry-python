@@ -18,6 +18,11 @@ try:
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
+_CALL_TYPE_TO_OPERATION = {
+    "embedding": "embeddings",
+    "completion": "chat",
+}
+
 
 def _get_metadata_dict(kwargs):
     # type: (Dict[str, Any]) -> Dict[str, Any]
@@ -48,8 +53,11 @@ def _input_callback(kwargs):
         model = full_model
         provider = "unknown"
 
-    messages = kwargs.get("messages", [])
-    operation = "chat" if messages else "embeddings"
+    call_type = kwargs.get("call_type", None)
+    if call_type not in _CALL_TYPE_TO_OPERATION:
+        return
+
+    operation = _CALL_TYPE_TO_OPERATION[call_type]
 
     # Start a new span/transaction
     span = get_start_span_function()(
@@ -71,6 +79,7 @@ def _input_callback(kwargs):
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record messages if allowed
+    messages = kwargs.get("messages", [])
     if messages and should_send_default_pii() and integration.include_prompts:
         set_data_normalized(
             span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
