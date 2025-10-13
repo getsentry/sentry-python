@@ -223,6 +223,31 @@ def test_timeout_error(lambda_client, test_environment):
     assert exception["mechanism"]["type"] == "threading"
 
 
+def test_timeout_error_scope_modified(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="TimeoutErrorScopeModified",
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (error_event,) = envelopes
+
+    assert error_event["level"] == "error"
+    assert (
+        error_event["extra"]["lambda"]["function_name"] == "TimeoutErrorScopeModified"
+    )
+
+    (exception,) = error_event["exception"]["values"]
+    assert not exception["mechanism"]["handled"]
+    assert exception["type"] == "ServerlessTimeoutWarning"
+    assert exception["value"].startswith(
+        "WARNING : Function is expected to get timed out. Configured timeout duration ="
+    )
+    assert exception["mechanism"]["type"] == "threading"
+
+    assert error_event["tags"]["custom_tag"] == "custom_value"
+
+
 @pytest.mark.parametrize(
     "aws_event, has_request_data, batch_size",
     [
