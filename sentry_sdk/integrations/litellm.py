@@ -6,7 +6,8 @@ from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
-    truncate_and_serialize_messages,
+    truncate_and_annotate_messages,
+    normalize_message_roles,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -76,7 +77,9 @@ def _input_callback(kwargs):
 
     # Record messages if allowed
     if messages and should_send_default_pii() and integration.include_prompts:
-        messages_data = truncate_and_serialize_messages(messages)
+        normalized_messages = normalize_message_roles(messages)
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
         if messages_data is not None:
             span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 

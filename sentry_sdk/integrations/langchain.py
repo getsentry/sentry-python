@@ -9,7 +9,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     get_start_span_function,
-    truncate_and_serialize_messages,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -222,7 +222,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     }
                     for prompt in prompts
                 ]
-                messages_data = truncate_and_serialize_messages(normalized_messages)
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    normalized_messages, span, scope
+                )
                 if messages_data is not None:
                     span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
@@ -276,7 +279,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                             self._normalize_langchain_message(message)
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
-                messages_data = truncate_and_serialize_messages(normalized_messages)
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    normalized_messages, span, scope
+                )
                 if messages_data is not None:
                     span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
@@ -752,7 +758,10 @@ def _wrap_agent_executor_invoke(f):
                 and integration.include_prompts
             ):
                 normalized_messages = normalize_message_roles([input])
-                messages_data = truncate_and_serialize_messages(normalized_messages)
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    normalized_messages, span, scope
+                )
                 if messages_data is not None:
                     span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
@@ -804,7 +813,9 @@ def _wrap_agent_executor_stream(f):
             and integration.include_prompts
         ):
             normalized_messages = normalize_message_roles([input])
-            messages_data = truncate_and_serialize_messages(normalized_messages)
+            messages_data = truncate_and_annotate_messages(
+                normalized_messages, span, sentry_sdk.get_current_scope()
+            )
             if messages_data is not None:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
 
