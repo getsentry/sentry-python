@@ -962,9 +962,6 @@ def test_langchain_message_role_normalization_units():
 
 def test_langchain_llm_exception_captured(sentry_init, capture_events):
     """Test that exceptions during LLM execution are properly captured with full context."""
-    global llm_type
-    llm_type = "openai-chat"
-
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -979,9 +976,6 @@ def test_langchain_llm_exception_captured(sentry_init, capture_events):
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-
-    global stream_result_mock
-    stream_result_mock = Mock(side_effect=RuntimeError("LLM service unavailable"))
 
     llm = MockOpenAI(
         model_name="gpt-3.5-turbo",
@@ -1234,3 +1228,90 @@ def test_langchain_exception_span_cleanup(sentry_init, capture_events):
     for span in errored_spans:
         assert "timestamp" in span
         assert span["timestamp"] > span.get("start_timestamp", 0)
+
+
+def test_langchain_callback_error_handler(sentry_init, capture_events):
+    """Test that the callback error handlers properly capture exceptions."""
+    from langchain_core.outputs import LLMResult
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "12345678-1234-1234-1234-123456789012"
+    serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
+    prompts = ["Test prompt"]
+
+    with start_transaction(name="test_callback_error"):
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            invocation_params={"model": "gpt-3.5-turbo"},
+        )
+
+        test_exception = RuntimeError("API Error")
+        callback.on_llm_error(error=test_exception, run_id=run_id)
+
+    assert len(events) >= 1
+
+    error_events = [e for e in events if e.get("level") == "error"]
+    assert len(error_events) > 0
+
+    error_event = error_events[0]
+    assert "exception" in error_event
+
+    exception = error_event["exception"]["values"][0]
+    assert exception["type"] == "RuntimeError"
+    assert exception["value"] == "API Error"
+
+    transaction_events = [e for e in events if e.get("type") == "transaction"]
+    if transaction_events:
+        transaction_event = transaction_events[0]
+        assert transaction_event["contexts"]["trace"]["status"] == "error"
+
+
+def test_langchain_chat_model_error_handler(sentry_init, capture_events):
+    """Test that chat model errors are properly captured."""
+    from langchain_core.messages import HumanMessage
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "87654321-4321-4321-4321-210987654321"
+    serialized = {"_type": "openai-chat", "model_name": "gpt-4"}
+    messages = [[HumanMessage(content="Test message")]]
+
+    with start_transaction(name="test_chat_model_error"):
+        callback.on_chat_model_start(
+            serialized=serialized,
+            messages=messages,
+            run_id=run_id,
+            invocation_params={"model": "gpt-4", "temperature": 0.7},
+        )
+
+        test_exception = ValueError("Chat model rate limit exceeded")
+        callback.on_chat_model_error(error=test_exception, run_id=run_id)
+
+    assert len(events) >= 1
+
+    error_events = [e for e in events if e.get("level") == "error"]
+    assert len(error_events) > 0
+
+    error_event = error_events[0]
+    assert "exception" in error_event
+
+    exception = error_event["exception"]["values"][0]
+    assert exception["type"] == "ValueError"
+    assert exception["value"] == "Chat model rate limit exceeded"
