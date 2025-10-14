@@ -749,6 +749,36 @@ class SPANDATA:
     Example: "MainThread"
     """
 
+    MCP_TOOL_NAME = "mcp.tool.name"
+    """
+    The name of the MCP tool being called.
+    Example: "get_weather"
+    """
+
+    MCP_PROMPT_NAME = "mcp.prompt.name"
+    """
+    The name of the MCP prompt being retrieved.
+    Example: "code_review"
+    """
+
+    MCP_RESOURCE_URI = "mcp.resource.uri"
+    """
+    The URI of the MCP resource being accessed.
+    Example: "file:///path/to/resource"
+    """
+
+    MCP_METHOD_NAME = "mcp.method.name"
+    """
+    The MCP protocol method name being called.
+    Example: "tools/call", "prompts/get", "resources/read"
+    """
+
+    MCP_REQUEST_ID = "mcp.request.id"
+    """
+    The unique identifier for the MCP request.
+    Example: "req_123abc"
+    """
+
 
 class SPANSTATUS:
     """
@@ -845,6 +875,9 @@ class OP:
     WEBSOCKET_SERVER = "websocket.server"
     SOCKET_CONNECTION = "socket.connection"
     SOCKET_DNS = "socket.dns"
+    MCP_TOOL = "mcp.tool"
+    MCP_PROMPT = "mcp.prompt"
+    MCP_RESOURCE = "mcp.resource"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
