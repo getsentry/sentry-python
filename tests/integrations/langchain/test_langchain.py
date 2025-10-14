@@ -1013,9 +1013,6 @@ def test_langchain_llm_exception_captured(sentry_init, capture_events):
 
 def test_langchain_different_exception_types(sentry_init, capture_events):
     """Test that different exception types are properly captured."""
-    global llm_type
-    llm_type = "openai-chat"
-
     exception_types = [
         (ValueError, "Invalid parameter"),
         (TypeError, "Type mismatch"),
@@ -1066,9 +1063,6 @@ def test_langchain_different_exception_types(sentry_init, capture_events):
 
 def test_langchain_exception_with_span_context(sentry_init, capture_events):
     """Test that exception events include proper span context."""
-    global llm_type
-    llm_type = "openai-chat"
-
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -1123,9 +1117,6 @@ def test_langchain_exception_with_span_context(sentry_init, capture_events):
 
 def test_langchain_tool_execution_error(sentry_init, capture_events):
     """Test that exceptions during tool execution are properly captured."""
-    global llm_type
-    llm_type = "openai-chat"
-
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -1198,9 +1189,6 @@ def test_langchain_tool_execution_error(sentry_init, capture_events):
 
 def test_langchain_exception_span_cleanup(sentry_init, capture_events):
     """Test that spans are properly cleaned up even when exceptions occur."""
-    global llm_type
-    llm_type = "openai-chat"
-
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
