@@ -958,3 +958,291 @@ def test_langchain_message_role_normalization_units():
     assert normalized[3]["role"] == "system"  # system unchanged
     assert "role" not in normalized[4]  # Message without role unchanged
     assert normalized[5] == "string message"  # String message unchanged
+
+
+def test_langchain_llm_exception_captured(sentry_init, capture_events):
+    """Test that exceptions during LLM execution are properly captured with full context."""
+    global llm_type
+    llm_type = "openai-chat"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant"),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    global stream_result_mock
+    stream_result_mock = Mock(side_effect=RuntimeError("LLM service unavailable"))
+
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    with start_transaction(name="test_llm_exception"):
+        with pytest.raises(RuntimeError):
+            list(agent_executor.stream({"input": "Test input"}))
+
+    (error_event, transaction_event) = events
+
+    assert error_event["level"] == "error"
+    assert "exception" in error_event
+    assert len(error_event["exception"]["values"]) > 0
+
+    exception = error_event["exception"]["values"][0]
+    assert exception["type"] == "RuntimeError"
+    assert exception["value"] == "LLM service unavailable"
+    assert "stacktrace" in exception
+
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "test_llm_exception"
+    assert transaction_event["contexts"]["trace"]["status"] == "error"
+
+
+def test_langchain_different_exception_types(sentry_init, capture_events):
+    """Test that different exception types are properly captured."""
+    global llm_type
+    llm_type = "openai-chat"
+
+    exception_types = [
+        (ValueError, "Invalid parameter"),
+        (TypeError, "Type mismatch"),
+        (RuntimeError, "Runtime error occurred"),
+        (Exception, "Generic exception"),
+    ]
+
+    for exception_class, exception_message in exception_types:
+        sentry_init(
+            integrations=[LangchainIntegration(include_prompts=False)],
+            traces_sample_rate=1.0,
+        )
+        events = capture_events()
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", "You are a helpful assistant"),
+                ("user", "{input}"),
+                MessagesPlaceholder(variable_name="agent_scratchpad"),
+            ]
+        )
+
+        global stream_result_mock
+        stream_result_mock = Mock(side_effect=exception_class(exception_message))
+
+        llm = MockOpenAI(
+            model_name="gpt-3.5-turbo",
+            temperature=0,
+            openai_api_key="badkey",
+        )
+        agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+        agent_executor = AgentExecutor(
+            agent=agent, tools=[get_word_length], verbose=True
+        )
+
+        with start_transaction():
+            with pytest.raises(exception_class):
+                list(agent_executor.stream({"input": "Test"}))
+
+        assert len(events) >= 1
+        error_event = events[0]
+        assert error_event["level"] == "error"
+
+        exception = error_event["exception"]["values"][0]
+        assert exception["type"] == exception_class.__name__
+        assert exception["value"] == exception_message
+
+
+def test_langchain_exception_with_span_context(sentry_init, capture_events):
+    """Test that exception events include proper span context."""
+    global llm_type
+    llm_type = "openai-chat"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant"),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    global stream_result_mock
+    stream_result_mock = Mock(side_effect=ValueError("Model error"))
+
+    llm = MockOpenAI(
+        model_name="gpt-4",
+        temperature=0.7,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    with start_transaction(name="llm_with_error"):
+        with pytest.raises(ValueError):
+            list(agent_executor.stream({"input": "Cause an error"}))
+
+    error_event, transaction_event = events
+
+    assert "contexts" in error_event
+    assert "trace" in error_event["contexts"]
+
+    error_trace_id = error_event["contexts"]["trace"].get("trace_id")
+    transaction_trace_id = transaction_event["contexts"]["trace"]["trace_id"]
+
+    assert error_trace_id == transaction_trace_id
+
+    gen_ai_spans = [
+        span
+        for span in transaction_event.get("spans", [])
+        if span.get("op", "").startswith("gen_ai")
+    ]
+    assert len(gen_ai_spans) > 0
+
+    for span in gen_ai_spans:
+        if span.get("tags", {}).get("status") == "error":
+            assert "span_id" in span
+
+
+def test_langchain_tool_execution_error(sentry_init, capture_events):
+    """Test that exceptions during tool execution are properly captured."""
+    global llm_type
+    llm_type = "openai-chat"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    @tool
+    def failing_tool(word: str) -> int:
+        """A tool that always fails."""
+        raise RuntimeError("Tool execution failed")
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant"),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    global stream_result_mock
+    stream_result_mock = Mock(
+        side_effect=[
+            [
+                ChatGenerationChunk(
+                    type="ChatGenerationChunk",
+                    message=AIMessageChunk(
+                        content="",
+                        additional_kwargs={
+                            "tool_calls": [
+                                {
+                                    "index": 0,
+                                    "id": "call_test",
+                                    "function": {
+                                        "arguments": '{"word": "test"}',
+                                        "name": "failing_tool",
+                                    },
+                                    "type": "function",
+                                }
+                            ]
+                        },
+                    ),
+                ),
+            ]
+        ]
+    )
+
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [failing_tool], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[failing_tool], verbose=True)
+
+    with start_transaction():
+        with pytest.raises(RuntimeError):
+            list(agent_executor.stream({"input": "Use the failing tool"}))
+
+    assert len(events) >= 1
+
+    error_events = [e for e in events if e.get("level") == "error"]
+    assert len(error_events) > 0
+
+    error_event = error_events[0]
+    exception = error_event["exception"]["values"][0]
+    assert exception["type"] == "RuntimeError"
+    assert "Tool execution failed" in exception["value"]
+
+
+def test_langchain_exception_span_cleanup(sentry_init, capture_events):
+    """Test that spans are properly cleaned up even when exceptions occur."""
+    global llm_type
+    llm_type = "openai-chat"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant"),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    global stream_result_mock
+    stream_result_mock = Mock(side_effect=ValueError("Test error"))
+
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    with start_transaction():
+        with pytest.raises(ValueError):
+            list(agent_executor.stream({"input": "Test"}))
+
+    transaction_event = next(
+        (e for e in events if e.get("type") == "transaction"), None
+    )
+    assert transaction_event is not None
+
+    errored_spans = [
+        span
+        for span in transaction_event.get("spans", [])
+        if span.get("tags", {}).get("status") == "error"
+    ]
+
+    assert len(errored_spans) > 0
+
+    for span in errored_spans:
+        assert "timestamp" in span
+        assert span["timestamp"] > span.get("start_timestamp", 0)

@@ -749,7 +749,12 @@ def _wrap_agent_executor_invoke(f):
             _set_tools_on_span(span, tools)
 
             # Run the agent
-            result = f(self, *args, **kwargs)
+            try:
+                result = f(self, *args, **kwargs)
+            except Exception as e:
+                run_id = kwargs.get("run_id")
+                self._handle_error(run_id, e)
+                raise e
 
             input = result.get("input")
             if (
@@ -820,8 +825,12 @@ def _wrap_agent_executor_stream(f):
                 unpack=False,
             )
 
-        # Run the agent
-        result = f(self, *args, **kwargs)
+        try:
+            result = f(self, *args, **kwargs)
+        except Exception as e:
+            run_id = kwargs.get("run_id")
+            self._handle_error(run_id, e)
+            raise e
 
         old_iterator = result
 
