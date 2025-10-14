@@ -140,12 +140,14 @@ _MIN_VERSIONS = {
     "flask": (1, 1, 4),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
+    "google_genai": (1, 29, 0),  # google-genai
     "grpc": (1, 32, 0),  # grpcio
     "httpx": (0, 16, 0),
     "huggingface_hub": (0, 24, 7),
     "langchain": (0, 1, 0),
     "langgraph": (0, 6, 6),
     "launchdarkly": (9, 8, 0),
+    "litellm": (1, 77, 5),
     "loguru": (0, 7, 0),
     "openai": (1, 0, 0),
     "openai_agents": (0, 0, 19),

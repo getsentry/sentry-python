@@ -1,7 +1,6 @@
 # The TEST_SUITE_CONFIG dictionary defines, for each integration test suite,
-# the main package (framework, library) to test with; any additional test
-# dependencies, optionally gated behind specific conditions; and optionally
-# the Python versions to test on.
+# at least the main package (framework, library) to test with. Additional
+# test dependencies, Python versions to test on, etc. can also be defined here.
 #
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
@@ -143,6 +142,13 @@ TEST_SUITE_CONFIG = {
         "package": "gql[all]",
         "num_versions": 2,
     },
+    "google_genai": {
+        "package": "google-genai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.9",
+    },
     "graphene": {
         "package": "graphene",
         "deps": {
@@ -183,9 +189,8 @@ TEST_SUITE_CONFIG = {
     "huggingface_hub": {
         "package": "huggingface_hub",
         "deps": {
-            "*": ["responses"],
+            "*": ["responses", "pytest-httpx"],
         },
-        "include": "<1.0",
     },
     "langchain-base": {
         "package": "langchain",
@@ -214,6 +219,9 @@ TEST_SUITE_CONFIG = {
         "package": "launchdarkly-server-sdk",
         "num_versions": 2,
     },
+    "litellm": {
+        "package": "litellm",
+    },
     "litestar": {
         "package": "litestar",
         "deps": {
@@ -232,7 +240,10 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "tiktoken"],
             "<1.55": ["httpx<0.28"],
         },
-        "python": ">=3.8",
+        "python": {
+            ">0.0,<2.3": ">=3.8",
+            ">=2.3": ">=3.9",
+        },
     },
     "openai-notiktoken": {
         "package": "openai",
@@ -241,7 +252,10 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
             "<1.55": ["httpx<0.28"],
         },
-        "python": ">=3.8",
+        "python": {
+            ">0.0,<2.3": ">=3.8",
+            ">=2.3": ">=3.9",
+        },
     },
     "openai_agents": {
         "package": "openai-agents",
