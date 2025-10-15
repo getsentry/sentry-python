@@ -2,7 +2,7 @@ import sys
 import asyncio
 import inspect
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 if TYPE_CHECKING:
     from typing import Any
@@ -12,47 +12,31 @@ if TYPE_CHECKING:
     T = TypeVar("T")
     _F = TypeVar("_F", bound=Callable[..., Any])
 
-# Public shim symbols with precise types so mypy accepts branch assignments
-iscoroutinefunction: "Callable[[Any], bool]"
-markcoroutinefunction: "Callable[[ _F ], _F]"
 
+# Use a conservative cutoff (Python 3.13+) before switching to
+# inspect.iscoroutinefunction. See contributor discussion and
+# references to Starlette/Uvicorn behavior for rationale.
+PY313 = sys.version_info[0] == 3 and sys.version_info[1] >= 13
 
+# Backwards-compatible version flags expected across the codebase
 PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
 PY38 = sys.version_info[0] == 3 and sys.version_info[1] >= 8
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
 
 
-# Python 3.12 deprecates asyncio.iscoroutinefunction() as an alias for
-# inspect.iscoroutinefunction(), whilst also removing the _is_coroutine marker.
-# The latter is replaced with the inspect.markcoroutinefunction decorator.
-# Until 3.12 is the minimum supported Python version, provide a shim.
-# This was adapted from https://github.com/django/asgiref/blob/main/asgiref/sync.py
-if hasattr(inspect, "markcoroutinefunction"):
-    iscoroutinefunction = inspect.iscoroutinefunction
-    markcoroutinefunction = inspect.markcoroutinefunction
-else:
-    iscoroutinefunction = asyncio.iscoroutinefunction
+# Public shim symbol so other modules can import a stable API. For Python
+# 3.13+ prefer inspect.iscoroutinefunction, otherwise fall back to
+# asyncio.iscoroutinefunction to preserve historical behavior on older Pythons.
+iscoroutinefunction: Callable[[Any], bool] = cast(
+    Callable[[Any], bool], inspect.iscoroutinefunction if PY313 else asyncio.iscoroutinefunction
+)
 
-    def markcoroutinefunction(func):
-        # type: (_F) -> _F
-        # Prior to Python 3.12, asyncio exposed a private `_is_coroutine`
-        # marker used by asyncio.iscoroutinefunction(). This attribute was
-        # removed in Python 3.11. If it's not available, fall back to a no-op,
-        # which preserves behavior of inspect.iscoroutinefunction for our
-        # supported versions while avoiding AttributeError.
-        try:
-            marker = getattr(asyncio.coroutines, "_is_coroutine")
-        except Exception:
-            # No marker available on this Python version; return function as-is.
-            return func
 
-        try:  # pragma: no cover - defensive
-            func._is_coroutine = marker  # type: ignore[attr-defined]
-        except Exception:
-            # If assignment fails for any reason, leave func unchanged.
-            pass
-        return func
+# We intentionally do not export `markcoroutinefunction` here. The decorator
+# is only used by the Django ASGI integration and historically may be applied
+# to middleware instances (non-callables). Keeping the marker local to the
+# integration reduces import surface and avoids potential circular imports.
 
 
 def with_metaclass(meta, *bases):

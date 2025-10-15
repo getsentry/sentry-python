@@ -577,7 +577,10 @@ class _Client(BaseClient):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = str(self.options[key]).strip()
+                # `event` is a TypedDict (Event). mypy doesn't allow assignment
+                # with a non-literal key, so cast to a plain dict for this
+                # dynamic assignment.
+                cast(Dict[str, Any], event)[key] = str(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -642,7 +645,9 @@ class _Client(BaseClient):
                 if event.get("exception"):
                     DedupeIntegration.reset_last_seen()
 
-            event = new_event
+            # `new_event` has type Any | None at runtime; cast to Event for mypy
+            # now that we've checked it's not None.
+            event = cast("Event", new_event)
 
         before_send_transaction = self.options["before_send_transaction"]
         if (
@@ -666,13 +671,17 @@ class _Client(BaseClient):
                         quantity=spans_before + 1,  # +1 for the transaction itself
                     )
             else:
-                spans_delta = spans_before - len(new_event.get("spans", []))
+                # new_event is not None here, but mypy doesn't narrow the type
+                # from Any | None, so cast to Event for safe attribute access.
+                new_event_cast = cast("Event", new_event)
+                spans_delta = spans_before - len(new_event_cast.get("spans", []))
                 if spans_delta > 0 and self.transport is not None:
                     self.transport.record_lost_event(
                         reason="before_send", data_category="span", quantity=spans_delta
                     )
 
-            event = new_event
+            # `new_event` may be Any | None; cast to Event for mypy.
+            event = cast("Event", new_event)
 
         return event
 

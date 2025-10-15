@@ -6,6 +6,7 @@ Since this file contains `async def` it is conditionally imported in
 `django.core.handlers.asgi`.
 """
 
+import sys
 import asyncio
 import functools
 import inspect
@@ -13,7 +14,7 @@ import inspect
 from django.core.handlers.wsgi import WSGIRequest
 
 import sentry_sdk
-from sentry_sdk._compat import iscoroutinefunction, markcoroutinefunction
+from sentry_sdk._compat import iscoroutinefunction
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -200,7 +201,41 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
             Taken from django.utils.deprecation::MiddlewareMixin._async_check
             """
             if iscoroutinefunction(self.get_response):
-                markcoroutinefunction(self)
+                # The stdlib moved the coroutine marker to
+                # `inspect.markcoroutinefunction` and removed the private
+                # `_is_coroutine` marker on newer Pythons. Historically some
+                # code (Django middleware) has relied on attaching that
+                # marker to middleware instances. We implement a conservative
+                # local helper which uses `inspect.markcoroutinefunction` on
+                # sufficiently new Pythons (3.13+), otherwise falls back to a
+                # best-effort shim that sets the old private marker when
+                # available. Keep this logic local to the integration to avoid
+                # widening import dependencies.
+
+                # Conservative cutoff mirroring Starlette/Uvicorn: prefer
+                # `inspect.iscoroutinefunction` on Python 3.13+ to avoid
+                # historical stdlib edge-cases.
+                PY313 = sys.version_info[0] == 3 and sys.version_info[1] >= 13
+
+                if hasattr(inspect, "markcoroutinefunction") and PY313:
+                    try:
+                        inspect.markcoroutinefunction(self)
+                    except Exception:
+                        # Best-effort: don't fail the application if this fails.
+                        pass
+                else:
+                    # Fallback for older Pythons: try to set the historical
+                    # private marker used by asyncio.iscoroutinefunction().
+                    try:
+                        marker = getattr(asyncio.coroutines, "_is_coroutine")
+                    except Exception:
+                        marker = None
+
+                    if marker is not None:
+                        try:
+                            setattr(self, "_is_coroutine", marker)
+                        except Exception:
+                            pass
 
         def async_route_check(self):
             # type: () -> bool
@@ -222,9 +257,9 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
             middleware_span = _check_middleware_span(old_method=f)
 
             if middleware_span is None:
-                return await f(*args, **kwargs)  # type: ignore
+                return await f(*args, **kwargs)
 
             with middleware_span:
-                return await f(*args, **kwargs)  # type: ignore
+                return await f(*args, **kwargs)
 
     return SentryASGIMixin
