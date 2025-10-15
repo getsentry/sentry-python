@@ -908,6 +908,7 @@ def test_last_event_id_cleared(sentry_init):
 
 
 @pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize("error_cls", [LookupError, ValueError])
 @pytest.mark.parametrize(
     "scope_manager",
     [
@@ -915,10 +916,10 @@ def test_last_event_id_cleared(sentry_init):
         use_scope,
     ],
 )
-def test_handle_lookup_error_on_token_reset_current_scope(scope_manager):
+def test_handle_error_on_token_reset_current_scope(error_cls, scope_manager):
     with mock.patch("sentry_sdk.scope.capture_internal_exception") as mock_capture:
         with mock.patch("sentry_sdk.scope._current_scope") as mock_token_var:
-            mock_token_var.reset.side_effect = LookupError()
+            mock_token_var.reset.side_effect = error_cls()
 
             mock_token = mock.Mock()
             mock_token_var.set.return_value = mock_token
@@ -932,13 +933,14 @@ def test_handle_lookup_error_on_token_reset_current_scope(scope_manager):
                         pass
 
             except Exception:
-                pytest.fail("Context manager should handle LookupError gracefully")
+                pytest.fail(f"Context manager should handle {error_cls} gracefully")
 
             mock_capture.assert_called_once()
             mock_token_var.reset.assert_called_once_with(mock_token)
 
 
 @pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize("error_cls", [LookupError, ValueError])
 @pytest.mark.parametrize(
     "scope_manager",
     [
@@ -946,13 +948,13 @@ def test_handle_lookup_error_on_token_reset_current_scope(scope_manager):
         use_isolation_scope,
     ],
 )
-def test_handle_lookup_error_on_token_reset_isolation_scope(scope_manager):
+def test_handle_error_on_token_reset_isolation_scope(error_cls, scope_manager):
     with mock.patch("sentry_sdk.scope.capture_internal_exception") as mock_capture:
         with mock.patch("sentry_sdk.scope._current_scope") as mock_current_scope:
             with mock.patch(
                 "sentry_sdk.scope._isolation_scope"
             ) as mock_isolation_scope:
-                mock_isolation_scope.reset.side_effect = LookupError()
+                mock_isolation_scope.reset.side_effect = error_cls()
                 mock_current_token = mock.Mock()
                 mock_current_scope.set.return_value = mock_current_token
 
@@ -965,7 +967,7 @@ def test_handle_lookup_error_on_token_reset_isolation_scope(scope_manager):
                             pass
 
                 except Exception:
-                    pytest.fail("Context manager should handle LookupError gracefully")
+                    pytest.fail(f"Context manager should handle {error_cls} gracefully")
 
                 mock_capture.assert_called_once()
                 mock_current_scope.reset.assert_called_once_with(mock_current_token)
