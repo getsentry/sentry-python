@@ -9,7 +9,6 @@ from .patches import (
 
 try:
     import pydantic_ai
-
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 

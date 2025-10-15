@@ -4,7 +4,11 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data, _set_model_data, _should_send_prompts
+from ..utils import (
+    _set_agent_data,
+    _set_model_data,
+    _should_send_prompts,
+)
 
 from typing import TYPE_CHECKING
 
@@ -46,11 +50,11 @@ def invoke_agent_span(user_prompt, agent, model, model_settings):
                     # Add description from function_schema if available
                     if hasattr(tool, "function_schema"):
                         schema = tool.function_schema
-                        if hasattr(schema, "description") and schema.description:
+                        if getattr(schema, "description", None):
                             tool_info["description"] = schema.description
 
                         # Add parameters from json_schema
-                        if hasattr(schema, "json_schema") and schema.json_schema:
+                        if getattr(schema, "json_schema", None):
                             tool_info["parameters"] = schema.json_schema
 
                     tools.append(tool_info)
@@ -72,14 +76,14 @@ def invoke_agent_span(user_prompt, agent, model, model_settings):
 
         if agent:
             # Check for system_prompt
-            if hasattr(agent, "_system_prompts") and agent._system_prompts:
-                for prompt in agent._system_prompts:
-                    if isinstance(prompt, str):
-                        system_texts.append(prompt)
+            system_prompts = getattr(agent, "_system_prompts", None) or []
+            for prompt in system_prompts:
+                if isinstance(prompt, str):
+                    system_texts.append(prompt)
 
             # Check for instructions (stored in _instructions)
-            if hasattr(agent, "_instructions") and agent._instructions:
-                instructions = agent._instructions
+            instructions = getattr(agent, "_instructions", None)
+            if instructions:
                 if isinstance(instructions, str):
                     system_texts.append(instructions)
                 elif isinstance(instructions, (list, tuple)):
@@ -134,9 +138,8 @@ def update_invoke_agent_span(span, output):
     # type: (sentry_sdk.tracing.Span, Any) -> None
     """Update and close the invoke agent span."""
     if span and _should_send_prompts() and output:
-        output_text = str(output) if not isinstance(output, str) else output
         set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_text, unpack=False
+            span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
         )
 
     if span:

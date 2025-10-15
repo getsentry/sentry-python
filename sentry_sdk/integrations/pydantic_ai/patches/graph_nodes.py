@@ -1,24 +1,17 @@
 from functools import wraps
 
-from sentry_sdk.integrations import DidNotEnable
-
 from ..spans import (
     invoke_agent_span,
     update_invoke_agent_span,
     ai_client_span,
     update_ai_client_span,
 )
+from pydantic_ai._agent_graph import UserPromptNode, ModelRequestNode, CallToolsNode
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable
-
-try:
-    import pydantic_ai
-    from pydantic_ai._agent_graph import UserPromptNode, ModelRequestNode, CallToolsNode
-except ImportError:
-    raise DidNotEnable("pydantic-ai not installed")
 
 
 def _patch_graph_nodes():

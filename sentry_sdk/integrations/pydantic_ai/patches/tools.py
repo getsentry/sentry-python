@@ -1,6 +1,9 @@
 from functools import wraps
 
-from sentry_sdk.integrations import DidNotEnable
+from pydantic_ai.toolsets.abstract import AbstractToolset
+from pydantic_ai.toolsets.function import FunctionToolset
+
+import sentry_sdk
 
 from ..spans import execute_tool_span, update_execute_tool_span
 
@@ -8,11 +11,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable
-
-try:
-    import pydantic_ai
-except ImportError:
-    raise DidNotEnable("pydantic-ai not installed")
 
 
 def _patch_tool_execution():
@@ -26,8 +24,6 @@ def _patch_tool_execution():
     Note: pydantic-ai has built-in OpenTelemetry instrumentation for tools.
     Our patching adds Sentry-specific span data on top of that.
     """
-    from pydantic_ai.toolsets.abstract import AbstractToolset
-    from pydantic_ai.toolsets.function import FunctionToolset
 
     def create_wrapped_call_tool(original_call_tool):
         # type: (Callable[..., Any]) -> Callable[..., Any]
@@ -37,7 +33,6 @@ def _patch_tool_execution():
         async def wrapped_call_tool(self, name, args_dict, ctx, tool):
             # type: (Any, str, Any, Any, Any) -> Any
             # Always create span if we're in a Sentry transaction context
-            import sentry_sdk
 
             current_span = sentry_sdk.get_current_span()
             should_create_span = current_span is not None

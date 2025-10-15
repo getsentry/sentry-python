@@ -1,21 +1,28 @@
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.utils import event_from_exception
 
-from ..spans import agent_workflow_span, invoke_agent_span, update_invoke_agent_span
-from ..utils import _capture_exception
+from ..spans import agent_workflow_span
 
 from typing import TYPE_CHECKING
+from pydantic_ai.agent import Agent
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
 
-try:
-    import pydantic_ai
-    from pydantic_ai.agent import Agent
-except ImportError:
-    raise DidNotEnable("pydantic-ai not installed")
+
+def _capture_exception(exc):
+    # type: (Any) -> None
+    set_span_errored()
+
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "pydantic_ai", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 class _StreamingContextManagerWrapper:
