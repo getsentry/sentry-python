@@ -14,7 +14,8 @@ from ..utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, List, Dict
+    from pydantic_ai.usage import RequestUsage
 
 
 def _set_usage_data(span, usage):
