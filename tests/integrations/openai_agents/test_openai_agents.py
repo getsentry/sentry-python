@@ -143,17 +143,14 @@ async def test_agent_invocation_span(
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
-    assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
-        [
-            {
-                "content": [
-                    {"text": "You are a helpful test assistant.", "type": "text"}
-                ],
-                "role": "system",
-            },
-            {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
-        ]
-    )
+    assert invoke_agent_span["data"]["gen_ai.request.messages"] == [
+        {
+            "content": [{"text": "You are a helpful test assistant.", "type": "text"}],
+            "role": "system",
+        },
+        {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
+    ]
+
     assert (
         invoke_agent_span["data"]["gen_ai.response.text"]
         == "Hello, how can I help you?"
@@ -488,22 +485,16 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span1["data"]["gen_ai.request.available_tools"] == available_tools
     assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
-        [
-            {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Please use the simple test tool"}
-                ],
-            },
-        ]
-    )
+    assert ai_client_span1["data"]["gen_ai.request.messages"] == [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": "You are a helpful test assistant."}],
+        },
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "Please use the simple test tool"}],
+        },
+    ]
     assert ai_client_span1["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span1["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span1["data"]["gen_ai.request.top_p"] == 1.0
@@ -564,49 +555,50 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         == available_tools
     )
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
-    assert re.sub(
+
+    # Convert list to JSON string, do regex replacement, then parse back
+    messages_json = json.dumps(ai_client_span2["data"]["gen_ai.request.messages"])
+    messages_json_cleaned = re.sub(
         r"SerializationIterator\(.*\)",
         "NOT_CHECKED",
-        ai_client_span2["data"]["gen_ai.request.messages"],
-    ) == safe_serialize(
-        [
-            {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Please use the simple test tool"}
-                ],
-            },
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "arguments": '{"message": "hello"}',
-                        "call_id": "call_123",
-                        "name": "simple_test_tool",
-                        "type": "function_call",
-                        "id": "call_123",
-                        "function": "NOT_CHECKED",
-                    }
-                ],
-            },
-            {
-                "role": "tool",
-                "content": [
-                    {
-                        "call_id": "call_123",
-                        "output": "Tool executed with: hello",
-                        "type": "function_call_output",
-                    }
-                ],
-            },
-        ]
+        messages_json,
     )
+    messages_cleaned = json.loads(messages_json_cleaned)
+
+    assert messages_cleaned == [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": "You are a helpful test assistant."}],
+        },
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "Please use the simple test tool"}],
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "arguments": '{"message": "hello"}',
+                    "call_id": "call_123",
+                    "name": "simple_test_tool",
+                    "type": "function_call",
+                    "id": "call_123",
+                    "function": "NOT_CHECKED",
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "content": [
+                {
+                    "call_id": "call_123",
+                    "output": "Tool executed with: hello",
+                    "type": "function_call_output",
+                }
+            ],
+        },
+    ]
+
     assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
@@ -1126,17 +1118,15 @@ def test_openai_agents_message_truncation(
     assert "gen_ai.request.messages" in invoke_agent_span["data"]
 
     messages_data = invoke_agent_span["data"]["gen_ai.request.messages"]
-    assert isinstance(messages_data, str)
+    assert isinstance(messages_data, list)
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) >= 1
+    assert len(messages_data) >= 1
 
-    result_size = len(messages_data.encode("utf-8"))
+    result_size = len(serialize(messages_data, is_vars=False))
     assert result_size <= MAX_GEN_AI_MESSAGE_BYTES
 
     total_original_size = len(large_system_prompt) + len(large_user_message)
-    total_parsed_size = sum(len(str(msg)) for msg in parsed_messages)
+    total_parsed_size = sum(len(str(msg)) for msg in messages_data)
     assert total_parsed_size < total_original_size
 
 
@@ -1181,14 +1171,12 @@ def test_openai_agents_single_large_message_preservation(
     assert "gen_ai.request.messages" in invoke_agent_span["data"]
 
     messages_data = invoke_agent_span["data"]["gen_ai.request.messages"]
-    assert isinstance(messages_data, str)
+    assert isinstance(messages_data, list)
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) >= 1
+    assert len(messages_data) >= 1
 
     user_message = next(
-        (msg for msg in parsed_messages if msg.get("role") == "user"), None
+        (msg for msg in messages_data if msg.get("role") == "user"), None
     )
     if user_message and "content" in user_message:
         assert len(user_message["content"]) < len(huge_content)
