@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.42.0
+
+### Various fixes & improvements
+
+- ci: 🤖 Update test matrix with new releases (10/13) (#4917) by @github-actions
+- build(deps): bump github/codeql-action from 3 to 4 (#4916) by @dependabot
+- feat: Add source information for slow outgoing HTTP requests (#4902) by @alexander-alderman-webb
+- tests: Update tox (#4913) by @sentrivana
+- fix(Ray): Retain the original function name when patching Ray tasks (#4858) by @svartalf
+- feat(ai): Add `python-genai` integration (#4891) by @vgrozdanic
+
 ## 2.41.0
 
 ### Various fixes & improvements
