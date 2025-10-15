@@ -637,10 +637,8 @@ def test_litellm_single_large_message_preservation(sentry_init, capture_events):
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
+    assert isinstance(messages_data, list)
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert parsed_messages[0]["role"] == "user"
-    assert len(parsed_messages[0]["content"]) < len(huge_content)
+    assert len(messages_data) == 1
+    assert messages_data[0]["role"] == "user"
+    assert len(messages_data[0]["content"]) < len(huge_content)
