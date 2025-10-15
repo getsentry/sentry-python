@@ -156,7 +156,9 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        messages = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages, list)
+        assert any("hello" in msg.get("content", "") for msg in messages)
         assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -198,7 +200,9 @@ async def test_nonstreaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        messages = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages, list)
+        assert any("hello" in msg.get("content", "") for msg in messages)
         assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -291,7 +295,9 @@ def test_streaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        messages = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages, list)
+        assert any("hello" in msg.get("content", "") for msg in messages)
         assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -387,7 +393,9 @@ async def test_streaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        messages = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages, list)
+        assert any("hello" in msg.get("content", "") for msg in messages)
         assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1060,7 +1068,9 @@ def test_ai_client_span_responses_api(sentry_init, capture_events):
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
-        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
+        "gen_ai.request.messages": [
+            "How do I check if a Python object is an instance of a class?"
+        ],
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.system": "openai",
         "gen_ai.response.model": "response-model-id",
@@ -1140,7 +1150,9 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
-        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
+        "gen_ai.request.messages": [
+            "How do I check if a Python object is an instance of a class?"
+        ],
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.system": "openai",
@@ -1186,7 +1198,9 @@ async def test_ai_client_span_streaming_responses_async_api(
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
-        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
+        "gen_ai.request.messages": [
+            "How do I check if a Python object is an instance of a class?"
+        ],
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
@@ -1356,7 +1370,7 @@ def test_streaming_responses_api(
     assert span["op"] == "gen_ai.responses"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == ["hello"]
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1411,7 +1425,7 @@ async def test_streaming_responses_api_async(
     assert span["op"] == "gen_ai.responses"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == ["hello"]
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1482,9 +1496,7 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
     # Parse the stored messages
-    import json
-
-    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    stored_messages = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
 
     # Verify that "ai" role was mapped to "assistant"
     assert len(stored_messages) == 4
@@ -1537,13 +1549,10 @@ def test_openai_message_truncation(sentry_init, capture_events):
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
+    assert isinstance(messages_data, list)
+    assert len(messages_data) <= len(large_messages)
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) <= len(large_messages)
-
-    if "_meta" in event and len(parsed_messages) < len(large_messages):
+    if "_meta" in event and len(messages_data) < len(large_messages):
         meta_path = event["_meta"]
         if (
             "spans" in meta_path
@@ -1585,13 +1594,11 @@ def test_openai_single_large_message_content_truncation(sentry_init, capture_eve
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
+    assert isinstance(messages_data, list)
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert parsed_messages[0]["role"] == "user"
-    assert len(parsed_messages[0]["content"]) < len(huge_content)
+    assert len(messages_data) == 1
+    assert messages_data[0]["role"] == "user"
+    assert len(messages_data[0]["content"]) < len(huge_content)
 
-    result_size = len(messages_data.encode("utf-8"))
+    result_size = len(serialize(messages_data, is_vars=False))
     assert result_size <= MAX_GEN_AI_MESSAGE_BYTES

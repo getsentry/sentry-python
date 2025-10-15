@@ -1066,9 +1066,7 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
     from sentry_sdk.consts import SPANDATA
 
     if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
-        import json
-
-        stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        stored_messages = span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
 
         # Verify roles were properly mapped
         found_assistant_roles = 0

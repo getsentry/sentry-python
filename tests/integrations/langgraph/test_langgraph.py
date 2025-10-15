@@ -672,9 +672,7 @@ def test_langgraph_message_role_mapping(sentry_init, capture_events):
 
     # If messages were captured, verify role mapping
     if SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]:
-        import json
-
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        stored_messages = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
 
         # Find messages with specific content to verify role mapping
         ai_message = next(
