@@ -1679,7 +1679,7 @@ def new_scope():
         try:
             # restore original scope
             _current_scope.reset(token)
-        except LookupError:
+        except (LookupError, ValueError):
             capture_internal_exception(sys.exc_info())
 
 
@@ -1717,7 +1717,7 @@ def use_scope(scope):
         try:
             # restore original scope
             _current_scope.reset(token)
-        except LookupError:
+        except (LookupError, ValueError):
             capture_internal_exception(sys.exc_info())
 
 
@@ -1761,12 +1761,12 @@ def isolation_scope():
         # restore original scopes
         try:
             _current_scope.reset(current_token)
-        except LookupError:
+        except (LookupError, ValueError):
             capture_internal_exception(sys.exc_info())
 
         try:
             _isolation_scope.reset(isolation_token)
-        except LookupError:
+        except (LookupError, ValueError):
             capture_internal_exception(sys.exc_info())
 
 
@@ -1808,12 +1808,12 @@ def use_isolation_scope(isolation_scope):
         # restore original scopes
         try:
             _current_scope.reset(current_token)
-        except LookupError:
+        except (LookupError, ValueError):
             capture_internal_exception(sys.exc_info())
 
         try:
             _isolation_scope.reset(isolation_token)
-        except LookupError:
+        except (LookupError, ValueError):
             capture_internal_exception(sys.exc_info())
 
 
