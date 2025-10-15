@@ -36,7 +36,7 @@ def sample_messages():
 @pytest.fixture
 def large_messages():
     """Messages that will definitely exceed size limits"""
-    large_content = "This is a very long message. " * 1000
+    large_content = "This is a very long message. " * 100
     return [
         {"role": "system", "content": large_content},
         {"role": "user", "content": large_content},
@@ -56,7 +56,7 @@ class TestTruncateMessagesBySize:
 
     def test_truncation_removes_oldest_first(self, large_messages):
         """Test that oldest messages are removed first during truncation"""
-        small_limit = MAX_GEN_AI_MESSAGE_BYTES // 100
+        small_limit = 3000
         result = truncate_messages_by_size(large_messages, max_bytes=small_limit)
         assert len(result) < len(large_messages)
 
@@ -246,7 +246,7 @@ class TestClientAnnotation:
             def __init__(self):
                 self._gen_ai_messages_truncated = {}
 
-        small_limit = 1000
+        small_limit = 3000
         span = MockSpan()
         scope = MockScope()
         original_count = len(large_messages)
