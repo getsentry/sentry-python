@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, get_baggage, get_traceparent
+from sentry_sdk import capture_message, get_baggage, get_traceparent, capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
@@ -26,6 +26,7 @@ from starlette.authentication import (
     AuthenticationError,
     SimpleUser,
 )
+from starlette.requests import Request
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
@@ -435,6 +436,7 @@ async def test_starletterequestextractor_extract_request_info(sentry_init):
     side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
     starlette_request._receive = mock.Mock(side_effect=side_effect)
 
+    starlette_request.scope["state"] = {"sentry_sdk.is_body_cached": True}
     extractor = StarletteRequestExtractor(starlette_request)
 
     request_info = await extractor.extract_request_info()
@@ -445,6 +447,37 @@ async def test_starletterequestextractor_extract_request_info(sentry_init):
         "yummy_cookie": "choco",
     }
     assert request_info["data"] == BODY_JSON
+
+
+@pytest.mark.asyncio
+async def test_starletterequestextractor_extract_request_info_not_cached(sentry_init):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    request_info = await extractor.extract_request_info()
+
+    assert request_info
+    assert request_info["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert request_info["data"].metadata == {"rem": [["!consumed", "x"]]}
 
 
 @pytest.mark.asyncio
@@ -466,6 +499,7 @@ async def test_starletterequestextractor_extract_request_info_no_pii(sentry_init
     side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
     starlette_request._receive = mock.Mock(side_effect=side_effect)
 
+    starlette_request.scope["state"] = {"sentry_sdk.is_body_cached": True}
     extractor = StarletteRequestExtractor(starlette_request)
 
     request_info = await extractor.extract_request_info()
@@ -941,8 +975,129 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
+def test_cookies_available(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    async def _exception(request: Request):
+        logging.critical("Oh no!")
+        return starlette.responses.JSONResponse({"status": "Oh no!"})
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/exception", _exception, methods=["POST"]),
+        ],
+    )
+
+    client = TestClient(app)
+
+    client.post(
+        "/exception",
+        json=BODY_JSON,
+        cookies={
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        },
+    )
+
+    event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+
+
+def test_request_body_not_cached_exception(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    async def _exception(request):
+        1 / 0
+        return starlette.responses.JSONResponse({"status": "Oh no!"})
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/exception", _exception, methods=["POST"]),
+        ],
+    )
+
+    client = TestClient(app)
+
+    try:
+        client.post(
+            "/exception",
+            json=BODY_JSON,
+            cookies={
+                "tasty_cookie": "strawberry",
+                "yummy_cookie": "choco",
+            },
+        )
+    except ZeroDivisionError:
+        capture_exception()
+
+    event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert event["request"]["data"] == ""
+
+
+def test_request_body_cached_exception(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    async def _exception(request):
+        await request.json()
+        1 / 0
+        return starlette.responses.JSONResponse({"status": "Oh no!"})
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/exception", _exception, methods=["POST"]),
+        ],
+    )
+
+    client = TestClient(app)
+
+    try:
+        client.post(
+            "/exception",
+            json=BODY_JSON,
+            cookies={
+                "tasty_cookie": "strawberry",
+                "yummy_cookie": "choco",
+            },
+        )
+    except ZeroDivisionError:
+        capture_exception()
+
+    event = events[0]
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert event["request"]["data"] == BODY_JSON
+
+
 def test_original_request_not_scrubbed(sentry_init, capture_events):
-    sentry_init(integrations=[StarletteIntegration()])
+    sentry_init(
+        default_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+    )
 
     events = capture_events()
 
