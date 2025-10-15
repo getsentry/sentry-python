@@ -3,7 +3,6 @@ import inspect
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk._compat import iscoroutinefunction
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -114,7 +113,9 @@ def patch_scaffold_route():
         def decorator(old_func):
             # type: (Any) -> Any
 
-            if inspect.isfunction(old_func) and not iscoroutinefunction(old_func):
+            if inspect.isfunction(old_func) and not asyncio.iscoroutinefunction(
+                old_func
+            ):
 
                 @wraps(old_func)
                 @ensure_integration_enabled(QuartIntegration, old_func)

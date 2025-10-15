@@ -3,7 +3,6 @@ from copy import deepcopy
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk._compat import iscoroutinefunction
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
@@ -76,7 +75,7 @@ def patch_get_request_handler():
         if (
             dependant
             and dependant.call is not None
-            and not iscoroutinefunction(dependant.call)
+            and not asyncio.iscoroutinefunction(dependant.call)
         ):
             old_call = dependant.call
 
