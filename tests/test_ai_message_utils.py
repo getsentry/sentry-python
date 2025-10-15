@@ -217,7 +217,7 @@ class TestTruncateAndAnnotateMessages:
             def __init__(self):
                 self._gen_ai_messages_truncated = {}
 
-        small_limit = 1000
+        small_limit = 3000
         span = MockSpan()
         scope = MockScope()
         result = truncate_and_annotate_messages(
