@@ -7,6 +7,11 @@ try:
 except ImportError:
     NOT_GIVEN = None
 
+try:
+    from openai import omit
+except ImportError:
+    omit = None
+
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
@@ -1424,7 +1429,7 @@ async def test_streaming_responses_api_async(
 )
 @pytest.mark.parametrize(
     "tools",
-    [[], None, NOT_GIVEN],
+    [[], None, NOT_GIVEN, omit],
 )
 def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     sentry_init(
