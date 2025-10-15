@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest import mock
 from datetime import datetime
@@ -24,6 +25,9 @@ from sentry_sdk.integrations.litellm import (
     _success_callback,
     _failure_callback,
 )
+from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
+from sentry_sdk._types import AnnotatedValue
+from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import package_version
 
 
@@ -546,3 +550,53 @@ def test_message_dict_extraction(sentry_init, capture_events):
 
     # Should have extracted the response message
     assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
+
+
+def test_litellm_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in LiteLLM integration."""
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    large_messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": large_content},
+    ]
+
+    mock_response = MockCompletionResponse()
+
+    with start_transaction(name="litellm test"):
+        kwargs = {
+            "model": "gpt-3.5-turbo",
+            "messages": large_messages,
+        }
+
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs,
+            mock_response,
+            datetime.now(),
+            datetime.now(),
+        )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) <= len(large_messages)
+
+    result_size = len(messages_data.encode("utf-8"))
+    assert result_size <= MAX_GEN_AI_MESSAGE_BYTES

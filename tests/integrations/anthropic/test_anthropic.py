@@ -1,6 +1,7 @@
-import pytest
-from unittest import mock
 import json
+from unittest import mock
+
+import pytest
 
 try:
     from unittest.mock import AsyncMock
@@ -41,15 +42,17 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk import start_transaction, start_span
+from sentry_sdk import start_span, start_transaction
+from sentry_sdk._types import AnnotatedValue
+from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
-    _set_output_data,
     _collect_ai_data,
+    _set_output_data,
 )
+from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import package_version
-
 
 ANTHROPIC_VERSION = package_version("anthropic")
 
@@ -891,9 +894,8 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
     events = capture_events()
 
     client = Anthropic(api_key="z")
-
-    def mock_messages_create(*args, **kwargs):
-        return Message(
+    client.messages._post = mock.Mock(
+        return_value=Message(
             id="msg_1",
             content=[TextBlock(text="Hi there!", type="text")],
             model="claude-3-opus",
@@ -903,15 +905,13 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
             type="message",
             usage=Usage(input_tokens=10, output_tokens=5),
         )
+    )
 
-    client.messages._post = mock.Mock(return_value=mock_messages_create())
-
-    # Test messages with mixed roles including "ai" that should be mapped to "assistant"
     test_messages = [
         {"role": "system", "content": "You are helpful."},
         {"role": "user", "content": "Hello"},
-        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
-        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
+        {"role": "ai", "content": "Hi there!"},
+        {"role": "assistant", "content": "How can I help?"},
     ]
 
     with start_transaction(name="anthropic tx"):
@@ -920,28 +920,72 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
         )
 
     (event,) = events
-    span = event["spans"][0]
+    (span,) = event["spans"]
 
-    # Verify that the span was created correctly
     assert span["op"] == "gen_ai.chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
-    # Parse the stored messages
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
-    # Verify that "ai" role was mapped to "assistant"
     assert len(stored_messages) == 4
     assert stored_messages[0]["role"] == "system"
     assert stored_messages[1]["role"] == "user"
-    assert (
-        stored_messages[2]["role"] == "assistant"
-    )  # "ai" should be mapped to "assistant"
-    assert stored_messages[3]["role"] == "assistant"  # should stay "assistant"
+    assert stored_messages[2]["role"] == "assistant"
+    assert stored_messages[3]["role"] == "assistant"
 
-    # Verify content is preserved
     assert stored_messages[2]["content"] == "Hi there!"
     assert stored_messages[3]["content"] == "How can I help?"
 
-    # Verify no "ai" roles remain
     roles = [msg["role"] for msg in stored_messages]
     assert "ai" not in roles
+
+
+def test_anthropic_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Anthropic integration."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = Anthropic(api_key="test-api-key")
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="test",
+            content=[TextBlock(text="Hello", type="text")],
+            model="claude-3",
+            role="assistant",
+            type="message",
+            usage=Usage(input_tokens=10, output_tokens=20),
+        )
+    )
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    large_messages = [
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": large_content},
+    ]
+
+    with start_transaction(name="anthropic tx"):
+        client.messages.create(
+            model="claude-3-sonnet-20240229",
+            messages=large_messages,
+            max_tokens=100,
+        )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) <= len(large_messages)
+
+    result_size = len(messages_data.encode("utf-8"))
+    assert result_size <= MAX_GEN_AI_MESSAGE_BYTES

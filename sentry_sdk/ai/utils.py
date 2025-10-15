@@ -1,13 +1,23 @@
 import json
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable
+
     from sentry_sdk.tracing import Span
+
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.utils import logger
+
+if TYPE_CHECKING:
+    from typing import Any, Dict, List, Optional
+
+from sentry_sdk._types import AnnotatedValue
+from sentry_sdk.serializer import serialize
+
+MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 
 
 class GEN_AI_ALLOWED_MESSAGE_ROLES:
@@ -95,3 +105,79 @@ def get_start_span_function():
         current_span is not None and current_span.containing_transaction is not None
     )
     return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
+
+
+def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
+    # type: (List[Dict[str, Any]], int) -> List[Dict[str, Any]]
+    if not messages:
+        return messages
+
+    truncated_messages = list(messages)
+
+    while len(truncated_messages) > 1:
+        serialized_json = json.dumps(truncated_messages, separators=(",", ":"))
+        current_size = len(serialized_json.encode("utf-8"))
+
+        if current_size <= max_bytes:
+            break
+
+        truncated_messages.pop(0)
+
+    serialized_json = json.dumps(truncated_messages, separators=(",", ":"))
+    current_size = len(serialized_json.encode("utf-8"))
+
+    if current_size > max_bytes and len(truncated_messages) == 1:
+        message = truncated_messages[0].copy()
+        content = message.get("content", "")
+
+        if isinstance(content, str):
+            max_content_length = max_bytes // 2
+            while True:
+                message["content"] = content[:max_content_length]
+                test_json = json.dumps([message], separators=(",", ":"))
+                if len(test_json.encode("utf-8")) <= max_bytes:
+                    break
+                max_content_length = int(max_content_length * 0.9)
+                if max_content_length < 100:
+                    message["content"] = ""
+                    break
+
+            truncated_messages = [message]
+        elif isinstance(content, list):
+            content_copy = list(content)
+            while len(content_copy) > 0:
+                message["content"] = content_copy
+                test_json = json.dumps([message], separators=(",", ":"))
+                if len(test_json.encode("utf-8")) <= max_bytes:
+                    break
+                content_copy = content_copy[:-1]
+
+            if len(content_copy) == 0:
+                message["content"] = []
+
+            truncated_messages = [message]
+
+    return truncated_messages
+
+
+def truncate_and_annotate_messages(
+    messages, span, scope, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
+):
+    # type: (Optional[List[Dict[str, Any]]], Any, Any, int) -> Optional[List[Dict[str, Any]]]
+    if not messages:
+        return None
+
+    original_count = len(messages)
+    truncated_messages = truncate_messages_by_size(messages, max_bytes)
+
+    if not truncated_messages:
+        return None
+
+    truncated_count = len(truncated_messages)
+    n_removed = original_count - truncated_count
+
+    if n_removed > 0:
+        scope._gen_ai_messages_truncated[span.span_id] = n_removed
+        span.set_data("_gen_ai_messages_original_count", original_count)
+
+    return truncated_messages

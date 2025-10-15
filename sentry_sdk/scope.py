@@ -188,6 +188,7 @@ class Scope:
         "_extras",
         "_breadcrumbs",
         "_n_breadcrumbs_truncated",
+        "_gen_ai_messages_truncated",
         "_event_processors",
         "_error_processors",
         "_should_capture",
@@ -213,6 +214,7 @@ class Scope:
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[PropagationContext]
         self._n_breadcrumbs_truncated = 0  # type: int
+        self._gen_ai_messages_truncated = {}  # type: Dict[str, int]
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -247,6 +249,7 @@ class Scope:
 
         rv._breadcrumbs = copy(self._breadcrumbs)
         rv._n_breadcrumbs_truncated = self._n_breadcrumbs_truncated
+        rv._gen_ai_messages_truncated = self._gen_ai_messages_truncated.copy()
         rv._event_processors = self._event_processors.copy()
         rv._error_processors = self._error_processors.copy()
         rv._propagation_context = self._propagation_context
@@ -1583,6 +1586,8 @@ class Scope:
             self._n_breadcrumbs_truncated = (
                 self._n_breadcrumbs_truncated + scope._n_breadcrumbs_truncated
             )
+        if scope._gen_ai_messages_truncated:
+            self._gen_ai_messages_truncated.update(scope._gen_ai_messages_truncated)
         if scope._span:
             self._span = scope._span
         if scope._attachments:
