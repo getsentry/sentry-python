@@ -19,7 +19,7 @@ def invoke_agent_span(user_prompt, agent, model, model_settings):
 
     # Determine agent name for span
     name = "agent"
-    if agent and hasattr(agent, "name") and agent.name:
+    if agent and getattr(agent, "name", None):
         name = agent.name
 
     span = start_span_function(
