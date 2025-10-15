@@ -124,9 +124,10 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == [
-            {"role": "user", "content": "Hello, Claude"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -192,9 +193,10 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == [
-            {"role": "user", "content": "Hello, Claude"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -291,9 +293,10 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == [
-            {"role": "user", "content": "Hello, Claude"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
@@ -394,9 +397,10 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == [
-            {"role": "user", "content": "Hello, Claude"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
@@ -524,9 +528,10 @@ def test_streaming_create_message_with_input_json_delta(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == [
-            {"role": "user", "content": "What is the weather like in San Francisco?"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
             == "{'location': 'San Francisco, CA'}"
@@ -663,9 +668,10 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == [
-            {"role": "user", "content": "What is the weather like in San Francisco?"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
             == "{'location': 'San Francisco, CA'}"
@@ -919,7 +925,7 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
     assert span["op"] == "gen_ai.chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
-    stored_messages = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(stored_messages) == 4
     assert stored_messages[0]["role"] == "system"
     assert stored_messages[1]["role"] == "user"
@@ -975,10 +981,13 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, list)
-    assert len(messages_data) <= len(large_messages)
+    assert isinstance(messages_data, str)
 
-    result_size = len(serialize(messages_data, is_vars=False))
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) <= len(large_messages)
+
+    result_size = len(messages_data.encode("utf-8"))
     assert result_size <= MAX_GEN_AI_MESSAGE_BYTES
 
 
@@ -1021,8 +1030,10 @@ def test_anthropic_single_large_message_preservation(sentry_init, capture_events
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, list)
+    assert isinstance(messages_data, str)
 
-    assert len(messages_data) == 1
-    assert messages_data[0]["role"] == "user"
-    assert len(messages_data[0]["content"]) < len(huge_content)
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+    assert parsed_messages[0]["role"] == "user"
+    assert len(parsed_messages[0]["content"]) < len(huge_content)

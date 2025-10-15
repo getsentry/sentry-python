@@ -190,7 +190,9 @@ def _set_input_data(span, kwargs, operation, integration):
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
         if messages_data is not None:
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
 
     # Input attributes: Common
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")

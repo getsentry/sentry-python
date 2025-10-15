@@ -227,7 +227,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     normalized_messages, span, scope
                 )
                 if messages_data is not None:
-                    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
@@ -284,7 +289,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     normalized_messages, span, scope
                 )
                 if messages_data is not None:
-                    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
 
     def on_chat_model_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
@@ -763,7 +773,12 @@ def _wrap_agent_executor_invoke(f):
                     normalized_messages, span, scope
                 )
                 if messages_data is not None:
-                    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
 
             output = result.get("output")
             if (
@@ -817,7 +832,9 @@ def _wrap_agent_executor_stream(f):
                 normalized_messages, span, sentry_sdk.get_current_scope()
             )
             if messages_data is not None:
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                )
 
         # Run the agent
         result = f(self, *args, **kwargs)

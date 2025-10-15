@@ -3,6 +3,7 @@ import pytest
 
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
+    set_data_normalized,
     truncate_messages_by_size,
     truncate_and_annotate_messages,
 )
@@ -268,10 +269,10 @@ class TestClientAnnotation:
         original_count = len(large_messages)
 
         # Simulate what integrations do
-        truncated = truncate_and_annotate_messages(
+        truncated_messages = truncate_and_annotate_messages(
             large_messages, span, scope, max_bytes=small_limit
         )
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, truncated)
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, truncated_messages)
 
         # Verify metadata was set on scope and span
         assert span.span_id in scope._gen_ai_messages_truncated
@@ -294,5 +295,5 @@ class TestClientAnnotation:
         messages_value = event["spans"][0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert isinstance(messages_value, AnnotatedValue)
         assert messages_value.metadata["len"] == original_count
-        assert isinstance(messages_value.value, list)
+        assert isinstance(messages_value.value, str)
         assert "_gen_ai_messages_original_count" not in event["spans"][0]["data"]

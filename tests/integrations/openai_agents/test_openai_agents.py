@@ -150,7 +150,6 @@ async def test_agent_invocation_span(
         },
         {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
     ]
-
     assert (
         invoke_agent_span["data"]["gen_ai.response.text"]
         == "Hello, how can I help you?"
@@ -556,7 +555,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     )
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
 
-    # Convert list to JSON string, do regex replacement, then parse back
+    # Convert list to JSON, do regex replacement, then parse back
     messages_json = json.dumps(ai_client_span2["data"]["gen_ai.request.messages"])
     messages_json_cleaned = re.sub(
         r"SerializationIterator\(.*\)",
@@ -598,7 +597,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
             ],
         },
     ]
-
     assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
@@ -1058,7 +1056,9 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
     from sentry_sdk.consts import SPANDATA
 
     if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
-        stored_messages = span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        import json
+
+        stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
         # Verify roles were properly mapped
         found_assistant_roles = 0
@@ -1118,15 +1118,17 @@ def test_openai_agents_message_truncation(
     assert "gen_ai.request.messages" in invoke_agent_span["data"]
 
     messages_data = invoke_agent_span["data"]["gen_ai.request.messages"]
-    assert isinstance(messages_data, list)
+    assert isinstance(messages_data, str)
 
-    assert len(messages_data) >= 1
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) >= 1
 
-    result_size = len(serialize(messages_data, is_vars=False))
+    result_size = len(messages_data.encode("utf-8"))
     assert result_size <= MAX_GEN_AI_MESSAGE_BYTES
 
     total_original_size = len(large_system_prompt) + len(large_user_message)
-    total_parsed_size = sum(len(str(msg)) for msg in messages_data)
+    total_parsed_size = sum(len(str(msg)) for msg in parsed_messages)
     assert total_parsed_size < total_original_size
 
 
@@ -1171,12 +1173,14 @@ def test_openai_agents_single_large_message_preservation(
     assert "gen_ai.request.messages" in invoke_agent_span["data"]
 
     messages_data = invoke_agent_span["data"]["gen_ai.request.messages"]
-    assert isinstance(messages_data, list)
+    assert isinstance(messages_data, str)
 
-    assert len(messages_data) >= 1
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) >= 1
 
     user_message = next(
-        (msg for msg in messages_data if msg.get("role") == "user"), None
+        (msg for msg in parsed_messages if msg.get("role") == "user"), None
     )
     if user_message and "content" in user_message:
         assert len(user_message["content"]) < len(huge_content)

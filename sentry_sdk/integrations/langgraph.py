@@ -190,7 +190,12 @@ def _wrap_pregel_invoke(f):
                         normalized_input_messages, span, scope
                     )
                     if messages_data is not None:
-                        span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                            messages_data,
+                            unpack=False,
+                        )
 
             result = f(self, *args, **kwargs)
 
@@ -241,7 +246,12 @@ def _wrap_pregel_ainvoke(f):
                         normalized_input_messages, span, scope
                     )
                     if messages_data is not None:
-                        span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                            messages_data,
+                            unpack=False,
+                        )
 
             result = await f(self, *args, **kwargs)
 

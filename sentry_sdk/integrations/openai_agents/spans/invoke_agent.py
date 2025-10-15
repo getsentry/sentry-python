@@ -67,7 +67,9 @@ def invoke_agent_span(context, agent, kwargs):
                 normalized_messages, span, scope
             )
             if messages_data is not None:
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                )
 
     _set_agent_data(span, agent)
 

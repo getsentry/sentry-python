@@ -127,19 +127,22 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
         truncated_messages.pop(0)
 
     if len(truncated_messages) == 1:
-        serialized = serialize(
-            truncated_messages, is_vars=False, max_value_length=round(max_bytes * 0.8)
-        )
-        serialized_json = json.dumps(serialized, separators=(",", ":"))
-        current_size = len(serialized_json.encode("utf-8"))
+        last_message = truncated_messages[0].copy()
+        content = last_message.get("content", "")
 
-        if current_size > max_bytes:
-            last_message = truncated_messages[0].copy()
-            content = last_message.get("content", "")
-
-            if content and isinstance(content, str):
+        if content and isinstance(content, str):
+            if len(content) > int(max_bytes * 0.8):
                 last_message["content"] = content[: int(max_bytes * 0.8)] + "..."
-                truncated_messages[0] = last_message
+            else:
+                last_message["content"] = content
+            truncated_messages[0] = last_message
+
+        if content and isinstance(content, list):
+            if len(content) > int(max_bytes * 0.8):
+                last_message["content"] = content[: int(max_bytes * 0.8)] + "..."
+            else:
+                last_message["content"] = content
+            truncated_messages[0] = last_message
 
     return truncated_messages
 

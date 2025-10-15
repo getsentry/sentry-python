@@ -151,7 +151,9 @@ def _set_input_data(span, kwargs, integration):
             role_normalized_messages, span, scope
         )
         if messages_data is not None:
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data)
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
 
     set_data_normalized(
         span, SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False)
