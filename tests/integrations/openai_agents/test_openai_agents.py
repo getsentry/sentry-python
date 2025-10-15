@@ -143,7 +143,10 @@ async def test_agent_invocation_span(
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
-    assert invoke_agent_span["data"]["gen_ai.request.messages"] == [
+    messages_data = invoke_agent_span["data"]["gen_ai.request.messages"]
+    assert isinstance(messages_data, str)
+    parsed_messages = json.loads(messages_data)
+    assert parsed_messages == [
         {
             "content": [{"text": "You are a helpful test assistant.", "type": "text"}],
             "role": "system",
@@ -484,7 +487,10 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span1["data"]["gen_ai.request.available_tools"] == available_tools
     assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span1["data"]["gen_ai.request.messages"] == [
+    messages_data = ai_client_span1["data"]["gen_ai.request.messages"]
+    assert isinstance(messages_data, str)
+    parsed_messages = json.loads(messages_data)
+    assert parsed_messages == [
         {
             "role": "system",
             "content": [{"type": "text", "text": "You are a helpful test assistant."}],
