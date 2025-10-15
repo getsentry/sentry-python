@@ -112,8 +112,10 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
     if not messages:
         return messages
 
+    # make a list out of the messages in case it's just a string? why is this needed?
     truncated_messages = list(messages)
 
+    # while there is more than one message, serialize and measure the size, and if it's too big, remove the oldest message
     while len(truncated_messages) > 1:
         serialized = serialize(
             truncated_messages, is_vars=False, max_value_length=round(max_bytes * 0.8)
@@ -125,24 +127,6 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
             break
 
         truncated_messages.pop(0)
-
-    if len(truncated_messages) == 1:
-        last_message = truncated_messages[0].copy()
-        content = last_message.get("content", "")
-
-        if content and isinstance(content, str):
-            if len(content) > int(max_bytes * 0.8):
-                last_message["content"] = content[: int(max_bytes * 0.8)] + "..."
-            else:
-                last_message["content"] = content
-            truncated_messages[0] = last_message
-
-        if content and isinstance(content, list):
-            if len(content) > int(max_bytes * 0.8):
-                last_message["content"] = content[: int(max_bytes * 0.8)] + "..."
-            else:
-                last_message["content"] = content
-            truncated_messages[0] = last_message
 
     return truncated_messages
 

@@ -9,6 +9,7 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.serializer import serialize
+from sentry_sdk.utils import safe_serialize
 
 
 @pytest.fixture
@@ -68,24 +69,6 @@ class TestTruncateMessagesBySize:
             [], max_bytes=MAX_GEN_AI_MESSAGE_BYTES // 500
         )
         assert result == []
-
-    def test_single_message_under_limit(self):
-        """Test single message under size limit"""
-        messages = [{"role": "user", "content": "Hello!"}]
-        result = truncate_messages_by_size(
-            messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES // 500
-        )
-        assert result == messages
-
-    def test_single_message_over_limit(self):
-        """Test single message that exceeds size limit"""
-        large_content = "x" * 10000
-        messages = [{"role": "user", "content": large_content}]
-
-        result = truncate_messages_by_size(messages, max_bytes=100)
-        assert len(result) == 1
-        assert result[0]["role"] == "user"
-        assert len(result[0]["content"]) < len(large_content)
 
     def test_progressive_truncation(self, large_messages):
         """Test that truncation works progressively with different limits"""
@@ -288,7 +271,8 @@ class TestClientAnnotation:
             orig_count = span_data.pop("_gen_ai_messages_original_count", None)
             if orig_count is not None and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data:
                 span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
-                    span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES], {"len": orig_count}
+                    safe_serialize(span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]),
+                    {"len": orig_count},
                 )
 
         # Verify the annotation happened
