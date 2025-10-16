@@ -2,17 +2,12 @@ import json
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Dict, List, Optional
 
     from sentry_sdk.tracing import Span
 
-from typing import TYPE_CHECKING
-
 import sentry_sdk
 from sentry_sdk.utils import logger
-
-if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional
 
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 
