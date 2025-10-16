@@ -142,6 +142,13 @@ TEST_SUITE_CONFIG = {
         "package": "gql[all]",
         "num_versions": 2,
     },
+    "google_genai": {
+        "package": "google-genai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.9",
+    },
     "graphene": {
         "package": "graphene",
         "deps": {
@@ -233,7 +240,10 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "tiktoken"],
             "<1.55": ["httpx<0.28"],
         },
-        "python": ">=3.8",
+        "python": {
+            ">0.0,<2.3": ">=3.8",
+            ">=2.3": ">=3.9",
+        },
     },
     "openai-notiktoken": {
         "package": "openai",
@@ -242,7 +252,10 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
             "<1.55": ["httpx<0.28"],
         },
-        "python": ">=3.8",
+        "python": {
+            ">0.0,<2.3": ">=3.8",
+            ">=2.3": ">=3.9",
+        },
     },
     "openai_agents": {
         "package": "openai-agents",
