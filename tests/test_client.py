@@ -759,55 +759,52 @@ def test_databag_depth_stripping(sentry_init, capture_events):
     for _ in range(100000):
         value = [value]
 
-    def inner():
-        del events[:]
-        try:
-            a = value  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
+    del events[:]
+    try:
+        a = value  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
 
-        (event,) = events
+    (event,) = events
 
-        assert len(json.dumps(event)) < 10000
+    assert len(json.dumps(event)) < 10000
 
 
 def test_databag_string_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    def inner():
-        del events[:]
-        try:
-            a = "A" * DEFAULT_MAX_VALUE_LENGTH * 10  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
+    del events[:]
+    try:
+        a = "A" * DEFAULT_MAX_VALUE_LENGTH * 10  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
 
-        (event,) = events
+    (event,) = events
 
-        assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
+    assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
 
 
 def test_databag_breadth_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    def inner():
-        del events[:]
-        try:
-            a = ["a"] * 1000000  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
+    del events[:]
+    try:
+        a = ["a"] * 1000000  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
 
-        (event,) = events
+    (event,) = events
 
-        assert (
-            len(event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"])
-            == MAX_DATABAG_BREADTH
-        )
-        assert len(json.dumps(event)) < 10000
+    assert (
+        len(event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"])
+        == MAX_DATABAG_BREADTH
+    )
+    assert len(json.dumps(event)) < 10000
 
 
 def test_chained_exceptions(sentry_init, capture_events):
