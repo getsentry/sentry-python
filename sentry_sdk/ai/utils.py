@@ -109,45 +109,9 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
     while len(truncated_messages) > 1:
         serialized_json = json.dumps(truncated_messages, separators=(",", ":"))
         current_size = len(serialized_json.encode("utf-8"))
-
         if current_size <= max_bytes:
             break
-
         truncated_messages.pop(0)
-
-    serialized_json = json.dumps(truncated_messages, separators=(",", ":"))
-    current_size = len(serialized_json.encode("utf-8"))
-
-    if current_size > max_bytes and len(truncated_messages) == 1:
-        message = truncated_messages[0].copy()
-        content = message.get("content", "")
-
-        if isinstance(content, str):
-            max_content_length = max_bytes // 2
-            while True:
-                message["content"] = content[:max_content_length]
-                test_json = json.dumps([message], separators=(",", ":"))
-                if len(test_json.encode("utf-8")) <= max_bytes:
-                    break
-                max_content_length = int(max_content_length * 0.9)
-                if max_content_length < 100:
-                    message["content"] = ""
-                    break
-
-            truncated_messages = [message]
-        elif isinstance(content, list):
-            content_copy = list(content)
-            while len(content_copy) > 0:
-                message["content"] = content_copy
-                test_json = json.dumps([message], separators=(",", ":"))
-                if len(test_json.encode("utf-8")) <= max_bytes:
-                    break
-                content_copy = content_copy[:-1]
-
-            if len(content_copy) == 0:
-                message["content"] = []
-
-            truncated_messages = [message]
 
     return truncated_messages
 
