@@ -751,7 +751,6 @@ def test_cyclic_data(sentry_init, capture_events):
     assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
 
 
-# ????????
 def test_databag_depth_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
