@@ -410,14 +410,13 @@ def span_metadata_matcher():
             self.check_name = check_name
 
         def __eq__(self, span):
-            print("OP", self.span["op"], span.op)
             return (
-                (not self.check_trace_id or self.span["trace_id"] == span.trace_id)
-                and (not self.check_op or self.span["op"] == span.op)
-                and (not self.check_status or self.span["status"] == span.status)
-                and (not self.check_origin or self.span["origin"] == span.origin)
+                (not self.check_trace_id or self.span.trace_id == span["trace_id"])
+                and (not self.check_op or self.span.op == span["op"])
+                and (not self.check_status or self.span.status == span["status"])
+                and (not self.check_origin or self.span.origin == span["origin"])
                 and (
-                    not self.check_name or self.span["description"] == span.description
+                    not self.check_name or self.span.description == span["description"]
                 )
             )
 
@@ -430,9 +429,9 @@ def span_metadata_matcher():
 @pytest.fixture(name="SpanTreeEqualUnorderedSiblings")
 def unordered_siblings_span_tree_matcher(EmittedSpanMetadataEqual):
     class SpanTreeEqualUnorderedSiblings:
-        def __init__(self, root_span, span_tree, **kwargs):
-            self.root_span = root_span
-            self.span_tree = span_tree
+        def __init__(self, expected_root_span, expected_span_tree, **kwargs):
+            self.expected_root_span = expected_root_span
+            self.expected_span_tree = expected_span_tree
 
             self.span_matcher_kwargs = kwargs
 
@@ -447,12 +446,12 @@ def unordered_siblings_span_tree_matcher(EmittedSpanMetadataEqual):
             self, actual_subtree_root_span, expected_subtree_root_span, by_parent
         ):
             if actual_subtree_root_span["span_id"] not in by_parent:
-                return expected_subtree_root_span == EmittedSpanMetadataEqual(
-                    actual_subtree_root_span, **self.span_matcher_kwargs
+                return actual_subtree_root_span == EmittedSpanMetadataEqual(
+                    expected_subtree_root_span, **self.span_matcher_kwargs
                 )
 
             actual_span_children = by_parent[actual_subtree_root_span["span_id"]]
-            expected_span_children = self.span_tree[expected_subtree_root_span]
+            expected_span_children = self.expected_span_tree[expected_subtree_root_span]
 
             if len(actual_span_children) != len(expected_span_children):
                 return False
@@ -460,8 +459,8 @@ def unordered_siblings_span_tree_matcher(EmittedSpanMetadataEqual):
             for expected_child in expected_span_children:
                 found = False
                 for actual_child in actual_span_children:
-                    if expected_child == EmittedSpanMetadataEqual(
-                        actual_child, **self.span_matcher_kwargs
+                    if actual_child == EmittedSpanMetadataEqual(
+                        expected_child, **self.span_matcher_kwargs
                     ):
                         found = True
                         if not self._subtree_eq(
@@ -477,14 +476,16 @@ def unordered_siblings_span_tree_matcher(EmittedSpanMetadataEqual):
 
         def __eq__(self, event):
             by_parent = self._construct_parent_to_spans_mapping(event)
-            root_span = event["contexts"]["trace"]
+            actual_root_span = event["contexts"]["trace"]
 
-            if self.root_span != EmittedSpanMetadataEqual(
-                root_span, **self.span_matcher_kwargs
+            if actual_root_span != EmittedSpanMetadataEqual(
+                self.expected_root_span, **self.span_matcher_kwargs
             ):
                 return False
 
-            return self._subtree_eq(root_span, self.root_span, by_parent)
+            return self._subtree_eq(
+                actual_root_span, self.expected_root_span, by_parent
+            )
 
         def __ne__(self, test_string):
             return not self.__eq__(test_string)
