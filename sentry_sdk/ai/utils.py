@@ -1,13 +1,17 @@
 import json
-
+from collections import deque
 from typing import TYPE_CHECKING
+from sys import getsizeof
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Dict, List, Optional, Tuple
+
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
 from sentry_sdk.utils import logger
+
+MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 
 
 class GEN_AI_ALLOWED_MESSAGE_ROLES:
@@ -95,3 +99,48 @@ def get_start_span_function():
         current_span is not None and current_span.containing_transaction is not None
     )
     return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
+
+
+def _find_truncation_index(messages, max_bytes):
+    # type: (List[Dict[str, Any]], int) -> int
+    """
+    Find the index of the first message that would exceed the max bytes limit.
+    Compute the individual message sizes, and return the index of the first message from the back
+    of the list that would exceed the max bytes limit.
+    """
+    running_sum = 0
+    for idx in range(len(messages) - 1, -1, -1):
+        size = len(json.dumps(messages[idx], separators=(",", ":")).encode("utf-8"))
+        running_sum += size
+        if running_sum > max_bytes:
+            return idx + 1
+
+    return 0
+
+
+def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
+    # type: (List[Dict[str, Any]], int) -> Tuple[List[Dict[str, Any]], int]
+    serialized_json = json.dumps(messages, separators=(",", ":"))
+    current_size = len(serialized_json.encode("utf-8"))
+
+    if current_size <= max_bytes:
+        return messages, 0
+
+    truncation_index = _find_truncation_index(messages, max_bytes)
+    return messages[truncation_index:], truncation_index
+
+
+def truncate_and_annotate_messages(
+    messages, span, scope, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
+):
+    # type: (Optional[List[Dict[str, Any]]], Any, Any, int) -> Optional[List[Dict[str, Any]]]
+    if not messages:
+        return None
+
+    truncated_messages, removed_count = truncate_messages_by_size(messages, max_bytes)
+    if removed_count > 0:
+        scope._gen_ai_messages_truncated[span.span_id] = len(messages) - len(
+            truncated_messages
+        )
+
+    return truncated_messages
