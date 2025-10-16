@@ -26,9 +26,14 @@ if TYPE_CHECKING:
 
 try:
     try:
-        from openai import NotGiven, Omit
+        from openai import NotGiven
     except ImportError:
         NotGiven = None
+
+    try:
+        from openai import Omit
+    except ImportError:
+        Omit = None
 
     from openai.resources.chat.completions import Completions, AsyncCompletions
     from openai.resources import Embeddings, AsyncEmbeddings
