@@ -12,41 +12,48 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.mcp import MCPIntegration
 from sentry_sdk.utils import safe_serialize
 
+from mcp.server.lowlevel import Server
+from mcp.server.lowlevel.server import request_ctx
+
+
 if TYPE_CHECKING:
     from typing import Any, Callable
 
 
 def _get_span_config(handler_type, handler_name):
-    # type: (str, str) -> tuple[str, str, str, str]
+    # type: (str, str) -> tuple[str, str, str]
     """
     Get span configuration based on handler type.
 
     Returns:
-        Tuple of (op, span_data_key, span_name, mcp_method_name)
+        Tuple of (span_data_key, span_name, mcp_method_name)
     """
     if handler_type == "tool":
-        op = OP.MCP_TOOL
         span_data_key = SPANDATA.MCP_TOOL_NAME
         mcp_method_name = "tools/call"
     elif handler_type == "prompt":
-        op = OP.MCP_PROMPT
         span_data_key = SPANDATA.MCP_PROMPT_NAME
         mcp_method_name = "prompts/get"
     else:  # resource
-        op = OP.MCP_RESOURCE
         span_data_key = SPANDATA.MCP_RESOURCE_URI
         mcp_method_name = "resources/read"
 
     span_name = f"{handler_type} {handler_name}"
-    return op, span_data_key, span_name, mcp_method_name
+    return span_data_key, span_name, mcp_method_name
 
 
-def _set_span_data(span, handler_name, span_data_key, mcp_method_name, kwargs):
-    # type: (Any, str, str, str, dict[str, Any]) -> None
+def _set_span_data(
+    span, handler_name, span_data_key, mcp_method_name, kwargs, request_id=None
+):
+    # type: (Any, str, str, str, dict[str, Any], str | None) -> None
     """Set common span data for MCP handlers."""
     # Set handler identifier
     span.set_data(span_data_key, handler_name)
     span.set_data(SPANDATA.MCP_METHOD_NAME, mcp_method_name)
+
+    # Set request_id if provided
+    if request_id:
+        span.set_data(SPANDATA.MCP_REQUEST_ID, request_id)
 
     # Set request arguments (excluding common request context objects)
     for k, v in kwargs.items():
@@ -66,7 +73,7 @@ def wrap_handler(original_handler, handler_type, handler_name):
     Returns:
         Wrapped handler function
     """
-    op, span_data_key, span_name, mcp_method_name = _get_span_config(
+    span_data_key, span_name, mcp_method_name = _get_span_config(
         handler_type, handler_name
     )
 
@@ -76,12 +83,25 @@ def wrap_handler(original_handler, handler_type, handler_name):
         async def async_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
             with get_start_span_function()(
-                op=op,
+                op=OP.MCP_SERVER,
                 name=span_name,
                 origin=MCPIntegration.origin,
             ) as span:
+                # Extract request_id from RequestContext context variable
+                request_id = None
+                try:
+                    ctx = request_ctx.get()
+                    request_id = ctx.request_id
+                except LookupError:
+                    # Not in a request context, request_id will remain None
+                    pass
                 _set_span_data(
-                    span, handler_name, span_data_key, mcp_method_name, kwargs
+                    span,
+                    handler_name,
+                    span_data_key,
+                    mcp_method_name,
+                    kwargs,
+                    request_id,
                 )
                 try:
                     return await original_handler(*args, **kwargs)
@@ -96,12 +116,25 @@ def wrap_handler(original_handler, handler_type, handler_name):
         def sync_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
             with get_start_span_function()(
-                op=op,
+                op=OP.MCP_SERVER,
                 name=span_name,
                 origin=MCPIntegration.origin,
             ) as span:
+                # Extract request_id from RequestContext context variable
+                request_id = None
+                try:
+                    ctx = request_ctx.get()
+                    request_id = ctx.request_id
+                except LookupError:
+                    # Not in a request context, request_id will remain None
+                    pass
                 _set_span_data(
-                    span, handler_name, span_data_key, mcp_method_name, kwargs
+                    span,
+                    handler_name,
+                    span_data_key,
+                    mcp_method_name,
+                    kwargs,
+                    request_id,
                 )
                 try:
                     return original_handler(*args, **kwargs)
@@ -117,7 +150,6 @@ def patch_lowlevel_server():
     """
     Patches the mcp.server.lowlevel.Server class to instrument handler execution.
     """
-    from mcp.server.lowlevel import Server
 
     # Patch call_tool decorator
     original_call_tool = Server.call_tool
