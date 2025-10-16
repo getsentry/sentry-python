@@ -1,4 +1,5 @@
 import inspect
+import functools
 import sys
 
 import sentry_sdk
@@ -17,7 +18,6 @@ try:
     import ray  # type: ignore[import-not-found]
 except ImportError:
     raise DidNotEnable("Ray not installed.")
-import functools
 
 from typing import TYPE_CHECKING
 
@@ -54,12 +54,13 @@ def _patch_ray_remote():
 
         def wrapper(user_f):
             # type: (Callable[..., Any]) -> Any
-            def new_func(*f_args, _tracing=None, **f_kwargs):
+            @functools.wraps(user_f)
+            def new_func(*f_args, _sentry_tracing=None, **f_kwargs):
                 # type: (Any, Optional[dict[str, Any]], Any) -> Any
                 _check_sentry_initialized()
 
                 transaction = sentry_sdk.continue_trace(
-                    _tracing or {},
+                    _sentry_tracing or {},
                     op=OP.QUEUE_TASK_RAY,
                     name=qualname_from_function(user_f),
                     origin=RayIntegration.origin,
@@ -77,6 +78,19 @@ def _patch_ray_remote():
                         reraise(*exc_info)
 
                     return result
+
+            # Patching new_func signature to add the _sentry_tracing parameter to it
+            # Ray later inspects the signature and finds the unexpected parameter otherwise
+            signature = inspect.signature(new_func)
+            params = list(signature.parameters.values())
+            params.append(
+                inspect.Parameter(
+                    "_sentry_tracing",
+                    kind=inspect.Parameter.KEYWORD_ONLY,
+                    default=None,
+                )
+            )
+            new_func.__signature__ = signature.replace(parameters=params)  # type: ignore[attr-defined]
 
             if f:
                 rv = old_remote(new_func)
@@ -99,7 +113,9 @@ def _patch_ray_remote():
                         for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
                     }
                     try:
-                        result = old_remote_method(*args, **kwargs, _tracing=tracing)
+                        result = old_remote_method(
+                            *args, **kwargs, _sentry_tracing=tracing
+                        )
                         span.set_status(SPANSTATUS.OK)
                     except Exception:
                         span.set_status(SPANSTATUS.INTERNAL_ERROR)

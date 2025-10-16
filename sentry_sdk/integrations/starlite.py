@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -237,7 +239,7 @@ def patch_http_route_handle():
 
             event.update(
                 {
-                    "request": request_info,
+                    "request": deepcopy(request_info),
                     "transaction": tx_name,
                     "transaction_info": tx_info,
                 }

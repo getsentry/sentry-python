@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.39.0",
+    version="2.42.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -65,6 +65,7 @@ setup(
         "langchain": ["langchain>=0.0.210"],
         "langgraph": ["langgraph>=0.6.6"],
         "launchdarkly": ["launchdarkly-server-sdk>=9.8.0"],
+        "litellm": ["litellm>=1.77.5"],
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
@@ -83,6 +84,7 @@ setup(
         "statsig": ["statsig>=0.55.3"],
         "tornado": ["tornado>=6"],
         "unleash": ["UnleashClient>=6.0.1"],
+        "google-genai": ["google-genai>=1.29.0"],
     },
     entry_points={
         "opentelemetry_propagator": [

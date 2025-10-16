@@ -1,3 +1,5 @@
+import os
+import datetime
 from http.client import HTTPConnection, HTTPSConnection
 from socket import SocketIO
 from urllib.error import HTTPError
@@ -372,6 +374,234 @@ def test_option_trace_propagation_targets(
         else:
             assert "sentry-trace" not in request_headers
             assert "baggage" not in request_headers
+
+
+@pytest.mark.parametrize("enable_http_request_source", [None, False])
+def test_request_source_disabled(
+    sentry_init, capture_events, enable_http_request_source
+):
+    sentry_options = {
+        "traces_sample_rate": 1.0,
+        "http_request_source_threshold_ms": 0,
+    }
+    if enable_http_request_source is not None:
+        sentry_options["enable_http_request_source"] = enable_http_request_source
+
+    sentry_init(**sentry_options)
+
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        conn = HTTPConnection("localhost", port=PORT)
+        conn.request("GET", "/foo")
+        conn.getresponse()
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO not in data
+    assert SPANDATA.CODE_NAMESPACE not in data
+    assert SPANDATA.CODE_FILEPATH not in data
+    assert SPANDATA.CODE_FUNCTION not in data
+
+
+def test_request_source_enabled(sentry_init, capture_events):
+    sentry_options = {
+        "traces_sample_rate": 1.0,
+        "enable_http_request_source": True,
+        "http_request_source_threshold_ms": 0,
+    }
+    sentry_init(**sentry_options)
+
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        conn = HTTPConnection("localhost", port=PORT)
+        conn.request("GET", "/foo")
+        conn.getresponse()
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+
+def test_request_source(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=0,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        conn = HTTPConnection("localhost", port=PORT)
+        conn.request("GET", "/foo")
+        conn.getresponse()
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.stdlib.test_httplib"
+    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+        "tests/integrations/stdlib/test_httplib.py"
+    )
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    assert data.get(SPANDATA.CODE_FUNCTION) == "test_request_source"
+
+
+def test_request_source_with_module_in_search_path(sentry_init, capture_events):
+    """
+    Test that request source is relative to the path of the module it ran in
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=0,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        from httplib_helpers.helpers import get_request_with_connection
+
+        conn = HTTPConnection("localhost", port=PORT)
+        get_request_with_connection(conn, "/foo")
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "httplib_helpers.helpers"
+    assert data.get(SPANDATA.CODE_FILEPATH) == "httplib_helpers/helpers.py"
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_connection"
+
+
+def test_no_request_source_if_duration_too_short(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=100,
+    )
+
+    already_patched_putrequest = HTTPConnection.putrequest
+
+    class HttpConnectionWithPatchedSpan(HTTPConnection):
+        def putrequest(self, *args, **kwargs) -> None:
+            already_patched_putrequest(self, *args, **kwargs)
+            span = self._sentrysdk_span  # type: ignore
+            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
+        conn.request("GET", "/foo")
+        conn.getresponse()
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO not in data
+    assert SPANDATA.CODE_NAMESPACE not in data
+    assert SPANDATA.CODE_FILEPATH not in data
+    assert SPANDATA.CODE_FUNCTION not in data
+
+
+def test_request_source_if_duration_over_threshold(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        enable_http_request_source=True,
+        http_request_source_threshold_ms=100,
+    )
+
+    already_patched_putrequest = HTTPConnection.putrequest
+
+    class HttpConnectionWithPatchedSpan(HTTPConnection):
+        def putrequest(self, *args, **kwargs) -> None:
+            already_patched_putrequest(self, *args, **kwargs)
+            span = self._sentrysdk_span  # type: ignore
+            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
+        conn.request("GET", "/foo")
+        conn.getresponse()
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("GET")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.stdlib.test_httplib"
+    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+        "tests/integrations/stdlib/test_httplib.py"
+    )
+
+    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    assert is_relative_path
+
+    assert (
+        data.get(SPANDATA.CODE_FUNCTION)
+        == "test_request_source_if_duration_over_threshold"
+    )
 
 
 def test_span_origin(sentry_init, capture_events):

@@ -1,9 +1,10 @@
 from functools import wraps
+from collections.abc import Iterable
 
 import sentry_sdk
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized, normalize_message_roles
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -17,14 +18,19 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Iterable, List, Optional, Callable, AsyncIterator, Iterator
+    from typing import Any, List, Optional, Callable, AsyncIterator, Iterator
     from sentry_sdk.tracing import Span
 
 try:
     try:
-        from openai import NOT_GIVEN
+        from openai import NotGiven
     except ImportError:
-        NOT_GIVEN = None
+        NotGiven = None
+
+    try:
+        from openai import Omit
+    except ImportError:
+        Omit = None
 
     from openai.resources.chat.completions import Completions, AsyncCompletions
     from openai.resources import Embeddings, AsyncEmbeddings
@@ -182,8 +188,9 @@ def _set_input_data(span, kwargs, operation, integration):
         and should_send_default_pii()
         and integration.include_prompts
     ):
+        normalized_messages = normalize_message_roles(messages)
         set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, normalized_messages, unpack=False
         )
 
     # Input attributes: Common
@@ -203,12 +210,12 @@ def _set_input_data(span, kwargs, operation, integration):
     for key, attribute in kwargs_keys_to_attributes.items():
         value = kwargs.get(key)
 
-        if value is not NOT_GIVEN and value is not None:
+        if value is not None and _is_given(value):
             set_data_normalized(span, attribute, value)
 
     # Input attributes: Tools
     tools = kwargs.get("tools")
-    if tools is not NOT_GIVEN and tools is not None and len(tools) > 0:
+    if tools is not None and _is_given(tools) and len(tools) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
         )
@@ -688,3 +695,15 @@ def _wrap_async_responses_create(f):
         return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_responses_async
+
+
+def _is_given(obj):
+    # type: (Any) -> bool
+    """
+    Check for givenness safely across different openai versions.
+    """
+    if NotGiven is not None and isinstance(obj, NotGiven):
+        return False
+    if Omit is not None and isinstance(obj, Omit):
+        return False
+    return True

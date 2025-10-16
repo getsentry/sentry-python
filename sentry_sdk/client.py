@@ -24,7 +24,9 @@ from sentry_sdk.utils import (
     is_gevent,
     logger,
     get_before_send_log,
+    get_before_send_metric,
     has_logs_enabled,
+    has_metrics_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -59,14 +61,14 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo, Log
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric
     from sentry_sdk.integrations import Integration
-    from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
     from sentry_sdk._log_batcher import LogBatcher
+    from sentry_sdk._metrics_batcher import MetricsBatcher
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
@@ -182,8 +184,8 @@ class BaseClient:
 
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
-        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
         self.log_batcher = None  # type: Optional[LogBatcher]
+        self.metrics_batcher = None  # type: Optional[MetricsBatcher]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -215,8 +217,12 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def _capture_experimental_log(self, log):
+    def _capture_log(self, log):
         # type: (Log) -> None
+        pass
+
+    def _capture_metric(self, metric):
+        # type: (Metric) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -361,32 +367,19 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
-            experiments = self.options.get("_experiments", {})
-            if experiments.get("enable_metrics", True):
-                # Context vars are not working correctly on Python <=3.6
-                # with gevent.
-                metrics_supported = not is_gevent() or PY37
-                if metrics_supported:
-                    from sentry_sdk.metrics import MetricsAggregator
-
-                    self.metrics_aggregator = MetricsAggregator(
-                        capture_func=_capture_envelope,
-                        enable_code_locations=bool(
-                            experiments.get("metric_code_locations", True)
-                        ),
-                    )
-                else:
-                    logger.info(
-                        "Metrics not supported on Python 3.6 and lower with gevent."
-                    )
-
             self.log_batcher = None
 
             if has_logs_enabled(self.options):
                 from sentry_sdk._log_batcher import LogBatcher
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
+
+            self.metrics_batcher = None
+
+            if has_metrics_enabled(self.options):
+                from sentry_sdk._metrics_batcher import MetricsBatcher
+
+                self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -467,7 +460,6 @@ class _Client(BaseClient):
 
         if (
             self.monitor
-            or self.metrics_aggregator
             or self.log_batcher
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, BaseHttpTransport)
@@ -900,7 +892,7 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_experimental_log(self, log):
+    def _capture_log(self, log):
         # type: (Optional[Log]) -> None
         if not has_logs_enabled(self.options) or log is None:
             return
@@ -967,6 +959,65 @@ class _Client(BaseClient):
         if self.log_batcher:
             self.log_batcher.add(log)
 
+    def _capture_metric(self, metric):
+        # type: (Optional[Metric]) -> None
+        if not has_metrics_enabled(self.options) or metric is None:
+            return
+
+        isolation_scope = sentry_sdk.get_isolation_scope()
+
+        metric["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
+        metric["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
+
+        environment = self.options.get("environment")
+        if environment is not None and "sentry.environment" not in metric["attributes"]:
+            metric["attributes"]["sentry.environment"] = environment
+
+        release = self.options.get("release")
+        if release is not None and "sentry.release" not in metric["attributes"]:
+            metric["attributes"]["sentry.release"] = release
+
+        span = sentry_sdk.get_current_span()
+        metric["trace_id"] = "00000000-0000-0000-0000-000000000000"
+
+        if span:
+            metric["trace_id"] = span.trace_id
+            metric["span_id"] = span.span_id
+        else:
+            propagation_context = isolation_scope.get_active_propagation_context()
+            if propagation_context and propagation_context.trace_id:
+                metric["trace_id"] = propagation_context.trace_id
+
+        if isolation_scope._user is not None:
+            for metric_attribute, user_attribute in (
+                ("user.id", "id"),
+                ("user.name", "username"),
+                ("user.email", "email"),
+            ):
+                if (
+                    user_attribute in isolation_scope._user
+                    and metric_attribute not in metric["attributes"]
+                ):
+                    metric["attributes"][metric_attribute] = isolation_scope._user[
+                        user_attribute
+                    ]
+
+        debug = self.options.get("debug", False)
+        if debug:
+            logger.debug(
+                f"[Sentry Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
+            )
+
+        before_send_metric = get_before_send_metric(self.options)
+        if before_send_metric is not None:
+            metric = before_send_metric(metric, {})
+
+        if metric is None:
+            return
+
+        if self.metrics_batcher:
+            self.metrics_batcher.add(metric)
+
     def capture_session(
         self,
         session,  # type: Session
@@ -1019,10 +1070,10 @@ class _Client(BaseClient):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.kill()
             if self.log_batcher is not None:
                 self.log_batcher.kill()
+            if self.metrics_batcher is not None:
+                self.metrics_batcher.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -1045,10 +1096,10 @@ class _Client(BaseClient):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self.session_flusher.flush()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.flush()
             if self.log_batcher is not None:
                 self.log_batcher.flush()
+            if self.metrics_batcher is not None:
+                self.metrics_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):

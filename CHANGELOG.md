@@ -1,5 +1,88 @@
 # Changelog
 
+## 2.42.0
+
+### Various fixes & improvements
+
+- feat: Add source information for slow outgoing HTTP requests (#4902) by @alexander-alderman-webb
+- tests: Update tox (#4913) by @sentrivana
+- fix(Ray): Retain the original function name when patching Ray tasks (#4858) by @svartalf
+- feat(ai): Add `python-genai` integration (#4891) by @vgrozdanic
+  Enable the new Google GenAI integration with the code snippet below, and you can use the Sentry AI dashboards to observe your AI calls:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          GoogleGenAIIntegration(),
+      ],
+  )
+  ```
+
+## 2.41.0
+
+### Various fixes & improvements
+
+- feat: Add `concurrent.futures` patch to threading integration (#4770) by @alexander-alderman-webb
+  
+  The SDK now makes sure to automatically preserve span relationships when using `ThreadPoolExecutor`.
+- chore: Remove old metrics code (#4899) by @sentrivana
+
+  Removed all code related to the deprecated experimental metrics feature (`sentry_sdk.metrics`).
+- ref: Remove "experimental" from log function name (#4901) by @sentrivana
+- fix(ai): Add mapping for gen_ai message roles (#4884) by @shellmayr
+- feat(metrics): Add trace metrics behind an experiments flag (#4898) by @k-fish
+
+## 2.40.0
+
+### Various fixes & improvements
+
+- Add LiteLLM integration (#4864) by @constantinius
+  Once you've enabled the [new LiteLLM integration](https://docs.sentry.io/platforms/python/integrations/litellm/), you can use the Sentry AI Agents Monitoring, a Sentry dashboard that helps you understand what's going on with your AI requests:
+  
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.litellm import LiteLLMIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          LiteLLMIntegration(),
+      ],
+  )
+  ```
+
+- Litestar: Copy request info to prevent cookies mutation (#4883) by @alexander-alderman-webb
+- Add tracing to `DramatiqIntegration` (#4571) by @Igreh
+- Also emit spans for MCP tool calls done by the LLM (#4875) by @constantinius
+- Option to not trace HTTP requests based on status codes (#4869) by @alexander-alderman-webb
+  You can now disable transactions for incoming requests with specific HTTP status codes. The [new `trace_ignore_status_codes` option](https://docs.sentry.io/platforms/python/configuration/options/#trace_ignore_status_codes) accepts a `set` of status codes as integers. If a transaction wraps a request that results in one of the provided status codes, the transaction will be unsampled.
+    
+  ```python
+  import sentry_sdk
+  
+  sentry_sdk.init(
+      trace_ignore_status_codes={301, 302, 303, *range(305, 400), 404},
+  )
+  ```
+
+- Move `_set_agent_data` call to `ai_client_span` function (#4876) by @constantinius
+- Add script to determine lowest supported versions (#4867) by @sentrivana
+- Update `CONTRIBUTING.md` (#4870) by @sentrivana
+
 ## 2.39.0
 
 ### Various fixes & improvements

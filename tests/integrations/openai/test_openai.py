@@ -7,6 +7,11 @@ try:
 except ImportError:
     NOT_GIVEN = None
 
+try:
+    from openai import omit
+except ImportError:
+    omit = None
+
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
@@ -1424,7 +1429,7 @@ async def test_streaming_responses_api_async(
 )
 @pytest.mark.parametrize(
     "tools",
-    [[], None, NOT_GIVEN],
+    [[], None, NOT_GIVEN, omit],
 )
 def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     sentry_init(
@@ -1447,3 +1452,56 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     span = event["spans"][0]
 
     assert "gen_ai.request.available_tools" not in span["data"]
+
+
+def test_openai_message_role_mapping(sentry_init, capture_events):
+    """Test that OpenAI integration properly maps message roles like 'ai' to 'assistant'"""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    # Test messages with mixed roles including "ai" that should be mapped to "assistant"
+    test_messages = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello"},
+        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
+        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
+    ]
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(model="test-model", messages=test_messages)
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Verify that the span was created correctly
+    assert span["op"] == "gen_ai.chat"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+
+    # Parse the stored messages
+    import json
+
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+    # Verify that "ai" role was mapped to "assistant"
+    assert len(stored_messages) == 4
+    assert stored_messages[0]["role"] == "system"
+    assert stored_messages[1]["role"] == "user"
+    assert (
+        stored_messages[2]["role"] == "assistant"
+    )  # "ai" should be mapped to "assistant"
+    assert stored_messages[3]["role"] == "assistant"  # should stay "assistant"
+
+    # Verify content is preserved
+    assert stored_messages[2]["content"] == "Hi there!"
+    assert stored_messages[3]["content"] == "How can I help?"
+
+    # Verify no "ai" roles remain
+    roles = [msg["role"] for msg in stored_messages]
+    assert "ai" not in roles
