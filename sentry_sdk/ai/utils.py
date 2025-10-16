@@ -14,9 +14,6 @@ from sentry_sdk.utils import logger
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
 
-from sentry_sdk._types import AnnotatedValue
-from sentry_sdk.serializer import serialize
-
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 
 
