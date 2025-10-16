@@ -606,6 +606,32 @@ class _Client(BaseClient):
             event["breadcrumbs"] = AnnotatedValue(
                 event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
             )
+
+        # Annotate truncated gen_ai messages in spans
+        if scope is not None and scope._gen_ai_messages_truncated:
+            spans = event.get("spans", [])
+            if isinstance(spans, AnnotatedValue):
+                spans = spans.value
+
+            for span in spans:
+                if isinstance(span, dict):
+                    span_id = span.get("span_id")
+                    if span_id and span_id in scope._gen_ai_messages_truncated:
+                        span_data = span.get("data", {})
+                        original_count = span_data.pop(
+                            "_gen_ai_messages_original_count", None
+                        )
+                        if (
+                            original_count is not None
+                            and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
+                        ):
+                            span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = (
+                                AnnotatedValue(
+                                    span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
+                                    {"len": original_count},
+                                )
+                            )
+
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
