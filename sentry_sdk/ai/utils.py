@@ -110,7 +110,7 @@ def _find_truncation_index(messages, max_bytes):
     """
     running_sum = 0
     for idx in range(len(messages) - 1, -1, -1):
-        size = len(json.dumps(messages[idx], separators=(",", ":")))
+        size = len(json.dumps(messages[idx], separators=(",", ":")).encode("utf-8"))
         running_sum += size
         if running_sum > max_bytes:
             return idx + 1
