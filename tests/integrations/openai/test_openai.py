@@ -12,7 +12,7 @@ try:
 except ImportError:
     omit = None
 
-from openai import AsyncOpenAI, Omit, OpenAI, AsyncStream, Stream, OpenAIError
+from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
 from openai.types.chat.chat_completion import Choice
