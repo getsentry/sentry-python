@@ -815,10 +815,10 @@ class SPANDATA:
     Example: 1, 3
     """
 
-    MCP_RESOURCE_RESULT_CONTENT = "mcp.resource.result.content"
+    MCP_RESOURCE_PROTOCOL = "mcp.resource.protocol"
     """
-    The result/output content from an MCP resource read.
-    Example: "File contents..."
+    The protocol/scheme of the MCP resource URI.
+    Example: "file", "http", "https"
     """
 
     MCP_TRANSPORT = "mcp.transport"

@@ -21,13 +21,14 @@ if TYPE_CHECKING:
     from typing import Any, Callable
 
 
-def _get_span_config(handler_type, handler_name):
-    # type: (str, str) -> tuple[str, str, str, str]
+def _get_span_config(handler_type, item_name):
+    # type: (str, str) -> tuple[str, str, str, str | None]
     """
     Get span configuration based on handler type.
 
     Returns:
         Tuple of (span_data_key, span_name, mcp_method_name, result_data_key)
+        Note: result_data_key is None for resources
     """
     if handler_type == "tool":
         span_data_key = SPANDATA.MCP_TOOL_NAME
@@ -40,9 +41,9 @@ def _get_span_config(handler_type, handler_name):
     else:  # resource
         span_data_key = SPANDATA.MCP_RESOURCE_URI
         mcp_method_name = "resources/read"
-        result_data_key = SPANDATA.MCP_RESOURCE_RESULT_CONTENT
+        result_data_key = None  # Resources don't capture result content
 
-    span_name = f"{handler_type} {handler_name}"
+    span_name = f"{mcp_method_name} {item_name}"
     return span_data_key, span_name, mcp_method_name, result_data_key
 
 
@@ -116,7 +117,7 @@ def _extract_tool_result_content(result):
 
 
 def _set_span_output_data(span, result, result_data_key, handler_type):
-    # type: (Any, Any, str, str) -> None
+    # type: (Any, Any, str | None, str) -> None
     """Set output span data for MCP handlers."""
     if result is None:
         return
@@ -184,9 +185,7 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
         except Exception:
             # Silently ignore if we can't extract message info, but still serialize result
             span.set_data(result_data_key, safe_serialize(result))
-    else:
-        # For resources, serialize directly
-        span.set_data(result_data_key, safe_serialize(result))
+    # Resources don't capture result content (result_data_key is None)
 
 
 def patch_lowlevel_server():
@@ -390,6 +389,13 @@ def patch_lowlevel_server():
                 async def async_wrapper(uri):
                     # type: (Any) -> Any
                     uri_str = str(uri) if uri else "unknown"
+                    # Extract protocol/scheme from URI
+                    protocol = None
+                    if hasattr(uri, "scheme"):
+                        protocol = uri.scheme
+                    elif uri_str and "://" in uri_str:
+                        protocol = uri_str.split("://")[0]
+
                     span_data_key, span_name, mcp_method_name, result_data_key = (
                         _get_span_config("resource", uri_str)
                     )
@@ -412,6 +418,9 @@ def patch_lowlevel_server():
                             {},
                             request_id,
                         )
+                        # Set protocol if found
+                        if protocol:
+                            span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
                         try:
                             result = await func(uri)
                             _set_span_output_data(
@@ -429,6 +438,13 @@ def patch_lowlevel_server():
                 def sync_wrapper(uri):
                     # type: (Any) -> Any
                     uri_str = str(uri) if uri else "unknown"
+                    # Extract protocol/scheme from URI
+                    protocol = None
+                    if hasattr(uri, "scheme"):
+                        protocol = uri.scheme
+                    elif uri_str and "://" in uri_str:
+                        protocol = uri_str.split("://")[0]
+
                     span_data_key, span_name, mcp_method_name, result_data_key = (
                         _get_span_config("resource", uri_str)
                     )
@@ -451,6 +467,9 @@ def patch_lowlevel_server():
                             {},
                             request_id,
                         )
+                        # Set protocol if found
+                        if protocol:
+                            span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
                         try:
                             result = func(uri)
                             _set_span_output_data(
