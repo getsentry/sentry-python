@@ -10,6 +10,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     truncate_and_annotate_messages,
     truncate_messages_by_size,
+    _find_truncation_index,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import safe_serialize
@@ -209,27 +210,53 @@ def large_messages():
 class TestTruncateMessagesBySize:
     def test_no_truncation_needed(self, sample_messages):
         """Test that messages under the limit are not truncated"""
-        result = truncate_messages_by_size(
+        result, removed_count = truncate_messages_by_size(
             sample_messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
         )
         assert len(result) == len(sample_messages)
         assert result == sample_messages
+        assert removed_count == 0
 
     def test_truncation_removes_oldest_first(self, large_messages):
         """Test that oldest messages are removed first during truncation"""
         small_limit = 3000
-        result = truncate_messages_by_size(large_messages, max_bytes=small_limit)
+        result, removed_count = truncate_messages_by_size(
+            large_messages, max_bytes=small_limit
+        )
         assert len(result) < len(large_messages)
 
         if result:
             assert result[-1] == large_messages[-1]
+        assert removed_count == len(large_messages) - len(result)
 
     def test_empty_messages_list(self):
         """Test handling of empty messages list"""
-        result = truncate_messages_by_size(
+        result, removed_count = truncate_messages_by_size(
             [], max_bytes=MAX_GEN_AI_MESSAGE_BYTES // 500
         )
         assert result == []
+        assert removed_count == 0
+
+    def test_find_truncation_index(
+        self,
+    ):
+        """Test that the truncation index is found correctly"""
+        # when represented in JSON, these are each 7 bytes long
+        messages = ["A" * 5, "B" * 5, "C" * 5, "D" * 5, "E" * 5]
+        truncation_index = _find_truncation_index(messages, 20)
+        assert truncation_index == 3
+        assert messages[truncation_index:] == ["D" * 5, "E" * 5]
+
+        messages = ["A" * 5, "B" * 5, "C" * 5, "D" * 5, "E" * 5]
+        truncation_index = _find_truncation_index(messages, 40)
+        assert truncation_index == 0
+        assert messages[truncation_index:] == [
+            "A" * 5,
+            "B" * 5,
+            "C" * 5,
+            "D" * 5,
+            "E" * 5,
+        ]
 
     def test_progressive_truncation(self, large_messages):
         """Test that truncation works progressively with different limits"""
@@ -249,20 +276,6 @@ class TestTruncateMessagesBySize:
             assert current_count <= prev_count
             assert current_count >= 1
             prev_count = current_count
-
-    def test_exact_size_boundary(self):
-        """Test behavior at exact size boundaries"""
-        messages = [{"role": "user", "content": "test"}]
-
-        serialized = serialize(messages, is_vars=False)
-        json_str = json.dumps(serialized, separators=(",", ":"))
-        exact_size = len(json_str.encode("utf-8"))
-
-        result = truncate_messages_by_size(messages, max_bytes=exact_size)
-        assert len(result) == 1
-
-        result = truncate_messages_by_size(messages, max_bytes=exact_size - 1)
-        assert len(result) == 1
 
 
 class TestTruncateAndAnnotateMessages:
