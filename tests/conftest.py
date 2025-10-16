@@ -57,17 +57,6 @@ else:
     with open(SENTRY_EVENT_SCHEMA) as f:
         SENTRY_EVENT_SCHEMA = json.load(f)
 
-try:
-    import pytest_benchmark
-except ImportError:
-
-    @pytest.fixture
-    def benchmark():
-        return lambda x: x()
-
-else:
-    del pytest_benchmark
-
 
 from sentry_sdk import scope
 
