@@ -90,7 +90,6 @@ def use_django_caching_with_cluster(settings):
     }
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_middleware(
@@ -116,7 +115,6 @@ def test_cache_spans_disabled_middleware(
     assert len(second_event["spans"]) == 0
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_decorator(
@@ -142,7 +140,6 @@ def test_cache_spans_disabled_decorator(
     assert len(second_event["spans"]) == 0
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_templatetag(
@@ -168,7 +165,6 @@ def test_cache_spans_disabled_templatetag(
     assert len(second_event["spans"]) == 0
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_middleware(
@@ -238,7 +234,6 @@ def test_cache_spans_middleware(
     assert second_event["spans"][1]["data"]["cache.item_size"] == 58
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_caching):
@@ -293,7 +288,6 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     assert second_event["spans"][1]["data"]["cache.item_size"] == 58
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_templatetag(
@@ -386,7 +380,6 @@ def test_cache_spans_get_span_description(
     assert _get_span_description(method_name, args, kwargs) == expected_description
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_location_with_port(
     sentry_init, client, capture_events, use_django_caching_with_port
@@ -414,7 +407,6 @@ def test_cache_spans_location_with_port(
             assert span["data"]["network.peer.port"] == 6379
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_location_without_port(
     sentry_init, client, capture_events, use_django_caching_without_port
@@ -440,7 +432,6 @@ def test_cache_spans_location_without_port(
             assert "network.peer.port" not in span["data"]
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_location_with_cluster(
     sentry_init, client, capture_events, use_django_caching_with_cluster
@@ -467,7 +458,6 @@ def test_cache_spans_location_with_cluster(
             assert "network.peer.port" not in span["data"].keys()
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_caching):
     sentry_init(
@@ -509,7 +499,6 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
     assert second_event["spans"][1]["data"]["cache.item_size"] == 58
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     sentry_init(
@@ -558,7 +547,6 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][6]["description"] == f"S{id + 1}"
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     sentry_init(
@@ -597,7 +585,6 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][3]["description"] == f"S{id}"
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
 def test_span_origin_cache(sentry_init, client, capture_events, use_django_caching):

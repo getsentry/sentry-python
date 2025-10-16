@@ -29,7 +29,6 @@ def client():
     return Client(application)
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_disabled(sentry_init, client, capture_events):
     sentry_options = {
@@ -67,7 +66,6 @@ def test_query_source_disabled(sentry_init, client, capture_events):
         raise AssertionError("No db span found")
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 @pytest.mark.parametrize("enable_db_query_source", [None, True])
 def test_query_source_enabled(
@@ -111,7 +109,6 @@ def test_query_source_enabled(
         raise AssertionError("No db span found")
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_query_source(sentry_init, client, capture_events):
     sentry_init(
@@ -164,7 +161,6 @@ def test_query_source(sentry_init, client, capture_events):
         raise AssertionError("No db span found")
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_with_module_in_search_path(sentry_init, client, capture_events):
     """
@@ -218,7 +214,6 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
         raise AssertionError("No db span found")
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
     sentry_init(
@@ -281,7 +276,6 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
         raise AssertionError("No db span found")
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_with_in_app_include(sentry_init, client, capture_events):
     sentry_init(
@@ -327,7 +321,6 @@ def test_query_source_with_in_app_include(sentry_init, client, capture_events):
         raise AssertionError("No db span found")
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_no_query_source_if_duration_too_short(sentry_init, client, capture_events):
     sentry_init(
@@ -385,7 +378,6 @@ def test_no_query_source_if_duration_too_short(sentry_init, client, capture_even
         raise AssertionError("No db span found")
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_if_duration_over_threshold(sentry_init, client, capture_events):
     sentry_init(
@@ -458,7 +450,6 @@ def test_query_source_if_duration_over_threshold(sentry_init, client, capture_ev
         raise AssertionError("No db span found")
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_span_origin_execute(sentry_init, client, capture_events):
     sentry_init(
@@ -487,7 +478,6 @@ def test_db_span_origin_execute(sentry_init, client, capture_events):
             assert span["origin"] == "auto.http.django"
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_span_origin_executemany(sentry_init, client, capture_events):
     sentry_init(

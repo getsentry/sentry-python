@@ -18,7 +18,6 @@ def client():
     return Client(application)
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_scrub_django_session_cookies_removed(
     sentry_init,
@@ -36,7 +35,6 @@ def test_scrub_django_session_cookies_removed(
     assert "cookies" not in event["request"]
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_scrub_django_session_cookies_filtered(
     sentry_init,
@@ -58,7 +56,6 @@ def test_scrub_django_session_cookies_filtered(
     }
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_scrub_django_custom_session_cookies_filtered(
     sentry_init,
