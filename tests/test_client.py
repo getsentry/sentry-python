@@ -46,6 +46,7 @@ def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
     for _ in range(100000):
         value = [value]
 
+    @benchmark
     def inner():
         del events[:]
         try:
