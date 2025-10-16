@@ -288,7 +288,6 @@ class TestTruncateAndAnnotateMessages:
         assert len(result) == len(sample_messages)
         assert result == sample_messages
         assert span.span_id not in scope._gen_ai_messages_truncated
-        assert "_gen_ai_messages_original_count" not in span.data
 
     def test_truncation_sets_metadata_on_scope(self, large_messages):
         class MockSpan:
@@ -316,9 +315,8 @@ class TestTruncateAndAnnotateMessages:
         assert len(result) < len(large_messages)
         n_removed = original_count - len(result)
         assert scope._gen_ai_messages_truncated[span.span_id] == n_removed
-        assert span.data["_gen_ai_messages_original_count"] == original_count
 
-    def test_metadata_contains_original_count(self, large_messages):
+    def test_scope_tracks_removed_messages(self, large_messages):
         class MockSpan:
             def __init__(self):
                 self.span_id = "test_span_id"
@@ -340,9 +338,9 @@ class TestTruncateAndAnnotateMessages:
             large_messages, span, scope, max_bytes=small_limit
         )
 
-        assert span.data["_gen_ai_messages_original_count"] == original_count
         n_removed = original_count - len(result)
         assert scope._gen_ai_messages_truncated[span.span_id] == n_removed
+        assert len(result) + n_removed == original_count
 
     def test_empty_messages_returns_none(self):
         class MockSpan:
@@ -391,7 +389,7 @@ class TestTruncateAndAnnotateMessages:
 
 class TestClientAnnotation:
     def test_client_wraps_truncated_messages_in_annotated_value(self, large_messages):
-        """Test that client.py properly wraps truncated messages in AnnotatedValue"""
+        """Test that client.py properly wraps truncated messages in AnnotatedValue using scope data"""
         from sentry_sdk._types import AnnotatedValue
         from sentry_sdk.consts import SPANDATA
 
@@ -418,22 +416,30 @@ class TestClientAnnotation:
         )
         span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, truncated_messages)
 
-        # Verify metadata was set on scope and span
+        # Verify metadata was set on scope
         assert span.span_id in scope._gen_ai_messages_truncated
         assert scope._gen_ai_messages_truncated[span.span_id] > 0
-        assert "_gen_ai_messages_original_count" in span.data
 
         # Simulate what client.py does
         event = {"spans": [{"span_id": span.span_id, "data": span.data.copy()}]}
 
-        # Mimic client.py logic
+        # Mimic client.py logic - using scope to get the removed count
         for event_span in event["spans"]:
+            span_id = event_span.get("span_id")
             span_data = event_span.get("data", {})
-            orig_count = span_data.pop("_gen_ai_messages_original_count", None)
-            if orig_count is not None and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data:
+            if (
+                span_id
+                and span_id in scope._gen_ai_messages_truncated
+                and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
+            ):
+                messages = span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+                n_removed = scope._gen_ai_messages_truncated[span_id]
+                n_remaining = len(messages) if isinstance(messages, list) else 0
+                original_count_calculated = n_removed + n_remaining
+
                 span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
-                    safe_serialize(span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]),
-                    {"len": orig_count},
+                    safe_serialize(messages),
+                    {"len": original_count_calculated},
                 )
 
         # Verify the annotation happened
@@ -441,4 +447,3 @@ class TestClientAnnotation:
         assert isinstance(messages_value, AnnotatedValue)
         assert messages_value.metadata["len"] == original_count
         assert isinstance(messages_value.value, str)
-        assert "_gen_ai_messages_original_count" not in event["spans"][0]["data"]

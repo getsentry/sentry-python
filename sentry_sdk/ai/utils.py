@@ -175,6 +175,5 @@ def truncate_and_annotate_messages(
 
     if n_removed > 0:
         scope._gen_ai_messages_truncated[span.span_id] = n_removed
-        span.set_data("_gen_ai_messages_original_count", original_count)
 
     return truncated_messages

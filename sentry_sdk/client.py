@@ -598,6 +598,23 @@ class _Client(BaseClient):
             if event_scrubber:
                 event_scrubber.scrub_event(event)
 
+        if scope is not None and scope._gen_ai_messages_truncated:
+            spans = event.get("spans", [])  # type: List[Dict[str, Any]] | AnnotatedValue[List[Dict[str, Any]]]
+            for span in spans:
+                span_id = span.get("span_id", None)
+                span_data = span.get("data", {})
+                if (
+                    span_id
+                    and span_id in scope._gen_ai_messages_truncated
+                    and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
+                ):
+                    span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
+                        span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
+                        {
+                            "len": scope._gen_ai_messages_truncated[span_id]
+                            + len(span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
+                        },
+                    )
         if previous_total_spans is not None:
             event["spans"] = AnnotatedValue(
                 event.get("spans", []), {"len": previous_total_spans}
@@ -606,28 +623,6 @@ class _Client(BaseClient):
             event["breadcrumbs"] = AnnotatedValue(
                 event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
             )
-
-        if scope is not None and scope._gen_ai_messages_truncated:
-            spans = []  # type: List[Dict[str, Any]]
-            for span in spans:
-                if isinstance(span, dict):
-                    span_id = span.get("span_id")
-                    if span_id and span_id in scope._gen_ai_messages_truncated:
-                        span_data = span.get("data", {})
-                        if isinstance(span_data, dict):
-                            original_count = span_data.pop(
-                                "_gen_ai_messages_original_count", None
-                            )
-                            if (
-                                original_count is not None
-                                and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
-                            ):
-                                span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = (
-                                    AnnotatedValue(
-                                        span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
-                                        {"len": original_count},
-                                    )
-                                )
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
