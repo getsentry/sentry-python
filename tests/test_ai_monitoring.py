@@ -1,4 +1,5 @@
 import json
+import uuid
 
 import pytest
 
@@ -290,7 +291,7 @@ class TestTruncateAndAnnotateMessages:
 
         class MockScope:
             def __init__(self):
-                self._gen_ai_messages_truncated = {}
+                self._gen_ai_original_message_count = {}
 
         span = MockSpan()
         scope = MockScope()
@@ -300,7 +301,7 @@ class TestTruncateAndAnnotateMessages:
         assert not isinstance(result, AnnotatedValue)
         assert len(result) == len(sample_messages)
         assert result == sample_messages
-        assert span.span_id not in scope._gen_ai_messages_truncated
+        assert span.span_id not in scope._gen_ai_original_message_count
 
     def test_truncation_sets_metadata_on_scope(self, large_messages):
         class MockSpan:
@@ -313,7 +314,7 @@ class TestTruncateAndAnnotateMessages:
 
         class MockScope:
             def __init__(self):
-                self._gen_ai_messages_truncated = {}
+                self._gen_ai_original_message_count = {}
 
         small_limit = 1000
         span = MockSpan()
@@ -327,7 +328,7 @@ class TestTruncateAndAnnotateMessages:
         assert not isinstance(result, AnnotatedValue)
         assert len(result) < len(large_messages)
         n_removed = original_count - len(result)
-        assert scope._gen_ai_messages_truncated[span.span_id] == n_removed
+        assert scope._gen_ai_original_message_count[span.span_id] == n_removed
 
     def test_scope_tracks_removed_messages(self, large_messages):
         class MockSpan:
@@ -340,7 +341,7 @@ class TestTruncateAndAnnotateMessages:
 
         class MockScope:
             def __init__(self):
-                self._gen_ai_messages_truncated = {}
+                self._gen_ai_original_message_count = {}
 
         small_limit = 1000
         original_count = len(large_messages)
@@ -352,7 +353,7 @@ class TestTruncateAndAnnotateMessages:
         )
 
         n_removed = original_count - len(result)
-        assert scope._gen_ai_messages_truncated[span.span_id] == n_removed
+        assert scope._gen_ai_original_message_count[span.span_id] == n_removed
         assert len(result) + n_removed == original_count
 
     def test_empty_messages_returns_none(self):
@@ -366,7 +367,7 @@ class TestTruncateAndAnnotateMessages:
 
         class MockScope:
             def __init__(self):
-                self._gen_ai_messages_truncated = {}
+                self._gen_ai_original_message_count = {}
 
         span = MockSpan()
         scope = MockScope()
@@ -387,7 +388,7 @@ class TestTruncateAndAnnotateMessages:
 
         class MockScope:
             def __init__(self):
-                self._gen_ai_messages_truncated = {}
+                self._gen_ai_original_message_count = {}
 
         small_limit = 3000
         span = MockSpan()
@@ -416,7 +417,7 @@ class TestClientAnnotation:
 
         class MockScope:
             def __init__(self):
-                self._gen_ai_messages_truncated = {}
+                self._gen_ai_original_message_count = {}
 
         small_limit = 3000
         span = MockSpan()
@@ -430,8 +431,8 @@ class TestClientAnnotation:
         span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, truncated_messages)
 
         # Verify metadata was set on scope
-        assert span.span_id in scope._gen_ai_messages_truncated
-        assert scope._gen_ai_messages_truncated[span.span_id] > 0
+        assert span.span_id in scope._gen_ai_original_message_count
+        assert scope._gen_ai_original_message_count[span.span_id] > 0
 
         # Simulate what client.py does
         event = {"spans": [{"span_id": span.span_id, "data": span.data.copy()}]}
@@ -442,17 +443,15 @@ class TestClientAnnotation:
             span_data = event_span.get("data", {})
             if (
                 span_id
-                and span_id in scope._gen_ai_messages_truncated
+                and span_id in scope._gen_ai_original_message_count
                 and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
             ):
                 messages = span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                n_removed = scope._gen_ai_messages_truncated[span_id]
-                n_remaining = len(messages) if isinstance(messages, list) else 0
-                original_count_calculated = n_removed + n_remaining
+                n_original_count = scope._gen_ai_original_message_count[span_id]
 
                 span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
                     safe_serialize(messages),
-                    {"len": original_count_calculated},
+                    {"len": n_original_count},
                 )
 
         # Verify the annotation happened
@@ -460,3 +459,61 @@ class TestClientAnnotation:
         assert isinstance(messages_value, AnnotatedValue)
         assert messages_value.metadata["len"] == original_count
         assert isinstance(messages_value.value, str)
+
+    def test_annotated_value_shows_correct_original_length(self, large_messages):
+        """Test that the annotated value correctly shows the original message count before truncation"""
+        from sentry_sdk.consts import SPANDATA
+
+        class MockSpan:
+            def __init__(self):
+                self.span_id = "test_span_456"
+                self.data = {}
+
+            def set_data(self, key, value):
+                self.data[key] = value
+
+        class MockScope:
+            def __init__(self):
+                self._gen_ai_original_message_count = {}
+
+        small_limit = 3000
+        span = MockSpan()
+        scope = MockScope()
+        original_message_count = len(large_messages)
+
+        truncated_messages = truncate_and_annotate_messages(
+            large_messages, span, scope, max_bytes=small_limit
+        )
+
+        assert len(truncated_messages) < original_message_count
+
+        assert span.span_id in scope._gen_ai_original_message_count
+        stored_original_length = scope._gen_ai_original_message_count[span.span_id]
+        assert stored_original_length == original_message_count
+
+        event = {
+            "spans": [
+                {
+                    "span_id": span.span_id,
+                    "data": {SPANDATA.GEN_AI_REQUEST_MESSAGES: truncated_messages},
+                }
+            ]
+        }
+
+        for event_span in event["spans"]:
+            span_id = event_span.get("span_id")
+            span_data = event_span.get("data", {})
+            if (
+                span_id
+                and span_id in scope._gen_ai_original_message_count
+                and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
+            ):
+                span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
+                    span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
+                    {"len": scope._gen_ai_original_message_count[span_id]},
+                )
+
+        messages_value = event["spans"][0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages_value, AnnotatedValue)
+        assert messages_value.metadata["len"] == stored_original_length
+        assert len(messages_value.value) == len(truncated_messages)
