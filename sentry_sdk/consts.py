@@ -779,6 +779,54 @@ class SPANDATA:
     Example: "req_123abc"
     """
 
+    MCP_TOOL_RESULT_CONTENT = "mcp.tool.result.content"
+    """
+    The result/output content from an MCP tool execution.
+    Example: "The weather is sunny"
+    """
+
+    MCP_TOOL_RESULT_CONTENT_COUNT = "mcp.tool.result.content_count"
+    """
+    The number of items/keys in the MCP tool result.
+    Example: 5
+    """
+
+    MCP_TOOL_RESULT_IS_ERROR = "mcp.tool.result.is_error"
+    """
+    Whether the MCP tool execution resulted in an error.
+    Example: True
+    """
+
+    MCP_PROMPT_RESULT_MESSAGE_CONTENT = "mcp.prompt.result.message_content"
+    """
+    The message content from an MCP prompt retrieval.
+    Example: "Review the following code..."
+    """
+
+    MCP_PROMPT_RESULT_MESSAGE_ROLE = "mcp.prompt.result.message_role"
+    """
+    The role of the message in an MCP prompt retrieval (only set for single-message prompts).
+    Example: "user", "assistant", "system"
+    """
+
+    MCP_PROMPT_RESULT_MESSAGE_COUNT = "mcp.prompt.result.message_count"
+    """
+    The number of messages in an MCP prompt result.
+    Example: 1, 3
+    """
+
+    MCP_RESOURCE_RESULT_CONTENT = "mcp.resource.result.content"
+    """
+    The result/output content from an MCP resource read.
+    Example: "File contents..."
+    """
+
+    MCP_TRANSPORT = "mcp.transport"
+    """
+    The transport method used for MCP communication.
+    Example: "pipe" (stdio), "tcp" (HTTP/WebSocket/SSE)
+    """
+
 
 class SPANSTATUS:
     """

@@ -12,7 +12,6 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 
 try:
     import mcp.server.lowlevel  # noqa: F401
-    import mcp.server.fastmcp  # noqa: F401
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
@@ -28,10 +27,9 @@ class MCPIntegration(Integration):
         Patches MCP server classes to instrument handler execution.
         """
         from sentry_sdk.integrations.mcp.lowlevel import patch_lowlevel_server
-        from sentry_sdk.integrations.mcp.fastmcp import patch_fastmcp_server
 
+        # Patch server classes to instrument handlers
         patch_lowlevel_server()
-        patch_fastmcp_server()
 
 
 __all__ = ["MCPIntegration"]
