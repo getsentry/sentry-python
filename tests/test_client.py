@@ -752,7 +752,7 @@ def test_cyclic_data(sentry_init, capture_events):
 
 
 @pytest.mark.forked
-def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
+def test_databag_depth_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
@@ -760,7 +760,6 @@ def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
     for _ in range(100000):
         value = [value]
 
-    @benchmark
     def inner():
         del events[:]
         try:
@@ -774,11 +773,10 @@ def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
         assert len(json.dumps(event)) < 10000
 
 
-def test_databag_string_stripping(sentry_init, capture_events, benchmark):
+def test_databag_string_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    @benchmark
     def inner():
         del events[:]
         try:
@@ -792,11 +790,10 @@ def test_databag_string_stripping(sentry_init, capture_events, benchmark):
         assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
 
 
-def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
+def test_databag_breadth_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    @benchmark
     def inner():
         del events[:]
         try:
