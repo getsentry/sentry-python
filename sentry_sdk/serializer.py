@@ -270,6 +270,7 @@ def serialize(event, **kwargs):
         if is_request_body is None:
             is_request_body = _is_request_body()
 
+        print("remaining depth", remaining_depth)
         if is_databag:
             if is_request_body and keep_request_bodies:
                 remaining_depth = float("inf")
