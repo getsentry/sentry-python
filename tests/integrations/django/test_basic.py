@@ -268,6 +268,7 @@ def test_trace_from_headers_if_performance_disabled(
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_user_captured(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
@@ -289,6 +290,7 @@ def test_user_captured(sentry_init, client, capture_events):
     }
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
@@ -311,6 +313,7 @@ def test_queryset_repr(sentry_init, capture_events):
     )
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_context_nested_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
@@ -360,6 +363,7 @@ def test_500(sentry_init, client):
     assert content == "Sentry error."
 
 
+@pytest.mark.forked
 def test_management_command_raises():
     # This just checks for our assumption that Django passes through all
     # exceptions by default, so our excepthook can be used for management
@@ -368,6 +372,7 @@ def test_management_command_raises():
         execute_from_command_line(["manage.py", "mycrash"])
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("with_integration", [True, False])
 def test_sql_queries(sentry_init, capture_events, with_integration):
@@ -400,6 +405,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
         assert crumb["data"]["db.params"] == [123]
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
@@ -434,6 +440,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["data"]["db.params"] == {"my_foo": 10}
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_response_trace(sentry_init, client, capture_events, render_span_tree):
     pytest.importorskip("rest_framework")
@@ -463,6 +470,7 @@ def test_response_trace(sentry_init, client, capture_events, render_span_tree):
         lambda sql: sql.SQL('SELECT %(my_param)s FROM "foobar"'),
     ],
 )
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
@@ -494,6 +502,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     assert crumb["data"]["db.params"] == {"my_param": 10}
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(
@@ -553,6 +562,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     ]
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_trace(sentry_init, client, capture_events, render_span_tree):
     """
@@ -589,6 +599,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
     assert '- op="db": description="connect"' in render_span_tree(event)
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_breadcrumbs(sentry_init, capture_events):
     """
@@ -624,6 +635,7 @@ def test_django_connect_breadcrumbs(sentry_init, capture_events):
     ]
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_connection_span_data(sentry_init, client, capture_events):
     sentry_init(
@@ -946,6 +958,7 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
     sentry_init(
