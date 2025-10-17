@@ -1484,16 +1484,36 @@ class TimeoutThread(threading.Thread):
     waiting_time and raises a custom ServerlessTimeout exception.
     """
 
-    def __init__(self, waiting_time, configured_timeout):
-        # type: (float, int) -> None
+    def __init__(
+        self, waiting_time, configured_timeout, isolation_scope=None, current_scope=None
+    ):
+        # type: (float, int, Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope]) -> None
         threading.Thread.__init__(self)
         self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
+
+        self.isolation_scope = isolation_scope
+        self.current_scope = current_scope
+
         self._stop_event = threading.Event()
 
     def stop(self):
         # type: () -> None
         self._stop_event.set()
+
+    def _capture_exception(self):
+        # type: () -> ExcInfo
+        exc_info = sys.exc_info()
+
+        client = sentry_sdk.get_client()
+        event, hint = event_from_exception(
+            exc_info,
+            client_options=client.options,
+            mechanism={"type": "threading", "handled": False},
+        )
+        sentry_sdk.capture_event(event, hint=hint)
+
+        return exc_info
 
     def run(self):
         # type: () -> None
@@ -1510,6 +1530,18 @@ class TimeoutThread(threading.Thread):
             integer_configured_timeout = integer_configured_timeout + 1
 
         # Raising Exception after timeout duration is reached
+        if self.isolation_scope is not None and self.current_scope is not None:
+            with sentry_sdk.scope.use_isolation_scope(self.isolation_scope):
+                with sentry_sdk.scope.use_scope(self.current_scope):
+                    try:
+                        raise ServerlessTimeoutWarning(
+                            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                                integer_configured_timeout
+                            )
+                        )
+                    except Exception:
+                        reraise(*self._capture_exception())
+
         raise ServerlessTimeoutWarning(
             "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
                 integer_configured_timeout
