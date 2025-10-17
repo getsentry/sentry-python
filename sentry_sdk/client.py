@@ -622,7 +622,8 @@ class _Client(BaseClient):
             )
         if previous_total_breadcrumbs is not None:
             event["breadcrumbs"] = AnnotatedValue(
-                event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
+                event.get("breadcrumbs", {"values": []}),
+                {"len": previous_total_breadcrumbs},
             )
 
         # Postprocess the event here so that annotated types do
