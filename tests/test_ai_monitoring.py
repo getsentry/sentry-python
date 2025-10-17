@@ -211,32 +211,32 @@ def large_messages():
 class TestTruncateMessagesBySize:
     def test_no_truncation_needed(self, sample_messages):
         """Test that messages under the limit are not truncated"""
-        result, removed_count = truncate_messages_by_size(
+        result, truncation_index = truncate_messages_by_size(
             sample_messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
         )
         assert len(result) == len(sample_messages)
         assert result == sample_messages
-        assert removed_count == 0
+        assert truncation_index == 0
 
     def test_truncation_removes_oldest_first(self, large_messages):
         """Test that oldest messages are removed first during truncation"""
         small_limit = 3000
-        result, removed_count = truncate_messages_by_size(
+        result, truncation_index = truncate_messages_by_size(
             large_messages, max_bytes=small_limit
         )
         assert len(result) < len(large_messages)
 
         if result:
             assert result[-1] == large_messages[-1]
-        assert removed_count == len(large_messages) - len(result)
+        assert truncation_index == len(large_messages) - len(result)
 
     def test_empty_messages_list(self):
         """Test handling of empty messages list"""
-        result, removed_count = truncate_messages_by_size(
+        result, truncation_index = truncate_messages_by_size(
             [], max_bytes=MAX_GEN_AI_MESSAGE_BYTES // 500
         )
         assert result == []
-        assert removed_count == 0
+        assert truncation_index == 0
 
     def test_find_truncation_index(
         self,
@@ -329,7 +329,7 @@ class TestTruncateAndAnnotateMessages:
         assert len(result) < len(large_messages)
         assert scope._gen_ai_original_message_count[span.span_id] == original_count
 
-    def test_scope_tracks_removed_messages(self, large_messages):
+    def test_scope_tracks_original_message_count(self, large_messages):
         class MockSpan:
             def __init__(self):
                 self.span_id = "test_span_id"
@@ -342,7 +342,7 @@ class TestTruncateAndAnnotateMessages:
             def __init__(self):
                 self._gen_ai_original_message_count = {}
 
-        small_limit = 1000
+        small_limit = 3000
         original_count = len(large_messages)
         span = MockSpan()
         scope = MockScope()
@@ -351,9 +351,8 @@ class TestTruncateAndAnnotateMessages:
             large_messages, span, scope, max_bytes=small_limit
         )
 
-        n_removed = original_count - len(result)
-        assert scope._gen_ai_original_message_count[span.span_id] == n_removed
-        assert len(result) + n_removed == original_count
+        assert scope._gen_ai_original_message_count[span.span_id] == original_count
+        assert len(result) == 1
 
     def test_empty_messages_returns_none(self):
         class MockSpan:
@@ -436,7 +435,7 @@ class TestClientAnnotation:
         # Simulate what client.py does
         event = {"spans": [{"span_id": span.span_id, "data": span.data.copy()}]}
 
-        # Mimic client.py logic - using scope to get the removed count
+        # Mimic client.py logic - using scope to get the original length
         for event_span in event["spans"]:
             span_id = event_span.get("span_id")
             span_data = event_span.get("data", {})
