@@ -696,3 +696,60 @@ def test_langgraph_message_role_mapping(sentry_init, capture_events):
         # Verify no "ai" roles remain
         roles = [msg["role"] for msg in stored_messages if "role" in msg]
         assert "ai" not in roles
+
+
+def test_langgraph_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Langgraph integration."""
+    import json
+
+    sentry_init(
+        integrations=[LanggraphIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    test_state = {
+        "messages": [
+            MockMessage("small message 1", name="user"),
+            MockMessage(large_content, name="assistant"),
+            MockMessage(large_content, name="user"),
+            MockMessage("small message 4", name="assistant"),
+            MockMessage("small message 5", name="user"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    def original_invoke(self, *args, **kwargs):
+        return {"messages": args[0].get("messages", [])}
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
+
+    assert result is not None
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) > 0
+
+    invoke_span = invoke_spans[0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+
+    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 2
+    assert "small message 4" in str(parsed_messages[0])
+    assert "small message 5" in str(parsed_messages[1])
+    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
