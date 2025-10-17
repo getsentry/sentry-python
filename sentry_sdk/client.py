@@ -598,7 +598,7 @@ class _Client(BaseClient):
             if event_scrubber:
                 event_scrubber.scrub_event(event)
 
-        if scope is not None and scope._gen_ai_messages_truncated:
+        if scope is not None and scope._gen_ai_original_message_count:
             spans = event.get("spans", [])  # type: List[Dict[str, Any]] | AnnotatedValue
             if isinstance(spans, list):
                 for span in spans:
@@ -606,15 +606,12 @@ class _Client(BaseClient):
                     span_data = span.get("data", {})
                     if (
                         span_id
-                        and span_id in scope._gen_ai_messages_truncated
+                        and span_id in scope._gen_ai_original_message_count
                         and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
                     ):
                         span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
                             span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
-                            {
-                                "len": scope._gen_ai_messages_truncated[span_id]
-                                + len(span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
-                            },
+                            {"len": scope._gen_ai_original_message_count[span_id]},
                         )
         if previous_total_spans is not None:
             event["spans"] = AnnotatedValue(
