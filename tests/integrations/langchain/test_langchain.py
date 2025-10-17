@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional, Any, Iterator
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -884,8 +885,6 @@ def test_langchain_message_role_mapping(sentry_init, capture_events):
 
             # Parse the message data (might be JSON string)
             if isinstance(messages_data, str):
-                import json
-
                 try:
                     messages = json.loads(messages_data)
                 except json.JSONDecodeError:
@@ -979,7 +978,13 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
     )
-    prompts = [large_content, large_content, large_content, large_content]
+    prompts = [
+        "small message 1",
+        large_content,
+        large_content,
+        "small message 4",
+        "small message 5",
+    ]
 
     with start_transaction():
         callback.on_llm_start(
@@ -1020,8 +1025,9 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
-    import json
-
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) <= len(prompts)
+    assert len(parsed_messages) == 2
+    assert "small message 4" in str(parsed_messages[0])
+    assert "small message 5" in str(parsed_messages[1])
+    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
