@@ -337,7 +337,7 @@ class EventStreamReader:
 @pytest.fixture(
     scope="session",
     params=[None, "gevent"],
-    ids=("threads", "greenlet"),
+    ids=("threads", "gevent"),
 )
 def maybe_monkeypatched_threading(request):
     if request.param == "gevent":

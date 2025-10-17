@@ -1,4 +1,5 @@
 from __future__ import annotations
+import warnings
 
 from typing import TYPE_CHECKING
 
@@ -25,6 +26,10 @@ def _init(*args: Optional[str], **kwargs: Any) -> None:
     setup_scope_context_management()
     client = sentry_sdk.Client(*args, **kwargs)
     sentry_sdk.get_global_scope().set_client(client)
+    warnings.warn(
+        "We won't be continuing development on SDK 3.0. Please use the last stable version of the SDK to get access to the newest features and fixes. See https://github.com/getsentry/sentry-python/discussions/4955",
+        stacklevel=2,
+    )
     _check_python_deprecations()
 
 
