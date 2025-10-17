@@ -316,7 +316,7 @@ class TestTruncateAndAnnotateMessages:
             def __init__(self):
                 self._gen_ai_original_message_count = {}
 
-        small_limit = 1000
+        small_limit = 3000
         span = MockSpan()
         scope = MockScope()
         original_count = len(large_messages)
@@ -327,8 +327,7 @@ class TestTruncateAndAnnotateMessages:
         assert isinstance(result, list)
         assert not isinstance(result, AnnotatedValue)
         assert len(result) < len(large_messages)
-        n_removed = original_count - len(result)
-        assert scope._gen_ai_original_message_count[span.span_id] == n_removed
+        assert scope._gen_ai_original_message_count[span.span_id] == original_count
 
     def test_scope_tracks_removed_messages(self, large_messages):
         class MockSpan:
