@@ -1,18 +1,28 @@
 """
-Transport detection for MCP servers.
+Transport detection and session tracking for MCP servers.
 
-This module provides functionality to detect which transport method is being used
-by an MCP server (stdio/pipe vs HTTP-based transports like SSE/WebSocket).
+This module provides functionality to:
+1. Detect which transport method is being used (stdio/pipe vs HTTP-based transports)
+2. Track session IDs for HTTP-based transports
 
-Detection is done lazily by inspecting the request context at runtime:
+Transport detection is done lazily by inspecting the request context at runtime:
 - If there's an HTTP request context (SSE/WebSocket), transport is "tcp"
 - If there's no request context (stdio), transport is "pipe"
+
+Session ID tracking is done by patching the StreamableHTTPServerTransport to store
+the session ID in a context variable that can be accessed during handler execution.
 """
 
+import contextvars
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional, Any
+    from starlette.types import Receive, Scope, Send
+
+
+# Context variable to store the current MCP session ID
+mcp_session_id_ctx = contextvars.ContextVar("mcp_session_id", default=None)  # type: contextvars.ContextVar[Optional[str]]
 
 
 def detect_mcp_transport_from_context(request_ctx):
@@ -46,3 +56,38 @@ def detect_mcp_transport_from_context(request_ctx):
         pass
 
     return None
+
+
+def patch_streamable_http_transport():
+    # type: () -> None
+    """
+    Patches the StreamableHTTPServerTransport to store session IDs in context.
+
+    This allows handler code to access the session ID via the mcp_session_id_ctx
+    context variable, regardless of whether it's the first request (where the
+    session ID hasn't been sent to the client yet) or a subsequent request.
+    """
+    try:
+        from mcp.server.streamable_http import StreamableHTTPServerTransport
+    except ImportError:
+        # StreamableHTTP transport not available
+        return
+
+    original_handle_request = StreamableHTTPServerTransport.handle_request
+
+    async def patched_handle_request(self, scope, receive, send):
+        # type: (Any, Scope, Receive, Send) -> None
+        """Wrap handle_request to set session ID in context."""
+        # Store session ID in context variable before handling request
+        token = None
+        if hasattr(self, "mcp_session_id") and self.mcp_session_id:
+            token = mcp_session_id_ctx.set(self.mcp_session_id)
+
+        try:
+            await original_handle_request(self, scope, receive, send)
+        finally:
+            # Reset context after request
+            if token is not None:
+                mcp_session_id_ctx.reset(token)
+
+    StreamableHTTPServerTransport.handle_request = patched_handle_request  # type: ignore

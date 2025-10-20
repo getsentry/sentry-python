@@ -827,6 +827,12 @@ class SPANDATA:
     Example: "pipe" (stdio), "tcp" (HTTP/WebSocket/SSE)
     """
 
+    MCP_SESSION_ID = "mcp.session.id"
+    """
+    The session identifier for the MCP connection.
+    Example: "a1b2c3d4e5f6"
+    """
+
 
 class SPANSTATUS:
     """
