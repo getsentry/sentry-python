@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.0.0a7
+
+### Various fixes & improvements
+
+- Add warning about 3.0 (#4956) by @sentrivana
+- breaking(transport): Make HTTP2Transport the default (#4492) by @BYK
+- breaking: Remove Spotlight Django integration (#4747) by @BYK
+- Update migration guide for async transport (#4732) by @srothh
+
 ## 3.0.0a6
 
 We're excited to announce that version 3.0 of the Sentry Python SDK is now
