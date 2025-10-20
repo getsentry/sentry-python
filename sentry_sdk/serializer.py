@@ -396,6 +396,7 @@ def serialize(event, **kwargs):
     #
     disable_capture_event.set(True)
     try:
+        print(event, kwargs)
         serialized_event = _serialize_node(event, **kwargs)
         if not is_vars and meta_stack and isinstance(serialized_event, dict):
             serialized_event["_meta"] = meta_stack[0]
