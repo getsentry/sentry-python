@@ -767,6 +767,7 @@ def test_databag_depth_stripping(sentry_init, capture_events):
         capture_exception()
 
     (event,) = events
+    print(json.dumps(event))
 
     assert len(json.dumps(event)) < 10000
 
