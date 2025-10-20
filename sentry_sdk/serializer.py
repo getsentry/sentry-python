@@ -303,7 +303,8 @@ def serialize(event, **kwargs):
         sentry_repr = getattr(type(obj), "__sentry_repr__", None)
 
         print(
-            "check:",
+            "check for type:",
+            type(obj),
             isinstance(obj, serializable_str_types),
             isinstance(obj, tuple(sequence_types)),
         )
