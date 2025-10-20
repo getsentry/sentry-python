@@ -1,5 +1,10 @@
 """
-Patches for mcp.server.lowlevel.Server class.
+Sentry integration for MCP (Model Context Protocol) servers.
+
+This integration instruments MCP servers to create spans for tool, prompt,
+and resource handler execution, and captures errors that occur during execution.
+
+Supports the low-level `mcp.server.lowlevel.Server` API.
 """
 
 import inspect
@@ -9,45 +14,59 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.mcp import MCPIntegration
-from sentry_sdk.integrations.mcp.transport import (
-    detect_mcp_transport_from_context,
-    get_session_id_from_context,
-)
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.utils import safe_serialize
 
-from mcp.server.lowlevel import Server
-from mcp.server.lowlevel.server import request_ctx
+try:
+    from mcp.server.lowlevel import Server
+    from mcp.server.lowlevel.server import request_ctx
+except ImportError:
+    raise DidNotEnable("MCP SDK not installed")
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Optional
 
 
 def _get_request_context_data():
-    # type: () -> tuple[str | None, str | None]
+    # type: () -> tuple[Optional[str], Optional[str], str]
     """
-    Extract request ID and session ID from the MCP request context.
+    Extract request ID, session ID, and transport type from the MCP request context.
 
     Returns:
-        Tuple of (request_id, session_id). Either value may be None if not available.
+        Tuple of (request_id, session_id, transport).
+        - request_id: May be None if not available
+        - session_id: May be None if not available
+        - transport: "tcp" for HTTP-based, "pipe" for stdio
     """
-    request_id = None  # type: str | None
-    session_id = None  # type: str | None
+    request_id = None  # type: Optional[str]
+    session_id = None  # type: Optional[str]
+    transport = "pipe"  # type: str
 
     try:
         ctx = request_ctx.get()
         request_id = ctx.request_id
-        session_id = get_session_id_from_context(ctx)
+
+        # Check if there's an HTTP request (SSE/WebSocket) or stdio
+        if hasattr(ctx, "request") and ctx.request is not None:
+            # This is HTTP-based (SSE or WebSocket)
+            transport = "tcp"
+            request = ctx.request
+
+            # Extract session ID from HTTP headers
+            if hasattr(request, "headers"):
+                session_id = request.headers.get("mcp-session-id")
+        # If ctx.request exists but is None, it's stdio (transport already set to "pipe")
+
     except LookupError:
-        # No request context available
+        # No request context available - default to pipe
         pass
 
-    return request_id, session_id
+    return request_id, session_id, transport
 
 
 def _get_span_config(handler_type, item_name):
-    # type: (str, str) -> tuple[str, str, str, str | None]
+    # type: (str, str) -> tuple[str, str, str, Optional[str]]
     """
     Get span configuration based on handler type.
 
@@ -78,24 +97,18 @@ def _set_span_input_data(
     span_data_key,
     mcp_method_name,
     arguments,
-    request_id=None,
-    session_id=None,
+    request_id,
+    session_id,
+    transport,
 ):
-    # type: (Any, str, str, str, dict[str, Any], str | None, str | None) -> None
+    # type: (Any, str, str, str, dict[str, Any], Optional[str], Optional[str], str) -> None
     """Set input span data for MCP handlers."""
     # Set handler identifier
     span.set_data(span_data_key, handler_name)
     span.set_data(SPANDATA.MCP_METHOD_NAME, mcp_method_name)
 
-    # Detect and set transport if available
-    try:
-        ctx = request_ctx.get()
-        transport = detect_mcp_transport_from_context(ctx)
-        if transport is not None:
-            span.set_data(SPANDATA.MCP_TRANSPORT, transport)
-    except LookupError:
-        # No request context available - likely stdio
-        span.set_data(SPANDATA.MCP_TRANSPORT, "pipe")
+    # Set transport type
+    span.set_data(SPANDATA.MCP_TRANSPORT, transport)
 
     # Set request_id if provided
     if request_id:
@@ -152,7 +165,7 @@ def _extract_tool_result_content(result):
 
 
 def _set_span_output_data(span, result, result_data_key, handler_type):
-    # type: (Any, Any, str | None, str) -> None
+    # type: (Any, Any, Optional[str], str) -> None
     """Set output span data for MCP handlers."""
     if result is None:
         return
@@ -223,8 +236,11 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
     # Resources don't capture result content (result_data_key is None)
 
 
+# Handler data preparation and wrapping
+
+
 def _prepare_handler_data(handler_type, original_args):
-    # type: (str, tuple[Any, ...]) -> tuple[str, dict[str, Any], str, str, str, str | None]
+    # type: (str, tuple[Any, ...]) -> tuple[str, dict[str, Any], str, str, str, Optional[str]]
     """
     Prepare common handler data for both async and sync wrappers.
 
@@ -285,8 +301,8 @@ async def _async_handler_wrapper(handler_type, func, original_args):
         name=span_name,
         origin=MCPIntegration.origin,
     ) as span:
-        # Get request ID and session ID from context
-        request_id, session_id = _get_request_context_data()
+        # Get request ID, session ID, and transport from context
+        request_id, session_id, transport = _get_request_context_data()
 
         # Set input span data
         _set_span_input_data(
@@ -297,6 +313,7 @@ async def _async_handler_wrapper(handler_type, func, original_args):
             arguments,
             request_id,
             session_id,
+            transport,
         )
 
         # For resources, extract and set protocol
@@ -348,8 +365,8 @@ def _sync_handler_wrapper(handler_type, func, original_args):
         name=span_name,
         origin=MCPIntegration.origin,
     ) as span:
-        # Get request ID and session ID from context
-        request_id, session_id = _get_request_context_data()
+        # Get request ID, session ID, and transport from context
+        request_id, session_id, transport = _get_request_context_data()
 
         # Set input span data
         _set_span_input_data(
@@ -360,6 +377,7 @@ def _sync_handler_wrapper(handler_type, func, original_args):
             arguments,
             request_id,
             session_id,
+            transport,
         )
 
         # For resources, extract and set protocol
@@ -461,7 +479,7 @@ def _create_instrumented_decorator(
     return instrumented_decorator
 
 
-def patch_lowlevel_server():
+def _patch_lowlevel_server():
     # type: () -> None
     """
     Patches the mcp.server.lowlevel.Server class to instrument handler execution.
@@ -501,3 +519,22 @@ def patch_lowlevel_server():
         )(func)
 
     Server.read_resource = patched_read_resource  # type: ignore
+
+
+# Integration class
+
+
+class MCPIntegration(Integration):
+    identifier = "mcp"
+    origin = "auto.ai.mcp"
+
+    @staticmethod
+    def setup_once():
+        # type: () -> None
+        """
+        Patches MCP server classes to instrument handler execution.
+        """
+        _patch_lowlevel_server()
+
+
+__all__ = ["MCPIntegration"]
