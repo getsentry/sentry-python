@@ -351,6 +351,7 @@ def serialize(event, **kwargs):
         elif not isinstance(obj, serializable_str_types) and isinstance(
             obj, tuple(sequence_types)
         ):
+            print("sequence type")
             rv_list = []
 
             for i, v in enumerate(obj):
@@ -378,9 +379,11 @@ def serialize(event, **kwargs):
             obj = _safe_repr_wrapper(obj)
         else:
             if isinstance(obj, bytes) or isinstance(obj, bytearray):
+                print("bytes")
                 obj = obj.decode("utf-8", "replace")
 
             if not isinstance(obj, str):
+                print("not string")
                 obj = _safe_repr_wrapper(obj)
 
         is_span_description = (
@@ -396,7 +399,6 @@ def serialize(event, **kwargs):
     #
     disable_capture_event.set(True)
     try:
-        # print("\n\n", event.keys(), "\n\n")
         serialized_event = _serialize_node(event, **kwargs)
         if not is_vars and meta_stack and isinstance(serialized_event, dict):
             serialized_event["_meta"] = meta_stack[0]

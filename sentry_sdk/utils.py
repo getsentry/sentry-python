@@ -613,8 +613,6 @@ def serialize_frame(
     if include_local_variables:
         from sentry_sdk.serializer import serialize
 
-        print(dict(frame.f_locals).keys())
-
         rv["vars"] = serialize(
             dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
         )
