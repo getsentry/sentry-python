@@ -2,12 +2,13 @@
 
 ## 3.0.0a7
 
-### Various fixes & improvements
+**We are discontinuing development on 3.0**. Please see
+https://github.com/getsentry/sentry-python/discussions/4955 for more information.
 
-- Add warning about 3.0 (#4956) by @sentrivana
-- breaking(transport): Make HTTP2Transport the default (#4492) by @BYK
-- breaking: Remove Spotlight Django integration (#4747) by @BYK
-- Update migration guide for async transport (#4732) by @srothh
+3.0.0a7 is a maintenance release that adds a warning that there won't be
+a stable 3.0 release. If you are on a 3.0 alpha release, please switch back
+to 2.x to get the newest features and fixes.
+
 
 ## 3.0.0a6
 
