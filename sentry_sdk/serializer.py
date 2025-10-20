@@ -146,11 +146,7 @@ def serialize(event, **kwargs):
     def _annotate(**meta):
         # type: (**Any) -> None
         while len(meta_stack) <= len(path):
-            try:
-                segment = path[len(meta_stack) - 1]
-                node = meta_stack[-1].setdefault(str(segment), {})
-            except IndexError:
-                node = {}
+            node = {}
 
             meta_stack.append(node)
 
@@ -270,7 +266,6 @@ def serialize(event, **kwargs):
         if is_request_body is None:
             is_request_body = _is_request_body()
 
-        print("remaining depth", remaining_depth)
         if is_databag:
             if is_request_body and keep_request_bodies:
                 remaining_depth = float("inf")
@@ -297,17 +292,9 @@ def serialize(event, **kwargs):
             for processor in global_repr_processors:
                 result = processor(obj, hints)
                 if result is not NotImplemented:
-                    print("global repr")
                     return _flatten_annotated(result)
 
         sentry_repr = getattr(type(obj), "__sentry_repr__", None)
-
-        print(
-            "check for type:",
-            type(obj),
-            isinstance(obj, serializable_str_types),
-            isinstance(obj, tuple(sequence_types)),
-        )
 
         if obj is None or isinstance(obj, (bool, int, float)):
             if should_repr_strings or (
@@ -318,11 +305,9 @@ def serialize(event, **kwargs):
                 return obj
 
         elif callable(sentry_repr):
-            print("callable")
             return sentry_repr(obj)
 
         elif isinstance(obj, datetime):
-            print("datetime")
             return (
                 str(format_timestamp(obj))
                 if not should_repr_strings
@@ -343,7 +328,6 @@ def serialize(event, **kwargs):
                     break
 
                 str_k = str(k)
-                print("serializing", str_k)
                 v = _serialize_node(
                     v,
                     segment=str_k,
@@ -363,12 +347,10 @@ def serialize(event, **kwargs):
         elif not isinstance(obj, serializable_str_types) and isinstance(
             obj, tuple(sequence_types)
         ):
-            print("sequence type")
             rv_list = []
 
             for i, v in enumerate(obj):
                 if remaining_breadth is not None and i >= remaining_breadth:
-                    print("annotated", i)
                     _annotate(len=len(obj))
                     break
 
@@ -389,22 +371,18 @@ def serialize(event, **kwargs):
             return rv_list
 
         if should_repr_strings:
-            print("string")
             obj = _safe_repr_wrapper(obj)
         else:
             if isinstance(obj, bytes) or isinstance(obj, bytearray):
-                print("bytes")
                 obj = obj.decode("utf-8", "replace")
 
             if not isinstance(obj, str):
-                print("not string")
                 obj = _safe_repr_wrapper(obj)
 
         is_span_description = (
             len(path) == 3 and path[0] == "spans" and path[-1] == "description"
         )
         if is_span_description:
-            print("is_description")
             return obj
 
         return _flatten_annotated(strip_string(obj, max_length=max_value_length))
@@ -416,7 +394,6 @@ def serialize(event, **kwargs):
     try:
         serialized_event = _serialize_node(event, **kwargs)
         if not is_vars and meta_stack and isinstance(serialized_event, dict):
-            print("serialized event", serialized_event)
             serialized_event["_meta"] = meta_stack[0]
 
         return serialized_event
