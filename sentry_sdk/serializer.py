@@ -343,6 +343,7 @@ def serialize(event, **kwargs):
                     break
 
                 str_k = str(k)
+                print("serializing", str_k)
                 v = _serialize_node(
                     v,
                     segment=str_k,
@@ -367,6 +368,7 @@ def serialize(event, **kwargs):
 
             for i, v in enumerate(obj):
                 if remaining_breadth is not None and i >= remaining_breadth:
+                    print("annotated", i)
                     _annotate(len=len(obj))
                     break
 
@@ -414,6 +416,7 @@ def serialize(event, **kwargs):
     try:
         serialized_event = _serialize_node(event, **kwargs)
         if not is_vars and meta_stack and isinstance(serialized_event, dict):
+            print("serialized event", serialized_event)
             serialized_event["_meta"] = meta_stack[0]
 
         return serialized_event
