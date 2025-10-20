@@ -208,14 +208,15 @@ def test_embeddings_create(sentry_init, capture_events):
     )
     events = capture_events()
 
+    messages = [{"role": "user", "content": "Some text to test embeddings"}]
     mock_response = MockEmbeddingResponse()
 
     with start_transaction(name="litellm test"):
-        # For embeddings, messages would be empty
         kwargs = {
             "model": "text-embedding-ada-002",
             "input": "Hello!",
-            "messages": [],  # Empty for embeddings
+            "messages": messages,
+            "call_type": "embedding",
         }
 
         _input_callback(kwargs)

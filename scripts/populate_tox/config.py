@@ -48,6 +48,9 @@ TEST_SUITE_CONFIG = {
         "package": "apache-beam",
         "python": ">=3.7",
         "num_versions": 2,
+        "deps": {
+            "*": ["dill"],
+        },
     },
     "boto3": {
         "package": "boto3",

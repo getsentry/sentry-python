@@ -75,7 +75,12 @@ def _wrap_func(func):
                 ):
                     waiting_time = configured_time - TIMEOUT_WARNING_BUFFER
 
-                    timeout_thread = TimeoutThread(waiting_time, configured_time)
+                    timeout_thread = TimeoutThread(
+                        waiting_time,
+                        configured_time,
+                        isolation_scope=scope,
+                        current_scope=sentry_sdk.get_current_scope(),
+                    )
 
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
