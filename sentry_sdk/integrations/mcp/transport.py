@@ -9,20 +9,15 @@ Transport detection is done lazily by inspecting the request context at runtime:
 - If there's an HTTP request context (SSE/WebSocket), transport is "tcp"
 - If there's no request context (stdio), transport is "pipe"
 
-Session ID tracking is done by patching the StreamableHTTPServerTransport to store
-the session ID in a context variable that can be accessed during handler execution.
+Session ID tracking is done by patching Server._run_request_handler to store a
+reference to the server instance in the request context. The session ID can then
+be retrieved from the server's transport when needed during handler execution.
 """
 
-import contextvars
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional, Any
-    from starlette.types import Receive, Scope, Send
-
-
-# Context variable to store the current MCP session ID
-mcp_session_id_ctx = contextvars.ContextVar("mcp_session_id", default=None)  # type: contextvars.ContextVar[Optional[str]]
 
 
 def detect_mcp_transport_from_context(request_ctx):
@@ -58,36 +53,32 @@ def detect_mcp_transport_from_context(request_ctx):
     return None
 
 
-def patch_streamable_http_transport():
-    # type: () -> None
+def get_session_id_from_context(request_ctx):
+    # type: (Any) -> Optional[str]
     """
-    Patches the StreamableHTTPServerTransport to store session IDs in context.
+    Extract session ID from the request context.
 
-    This allows handler code to access the session ID via the mcp_session_id_ctx
-    context variable, regardless of whether it's the first request (where the
-    session ID hasn't been sent to the client yet) or a subsequent request.
+    The session ID is sent by the client in the MCP-Session-Id header and is
+    available in the Starlette Request object stored in ctx.request.
+
+    Args:
+        request_ctx: The MCP request context object
+
+    Returns:
+        Session ID string if available, None otherwise
     """
     try:
-        from mcp.server.streamable_http import StreamableHTTPServerTransport
-    except ImportError:
-        # StreamableHTTP transport not available
-        return
+        # The Starlette Request object is stored in ctx.request
+        if hasattr(request_ctx, "request") and request_ctx.request is not None:
+            request = request_ctx.request
 
-    original_handle_request = StreamableHTTPServerTransport.handle_request
+            # Check if it's a Starlette Request with headers
+            if hasattr(request, "headers"):
+                # The session ID is sent in the mcp-session-id header
+                # MCP_SESSION_ID_HEADER = "mcp-session-id"
+                return request.headers.get("mcp-session-id")
 
-    async def patched_handle_request(self, scope, receive, send):
-        # type: (Any, Scope, Receive, Send) -> None
-        """Wrap handle_request to set session ID in context."""
-        # Store session ID in context variable before handling request
-        token = None
-        if hasattr(self, "mcp_session_id") and self.mcp_session_id:
-            token = mcp_session_id_ctx.set(self.mcp_session_id)
+    except Exception:
+        pass
 
-        try:
-            await original_handle_request(self, scope, receive, send)
-        finally:
-            # Reset context after request
-            if token is not None:
-                mcp_session_id_ctx.reset(token)
-
-    StreamableHTTPServerTransport.handle_request = patched_handle_request  # type: ignore
+    return None

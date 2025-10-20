@@ -27,15 +27,9 @@ class MCPIntegration(Integration):
         Patches MCP server classes to instrument handler execution.
         """
         from sentry_sdk.integrations.mcp.lowlevel import patch_lowlevel_server
-        from sentry_sdk.integrations.mcp.transport import (
-            patch_streamable_http_transport,
-        )
 
         # Patch server classes to instrument handlers
         patch_lowlevel_server()
-
-        # Patch HTTP transport to track session IDs
-        patch_streamable_http_transport()
 
 
 __all__ = ["MCPIntegration"]

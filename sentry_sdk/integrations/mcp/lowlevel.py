@@ -12,7 +12,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.mcp import MCPIntegration
 from sentry_sdk.integrations.mcp.transport import (
     detect_mcp_transport_from_context,
-    mcp_session_id_ctx,
+    get_session_id_from_context,
 )
 from sentry_sdk.utils import safe_serialize
 
@@ -22,6 +22,28 @@ from mcp.server.lowlevel.server import request_ctx
 
 if TYPE_CHECKING:
     from typing import Any, Callable
+
+
+def _get_request_context_data():
+    # type: () -> tuple[str | None, str | None]
+    """
+    Extract request ID and session ID from the MCP request context.
+
+    Returns:
+        Tuple of (request_id, session_id). Either value may be None if not available.
+    """
+    request_id = None  # type: str | None
+    session_id = None  # type: str | None
+
+    try:
+        ctx = request_ctx.get()
+        request_id = ctx.request_id
+        session_id = get_session_id_from_context(ctx)
+    except LookupError:
+        # No request context available
+        pass
+
+    return request_id, session_id
 
 
 def _get_span_config(handler_type, item_name):
@@ -51,9 +73,15 @@ def _get_span_config(handler_type, item_name):
 
 
 def _set_span_input_data(
-    span, handler_name, span_data_key, mcp_method_name, arguments, request_id=None
+    span,
+    handler_name,
+    span_data_key,
+    mcp_method_name,
+    arguments,
+    request_id=None,
+    session_id=None,
 ):
-    # type: (Any, str, str, str, dict[str, Any], str | None) -> None
+    # type: (Any, str, str, str, dict[str, Any], str | None, str | None) -> None
     """Set input span data for MCP handlers."""
     # Set handler identifier
     span.set_data(span_data_key, handler_name)
@@ -69,18 +97,13 @@ def _set_span_input_data(
         # No request context available - likely stdio
         span.set_data(SPANDATA.MCP_TRANSPORT, "pipe")
 
-    # Extract session ID from context variable if available (HTTP transport)
-    try:
-        session_id = mcp_session_id_ctx.get()
-        if session_id:
-            span.set_data(SPANDATA.MCP_SESSION_ID, session_id)
-    except Exception:
-        # Session ID not available or transport module not imported
-        pass
-
     # Set request_id if provided
     if request_id:
         span.set_data(SPANDATA.MCP_REQUEST_ID, request_id)
+
+    # Set session_id if provided
+    if session_id:
+        span.set_data(SPANDATA.MCP_SESSION_ID, session_id)
 
     # Set request arguments (excluding common request context objects)
     for k, v in arguments.items():
@@ -262,13 +285,8 @@ async def _async_handler_wrapper(handler_type, func, original_args):
         name=span_name,
         origin=MCPIntegration.origin,
     ) as span:
-        # Get request ID from context
-        request_id = None
-        try:
-            ctx = request_ctx.get()
-            request_id = ctx.request_id
-        except LookupError:
-            pass
+        # Get request ID and session ID from context
+        request_id, session_id = _get_request_context_data()
 
         # Set input span data
         _set_span_input_data(
@@ -278,6 +296,7 @@ async def _async_handler_wrapper(handler_type, func, original_args):
             mcp_method_name,
             arguments,
             request_id,
+            session_id,
         )
 
         # For resources, extract and set protocol
@@ -329,13 +348,8 @@ def _sync_handler_wrapper(handler_type, func, original_args):
         name=span_name,
         origin=MCPIntegration.origin,
     ) as span:
-        # Get request ID from context
-        request_id = None
-        try:
-            ctx = request_ctx.get()
-            request_id = ctx.request_id
-        except LookupError:
-            pass
+        # Get request ID and session ID from context
+        request_id, session_id = _get_request_context_data()
 
         # Set input span data
         _set_span_input_data(
@@ -345,6 +359,7 @@ def _sync_handler_wrapper(handler_type, func, original_args):
             mcp_method_name,
             arguments,
             request_id,
+            session_id,
         )
 
         # For resources, extract and set protocol
