@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.0a7
+
+**We are discontinuing development on 3.0**. Please see
+https://github.com/getsentry/sentry-python/discussions/4955 for more information.
+
+3.0.0a7 is a maintenance release that adds a warning that there won't be
+a stable 3.0 release. If you are on a 3.0 alpha release, please switch back
+to 2.x to get the newest features and fixes.
+
+
 ## 3.0.0a6
 
 We're excited to announce that version 3.0 of the Sentry Python SDK is now
