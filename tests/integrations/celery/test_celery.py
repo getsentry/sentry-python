@@ -52,7 +52,9 @@ def init_celery(sentry_init, request):
         elif backend == "redis":
             # broken on celery 3
             if VERSION < (4,):
-                pytest.skip("Redis backend broken for some reason")
+                pytest.skip(
+                    "Redis backend broken for some reason", allow_module_level=True
+                )
 
             # this backend requires capture_events_forksafe
             celery.conf.worker_max_tasks_per_child = 1
