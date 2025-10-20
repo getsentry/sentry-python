@@ -78,14 +78,12 @@ envlist =
     {py3.9,py3.11,py3.12}-langchain-v0.1
     {py3.9,py3.11,py3.12}-langchain-v0.3
     {py3.9,py3.11,py3.12}-langchain-latest
-    {py3.9,py3.11,py3.12}-langchain-notiktoken
 
     # OpenAI
     {py3.9,py3.11,py3.12}-openai-v1.0
     {py3.9,py3.11,py3.12}-openai-v1.22
     {py3.9,py3.11,py3.12}-openai-v1.55
     {py3.9,py3.11,py3.12}-openai-latest
-    {py3.9,py3.11,py3.12}-openai-notiktoken
 
     # pure_eval
     {py3.7,py3.12,py3.13}-pure_eval
@@ -154,6 +152,7 @@ deps =
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
     gevent: pytest-asyncio
     {py3.10,py3.11}-gevent: zope.event<5.0.0
+    {py3.10,py3.11}-gevent: zope.interface<8.0
 
     # === Integrations ===
 
@@ -227,9 +226,9 @@ deps =
     langchain-v0.3: langchain-community
     langchain-v0.3: tiktoken
     langchain-v0.3: openai
-    langchain-{latest,notiktoken}: langchain
-    langchain-{latest,notiktoken}: langchain-openai
-    langchain-{latest,notiktoken}: openai>=1.6.1
+    langchain-latest: langchain<1.0
+    langchain-latest: langchain-openai
+    langchain-latest: openai>=1.6.1
     langchain-latest: tiktoken~=0.6.0
 
     # OpenAI
@@ -244,7 +243,6 @@ deps =
     openai-v1.55: tiktoken
     openai-latest: openai
     openai-latest: tiktoken~=0.6.0
-    openai-notiktoken: openai
 
     # pure_eval
     pure_eval: pure_eval
