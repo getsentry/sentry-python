@@ -297,9 +297,16 @@ def serialize(event, **kwargs):
             for processor in global_repr_processors:
                 result = processor(obj, hints)
                 if result is not NotImplemented:
+                    print("global repr")
                     return _flatten_annotated(result)
 
         sentry_repr = getattr(type(obj), "__sentry_repr__", None)
+
+        print(
+            "check:",
+            isinstance(obj, serializable_str_types),
+            isinstance(obj, tuple(sequence_types)),
+        )
 
         if obj is None or isinstance(obj, (bool, int, float)):
             if should_repr_strings or (
@@ -310,9 +317,11 @@ def serialize(event, **kwargs):
                 return obj
 
         elif callable(sentry_repr):
+            print("callable")
             return sentry_repr(obj)
 
         elif isinstance(obj, datetime):
+            print("datetime")
             return (
                 str(format_timestamp(obj))
                 if not should_repr_strings
@@ -377,6 +386,7 @@ def serialize(event, **kwargs):
             return rv_list
 
         if should_repr_strings:
+            print("string")
             obj = _safe_repr_wrapper(obj)
         else:
             if isinstance(obj, bytes) or isinstance(obj, bytearray):
@@ -391,6 +401,7 @@ def serialize(event, **kwargs):
             len(path) == 3 and path[0] == "spans" and path[-1] == "description"
         )
         if is_span_description:
+            print("is_description")
             return obj
 
         return _flatten_annotated(strip_string(obj, max_length=max_value_length))
