@@ -52,10 +52,6 @@ def init_celery(sentry_init, request):
             else:
                 celery.conf.task_always_eager = True
         elif backend == "redis":
-            # broken on celery 3
-            if VERSION < (4,):
-                pytest.skip("Redis backend broken for some reason")
-
             # this backend requires capture_events_forksafe
             celery.conf.worker_max_tasks_per_child = 1
             celery.conf.worker_concurrency = 1
