@@ -540,7 +540,8 @@ def safe_repr(value):
     # type: (Any) -> str
     try:
         return repr(value)
-    except Exception:
+    except Exception as e:
+        print(e)
         return "<broken repr>"
 
 
