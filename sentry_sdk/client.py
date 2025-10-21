@@ -598,14 +598,31 @@ class _Client(BaseClient):
             if event_scrubber:
                 event_scrubber.scrub_event(event)
 
+        if scope is not None and scope._gen_ai_original_message_count:
+            spans = event.get("spans", [])  # type: List[Dict[str, Any]] | AnnotatedValue
+            if isinstance(spans, list):
+                for span in spans:
+                    span_id = span.get("span_id", None)
+                    span_data = span.get("data", {})
+                    if (
+                        span_id
+                        and span_id in scope._gen_ai_original_message_count
+                        and SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data
+                    ):
+                        span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES] = AnnotatedValue(
+                            span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES],
+                            {"len": scope._gen_ai_original_message_count[span_id]},
+                        )
         if previous_total_spans is not None:
             event["spans"] = AnnotatedValue(
                 event.get("spans", []), {"len": previous_total_spans}
             )
         if previous_total_breadcrumbs is not None:
             event["breadcrumbs"] = AnnotatedValue(
-                event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
+                event.get("breadcrumbs", {"values": []}),
+                {"len": previous_total_breadcrumbs},
             )
+
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:

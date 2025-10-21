@@ -196,6 +196,7 @@ def test_timeout_error(run_cloud_function):
         functionhandler = None
         event = {}
         def cloud_function(functionhandler, event):
+            sentry_sdk.set_tag("cloud_function", "true")
             time.sleep(10)
             return "3"
         """
@@ -218,6 +219,8 @@ def test_timeout_error(run_cloud_function):
     )
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
+
+    assert envelope_items[0]["tags"]["cloud_function"] == "true"
 
 
 def test_performance_no_error(run_cloud_function):
