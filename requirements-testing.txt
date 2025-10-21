@@ -5,7 +5,7 @@ pytest-cov
 pytest-forked
 pytest-localserver
 pytest-watch
-jsonschema
+jsonschema<4.18
 executing
 asttokens
 responses
