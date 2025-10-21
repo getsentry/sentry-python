@@ -405,7 +405,7 @@ def test_request_source_disabled(sentry_init, capture_events, httpx_client, http
     sentry_options = {
         "integrations": [HttpxIntegration()],
         "traces_sample_rate": 1.0,
-        "enable_http_request_source": True,
+        "enable_http_request_source": False,
         "http_request_source_threshold_ms": 0,
     }
 
