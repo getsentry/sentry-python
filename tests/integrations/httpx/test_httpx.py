@@ -396,22 +396,18 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock)
     assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
 
 
-@pytest.mark.parametrize("enable_http_request_source", [None, False])
 @pytest.mark.parametrize(
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_request_source_disabled(
-    sentry_init, capture_events, enable_http_request_source, httpx_client, httpx_mock
-):
+def test_request_source_disabled(sentry_init, capture_events, httpx_client, httpx_mock):
     httpx_mock.add_response()
     sentry_options = {
         "integrations": [HttpxIntegration()],
         "traces_sample_rate": 1.0,
+        "enable_http_request_source": True,
         "http_request_source_threshold_ms": 0,
     }
-    if enable_http_request_source is not None:
-        sentry_options["enable_http_request_source"] = enable_http_request_source
 
     sentry_init(**sentry_options)
 
@@ -438,18 +434,23 @@ def test_request_source_disabled(
     assert SPANDATA.CODE_FUNCTION not in data
 
 
+@pytest.mark.parametrize("enable_http_request_source", [None, True])
 @pytest.mark.parametrize(
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_request_source_enabled(sentry_init, capture_events, httpx_client, httpx_mock):
+def test_request_source_enabled(
+    sentry_init, capture_events, enable_http_request_source, httpx_client, httpx_mock
+):
     httpx_mock.add_response()
     sentry_options = {
         "integrations": [HttpxIntegration()],
         "traces_sample_rate": 1.0,
-        "enable_http_request_source": True,
         "http_request_source_threshold_ms": 0,
     }
+    if enable_http_request_source is not None:
+        sentry_options["enable_http_request_source"] = enable_http_request_source
+
     sentry_init(**sentry_options)
 
     events = capture_events()
