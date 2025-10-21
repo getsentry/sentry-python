@@ -236,6 +236,12 @@ TEST_SUITE_CONFIG = {
         "package": "loguru",
         "num_versions": 2,
     },
+    "mcp": {
+        "package": "mcp",
+        "deps": {
+            "*": ["pytest-asyncio", "mcp>=1.15.0"],
+        },
+    },
     "openai-base": {
         "package": "openai",
         "integration_name": "openai",
