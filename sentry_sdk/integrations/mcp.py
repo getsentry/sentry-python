@@ -16,6 +16,7 @@ from sentry_sdk.ai.utils import get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.utils import safe_serialize
+from sentry_sdk.scope import should_send_default_pii
 
 try:
     from mcp.server.lowlevel import Server
@@ -166,10 +167,18 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
     if result is None:
         return
 
+    # Get integration to check PII settings
+    integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+    if integration is None:
+        return
+
+    # Check if we should include sensitive data
+    should_include_data = should_send_default_pii() and integration.include_prompts
+
     # For tools, extract the meaningful content
     if handler_type == "tool":
         extracted = _extract_tool_result_content(result)
-        if extracted is not None:
+        if extracted is not None and should_include_data:
             span.set_data(result_data_key, safe_serialize(extracted))
             # Set content count if result is a dict
             if isinstance(extracted, dict):
@@ -193,8 +202,8 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
             if message_count > 0:
                 span.set_data(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count)
 
-            # Only set role and content for single-message prompts
-            if message_count == 1:
+            # Only set role and content for single-message prompts if PII is allowed
+            if message_count == 1 and should_include_data:
                 first_message = messages[0]
                 # Extract role
                 role = None
@@ -227,8 +236,8 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
                 if content_text:
                     span.set_data(result_data_key, content_text)
         except Exception:
-            # Silently ignore if we can't extract message info, but still serialize result
-            span.set_data(result_data_key, safe_serialize(result))
+            # Silently ignore if we can't extract message info
+            pass
     # Resources don't capture result content (result_data_key is None)
 
 
@@ -523,6 +532,17 @@ def _patch_lowlevel_server():
 class MCPIntegration(Integration):
     identifier = "mcp"
     origin = "auto.ai.mcp"
+
+    def __init__(self, include_prompts=True):
+        # type: (bool) -> None
+        """
+        Initialize the MCP integration.
+
+        Args:
+            include_prompts: Whether to include prompts (tool results and prompt content)
+                           in span data. Requires send_default_pii=True. Default is True.
+        """
+        self.include_prompts = include_prompts
 
     @staticmethod
     def setup_once():
