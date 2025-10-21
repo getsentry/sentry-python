@@ -330,7 +330,7 @@ def add_http_request_source(span):
     if span.timestamp is None or span.start_timestamp is None:
         return
 
-    should_add_request_source = client.options.get("enable_http_request_source", False)
+    should_add_request_source = client.options.get("enable_http_request_source", True)
     if not should_add_request_source:
         return
 
