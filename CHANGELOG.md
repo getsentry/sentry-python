@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.42.1
+
+### Various fixes & improvements
+
+- fix(gcp): Inject scopes in TimeoutThread exception with GCP (#4959) by @alexander-alderman-webb
+- fix(aws): Inject scopes in TimeoutThread exception with AWS lambda (#4914) by @alexander-alderman-webb
+- fix(ai): add message trunction to anthropic (#4953) by @shellmayr
+- fix(ai): add message truncation to langgraph (#4954) by @shellmayr
+- fix: Default breadcrumbs value for events without breadcrumbs (#4952) by @alexander-alderman-webb
+- fix(ai): add message truncation in langchain (#4950) by @shellmayr
+- fix(ai): correct size calculation, rename internal property for message truncation & add test (#4949) by @shellmayr
+- fix(ai): introduce message truncation for openai (#4946) by @shellmayr
+- fix(openai): Use non-deprecated Pydantic method to extract response text  (#4942) by @JasonLovesDoggo
+- ci: 🤖 Update test matrix with new releases (10/16) (#4945) by @github-actions
+- Handle ValueError in scope resets (#4928) by @sl0thentr0py
+- fix(litellm): Classify embeddings correctly (#4918) by @alexander-alderman-webb
+- Generalize NOT_GIVEN check with omit for openai (#4926) by @sl0thentr0py
+- ⚡️ Speed up function `_get_db_span_description` (#4924) by @misrasaurabh1
+
 ## 2.42.0
 
 ### Various fixes & improvements

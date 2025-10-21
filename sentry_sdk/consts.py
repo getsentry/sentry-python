@@ -909,7 +909,7 @@ class ClientConstructor:
         error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
         enable_db_query_source=True,  # type: bool
         db_query_source_threshold_ms=100,  # type: int
-        enable_http_request_source=False,  # type: bool
+        enable_http_request_source=True,  # type: bool
         http_request_source_threshold_ms=100,  # type: int
         spotlight=None,  # type: Optional[Union[bool, str]]
         cert_file=None,  # type: Optional[str]
@@ -1348,4 +1348,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.42.0"
+VERSION = "2.42.1"

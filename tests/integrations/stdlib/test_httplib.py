@@ -376,16 +376,12 @@ def test_option_trace_propagation_targets(
             assert "baggage" not in request_headers
 
 
-@pytest.mark.parametrize("enable_http_request_source", [None, False])
-def test_request_source_disabled(
-    sentry_init, capture_events, enable_http_request_source
-):
+def test_request_source_disabled(sentry_init, capture_events):
     sentry_options = {
         "traces_sample_rate": 1.0,
+        "enable_http_request_source": False,
         "http_request_source_threshold_ms": 0,
     }
-    if enable_http_request_source is not None:
-        sentry_options["enable_http_request_source"] = enable_http_request_source
 
     sentry_init(**sentry_options)
 
@@ -409,12 +405,17 @@ def test_request_source_disabled(
     assert SPANDATA.CODE_FUNCTION not in data
 
 
-def test_request_source_enabled(sentry_init, capture_events):
+@pytest.mark.parametrize("enable_http_request_source", [None, True])
+def test_request_source_enabled(
+    sentry_init, capture_events, enable_http_request_source
+):
     sentry_options = {
         "traces_sample_rate": 1.0,
-        "enable_http_request_source": True,
         "http_request_source_threshold_ms": 0,
     }
+    if enable_http_request_source is not None:
+        sentry_options["enable_http_request_source"] = enable_http_request_source
+
     sentry_init(**sentry_options)
 
     events = capture_events()
