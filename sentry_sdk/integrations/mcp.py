@@ -45,18 +45,14 @@ def _get_request_context_data():
 
     try:
         ctx = request_ctx.get()
-        request_id = ctx.request_id
 
-        # Check if there's an HTTP request (SSE/WebSocket) or stdio
-        if hasattr(ctx, "request") and ctx.request is not None:
-            # This is HTTP-based (SSE or WebSocket)
-            transport = "tcp"
-            request = ctx.request
-
-            # Extract session ID from HTTP headers
-            if hasattr(request, "headers"):
-                session_id = request.headers.get("mcp-session-id")
-        # If ctx.request exists but is None, it's stdio (transport already set to "pipe")
+        if ctx is not None:
+            request_id = ctx.request_id
+            if hasattr(ctx, "request") and ctx.request is not None:
+                transport = "tcp"
+                request = ctx.request
+                if hasattr(request, "headers"):
+                    session_id = request.headers.get("mcp-session-id")
 
     except LookupError:
         # No request context available - default to pipe
