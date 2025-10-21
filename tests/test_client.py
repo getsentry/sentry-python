@@ -768,7 +768,25 @@ def test_databag_depth_stripping(sentry_init, capture_events):
 
     (event,) = events
 
-    assert len(json.dumps(event)) < 10000
+    stacktrace_frame = event["exception"]["values"][0]["stacktrace"]["frames"][0]
+    a_var = stacktrace_frame["vars"]["a"]
+
+    assert type(a_var) == list
+    assert len(a_var) == 1 and type(a_var[0]) == list
+
+    first_level_list = a_var[0]
+    assert type(first_level_list) == list
+    assert len(first_level_list) == 1
+
+    second_level_list = first_level_list[0]
+    assert type(second_level_list) == list
+    assert len(second_level_list) == 1
+
+    third_level_list = second_level_list[0]
+    assert type(third_level_list) == list
+
+    inner_value_repr = third_level_list[0]
+    assert type(inner_value_repr) == str
 
 
 def test_databag_string_stripping(sentry_init, capture_events):
