@@ -784,6 +784,7 @@ def test_databag_depth_stripping(sentry_init, capture_events):
 
     third_level_list = second_level_list[0]
     assert type(third_level_list) == list
+    assert len(third_level_list) == 1
 
     inner_value_repr = third_level_list[0]
     assert type(inner_value_repr) == str
