@@ -34,6 +34,15 @@ else:
     )
 
 
+def get_hf_provider_inference_client():
+    # The provider parameter was added in version 0.28.0 of huggingface_hub
+    return (
+        InferenceClient(model="test-model", provider="hf-inference")
+        if HF_VERSION >= (0, 28, 0)
+        else InferenceClient(model="test-model")
+    )
+
+
 def _add_mock_response(
     httpx_mock, rsps, method, url, json=None, status=200, body=None, headers=None
 ):
@@ -616,12 +625,7 @@ def test_chat_completion(
     )
     events = capture_events()
 
-    # The provider parameter was added in version 0.28.0 of huggingface_hub
-    client = (
-        InferenceClient(model="test-model", provider="hf-inference")
-        if HF_VERSION >= (0, 28, 0)
-        else InferenceClient(model="test-model")
-    )
+    client = get_hf_provider_inference_client()
 
     with sentry_sdk.start_transaction(name="test"):
         client.chat_completion(
@@ -693,12 +697,7 @@ def test_chat_completion_streaming(
     )
     events = capture_events()
 
-    # The provider parameter was added in version 0.28.0 of huggingface_hub
-    client = (
-        InferenceClient(model="test-model", provider="hf-inference")
-        if HF_VERSION >= (0, 28, 0)
-        else InferenceClient(model="test-model")
-    )
+    client = get_hf_provider_inference_client()
 
     with sentry_sdk.start_transaction(name="test"):
         _ = list(
@@ -762,12 +761,7 @@ def test_chat_completion_api_error(
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    # The provider parameter was added in version 0.28.0 of huggingface_hub
-    client = (
-        InferenceClient(model="test-model", provider="hf-inference")
-        if HF_VERSION >= (0, 28, 0)
-        else InferenceClient(model="test-model")
-    )
+    client = get_hf_provider_inference_client()
 
     with sentry_sdk.start_transaction(name="test"):
         with pytest.raises(HfHubHTTPError):
@@ -819,12 +813,7 @@ def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors)
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    # The provider parameter was added in version 0.28.0 of huggingface_hub
-    client = (
-        InferenceClient(model="test-model", provider="hf-inference")
-        if HF_VERSION >= (0, 28, 0)
-        else InferenceClient(model="test-model")
-    )
+    client = get_hf_provider_inference_client()
 
     with sentry_sdk.start_transaction(name="test"):
         with pytest.raises(HfHubHTTPError):
@@ -869,12 +858,7 @@ def test_chat_completion_with_tools(
     )
     events = capture_events()
 
-    # The provider parameter was added in version 0.28.0 of huggingface_hub
-    client = (
-        InferenceClient(model="test-model", provider="hf-inference")
-        if HF_VERSION >= (0, 28, 0)
-        else InferenceClient(model="test-model")
-    )
+    client = get_hf_provider_inference_client()
 
     tools = [
         {
@@ -963,12 +947,7 @@ def test_chat_completion_streaming_with_tools(
     )
     events = capture_events()
 
-    # The provider parameter was added in version 0.28.0 of huggingface_hub
-    client = (
-        InferenceClient(model="test-model", provider="hf-inference")
-        if HF_VERSION >= (0, 28, 0)
-        else InferenceClient(model="test-model")
-    )
+    client = get_hf_provider_inference_client()
 
     tools = [
         {
