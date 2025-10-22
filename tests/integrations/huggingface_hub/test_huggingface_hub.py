@@ -5,7 +5,6 @@ import responses
 import httpx
 
 from huggingface_hub import InferenceClient
-from huggingface_hub.inference._providers.hf_inference import HFInferenceConversational
 
 import sentry_sdk
 from sentry_sdk.utils import package_version
