@@ -617,64 +617,64 @@ def test_chat_completion(
     )
     events = capture_events()
 
+    client = InferenceClient(model="test-model")
+
     def get_provider(*args, **kwargs):
         return HFInferenceConversational()
 
     with mock.patch(
         "huggingface_hub.inference._client.get_provider_helper", get_provider
     ):
-        client = InferenceClient(model="test-model")
-
         with sentry_sdk.start_transaction(name="test"):
             client.chat_completion(
                 messages=[{"role": "user", "content": "Hello!"}],
                 stream=False,
             )
 
-        (transaction,) = events
+    (transaction,) = events
 
-        span = None
-        for sp in transaction["spans"]:
-            if sp["op"].startswith("gen_ai"):
-                assert span is None, "there is exactly one gen_ai span"
-                span = sp
-            else:
-                # there should be no other spans, just the gen_ai span
-                # and optionally some http.client spans from talking to the hf api
-                assert sp["op"] == "http.client"
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
 
-        assert span is not None
+    assert span is not None
 
-        assert span["op"] == "gen_ai.chat"
-        assert span["description"] == "chat test-model"
-        assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
-        expected_data = {
-            "gen_ai.operation.name": "chat",
-            "gen_ai.request.model": "test-model",
-            "gen_ai.response.finish_reasons": "stop",
-            "gen_ai.response.model": "test-model-123",
-            "gen_ai.response.streaming": False,
-            "gen_ai.usage.input_tokens": 10,
-            "gen_ai.usage.output_tokens": 8,
-            "gen_ai.usage.total_tokens": 18,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
-        }
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "stop",
+        "gen_ai.response.model": "test-model-123",
+        "gen_ai.response.streaming": False,
+        "gen_ai.usage.input_tokens": 10,
+        "gen_ai.usage.output_tokens": 8,
+        "gen_ai.usage.total_tokens": 18,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
 
-        if send_default_pii and include_prompts:
-            expected_data["gen_ai.request.messages"] = (
-                '[{"role": "user", "content": "Hello!"}]'
-            )
-            expected_data["gen_ai.response.text"] = (
-                "[mocked] Hello! How can I help you today?"
-            )
+    if send_default_pii and include_prompts:
+        expected_data["gen_ai.request.messages"] = (
+            '[{"role": "user", "content": "Hello!"}]'
+        )
+        expected_data["gen_ai.response.text"] = (
+            "[mocked] Hello! How can I help you today?"
+        )
 
-        if not send_default_pii or not include_prompts:
-            assert "gen_ai.request.messages" not in expected_data
-            assert "gen_ai.response.text" not in expected_data
+    if not send_default_pii or not include_prompts:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
 
-        assert span["data"] == expected_data
+    assert span["data"] == expected_data
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -695,14 +695,14 @@ def test_chat_completion_streaming(
     )
     events = capture_events()
 
+    client = InferenceClient(model="test-model")
+
     def get_provider(*args, **kwargs):
         return HFInferenceConversational()
 
     with mock.patch(
         "huggingface_hub.inference._client.get_provider_helper", get_provider
     ):
-        client = InferenceClient(model="test-model")
-
         with sentry_sdk.start_transaction(name="test"):
             _ = list(
                 client.chat_completion(
@@ -711,50 +711,50 @@ def test_chat_completion_streaming(
                 )
             )
 
-        (transaction,) = events
+    (transaction,) = events
 
-        span = None
-        for sp in transaction["spans"]:
-            if sp["op"].startswith("gen_ai"):
-                assert span is None, "there is exactly one gen_ai span"
-                span = sp
-            else:
-                # there should be no other spans, just the gen_ai span
-                # and optionally some http.client spans from talking to the hf api
-                assert sp["op"] == "http.client"
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
 
-        assert span is not None
+    assert span is not None
 
-        assert span["op"] == "gen_ai.chat"
-        assert span["description"] == "chat test-model"
-        assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
-        expected_data = {
-            "gen_ai.operation.name": "chat",
-            "gen_ai.request.model": "test-model",
-            "gen_ai.response.finish_reasons": "stop",
-            "gen_ai.response.model": "test-model-123",
-            "gen_ai.response.streaming": True,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
-        }
-        # usage is not available in older versions of the library
-        if HF_VERSION and HF_VERSION >= (0, 26, 0):
-            expected_data["gen_ai.usage.input_tokens"] = 183
-            expected_data["gen_ai.usage.output_tokens"] = 14
-            expected_data["gen_ai.usage.total_tokens"] = 197
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "stop",
+        "gen_ai.response.model": "test-model-123",
+        "gen_ai.response.streaming": True,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+    # usage is not available in older versions of the library
+    if HF_VERSION and HF_VERSION >= (0, 26, 0):
+        expected_data["gen_ai.usage.input_tokens"] = 183
+        expected_data["gen_ai.usage.output_tokens"] = 14
+        expected_data["gen_ai.usage.total_tokens"] = 197
 
-        if send_default_pii and include_prompts:
-            expected_data["gen_ai.request.messages"] = (
-                '[{"role": "user", "content": "Hello!"}]'
-            )
-            expected_data["gen_ai.response.text"] = "the mocked model response"
+    if send_default_pii and include_prompts:
+        expected_data["gen_ai.request.messages"] = (
+            '[{"role": "user", "content": "Hello!"}]'
+        )
+        expected_data["gen_ai.response.text"] = "the mocked model response"
 
-        if not send_default_pii or not include_prompts:
-            assert "gen_ai.request.messages" not in expected_data
-            assert "gen_ai.response.text" not in expected_data
+    if not send_default_pii or not include_prompts:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
 
-        assert span["data"] == expected_data
+    assert span["data"] == expected_data
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -765,56 +765,56 @@ def test_chat_completion_api_error(
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
+    client = InferenceClient(model="test-model")
+
     def get_provider(*args, **kwargs):
         return HFInferenceConversational()
 
     with mock.patch(
         "huggingface_hub.inference._client.get_provider_helper", get_provider
     ):
-        client = InferenceClient(model="test-model")
-
         with sentry_sdk.start_transaction(name="test"):
             with pytest.raises(HfHubHTTPError):
                 client.chat_completion(
                     messages=[{"role": "user", "content": "Hello!"}],
                 )
 
-        (
-            error,
-            transaction,
-        ) = events
+    (
+        error,
+        transaction,
+    ) = events
 
-        assert error["exception"]["values"][0]["mechanism"]["type"] == "huggingface_hub"
-        assert not error["exception"]["values"][0]["mechanism"]["handled"]
+    assert error["exception"]["values"][0]["mechanism"]["type"] == "huggingface_hub"
+    assert not error["exception"]["values"][0]["mechanism"]["handled"]
 
-        span = None
-        for sp in transaction["spans"]:
-            if sp["op"].startswith("gen_ai"):
-                assert span is None, "there is exactly one gen_ai span"
-                span = sp
-            else:
-                # there should be no other spans, just the gen_ai span
-                # and optionally some http.client spans from talking to the hf api
-                assert sp["op"] == "http.client"
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
 
-        assert span is not None
+    assert span is not None
 
-        assert span["op"] == "gen_ai.chat"
-        assert span["description"] == "chat test-model"
-        assert span["origin"] == "auto.ai.huggingface_hub"
-        assert span.get("tags", {}).get("status") == "error"
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span.get("tags", {}).get("status") == "error"
 
-        assert (
-            error["contexts"]["trace"]["trace_id"]
-            == transaction["contexts"]["trace"]["trace_id"]
-        )
-        expected_data = {
-            "gen_ai.operation.name": "chat",
-            "gen_ai.request.model": "test-model",
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
-        }
-        assert span["data"] == expected_data
+    assert (
+        error["contexts"]["trace"]["trace_id"]
+        == transaction["contexts"]["trace"]["trace_id"]
+    )
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "test-model",
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+    assert span["data"] == expected_data
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -823,37 +823,37 @@ def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors)
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
+    client = InferenceClient(model="test-model")
+
     def get_provider(*args, **kwargs):
         return HFInferenceConversational()
 
     with mock.patch(
         "huggingface_hub.inference._client.get_provider_helper", get_provider
     ):
-        client = InferenceClient(model="test-model")
-
         with sentry_sdk.start_transaction(name="test"):
             with pytest.raises(HfHubHTTPError):
                 client.chat_completion(
                     messages=[{"role": "user", "content": "Hello!"}],
                 )
 
-        (error, transaction) = events
-        assert error["level"] == "error"
+    (error, transaction) = events
+    assert error["level"] == "error"
 
-        span = None
-        for sp in transaction["spans"]:
-            if sp["op"].startswith("gen_ai"):
-                assert span is None, "there is exactly one gen_ai span"
-                span = sp
-            else:
-                # there should be no other spans, just the gen_ai span
-                # and optionally some http.client spans from talking to the hf api
-                assert sp["op"] == "http.client"
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
 
-        assert span is not None
-        assert span["tags"]["status"] == "error"
+    assert span is not None
+    assert span["tags"]["status"] == "error"
 
-        assert transaction["contexts"]["trace"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "error"
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -874,14 +874,14 @@ def test_chat_completion_with_tools(
     )
     events = capture_events()
 
+    client = InferenceClient(model="test-model")
+
     def get_provider(*args, **kwargs):
         return HFInferenceConversational()
 
     with mock.patch(
         "huggingface_hub.inference._client.get_provider_helper", get_provider
     ):
-        client = InferenceClient(model="test-model")
-
         tools = [
             {
                 "type": "function",
@@ -904,51 +904,51 @@ def test_chat_completion_with_tools(
                 tool_choice="auto",
             )
 
-        (transaction,) = events
+    (transaction,) = events
 
-        span = None
-        for sp in transaction["spans"]:
-            if sp["op"].startswith("gen_ai"):
-                assert span is None, "there is exactly one gen_ai span"
-                span = sp
-            else:
-                # there should be no other spans, just the gen_ai span
-                # and optionally some http.client spans from talking to the hf api
-                assert sp["op"] == "http.client"
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
 
-        assert span is not None
+    assert span is not None
 
-        assert span["op"] == "gen_ai.chat"
-        assert span["description"] == "chat test-model"
-        assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
-        expected_data = {
-            "gen_ai.operation.name": "chat",
-            "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
-            "gen_ai.request.model": "test-model",
-            "gen_ai.response.finish_reasons": "tool_calls",
-            "gen_ai.response.model": "test-model-123",
-            "gen_ai.usage.input_tokens": 10,
-            "gen_ai.usage.output_tokens": 8,
-            "gen_ai.usage.total_tokens": 18,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
-        }
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "tool_calls",
+        "gen_ai.response.model": "test-model-123",
+        "gen_ai.usage.input_tokens": 10,
+        "gen_ai.usage.output_tokens": 8,
+        "gen_ai.usage.total_tokens": 18,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
 
-        if send_default_pii and include_prompts:
-            expected_data["gen_ai.request.messages"] = (
-                '[{"role": "user", "content": "What is the weather in Paris?"}]'
-            )
-            expected_data["gen_ai.response.tool_calls"] = (
-                '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]'
-            )
+    if send_default_pii and include_prompts:
+        expected_data["gen_ai.request.messages"] = (
+            '[{"role": "user", "content": "What is the weather in Paris?"}]'
+        )
+        expected_data["gen_ai.response.tool_calls"] = (
+            '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]'
+        )
 
-        if not send_default_pii or not include_prompts:
-            assert "gen_ai.request.messages" not in expected_data
-            assert "gen_ai.response.text" not in expected_data
-            assert "gen_ai.response.tool_calls" not in expected_data
+    if not send_default_pii or not include_prompts:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
+        assert "gen_ai.response.tool_calls" not in expected_data
 
-        assert span["data"] == expected_data
+    assert span["data"] == expected_data
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -969,14 +969,14 @@ def test_chat_completion_streaming_with_tools(
     )
     events = capture_events()
 
+    client = InferenceClient(model="test-model")
+
     def get_provider(*args, **kwargs):
         return HFInferenceConversational()
 
     with mock.patch(
         "huggingface_hub.inference._client.get_provider_helper", get_provider
     ):
-        client = InferenceClient(model="test-model")
-
         tools = [
             {
                 "type": "function",
@@ -1004,52 +1004,52 @@ def test_chat_completion_streaming_with_tools(
                 )
             )
 
-        (transaction,) = events
+    (transaction,) = events
 
-        span = None
-        for sp in transaction["spans"]:
-            if sp["op"].startswith("gen_ai"):
-                assert span is None, "there is exactly one gen_ai span"
-                span = sp
-            else:
-                # there should be no other spans, just the gen_ai span
-                # and optionally some http.client spans from talking to the hf api
-                assert sp["op"] == "http.client"
+    span = None
+    for sp in transaction["spans"]:
+        if sp["op"].startswith("gen_ai"):
+            assert span is None, "there is exactly one gen_ai span"
+            span = sp
+        else:
+            # there should be no other spans, just the gen_ai span
+            # and optionally some http.client spans from talking to the hf api
+            assert sp["op"] == "http.client"
 
-        assert span is not None
+    assert span is not None
 
-        assert span["op"] == "gen_ai.chat"
-        assert span["description"] == "chat test-model"
-        assert span["origin"] == "auto.ai.huggingface_hub"
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
-        expected_data = {
-            "gen_ai.operation.name": "chat",
-            "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
-            "gen_ai.request.model": "test-model",
-            "gen_ai.response.finish_reasons": "tool_calls",
-            "gen_ai.response.model": "test-model-123",
-            "gen_ai.response.streaming": True,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
-        }
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "tool_calls",
+        "gen_ai.response.model": "test-model-123",
+        "gen_ai.response.streaming": True,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
 
-        if HF_VERSION and HF_VERSION >= (0, 26, 0):
-            expected_data["gen_ai.usage.input_tokens"] = 183
-            expected_data["gen_ai.usage.output_tokens"] = 14
-            expected_data["gen_ai.usage.total_tokens"] = 197
+    if HF_VERSION and HF_VERSION >= (0, 26, 0):
+        expected_data["gen_ai.usage.input_tokens"] = 183
+        expected_data["gen_ai.usage.output_tokens"] = 14
+        expected_data["gen_ai.usage.total_tokens"] = 197
 
-        if send_default_pii and include_prompts:
-            expected_data["gen_ai.request.messages"] = (
-                '[{"role": "user", "content": "What is the weather in Paris?"}]'
-            )
-            expected_data["gen_ai.response.text"] = "response with tool calls follows"
-            expected_data["gen_ai.response.tool_calls"] = (
-                '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]'
-            )
+    if send_default_pii and include_prompts:
+        expected_data["gen_ai.request.messages"] = (
+            '[{"role": "user", "content": "What is the weather in Paris?"}]'
+        )
+        expected_data["gen_ai.response.text"] = "response with tool calls follows"
+        expected_data["gen_ai.response.tool_calls"] = (
+            '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]'
+        )
 
-        if not send_default_pii or not include_prompts:
-            assert "gen_ai.request.messages" not in expected_data
-            assert "gen_ai.response.text" not in expected_data
-            assert "gen_ai.response.tool_calls" not in expected_data
+    if not send_default_pii or not include_prompts:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
+        assert "gen_ai.response.tool_calls" not in expected_data
 
-        assert span["data"] == expected_data
+    assert span["data"] == expected_data
