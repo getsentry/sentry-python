@@ -214,8 +214,6 @@ def ai_client_span(messages, agent, model, model_settings):
 
     if agent_obj and hasattr(agent_obj, "_function_toolset"):
         try:
-            from sentry_sdk.utils import safe_serialize
-
             tools = []
             # Get tools from the function toolset
             if hasattr(agent_obj._function_toolset, "tools"):

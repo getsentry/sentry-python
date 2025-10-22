@@ -35,8 +35,7 @@ class PydanticAIIntegration(Integration):
         Set up the pydantic-ai integration.
 
         This patches the key methods in pydantic-ai to create Sentry spans for:
-        - Agent workflow execution (root span)
-        - Individual agent invocations
+        - Agent invocations (Agent.run methods)
         - Model requests (AI client calls)
         - Tool executions
         """

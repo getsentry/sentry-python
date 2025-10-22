@@ -19,19 +19,16 @@ if TYPE_CHECKING:
 def invoke_agent_span(user_prompt, agent, model, model_settings):
     # type: (Any, Any, Any, Any) -> sentry_sdk.tracing.Span
     """Create a span for invoking the agent."""
-    start_span_function = get_start_span_function()
-
     # Determine agent name for span
     name = "agent"
     if agent and getattr(agent, "name", None):
         name = agent.name
 
-    span = start_span_function(
+    span = get_start_span_function()(
         op=OP.GEN_AI_INVOKE_AGENT,
         name=f"invoke_agent {name}",
         origin=SPAN_ORIGIN,
     )
-    span.__enter__()
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
@@ -141,6 +138,3 @@ def update_invoke_agent_span(span, output):
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
         )
-
-    if span:
-        span.__exit__(None, None, None)
