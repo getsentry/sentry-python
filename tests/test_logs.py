@@ -397,3 +397,52 @@ def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
             return
 
     raise AssertionError("1 logs was never flushed after 10 seconds")
+
+
+@minimum_python_37
+@pytest.mark.parametrize(
+    "message,expected_body,params",
+    [
+        ("any text with {braces} in it", "any text with {braces} in it", None),
+        (
+            'JSON data: {"key": "value", "number": 42}',
+            'JSON data: {"key": "value", "number": 42}',
+            None,
+        ),
+        ("Multiple {braces} {in} {message}", "Multiple {braces} {in} {message}", None),
+        ("Nested {{braces}}", "Nested {{braces}}", None),
+        ("Empty braces: {}", "Empty braces: {}", None),
+        ("Braces with params: {user}", "Braces with params: alice", {"user": "alice"}),
+        (
+            "Braces with partial params: {user1} {user2}",
+            "Braces with partial params: alice {user2}",
+            {"user1": "alice"},
+        ),
+    ],
+)
+def test_logs_with_literal_braces(
+    sentry_init, capture_envelopes, message, expected_body, params
+):
+    """
+    Test that log messages with literal braces (like JSON) work without crashing.
+    This is a regression test for issue #4975.
+    """
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    if params:
+        sentry_sdk.logger.info(message, **params)
+    else:
+        sentry_sdk.logger.info(message)
+
+    get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+
+    assert len(logs) == 1
+    assert logs[0]["body"] == expected_body
+
+    # Verify template is only stored when there are parameters
+    if params:
+        assert logs[0]["attributes"]["sentry.message.template"] == message
+    else:
+        assert "sentry.message.template" not in logs[0]["attributes"]
