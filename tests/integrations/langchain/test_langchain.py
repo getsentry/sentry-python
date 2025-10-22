@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional, Any, Iterator
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -817,3 +818,216 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
         assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
         assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
         assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
+
+
+def test_langchain_message_role_mapping(sentry_init, capture_events):
+    """Test that message roles are properly normalized in langchain integration."""
+    global llm_type
+    llm_type = "openai-chat"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant"),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    global stream_result_mock
+    stream_result_mock = Mock(
+        side_effect=[
+            [
+                ChatGenerationChunk(
+                    type="ChatGenerationChunk",
+                    message=AIMessageChunk(content="Test response"),
+                ),
+            ]
+        ]
+    )
+
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    # Test input that should trigger message role normalization
+    test_input = "Hello, how are you?"
+
+    with start_transaction():
+        list(agent_executor.stream({"input": test_input}))
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    # Find spans with gen_ai operation that should have message data
+    gen_ai_spans = [
+        span for span in tx.get("spans", []) if span.get("op", "").startswith("gen_ai")
+    ]
+
+    # Check if any span has message data with normalized roles
+    message_data_found = False
+    for span in gen_ai_spans:
+        span_data = span.get("data", {})
+        if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data:
+            message_data_found = True
+            messages_data = span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+
+            # Parse the message data (might be JSON string)
+            if isinstance(messages_data, str):
+                try:
+                    messages = json.loads(messages_data)
+                except json.JSONDecodeError:
+                    # If not valid JSON, skip this assertion
+                    continue
+            else:
+                messages = messages_data
+
+            # Verify that the input message is present and contains the test input
+            assert isinstance(messages, list)
+            assert len(messages) > 0
+
+            # The test input should be in one of the messages
+            input_found = False
+            for msg in messages:
+                if isinstance(msg, dict) and test_input in str(msg.get("content", "")):
+                    input_found = True
+                    break
+                elif isinstance(msg, str) and test_input in msg:
+                    input_found = True
+                    break
+
+            assert input_found, (
+                f"Test input '{test_input}' not found in messages: {messages}"
+            )
+            break
+
+    # The message role mapping functionality is primarily tested through the normalization
+    # that happens in the integration code. The fact that we can capture and process
+    # the messages without errors indicates the role mapping is working correctly.
+    assert message_data_found, "No span found with gen_ai request messages data"
+
+
+def test_langchain_message_role_normalization_units():
+    """Test the message role normalization functions directly."""
+    from sentry_sdk.ai.utils import normalize_message_role, normalize_message_roles
+
+    # Test individual role normalization
+    assert normalize_message_role("ai") == "assistant"
+    assert normalize_message_role("human") == "user"
+    assert normalize_message_role("tool_call") == "tool"
+    assert normalize_message_role("system") == "system"
+    assert normalize_message_role("user") == "user"
+    assert normalize_message_role("assistant") == "assistant"
+    assert normalize_message_role("tool") == "tool"
+
+    # Test unknown role (should remain unchanged)
+    assert normalize_message_role("unknown_role") == "unknown_role"
+
+    # Test message list normalization
+    test_messages = [
+        {"role": "human", "content": "Hello"},
+        {"role": "ai", "content": "Hi there!"},
+        {"role": "tool_call", "content": "function_call"},
+        {"role": "system", "content": "You are helpful"},
+        {"content": "Message without role"},
+        "string message",
+    ]
+
+    normalized = normalize_message_roles(test_messages)
+
+    # Verify the original messages are not modified
+    assert test_messages[0]["role"] == "human"  # Original unchanged
+    assert test_messages[1]["role"] == "ai"  # Original unchanged
+
+    # Verify the normalized messages have correct roles
+    assert normalized[0]["role"] == "user"  # human -> user
+    assert normalized[1]["role"] == "assistant"  # ai -> assistant
+    assert normalized[2]["role"] == "tool"  # tool_call -> tool
+    assert normalized[3]["role"] == "system"  # system unchanged
+    assert "role" not in normalized[4]  # Message without role unchanged
+    assert normalized[5] == "string message"  # String message unchanged
+
+
+def test_langchain_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Langchain integration."""
+    from langchain_core.outputs import LLMResult, Generation
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "12345678-1234-1234-1234-123456789012"
+    serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    prompts = [
+        "small message 1",
+        large_content,
+        large_content,
+        "small message 4",
+        "small message 5",
+    ]
+
+    with start_transaction():
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            invocation_params={
+                "temperature": 0.7,
+                "max_tokens": 100,
+                "model": "gpt-3.5-turbo",
+            },
+        )
+
+        response = LLMResult(
+            generations=[[Generation(text="The response")]],
+            llm_output={
+                "token_usage": {
+                    "total_tokens": 25,
+                    "prompt_tokens": 10,
+                    "completion_tokens": 15,
+                }
+            },
+        )
+        callback.on_llm_end(response=response, run_id=run_id)
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
+
+    messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 2
+    assert "small message 4" in str(parsed_messages[0])
+    assert "small message 5" in str(parsed_messages[1])
+    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5

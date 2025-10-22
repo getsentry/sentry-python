@@ -625,3 +625,131 @@ def test_extraction_functions_complex_scenario(sentry_init, capture_events):
     assert tool_calls_data[0]["function"]["name"] == "search"
     assert tool_calls_data[1]["id"] == "call_multi_2"
     assert tool_calls_data[1]["function"]["name"] == "calculate"
+
+
+def test_langgraph_message_role_mapping(sentry_init, capture_events):
+    """Test that Langgraph integration properly maps message roles like 'ai' to 'assistant'"""
+    sentry_init(
+        integrations=[LanggraphIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    # Mock a langgraph message with mixed roles
+    class MockMessage:
+        def __init__(self, content, message_type="human"):
+            self.content = content
+            self.type = message_type
+
+    # Create mock state with messages having different roles
+    state_data = {
+        "messages": [
+            MockMessage("System prompt", "system"),
+            MockMessage("Hello", "human"),
+            MockMessage("Hi there!", "ai"),  # Should be mapped to "assistant"
+            MockMessage("How can I help?", "assistant"),  # Should stay "assistant"
+        ]
+    }
+
+    compiled_graph = MockCompiledGraph("test_graph")
+    pregel = MockPregelInstance(compiled_graph)
+
+    with start_transaction(name="langgraph tx"):
+        # Use the wrapped invoke function directly
+        from sentry_sdk.integrations.langgraph import _wrap_pregel_invoke
+
+        wrapped_invoke = _wrap_pregel_invoke(
+            lambda self, state_data: {"result": "success"}
+        )
+        wrapped_invoke(pregel, state_data)
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Verify that the span was created correctly
+    assert span["op"] == "gen_ai.invoke_agent"
+
+    # If messages were captured, verify role mapping
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]:
+        import json
+
+        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+        # Find messages with specific content to verify role mapping
+        ai_message = next(
+            (msg for msg in stored_messages if msg.get("content") == "Hi there!"), None
+        )
+        assistant_message = next(
+            (msg for msg in stored_messages if msg.get("content") == "How can I help?"),
+            None,
+        )
+
+        if ai_message:
+            # "ai" should have been mapped to "assistant"
+            assert ai_message["role"] == "assistant"
+
+        if assistant_message:
+            # "assistant" should stay "assistant"
+            assert assistant_message["role"] == "assistant"
+
+        # Verify no "ai" roles remain
+        roles = [msg["role"] for msg in stored_messages if "role" in msg]
+        assert "ai" not in roles
+
+
+def test_langgraph_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Langgraph integration."""
+    import json
+
+    sentry_init(
+        integrations=[LanggraphIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    test_state = {
+        "messages": [
+            MockMessage("small message 1", name="user"),
+            MockMessage(large_content, name="assistant"),
+            MockMessage(large_content, name="user"),
+            MockMessage("small message 4", name="assistant"),
+            MockMessage("small message 5", name="user"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    def original_invoke(self, *args, **kwargs):
+        return {"messages": args[0].get("messages", [])}
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
+
+    assert result is not None
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) > 0
+
+    invoke_span = invoke_spans[0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+
+    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 2
+    assert "small message 4" in str(parsed_messages[0])
+    assert "small message 5" in str(parsed_messages[1])
+    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5

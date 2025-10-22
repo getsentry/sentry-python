@@ -138,6 +138,8 @@ def _wrap_handler(handler):
                     timeout_thread = TimeoutThread(
                         waiting_time,
                         configured_time / MILLIS_TO_SECONDS,
+                        isolation_scope=scope,
+                        current_scope=sentry_sdk.get_current_scope(),
                     )
 
                     # Starting the thread to raise timeout warning exception
