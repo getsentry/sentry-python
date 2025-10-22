@@ -1,4 +1,5 @@
 import gc
+import sys
 from concurrent import futures
 from textwrap import dedent
 from threading import Thread
@@ -68,7 +69,9 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
 
-    if propagate_hub:
+    # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
+    # https://docs.python.org/3/howto/free-threading-python.html
+    if propagate_hub or sys.flags.thread_inherit_context:
         assert event["tags"]["stage1"] == "true"
     else:
         assert "stage1" not in event.get("tags", {})
@@ -94,7 +97,9 @@ def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
 
     sentry_sdk.flush()
 
-    if propagate_hub:
+    # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
+    # https://docs.python.org/3/howto/free-threading-python.html
+    if propagate_hub or sys.flags.thread_inherit_context:
         assert len(events) == 1
         (event,) = events
         assert event["spans"][0]["trace_id"] == event["spans"][1]["trace_id"]
@@ -248,7 +253,10 @@ def test_spans_from_multiple_threads(
             t.join()
 
     (event,) = events
-    if propagate_scope:
+
+    # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
+    # https://docs.python.org/3/howto/free-threading-python.html
+    if propagate_scope or sys.flags.thread_inherit_context:
         assert render_span_tree(event) == dedent(
             """\
             - op="outer-trx": description=null
@@ -309,7 +317,9 @@ def test_spans_from_threadpool(
 
     (event,) = events
 
-    if propagate_scope:
+    # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
+    # https://docs.python.org/3/howto/free-threading-python.html
+    if propagate_scope or sys.flags.thread_inherit_context:
         assert render_span_tree(event) == dedent(
             """\
             - op="outer-trx": description=null
