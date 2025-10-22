@@ -617,19 +617,13 @@ def test_chat_completion(
     )
     events = capture_events()
 
-    client = InferenceClient(model="test-model")
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
-    def get_provider(*args, **kwargs):
-        return HFInferenceConversational()
-
-    with mock.patch(
-        "huggingface_hub.inference._client.get_provider_helper", get_provider
-    ):
-        with sentry_sdk.start_transaction(name="test"):
-            client.chat_completion(
-                messages=[{"role": "user", "content": "Hello!"}],
-                stream=False,
-            )
+    with sentry_sdk.start_transaction(name="test"):
+        client.chat_completion(
+            messages=[{"role": "user", "content": "Hello!"}],
+            stream=False,
+        )
 
     (transaction,) = events
 
@@ -695,21 +689,15 @@ def test_chat_completion_streaming(
     )
     events = capture_events()
 
-    client = InferenceClient(model="test-model")
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
-    def get_provider(*args, **kwargs):
-        return HFInferenceConversational()
-
-    with mock.patch(
-        "huggingface_hub.inference._client.get_provider_helper", get_provider
-    ):
-        with sentry_sdk.start_transaction(name="test"):
-            _ = list(
-                client.chat_completion(
-                    [{"role": "user", "content": "Hello!"}],
-                    stream=True,
-                )
+    with sentry_sdk.start_transaction(name="test"):
+        _ = list(
+            client.chat_completion(
+                [{"role": "user", "content": "Hello!"}],
+                stream=True,
             )
+        )
 
     (transaction,) = events
 
@@ -765,19 +753,13 @@ def test_chat_completion_api_error(
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    client = InferenceClient(model="test-model")
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
-    def get_provider(*args, **kwargs):
-        return HFInferenceConversational()
-
-    with mock.patch(
-        "huggingface_hub.inference._client.get_provider_helper", get_provider
-    ):
-        with sentry_sdk.start_transaction(name="test"):
-            with pytest.raises(HfHubHTTPError):
-                client.chat_completion(
-                    messages=[{"role": "user", "content": "Hello!"}],
-                )
+    with sentry_sdk.start_transaction(name="test"):
+        with pytest.raises(HfHubHTTPError):
+            client.chat_completion(
+                messages=[{"role": "user", "content": "Hello!"}],
+            )
 
     (
         error,
@@ -823,19 +805,13 @@ def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors)
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    client = InferenceClient(model="test-model")
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
-    def get_provider(*args, **kwargs):
-        return HFInferenceConversational()
-
-    with mock.patch(
-        "huggingface_hub.inference._client.get_provider_helper", get_provider
-    ):
-        with sentry_sdk.start_transaction(name="test"):
-            with pytest.raises(HfHubHTTPError):
-                client.chat_completion(
-                    messages=[{"role": "user", "content": "Hello!"}],
-                )
+    with sentry_sdk.start_transaction(name="test"):
+        with pytest.raises(HfHubHTTPError):
+            client.chat_completion(
+                messages=[{"role": "user", "content": "Hello!"}],
+            )
 
     (error, transaction) = events
     assert error["level"] == "error"
@@ -874,35 +850,29 @@ def test_chat_completion_with_tools(
     )
     events = capture_events()
 
-    client = InferenceClient(model="test-model")
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
-    def get_provider(*args, **kwargs):
-        return HFInferenceConversational()
-
-    with mock.patch(
-        "huggingface_hub.inference._client.get_provider_helper", get_provider
-    ):
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_weather",
-                    "description": "Get current weather",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"location": {"type": "string"}},
-                        "required": ["location"],
-                    },
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                    "required": ["location"],
                 },
-            }
-        ]
+            },
+        }
+    ]
 
-        with sentry_sdk.start_transaction(name="test"):
-            client.chat_completion(
-                messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-                tools=tools,
-                tool_choice="auto",
-            )
+    with sentry_sdk.start_transaction(name="test"):
+        client.chat_completion(
+            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+            tools=tools,
+            tool_choice="auto",
+        )
 
     (transaction,) = events
 
@@ -969,40 +939,32 @@ def test_chat_completion_streaming_with_tools(
     )
     events = capture_events()
 
-    client = InferenceClient(model="test-model")
+    client = InferenceClient(model="test-model", provider="hf-inference")
 
-    def get_provider(*args, **kwargs):
-        return HFInferenceConversational()
-
-    with mock.patch(
-        "huggingface_hub.inference._client.get_provider_helper", get_provider
-    ):
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_weather",
-                    "description": "Get current weather",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"location": {"type": "string"}},
-                        "required": ["location"],
-                    },
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                    "required": ["location"],
                 },
-            }
-        ]
+            },
+        }
+    ]
 
-        with sentry_sdk.start_transaction(name="test"):
-            _ = list(
-                client.chat_completion(
-                    messages=[
-                        {"role": "user", "content": "What is the weather in Paris?"}
-                    ],
-                    stream=True,
-                    tools=tools,
-                    tool_choice="auto",
-                )
+    with sentry_sdk.start_transaction(name="test"):
+        _ = list(
+            client.chat_completion(
+                messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+                stream=True,
+                tools=tools,
+                tool_choice="auto",
             )
+        )
 
     (transaction,) = events
 
