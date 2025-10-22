@@ -204,6 +204,9 @@ TEST_SUITE_CONFIG = {
             ">=0.3": ["langchain-community"],
         },
         "include": "<1.0",
+        "python": {
+            "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
+        },
     },
     "langchain-notiktoken": {
         "package": "langchain",
@@ -214,6 +217,9 @@ TEST_SUITE_CONFIG = {
             ">=0.3": ["langchain-community"],
         },
         "include": "<1.0",
+        "python": {
+            "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
+        },
     },
     "langgraph": {
         "package": "langgraph",
