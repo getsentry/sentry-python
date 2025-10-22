@@ -1,5 +1,6 @@
 import importlib
 import json
+import sys
 import threading
 from unittest import mock
 
@@ -77,6 +78,10 @@ def integration_enabled_params(request):
 @pytest.mark.skipif(
     not importlib.util.find_spec("quart_flask_patch"),
     reason="requires quart_flask_patch",
+)
+@pytest.mark.skipif(
+    sys.version_info >= (3, 14),
+    reason="quart_flask_patch not working on 3.14 (yet?)",
 )
 async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations):
     # This testcase is forked because `import quart_flask_patch` needs to run
