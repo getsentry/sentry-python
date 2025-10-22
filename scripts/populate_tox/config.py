@@ -239,7 +239,7 @@ TEST_SUITE_CONFIG = {
     "mcp": {
         "package": "mcp",
         "deps": {
-            "*": ["pytest-asyncio", "mcp>=1.15.0"],
+            "*": ["pytest-asyncio"],
         },
     },
     "openai-base": {
