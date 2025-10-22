@@ -134,6 +134,9 @@ setenv =
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     COVERAGE_FILE=.coverage-sentry-{envname}
     py3.6: COVERAGE_RCFILE=.coveragerc36
+    # Lowest version to support free-threading
+    # https://discuss.python.org/t/announcement-pip-24-1-release/56281
+    py3.14t: VIRTUALENV_PIP=24.1
 
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
     spark-v{3.0.3,3.5.6}: JAVA_HOME=/usr/lib/jvm/temurin-11-jdk-amd64
