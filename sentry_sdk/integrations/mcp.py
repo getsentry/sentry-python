@@ -29,6 +29,30 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Optional
 
 
+class MCPIntegration(Integration):
+    identifier = "mcp"
+    origin = "auto.ai.mcp"
+
+    def __init__(self, include_prompts=True):
+        # type: (bool) -> None
+        """
+        Initialize the MCP integration.
+
+        Args:
+            include_prompts: Whether to include prompts (tool results and prompt content)
+                             in span data. Requires send_default_pii=True. Default is True.
+        """
+        self.include_prompts = include_prompts
+
+    @staticmethod
+    def setup_once():
+        # type: () -> None
+        """
+        Patches MCP server classes to instrument handler execution.
+        """
+        _patch_lowlevel_server()
+
+
 def _get_request_context_data():
     # type: () -> tuple[Optional[str], Optional[str], str]
     """
@@ -335,14 +359,15 @@ async def _async_handler_wrapper(handler_type, func, original_args):
         try:
             # Execute the async handler
             result = await func(*original_args)
-            _set_span_output_data(span, result, result_data_key, handler_type)
-            return result
         except Exception as e:
             # Set error flag for tools
             if handler_type == "tool":
                 span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
             sentry_sdk.capture_exception(e)
             raise
+
+        _set_span_output_data(span, result, result_data_key, handler_type)
+        return result
 
 
 def _sync_handler_wrapper(handler_type, func, original_args):
@@ -399,14 +424,15 @@ def _sync_handler_wrapper(handler_type, func, original_args):
         try:
             # Execute the sync handler
             result = func(*original_args)
-            _set_span_output_data(span, result, result_data_key, handler_type)
-            return result
         except Exception as e:
             # Set error flag for tools
             if handler_type == "tool":
                 span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
             sentry_sdk.capture_exception(e)
             raise
+
+        _set_span_output_data(span, result, result_data_key, handler_type)
+        return result
 
 
 def _create_instrumented_handler(handler_type, func):
@@ -524,33 +550,3 @@ def _patch_lowlevel_server():
         )(func)
 
     Server.read_resource = patched_read_resource  # type: ignore
-
-
-# Integration class
-
-
-class MCPIntegration(Integration):
-    identifier = "mcp"
-    origin = "auto.ai.mcp"
-
-    def __init__(self, include_prompts=True):
-        # type: (bool) -> None
-        """
-        Initialize the MCP integration.
-
-        Args:
-            include_prompts: Whether to include prompts (tool results and prompt content)
-                           in span data. Requires send_default_pii=True. Default is True.
-        """
-        self.include_prompts = include_prompts
-
-    @staticmethod
-    def setup_once():
-        # type: () -> None
-        """
-        Patches MCP server classes to instrument handler execution.
-        """
-        _patch_lowlevel_server()
-
-
-__all__ = ["MCPIntegration"]
