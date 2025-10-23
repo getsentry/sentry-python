@@ -139,29 +139,6 @@ def _create_run_wrapper(original_func, is_streaming=False):
     return wrapper
 
 
-def _create_run_sync_wrapper(original_func):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-    """
-    Wraps the Agent.run_sync method - no span needed as it delegates to run().
-
-    Note: run_sync just calls self.run() via run_until_complete, so the
-    invoke_agent span will be created by the run() wrapper.
-    """
-
-    @wraps(original_func)
-    def wrapper(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
-        # Just call the original function - it will call run() which has the instrumentation
-        try:
-            result = original_func(self, *args, **kwargs)
-            return result
-        except Exception as exc:
-            _capture_exception(exc)
-            raise exc from None
-
-    return wrapper
-
-
 def _create_streaming_wrapper(original_func):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     """
@@ -226,13 +203,11 @@ def _patch_agent_run():
 
     # Store original methods
     original_run = Agent.run
-    original_run_sync = Agent.run_sync
     original_run_stream = Agent.run_stream
     original_run_stream_events = Agent.run_stream_events
 
     # Wrap and apply patches for non-streaming methods
     Agent.run = _create_run_wrapper(original_run, is_streaming=False)  # type: ignore
-    Agent.run_sync = _create_run_sync_wrapper(original_run_sync)  # type: ignore
 
     # Wrap and apply patches for streaming methods
     Agent.run_stream = _create_streaming_wrapper(original_run_stream)  # type: ignore
