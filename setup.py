@@ -68,6 +68,7 @@ setup(
         "litellm": ["litellm>=1.77.5"],
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
+        "mcp": ["mcp>=1.15.0"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "openfeature": ["openfeature-sdk>=0.7.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],

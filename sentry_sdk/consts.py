@@ -749,6 +749,90 @@ class SPANDATA:
     Example: "MainThread"
     """
 
+    MCP_TOOL_NAME = "mcp.tool.name"
+    """
+    The name of the MCP tool being called.
+    Example: "get_weather"
+    """
+
+    MCP_PROMPT_NAME = "mcp.prompt.name"
+    """
+    The name of the MCP prompt being retrieved.
+    Example: "code_review"
+    """
+
+    MCP_RESOURCE_URI = "mcp.resource.uri"
+    """
+    The URI of the MCP resource being accessed.
+    Example: "file:///path/to/resource"
+    """
+
+    MCP_METHOD_NAME = "mcp.method.name"
+    """
+    The MCP protocol method name being called.
+    Example: "tools/call", "prompts/get", "resources/read"
+    """
+
+    MCP_REQUEST_ID = "mcp.request.id"
+    """
+    The unique identifier for the MCP request.
+    Example: "req_123abc"
+    """
+
+    MCP_TOOL_RESULT_CONTENT = "mcp.tool.result.content"
+    """
+    The result/output content from an MCP tool execution.
+    Example: "The weather is sunny"
+    """
+
+    MCP_TOOL_RESULT_CONTENT_COUNT = "mcp.tool.result.content_count"
+    """
+    The number of items/keys in the MCP tool result.
+    Example: 5
+    """
+
+    MCP_TOOL_RESULT_IS_ERROR = "mcp.tool.result.is_error"
+    """
+    Whether the MCP tool execution resulted in an error.
+    Example: True
+    """
+
+    MCP_PROMPT_RESULT_MESSAGE_CONTENT = "mcp.prompt.result.message_content"
+    """
+    The message content from an MCP prompt retrieval.
+    Example: "Review the following code..."
+    """
+
+    MCP_PROMPT_RESULT_MESSAGE_ROLE = "mcp.prompt.result.message_role"
+    """
+    The role of the message in an MCP prompt retrieval (only set for single-message prompts).
+    Example: "user", "assistant", "system"
+    """
+
+    MCP_PROMPT_RESULT_MESSAGE_COUNT = "mcp.prompt.result.message_count"
+    """
+    The number of messages in an MCP prompt result.
+    Example: 1, 3
+    """
+
+    MCP_RESOURCE_PROTOCOL = "mcp.resource.protocol"
+    """
+    The protocol/scheme of the MCP resource URI.
+    Example: "file", "http", "https"
+    """
+
+    MCP_TRANSPORT = "mcp.transport"
+    """
+    The transport method used for MCP communication.
+    Example: "pipe" (stdio), "tcp" (HTTP/WebSocket/SSE)
+    """
+
+    MCP_SESSION_ID = "mcp.session.id"
+    """
+    The session identifier for the MCP connection.
+    Example: "a1b2c3d4e5f6"
+    """
+
 
 class SPANSTATUS:
     """
@@ -845,6 +929,7 @@ class OP:
     WEBSOCKET_SERVER = "websocket.server"
     SOCKET_CONNECTION = "socket.connection"
     SOCKET_DNS = "socket.dns"
+    MCP_SERVER = "mcp.server"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`

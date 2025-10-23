@@ -78,6 +78,7 @@ GROUPS = {
         "langchain-notiktoken",
         "langgraph",
         "litellm",
+        "mcp",
         "openai-base",
         "openai-notiktoken",
         "openai_agents",

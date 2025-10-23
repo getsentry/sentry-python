@@ -149,6 +149,7 @@ _MIN_VERSIONS = {
     "launchdarkly": (9, 8, 0),
     "litellm": (1, 77, 5),
     "loguru": (0, 7, 0),
+    "mcp": (1, 15, 0),
     "openai": (1, 0, 0),
     "openai_agents": (0, 0, 19),
     "openfeature": (0, 7, 1),
