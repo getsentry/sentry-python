@@ -73,6 +73,7 @@ setup(
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": ["opentelemetry-distro"],
         "pure-eval": ["pure_eval", "executing", "asttokens"],
+        "pydantic_ai": ["pydantic-ai>=1.0.0"],
         "pymongo": ["pymongo>=3.1"],
         "pyspark": ["pyspark>=2.4.4"],
         "quart": ["quart>=0.16.1", "blinker>=1.1"],
