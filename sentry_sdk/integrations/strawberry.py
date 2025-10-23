@@ -99,11 +99,15 @@ def _patch_schema_init():
         if integration.async_execution is not None:
             should_use_async_extension = integration.async_execution
         else:
-            # use the sync extension by default
-            warnings.warn(
-                "Assuming strawberry is running sync. If not, initialize the integration as StrawberryIntegration(async_execution=True).",
-                stacklevel=2,
-            )
+            # try to figure it out ourselves
+            should_use_async_extension = _guess_if_using_async(extensions)
+
+            if should_use_async_extension is None:
+                warnings.warn(
+                    "Assuming strawberry is running sync. If not, initialize the integration as StrawberryIntegration(async_execution=True).",
+                    stacklevel=2,
+                )
+                should_use_async_extension = False
 
         # remove the built in strawberry sentry extension, if present
         extensions = [
@@ -377,3 +381,13 @@ def _make_response_event_processor(response_data):
         return event
 
     return inner
+
+
+def _guess_if_using_async(extensions):
+    # type: (List[SchemaExtension]) -> Optional[bool]
+    if StrawberrySentryAsyncExtension in extensions:
+        return True
+    elif StrawberrySentrySyncExtension in extensions:
+        return False
+
+    return None
