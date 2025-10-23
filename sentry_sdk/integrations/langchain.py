@@ -50,7 +50,7 @@ except ImportError:
 
 
 try:
-    from langchain_classic.agents import AgentExecutor
+    from langchain_classic.agents import AgentExecutor  # type: ignore[import-not-found]
 except ImportError:
     AgentExecutor = None
 

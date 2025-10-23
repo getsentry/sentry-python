@@ -29,7 +29,7 @@ from sentry_sdk.integrations.langchain import (
 try:
     # langchain v1+
     from langchain.tools import tool
-    from langchain_classic.agents import AgentExecutor, create_openai_tools_agent
+    from langchain_classic.agents import AgentExecutor, create_openai_tools_agent  # type: ignore[import-not-found]
 except ImportError:
     # langchain <v1
     from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
