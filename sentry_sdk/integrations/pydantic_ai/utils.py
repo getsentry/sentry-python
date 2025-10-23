@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, List, Dict
-    from pydantic_ai.usage import RequestUsage
+    from pydantic_ai.usage import RequestUsage  # type: ignore
 
 
 def _should_send_prompts():

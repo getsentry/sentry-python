@@ -212,6 +212,6 @@ def _patch_agent_run():
 
     # Wrap and apply patches for streaming methods
     Agent.run_stream = _create_streaming_wrapper(original_run_stream)
-    Agent.run_stream_events = _create_streaming_events_wrapper(  # type: ignore[method-assign]
+    Agent.run_stream_events = _create_streaming_events_wrapper(
         original_run_stream_events
     )
