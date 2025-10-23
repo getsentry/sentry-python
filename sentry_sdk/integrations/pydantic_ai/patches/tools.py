@@ -1,6 +1,6 @@
 from functools import wraps
 
-from pydantic_ai._tool_manager import ToolManager
+from pydantic_ai._tool_manager import ToolManager  # type: ignore
 
 import sentry_sdk
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from typing import Any
 
 try:
-    from pydantic_ai.mcp import MCPServer
+    from pydantic_ai.mcp import MCPServer  # type: ignore
 
     HAS_MCP = True
 except ImportError:
@@ -72,4 +72,4 @@ def _patch_tool_execution():
             self, call, allow_partial, wrap_validation_errors
         )
 
-    ToolManager._call_tool = wrapped_call_tool  # type: ignore
+    ToolManager._call_tool = wrapped_call_tool

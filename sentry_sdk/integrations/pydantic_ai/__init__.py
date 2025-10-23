@@ -2,7 +2,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 
 
 try:
-    import pydantic_ai
+    import pydantic_ai  # type: ignore
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 

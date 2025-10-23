@@ -16,10 +16,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, List, Dict
-    from pydantic_ai.usage import RequestUsage
+    from pydantic_ai.usage import RequestUsage  # type: ignore
 
 try:
-    from pydantic_ai.messages import (
+    from pydantic_ai.messages import (  # type: ignore
         BaseToolCallPart,
         BaseToolReturnPart,
         SystemPromptPart,
@@ -29,12 +29,12 @@ try:
     )
 except ImportError:
     # Fallback if these classes are not available
-    BaseToolCallPart = None  # type: ignore
-    BaseToolReturnPart = None  # type: ignore
-    SystemPromptPart = None  # type: ignore
-    UserPromptPart = None  # type: ignore
-    TextPart = None  # type: ignore
-    ThinkingPart = None  # type: ignore
+    BaseToolCallPart = None
+    BaseToolReturnPart = None
+    SystemPromptPart = None
+    UserPromptPart = None
+    TextPart = None
+    ThinkingPart = None
 
 
 def _set_usage_data(span, usage):

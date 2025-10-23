@@ -7,7 +7,7 @@ from sentry_sdk.utils import event_from_exception
 from ..spans import invoke_agent_span, update_invoke_agent_span
 
 from typing import TYPE_CHECKING
-from pydantic_ai.agent import Agent
+from pydantic_ai.agent import Agent  # type: ignore
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -81,7 +81,8 @@ class _StreamingContextManagerWrapper:
                 output = (
                     self._result.output if hasattr(self._result, "output") else None
                 )
-                update_invoke_agent_span(self._span, output)
+                if self._span is not None:
+                    update_invoke_agent_span(self._span, output)
         finally:
             sentry_sdk.get_current_scope().remove_context("pydantic_ai_agent")
             # Clean up invoke span
@@ -207,10 +208,10 @@ def _patch_agent_run():
     original_run_stream_events = Agent.run_stream_events
 
     # Wrap and apply patches for non-streaming methods
-    Agent.run = _create_run_wrapper(original_run, is_streaming=False)  # type: ignore
+    Agent.run = _create_run_wrapper(original_run, is_streaming=False)
 
     # Wrap and apply patches for streaming methods
-    Agent.run_stream = _create_streaming_wrapper(original_run_stream)  # type: ignore
+    Agent.run_stream = _create_streaming_wrapper(original_run_stream)
     Agent.run_stream_events = _create_streaming_events_wrapper(  # type: ignore[method-assign]
         original_run_stream_events
     )

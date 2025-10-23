@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import TYPE_CHECKING
 
-from pydantic_ai import models
+from pydantic_ai import models  # type: ignore
 
 from ..spans import ai_client_span, update_ai_client_span
 
@@ -32,4 +32,4 @@ def _patch_model_request():
                 update_ai_client_span(span, result)
                 return result
 
-        models.Model.request = wrapped_request  # type: ignore
+        models.Model.request = wrapped_request

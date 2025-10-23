@@ -7,7 +7,7 @@ from ..spans import (
     ai_client_span,
     update_ai_client_span,
 )
-from pydantic_ai._agent_graph import ModelRequestNode
+from pydantic_ai._agent_graph import ModelRequestNode  # type: ignore
 
 from typing import TYPE_CHECKING
 
@@ -69,7 +69,7 @@ def _patch_graph_nodes():
             update_ai_client_span(span, model_response)
             return result
 
-    ModelRequestNode.run = wrapped_model_request_run  # type: ignore
+    ModelRequestNode.run = wrapped_model_request_run
 
     # Patch ModelRequestNode.stream for streaming requests
     original_model_request_stream = ModelRequestNode.stream
@@ -102,4 +102,4 @@ def _patch_graph_nodes():
 
         return wrapped_model_request_stream
 
-    ModelRequestNode.stream = create_wrapped_stream(original_model_request_stream)  # type: ignore
+    ModelRequestNode.stream = create_wrapped_stream(original_model_request_stream)
