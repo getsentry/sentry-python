@@ -32,11 +32,8 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
 
-try:
-    from mcp.server.lowlevel import Server
-    from mcp.server.lowlevel.server import request_ctx
-except ImportError:
-    pytest.skip("MCP not installed", allow_module_level=True)
+from mcp.server.lowlevel import Server
+from mcp.server.lowlevel.server import request_ctx
 
 
 # Mock MCP types and structures
