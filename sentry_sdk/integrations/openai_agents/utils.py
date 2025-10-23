@@ -17,11 +17,12 @@ if TYPE_CHECKING:
     from typing import Any
     from agents import Usage
 
-try:
-    import agents
+import agents
 
+try:
+    from agents.items import McpCall
 except ImportError:
-    raise DidNotEnable("OpenAI Agents not installed")
+    McpCall = None  # type: ignore
 
 
 def _capture_exception(exc):
@@ -178,7 +179,7 @@ def _set_output_data(span, result):
 def _create_mcp_execute_tool_spans(span, result):
     # type: (sentry_sdk.tracing.Span, agents.Result) -> None
     for output in result.output:
-        if output.__class__.__name__ == "McpCall":
+        if McpCall and isinstance(output, McpCall):
             with sentry_sdk.start_span(
                 op=OP.GEN_AI_EXECUTE_TOOL,
                 description=f"execute_tool {output.name}",

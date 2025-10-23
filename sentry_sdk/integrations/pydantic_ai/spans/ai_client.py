@@ -17,6 +17,24 @@ if TYPE_CHECKING:
     from typing import Any, List, Dict
     from pydantic_ai.usage import RequestUsage
 
+try:
+    from pydantic_ai.messages import (
+        BaseToolCallPart,
+        BaseToolReturnPart,
+        SystemPromptPart,
+        UserPromptPart,
+        TextPart,
+        ThinkingPart,
+    )
+except ImportError:
+    # Fallback if these classes are not available
+    BaseToolCallPart = None  # type: ignore
+    BaseToolReturnPart = None  # type: ignore
+    SystemPromptPart = None  # type: ignore
+    UserPromptPart = None  # type: ignore
+    TextPart = None  # type: ignore
+    ThinkingPart = None  # type: ignore
+
 
 def _set_usage_data(span, usage):
     # type: (sentry_sdk.tracing.Span, RequestUsage) -> None
@@ -63,24 +81,24 @@ def _set_input_messages(span, messages):
             if hasattr(msg, "parts"):
                 for part in msg.parts:
                     role = "user"
-                    if hasattr(part, "__class__"):
-                        if "System" in part.__class__.__name__:
-                            role = "system"
-                        elif (
-                            "Assistant" in part.__class__.__name__
-                            or "Text" in part.__class__.__name__
-                            or "ToolCall" in part.__class__.__name__
-                        ):
-                            role = "assistant"
-                        elif "ToolReturn" in part.__class__.__name__:
-                            role = "tool"
+                    # Use isinstance checks with proper base classes
+                    if SystemPromptPart and isinstance(part, SystemPromptPart):
+                        role = "system"
+                    elif (
+                        (TextPart and isinstance(part, TextPart))
+                        or (ThinkingPart and isinstance(part, ThinkingPart))
+                        or (BaseToolCallPart and isinstance(part, BaseToolCallPart))
+                    ):
+                        role = "assistant"
+                    elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
+                        role = "tool"
 
                     content = []  # type: List[Dict[str, Any] | str]
                     tool_calls = None
                     tool_call_id = None
 
                     # Handle ToolCallPart (assistant requesting tool use)
-                    if "ToolCall" in part.__class__.__name__:
+                    if BaseToolCallPart and isinstance(part, BaseToolCallPart):
                         tool_call_data = {}
                         if hasattr(part, "tool_name"):
                             tool_call_data["name"] = part.tool_name
@@ -89,7 +107,7 @@ def _set_input_messages(span, messages):
                         if tool_call_data:
                             tool_calls = [tool_call_data]
                     # Handle ToolReturnPart (tool result)
-                    elif "ToolReturn" in part.__class__.__name__:
+                    elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
                         if hasattr(part, "tool_name"):
                             tool_call_id = part.tool_name
                         if hasattr(part, "content"):
@@ -144,18 +162,17 @@ def _set_output_data(span, response):
             tool_calls = []
 
             for part in response.parts:
-                if hasattr(part, "__class__"):
-                    if "Text" in part.__class__.__name__ and hasattr(part, "content"):
-                        texts.append(part.content)
-                    elif "ToolCall" in part.__class__.__name__:
-                        tool_call_data = {
-                            "type": "function",
-                        }
-                        if hasattr(part, "tool_name"):
-                            tool_call_data["name"] = part.tool_name
-                        if hasattr(part, "args"):
-                            tool_call_data["arguments"] = safe_serialize(part.args)
-                        tool_calls.append(tool_call_data)
+                if TextPart and isinstance(part, TextPart) and hasattr(part, "content"):
+                    texts.append(part.content)
+                elif BaseToolCallPart and isinstance(part, BaseToolCallPart):
+                    tool_call_data = {
+                        "type": "function",
+                    }
+                    if hasattr(part, "tool_name"):
+                        tool_call_data["name"] = part.tool_name
+                    if hasattr(part, "args"):
+                        tool_call_data["arguments"] = safe_serialize(part.args)
+                    tool_calls.append(tool_call_data)
 
             if texts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, texts)
