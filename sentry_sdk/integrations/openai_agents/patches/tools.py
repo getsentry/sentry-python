@@ -9,12 +9,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Callable
 
-import agents
-
 try:
-    from agents import FunctionTool
+    import agents
 except ImportError:
-    FunctionTool = None  # type: ignore
+    raise DidNotEnable("OpenAI Agents not installed")
 
 
 def _create_get_all_tools_wrapper(original_get_all_tools):
@@ -37,7 +35,7 @@ def _create_get_all_tools_wrapper(original_get_all_tools):
         wrapped_tools = []
         for tool in tools:
             # Wrap only the function tools (for now)
-            if not isinstance(tool, FunctionTool):
+            if tool.__class__.__name__ != "FunctionTool":
                 wrapped_tools.append(tool)
                 continue
 

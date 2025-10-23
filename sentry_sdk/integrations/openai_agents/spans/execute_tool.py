@@ -11,11 +11,6 @@ if TYPE_CHECKING:
     import agents
     from typing import Any
 
-try:
-    from agents import FunctionTool
-except ImportError:
-    FunctionTool = None  # type: ignore
-
 
 def execute_tool_span(tool, *args, **kwargs):
     # type: (agents.Tool, *Any, **Any) -> sentry_sdk.tracing.Span
@@ -27,7 +22,7 @@ def execute_tool_span(tool, *args, **kwargs):
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
 
-    if FunctionTool and isinstance(tool, FunctionTool):
+    if tool.__class__.__name__ == "FunctionTool":
         span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
 
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
