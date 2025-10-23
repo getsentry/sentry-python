@@ -19,8 +19,8 @@ from sentry_sdk.utils import safe_serialize
 from sentry_sdk.scope import should_send_default_pii
 
 try:
-    from mcp.server.lowlevel import Server
-    from mcp.server.lowlevel.server import request_ctx
+    from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
+    from mcp.server.lowlevel.server import request_ctx  # type: ignore[import-not-found]
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
@@ -210,7 +210,7 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
     elif handler_type == "prompt":
         # For prompts, count messages and set role/content only for single-message prompts
         try:
-            messages = None
+            messages = None  # type: Optional[list[str]]
             message_count = 0
 
             # Check if result has messages attribute (GetPromptResult)
@@ -227,7 +227,7 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
                 span.set_data(SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count)
 
             # Only set role and content for single-message prompts if PII is allowed
-            if message_count == 1 and should_include_data:
+            if message_count == 1 and should_include_data and messages:
                 first_message = messages[0]
                 # Extract role
                 role = None
@@ -525,7 +525,7 @@ def _patch_lowlevel_server():
             original_call_tool, "tool", self, **kwargs
         )(func)
 
-    Server.call_tool = patched_call_tool  # type: ignore
+    Server.call_tool = patched_call_tool
 
     # Patch get_prompt decorator
     original_get_prompt = Server.get_prompt
@@ -537,7 +537,7 @@ def _patch_lowlevel_server():
             original_get_prompt, "prompt", self
         )(func)
 
-    Server.get_prompt = patched_get_prompt  # type: ignore
+    Server.get_prompt = patched_get_prompt
 
     # Patch read_resource decorator
     original_read_resource = Server.read_resource
@@ -549,4 +549,4 @@ def _patch_lowlevel_server():
             original_read_resource, "resource", self
         )(func)
 
-    Server.read_resource = patched_read_resource  # type: ignore
+    Server.read_resource = patched_read_resource
