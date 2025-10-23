@@ -1,16 +1,18 @@
 from sentry_sdk.integrations import DidNotEnable, Integration
 
+
+try:
+    import pydantic_ai
+except ImportError:
+    raise DidNotEnable("pydantic-ai not installed")
+
+
 from .patches import (
     _patch_agent_run,
     _patch_graph_nodes,
     _patch_model_request,
     _patch_tool_execution,
 )
-
-try:
-    import pydantic_ai
-except ImportError:
-    raise DidNotEnable("pydantic-ai not installed")
 
 
 class PydanticAIIntegration(Integration):
