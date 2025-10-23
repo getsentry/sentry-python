@@ -154,12 +154,14 @@ def test_metrics_tracing_without_performance(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_metrics": True})
     envelopes = capture_envelopes()
 
-    _metrics.count("test.span.counter", 1)
+    _metrics.count(22, 1)
 
     get_client().flush()
 
     metrics = envelopes_to_metrics(envelopes)
     assert len(metrics) == 1
+
+    print(metrics)
 
     assert metrics[0]["trace_id"] is not None
     assert metrics[0]["trace_id"] != "00000000-0000-0000-0000-000000000000"
