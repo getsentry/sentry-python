@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional, Any, Iterator
 from unittest import mock
 from unittest.mock import Mock, patch
@@ -24,7 +25,15 @@ from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
 )
-from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
+
+try:
+    # langchain v1+
+    from langchain.tools import tool
+    from langchain_classic.agents import AgentExecutor, create_openai_tools_agent  # type: ignore[import-not-found]
+except ImportError:
+    # langchain <v1
+    from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
+
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
@@ -884,8 +893,6 @@ def test_langchain_message_role_mapping(sentry_init, capture_events):
 
             # Parse the message data (might be JSON string)
             if isinstance(messages_data, str):
-                import json
-
                 try:
                     messages = json.loads(messages_data)
                 except json.JSONDecodeError:
@@ -958,3 +965,77 @@ def test_langchain_message_role_normalization_units():
     assert normalized[3]["role"] == "system"  # system unchanged
     assert "role" not in normalized[4]  # Message without role unchanged
     assert normalized[5] == "string message"  # String message unchanged
+
+
+def test_langchain_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Langchain integration."""
+    from langchain_core.outputs import LLMResult, Generation
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "12345678-1234-1234-1234-123456789012"
+    serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    prompts = [
+        "small message 1",
+        large_content,
+        large_content,
+        "small message 4",
+        "small message 5",
+    ]
+
+    with start_transaction():
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            invocation_params={
+                "temperature": 0.7,
+                "max_tokens": 100,
+                "model": "gpt-3.5-turbo",
+            },
+        )
+
+        response = LLMResult(
+            generations=[[Generation(text="The response")]],
+            llm_output={
+                "token_usage": {
+                    "total_tokens": 25,
+                    "prompt_tokens": 10,
+                    "completion_tokens": 15,
+                }
+            },
+        )
+        callback.on_llm_end(response=response, run_id=run_id)
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
+
+    messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 2
+    assert "small message 4" in str(parsed_messages[0])
+    assert "small message 5" in str(parsed_messages[1])
+    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5

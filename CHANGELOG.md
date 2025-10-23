@@ -1,5 +1,51 @@
 # Changelog
 
+## 2.42.1
+
+### Various fixes & improvements
+
+- fix(gcp): Inject scopes in TimeoutThread exception with GCP (#4959) by @alexander-alderman-webb
+- fix(aws): Inject scopes in TimeoutThread exception with AWS lambda (#4914) by @alexander-alderman-webb
+- fix(ai): add message trunction to anthropic (#4953) by @shellmayr
+- fix(ai): add message truncation to langgraph (#4954) by @shellmayr
+- fix: Default breadcrumbs value for events without breadcrumbs (#4952) by @alexander-alderman-webb
+- fix(ai): add message truncation in langchain (#4950) by @shellmayr
+- fix(ai): correct size calculation, rename internal property for message truncation & add test (#4949) by @shellmayr
+- fix(ai): introduce message truncation for openai (#4946) by @shellmayr
+- fix(openai): Use non-deprecated Pydantic method to extract response text  (#4942) by @JasonLovesDoggo
+- ci: 🤖 Update test matrix with new releases (10/16) (#4945) by @github-actions
+- Handle ValueError in scope resets (#4928) by @sl0thentr0py
+- fix(litellm): Classify embeddings correctly (#4918) by @alexander-alderman-webb
+- Generalize NOT_GIVEN check with omit for openai (#4926) by @sl0thentr0py
+- ⚡️ Speed up function `_get_db_span_description` (#4924) by @misrasaurabh1
+
+## 2.42.0
+
+### Various fixes & improvements
+
+- feat: Add source information for slow outgoing HTTP requests (#4902) by @alexander-alderman-webb
+- tests: Update tox (#4913) by @sentrivana
+- fix(Ray): Retain the original function name when patching Ray tasks (#4858) by @svartalf
+- feat(ai): Add `python-genai` integration (#4891) by @vgrozdanic
+  Enable the new Google GenAI integration with the code snippet below, and you can use the Sentry AI dashboards to observe your AI calls:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          GoogleGenAIIntegration(),
+      ],
+  )
+  ```
+
 ## 2.41.0
 
 ### Various fixes & improvements
