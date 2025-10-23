@@ -281,6 +281,12 @@ TEST_SUITE_CONFIG = {
         "package": "pure_eval",
         "num_versions": 2,
     },
+    "pydantic_ai": {
+        "package": "pydantic-ai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
     "pymongo": {
         "package": "pymongo",
         "deps": {
