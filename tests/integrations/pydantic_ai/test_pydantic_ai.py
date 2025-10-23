@@ -787,3 +787,152 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_events):
     pytest.skip(
         "MCP test needs to be rewritten to use agent.run() instead of manually calling toolset methods"
     )
+
+
+@pytest.mark.asyncio
+async def test_context_cleanup_after_run(sentry_init, test_agent):
+    """
+    Test that the pydantic_ai_agent context is properly cleaned up after agent execution.
+    """
+    import sentry_sdk
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Verify context is not set before run
+    scope = sentry_sdk.get_current_scope()
+    assert "pydantic_ai_agent" not in scope._contexts
+
+    # Run the agent
+    await test_agent.run("Test input")
+
+    # Verify context is cleaned up after run
+    assert "pydantic_ai_agent" not in scope._contexts
+
+
+def test_context_cleanup_after_run_sync(sentry_init, test_agent):
+    """
+    Test that the pydantic_ai_agent context is properly cleaned up after sync agent execution.
+    """
+    import sentry_sdk
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Verify context is not set before run
+    scope = sentry_sdk.get_current_scope()
+    assert "pydantic_ai_agent" not in scope._contexts
+
+    # Run the agent synchronously
+    test_agent.run_sync("Test input")
+
+    # Verify context is cleaned up after run
+    assert "pydantic_ai_agent" not in scope._contexts
+
+
+@pytest.mark.asyncio
+async def test_context_cleanup_after_streaming(sentry_init, test_agent):
+    """
+    Test that the pydantic_ai_agent context is properly cleaned up after streaming execution.
+    """
+    import sentry_sdk
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Verify context is not set before run
+    scope = sentry_sdk.get_current_scope()
+    assert "pydantic_ai_agent" not in scope._contexts
+
+    # Run the agent with streaming
+    async with test_agent.run_stream("Test input") as result:
+        async for _ in result.stream_output():
+            pass
+
+    # Verify context is cleaned up after streaming completes
+    assert "pydantic_ai_agent" not in scope._contexts
+
+
+@pytest.mark.asyncio
+async def test_context_cleanup_on_error(sentry_init, test_agent):
+    """
+    Test that the pydantic_ai_agent context is cleaned up even when an error occurs.
+    """
+    import sentry_sdk
+
+    # Create an agent with a tool that raises an error
+    @test_agent.tool_plain
+    def failing_tool() -> str:
+        """A tool that always fails."""
+        raise ValueError("Tool error")
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Verify context is not set before run
+    scope = sentry_sdk.get_current_scope()
+    assert "pydantic_ai_agent" not in scope._contexts
+
+    # Run the agent - this may or may not raise depending on pydantic-ai's error handling
+    try:
+        await test_agent.run("Use the failing tool")
+    except Exception:
+        pass
+
+    # Verify context is cleaned up even if there was an error
+    assert "pydantic_ai_agent" not in scope._contexts
+
+
+@pytest.mark.asyncio
+async def test_context_isolation_concurrent_agents(sentry_init, test_agent):
+    """
+    Test that concurrent agent executions maintain isolated contexts.
+    """
+    import sentry_sdk
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Create a second agent
+    agent2 = Agent(
+        "test",
+        name="test_agent_2",
+        system_prompt="Second test agent.",
+    )
+
+    async def run_and_check_context(agent, agent_name):
+        """Run an agent and verify its context during and after execution."""
+        # Before execution, context should not exist in the outer scope
+        outer_scope = sentry_sdk.get_current_scope()
+
+        # Run the agent
+        await agent.run(f"Input for {agent_name}")
+
+        # After execution, verify context is cleaned up
+        # Note: Due to isolation_scope, we can't easily check the inner scope here,
+        # but we can verify the outer scope remains clean
+        assert "pydantic_ai_agent" not in outer_scope._contexts
+
+        return agent_name
+
+    # Run both agents concurrently
+    results = await asyncio.gather(
+        run_and_check_context(test_agent, "agent1"),
+        run_and_check_context(agent2, "agent2"),
+    )
+
+    assert results == ["agent1", "agent2"]
+
+    # Final check: outer scope should be clean
+    final_scope = sentry_sdk.get_current_scope()
+    assert "pydantic_ai_agent" not in final_scope._contexts

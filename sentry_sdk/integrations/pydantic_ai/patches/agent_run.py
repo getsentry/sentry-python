@@ -83,6 +83,7 @@ class _StreamingContextManagerWrapper:
                 )
                 update_invoke_agent_span(self._span, output)
         finally:
+            sentry_sdk.get_current_scope().remove_context("pydantic_ai_agent")
             # Clean up invoke span
             if self._span:
                 self._span.__exit__(exc_type, exc_val, exc_tb)
@@ -132,6 +133,8 @@ def _create_run_wrapper(original_func, is_streaming=False):
                 except Exception as exc:
                     _capture_exception(exc)
                     raise exc from None
+                finally:
+                    sentry_sdk.get_current_scope().remove_context("pydantic_ai_agent")
 
     return wrapper
 
