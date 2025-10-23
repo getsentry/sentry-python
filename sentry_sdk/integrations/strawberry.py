@@ -96,6 +96,7 @@ def _patch_schema_init():
 
         extensions = kwargs.get("extensions") or []
 
+        should_use_async_extension = None  # type: Optional[bool]
         if integration.async_execution is not None:
             should_use_async_extension = integration.async_execution
         else:
