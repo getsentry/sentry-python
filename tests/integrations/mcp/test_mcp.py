@@ -28,12 +28,36 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
+from mcp.server.lowlevel import Server
+from mcp.server.lowlevel.server import request_ctx
+
+try:
+    from mcp.server.lowlevel.server import request_ctx
+except ImportError:
+    request_ctx = None
+
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
 
-from mcp.server.lowlevel import Server
-from mcp.server.lowlevel.server import request_ctx
+
+@pytest.fixture(autouse=True)
+def reset_request_ctx():
+    """Reset request context before and after each test"""
+    if request_ctx is not None:
+        try:
+            if request_ctx.get() is not None:
+                request_ctx.set(None)
+        except LookupError:
+            pass
+
+    yield
+
+    if request_ctx is not None:
+        try:
+            request_ctx.set(None)
+        except LookupError:
+            pass
 
 
 # Mock MCP types and structures
