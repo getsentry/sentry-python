@@ -202,8 +202,11 @@ TEST_SUITE_CONFIG = {
             "*": ["openai", "tiktoken", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
+            ">=1.0": ["langchain-classic"],
         },
-        "include": "<1.0",
+        "python": {
+            "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
+        },
     },
     "langchain-notiktoken": {
         "package": "langchain",
@@ -212,8 +215,11 @@ TEST_SUITE_CONFIG = {
             "*": ["openai", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
+            ">=1.0": ["langchain-classic"],
         },
-        "include": "<1.0",
+        "python": {
+            "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
+        },
     },
     "langgraph": {
         "package": "langgraph",
