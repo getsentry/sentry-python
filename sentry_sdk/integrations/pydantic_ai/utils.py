@@ -134,3 +134,42 @@ def _set_model_data(span, model, model_settings):
                     value = getattr(settings, setting_name)
                     if value is not None:
                         span.set_data(spandata_key, value)
+
+
+def _set_available_tools(span, agent):
+    # type: (sentry_sdk.tracing.Span, Any) -> None
+    """Set available tools data on a span from an agent's function toolset.
+
+    Args:
+        span: The span to set data on
+        agent: Agent object with _function_toolset attribute
+    """
+    if not agent or not hasattr(agent, "_function_toolset"):
+        return
+
+    try:
+        tools = []
+        # Get tools from the function toolset
+        if hasattr(agent._function_toolset, "tools"):
+            for tool_name, tool in agent._function_toolset.tools.items():
+                tool_info = {"name": tool_name}
+
+                # Add description from function_schema if available
+                if hasattr(tool, "function_schema"):
+                    schema = tool.function_schema
+                    if getattr(schema, "description", None):
+                        tool_info["description"] = schema.description
+
+                    # Add parameters from json_schema
+                    if getattr(schema, "json_schema", None):
+                        tool_info["parameters"] = schema.json_schema
+
+                tools.append(tool_info)
+
+        if tools:
+            span.set_data(
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            )
+    except Exception:
+        # If we can't extract tools, just skip it
+        pass

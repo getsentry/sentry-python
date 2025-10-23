@@ -6,6 +6,7 @@ from sentry_sdk.utils import safe_serialize
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _set_agent_data,
+    _set_available_tools,
     _set_model_data,
     _should_send_prompts,
     _get_model_name,
@@ -229,33 +230,7 @@ def ai_client_span(messages, agent, model, model_settings):
         )
         agent_obj = agent_data.get("_agent")
 
-    if agent_obj and hasattr(agent_obj, "_function_toolset"):
-        try:
-            tools = []
-            # Get tools from the function toolset
-            if hasattr(agent_obj._function_toolset, "tools"):
-                for tool_name, tool in agent_obj._function_toolset.tools.items():
-                    tool_info = {"name": tool_name}
-
-                    # Add description from function_schema if available
-                    if hasattr(tool, "function_schema"):
-                        schema = tool.function_schema
-                        if getattr(schema, "description", None):
-                            tool_info["description"] = schema.description
-
-                        # Add parameters from json_schema
-                        if getattr(schema, "json_schema", None):
-                            tool_info["parameters"] = schema.json_schema
-
-                    tools.append(tool_info)
-
-            if tools:
-                span.set_data(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
-        except Exception:
-            # If we can't extract tools, just skip it
-            pass
+    _set_available_tools(span, agent_obj)
 
     # Set input messages (full conversation history)
     if messages:

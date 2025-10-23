@@ -1,11 +1,11 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _set_agent_data,
+    _set_available_tools,
     _set_model_data,
     _should_send_prompts,
 )
@@ -34,35 +34,7 @@ def invoke_agent_span(user_prompt, agent, model, model_settings):
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
-
-    # Add available tools if present
-    if agent and hasattr(agent, "_function_toolset"):
-        try:
-            tools = []
-            # Get tools from the function toolset
-            if hasattr(agent._function_toolset, "tools"):
-                for tool_name, tool in agent._function_toolset.tools.items():
-                    tool_info = {"name": tool_name}
-
-                    # Add description from function_schema if available
-                    if hasattr(tool, "function_schema"):
-                        schema = tool.function_schema
-                        if getattr(schema, "description", None):
-                            tool_info["description"] = schema.description
-
-                        # Add parameters from json_schema
-                        if getattr(schema, "json_schema", None):
-                            tool_info["parameters"] = schema.json_schema
-
-                    tools.append(tool_info)
-
-            if tools:
-                span.set_data(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
-        except Exception:
-            # If we can't extract tools, just skip it
-            pass
+    _set_available_tools(span, agent)
 
     # Add user prompt and system prompts if available and prompts are enabled
     if _should_send_prompts():
