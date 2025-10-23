@@ -32,7 +32,7 @@ try:
     from langchain_classic.agents import AgentExecutor, create_openai_tools_agent
 except ImportError:
     # langchain <v1
-    from langchain.agents import tool, AgentExecutor, reate_openai_tools_agent
+    from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
