@@ -1,5 +1,6 @@
 import functools
 import hashlib
+import warnings
 from inspect import isawaitable
 
 import sentry_sdk
@@ -98,13 +99,10 @@ def _patch_schema_init():
         if integration.async_execution is not None:
             should_use_async_extension = integration.async_execution
         else:
-            # try to figure it out ourselves
-            should_use_async_extension = _guess_if_using_async(extensions)
-
-            logger.info(
-                "Assuming strawberry is running %s. If not, initialize it as StrawberryIntegration(async_execution=%s).",
-                "async" if should_use_async_extension else "sync",
-                "False" if should_use_async_extension else "True",
+            # use the sync extension by default
+            warnings.warn(
+                "Assuming strawberry is running sync. If not, initialize the integration as StrawberryIntegration(async_execution=True).",
+                stacklevel=2,
             )
 
         # remove the built in strawberry sentry extension, if present
@@ -379,15 +377,3 @@ def _make_response_event_processor(response_data):
         return event
 
     return inner
-
-
-def _guess_if_using_async(extensions):
-    # type: (List[SchemaExtension]) -> bool
-    if StrawberrySentryAsyncExtension in extensions:
-        return True
-    elif StrawberrySentrySyncExtension in extensions:
-        return False
-
-    return bool(
-        {"starlette", "starlite", "litestar", "fastapi"} & set(_get_installed_modules())
-    )
