@@ -3,7 +3,11 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
+from sentry_sdk.ai.utils import (
+    get_start_span_function,
+    set_data_normalized,
+    truncate_and_annotate_messages,
+)
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -76,9 +80,12 @@ def _input_callback(kwargs):
     # Record messages if allowed
     messages = kwargs.get("messages", [])
     if messages and should_send_default_pii() and integration.include_prompts:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
-        )
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
 
     # Record other parameters
     params = {
