@@ -50,14 +50,14 @@ except ImportError:
 
 
 try:
+    # >=v1
     from langchain_classic.agents import AgentExecutor  # type: ignore[import-not-found]
 except ImportError:
-    AgentExecutor = None
-
-try:
-    from langchain.agents import AgentExecutor
-except ImportError:
-    AgentExecutor = None
+    try:
+        # <v1
+        from langchain.agents import AgentExecutor
+    except ImportError:
+        AgentExecutor = None
 
 
 DATA_FIELDS = {
