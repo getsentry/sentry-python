@@ -514,8 +514,6 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
 
 def has_free_threading_wheel(pypi_data: dict) -> bool:
     for download in pypi_data["urls"]:
-        print(download)
-
         if download["packagetype"] == "bdist_wheel":
             abi_tag = download["filename"].removesuffix(".whl").split("-")[-2]
 
