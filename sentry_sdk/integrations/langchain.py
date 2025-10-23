@@ -50,9 +50,15 @@ except ImportError:
 
 
 try:
+    from langchain_classic.agents import AgentExecutor
+except ImportError:
+    AgentExecutor = None
+
+try:
     from langchain.agents import AgentExecutor
 except ImportError:
     AgentExecutor = None
+
 
 DATA_FIELDS = {
     "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
