@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from bisect import bisect_left
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone  # noqa: F401
@@ -66,6 +67,26 @@ IGNORE = {
     "opentelemetry",
     "potel",
 }
+
+# Free-threading is experimentally supported in 3.13, and officially supported in 3.14.
+MIN_FREE_THREADING_SUPPORT = Version("3.14")
+
+
+@dataclass(order=True)
+class ThreadedVersion:
+    version: Version
+    no_gil: bool
+
+    def __init__(self, version: str | Version, no_gil=False):
+        self.version = Version(version) if isinstance(version, str) else version
+        self.no_gil = no_gil
+
+    def __str__(self):
+        version = f"py{self.version.major}.{self.version.minor}"
+        if self.no_gil:
+            version += "t"
+
+        return version
 
 
 def _fetch_sdk_metadata() -> PackageMetadata:
@@ -404,12 +425,19 @@ def supported_python_versions(
     return supported
 
 
-def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version]:
+def pick_python_versions_to_test(
+    python_versions: list[Version],
+    python_versions_with_free_threaded_wheel: set[Version],
+) -> list[ThreadedVersion]:
     """
     Given a list of Python versions, pick those that make sense to test on.
 
     Currently, this is the oldest, the newest, and the second newest Python
     version.
+
+    A free-threaded variant is also chosen for the newest Python version for which
+    - a free-threaded wheel is distributed; and
+    - the SDK supports free-threading.
     """
     filtered_python_versions = {
         python_versions[0],
@@ -421,7 +449,21 @@ def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version
     except IndexError:
         pass
 
-    return sorted(filtered_python_versions)
+    versions_to_test = sorted(
+        ThreadedVersion(version) for version in filtered_python_versions
+    )
+
+    for python_version in reversed(python_versions):
+        if python_version < MIN_FREE_THREADING_SUPPORT:
+            break
+
+        if python_version in python_versions_with_free_threaded_wheel:
+            versions_to_test.append(
+                ThreadedVersion(versions_to_test[-1].version, no_gil=True)
+            )
+            break
+
+    return versions_to_test
 
 
 def _parse_python_versions_from_classifiers(classifiers: list[str]) -> list[Version]:
@@ -475,12 +517,33 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
     return []
 
 
-def _render_python_versions(python_versions: list[Version]) -> str:
-    return (
-        "{"
-        + ",".join(f"py{version.major}.{version.minor}" for version in python_versions)
-        + "}"
-    )
+def has_free_threading_wheel(pypi_data: dict, version: Version) -> bool:
+    """
+    Check if the package distributes a wheel on the given Python minor
+    version which supports free-threading Python.
+
+    There are two cases in which we assume a package has free-threading
+    support:
+    - The package is pure Python, indicated by a "none" abi tag in its wheels; or
+    - the abi tag of one of its wheels has a "t" suffix to indicate a free-threaded build.
+
+    See https://peps.python.org/pep-0427/#file-name-convention
+    """
+    for download in pypi_data["urls"]:
+        if download["packagetype"] == "bdist_wheel":
+            abi_tag = download["filename"].removesuffix(".whl").split("-")[-2]
+
+            abi_tag_version = f"{version.major}{version.minor}"
+            if abi_tag == "none" or (
+                abi_tag.endswith("t") and abi_tag.startswith(f"cp{abi_tag_version}")
+            ):
+                return True
+
+    return False
+
+
+def _render_python_versions(python_versions: list[ThreadedVersion]) -> str:
+    return "{" + ",".join(str(version) for version in python_versions) + "}"
 
 
 def _render_dependencies(integration: str, releases: list[Version]) -> list[str]:
@@ -585,12 +648,21 @@ def _add_python_versions_to_release(
         TEST_SUITE_CONFIG[integration].get("python")
     )
 
+    supported_py_versions = supported_python_versions(
+        determine_python_versions(release_pypi_data),
+        target_python_versions,
+        release,
+    )
+
+    py_versions_with_free_threaded_wheel = set(
+        version
+        for version in supported_py_versions
+        if has_free_threading_wheel(release_pypi_data, version)
+    )
+
     release.python_versions = pick_python_versions_to_test(
-        supported_python_versions(
-            determine_python_versions(release_pypi_data),
-            target_python_versions,
-            release,
-        )
+        supported_py_versions,
+        py_versions_with_free_threaded_wheel,
     )
 
     release.rendered_python_versions = _render_python_versions(release.python_versions)
@@ -647,8 +719,16 @@ def _normalize_name(package: str) -> str:
     return package.lower().replace("-", "_")
 
 
+def _extract_wheel_info_to_cache(wheel: dict):
+    return {
+        "packagetype": wheel["packagetype"],
+        "filename": wheel["filename"],
+    }
+
+
 def _normalize_release(release: dict) -> dict:
     """Filter out unneeded parts of the release JSON."""
+    urls = [_extract_wheel_info_to_cache(wheel) for wheel in release["urls"]]
     normalized = {
         "info": {
             "classifiers": release["info"]["classifiers"],
@@ -657,6 +737,7 @@ def _normalize_release(release: dict) -> dict:
             "version": release["info"]["version"],
             "yanked": release["info"]["yanked"],
         },
+        "urls": urls,
     }
     return normalized
 
@@ -766,7 +847,7 @@ def main() -> dict[str, list]:
 
     print(
         "Done generating tox.ini. Make sure to also update the CI YAML "
-        "files to reflect the new test targets."
+        "files by executing split_tox_gh_actions.py."
     )
 
     return packages
