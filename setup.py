@@ -71,7 +71,7 @@ setup(
         "mcp": ["mcp>=1.15.0"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "openfeature": ["openfeature-sdk>=0.7.1"],
-        "opentelemetry": ["opentelemetry-distro>=0.35b0"],
+        "opentelemetry": ["opentelemetry-distro>=0.35b0", "opentelemetry-exporter-otlp-proto-http>=1.0.0"],
         "opentelemetry-experimental": ["opentelemetry-distro"],
         "pure-eval": ["pure_eval", "executing", "asttokens"],
         "pydantic_ai": ["pydantic-ai>=1.0.0"],
