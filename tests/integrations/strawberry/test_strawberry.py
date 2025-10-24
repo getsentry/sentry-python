@@ -103,49 +103,24 @@ def sync_app_client_factory():
 def test_async_execution_uses_async_extension(sentry_init):
     sentry_init(integrations=[StrawberryIntegration(async_execution=True)])
 
-    with mock.patch(
-        "sentry_sdk.integrations.strawberry._get_installed_modules",
-        return_value={"flask": "2.3.3"},
-    ):
-        # actual installed modules should not matter, the explicit option takes
-        # precedence
-        schema = strawberry.Schema(Query)
-        assert SentryAsyncExtension in schema.extensions
+    schema = strawberry.Schema(Query)
+    assert SentryAsyncExtension in schema.extensions
+    assert SentrySyncExtension not in schema.extensions
 
 
 def test_sync_execution_uses_sync_extension(sentry_init):
     sentry_init(integrations=[StrawberryIntegration(async_execution=False)])
 
-    with mock.patch(
-        "sentry_sdk.integrations.strawberry._get_installed_modules",
-        return_value={"fastapi": "0.103.1", "starlette": "0.27.0"},
-    ):
-        # actual installed modules should not matter, the explicit option takes
-        # precedence
-        schema = strawberry.Schema(Query)
-        assert SentrySyncExtension in schema.extensions
+    schema = strawberry.Schema(Query)
+    assert SentrySyncExtension in schema.extensions
+    assert SentryAsyncExtension not in schema.extensions
 
 
-def test_infer_execution_type_from_installed_packages_async(sentry_init):
+def test_use_sync_extension_if_not_specified(sentry_init):
     sentry_init(integrations=[StrawberryIntegration()])
-
-    with mock.patch(
-        "sentry_sdk.integrations.strawberry._get_installed_modules",
-        return_value={"fastapi": "0.103.1", "starlette": "0.27.0"},
-    ):
-        schema = strawberry.Schema(Query)
-        assert SentryAsyncExtension in schema.extensions
-
-
-def test_infer_execution_type_from_installed_packages_sync(sentry_init):
-    sentry_init(integrations=[StrawberryIntegration()])
-
-    with mock.patch(
-        "sentry_sdk.integrations.strawberry._get_installed_modules",
-        return_value={"flask": "2.3.3"},
-    ):
-        schema = strawberry.Schema(Query)
-        assert SentrySyncExtension in schema.extensions
+    schema = strawberry.Schema(Query)
+    assert SentrySyncExtension in schema.extensions
+    assert SentryAsyncExtension not in schema.extensions
 
 
 @pytest.mark.skipif(
