@@ -78,9 +78,11 @@ GROUPS = {
         "langchain-notiktoken",
         "langgraph",
         "litellm",
+        "mcp",
         "openai-base",
         "openai-notiktoken",
         "openai_agents",
+        "pydantic_ai",
     ],
     "Cloud": [
         "aws_lambda",

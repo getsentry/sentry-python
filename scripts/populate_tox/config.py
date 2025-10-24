@@ -242,6 +242,12 @@ TEST_SUITE_CONFIG = {
         "package": "loguru",
         "num_versions": 2,
     },
+    "mcp": {
+        "package": "mcp",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
     "openai-base": {
         "package": "openai",
         "integration_name": "openai",
@@ -280,6 +286,12 @@ TEST_SUITE_CONFIG = {
     "pure_eval": {
         "package": "pure_eval",
         "num_versions": 2,
+    },
+    "pydantic_ai": {
+        "package": "pydantic-ai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
     },
     "pymongo": {
         "package": "pymongo",
