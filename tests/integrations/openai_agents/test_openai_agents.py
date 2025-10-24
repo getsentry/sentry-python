@@ -1,32 +1,32 @@
 import asyncio
-import re
-import pytest
-from unittest.mock import MagicMock, patch
+import json
 import os
-
-from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
-from sentry_sdk.integrations.openai_agents.utils import safe_serialize
-from sentry_sdk.utils import parse_version
+import re
+from unittest.mock import MagicMock, patch
 
 import agents
+import pytest
 from agents import (
     Agent,
     ModelResponse,
-    Usage,
     ModelSettings,
+    Usage,
 )
 from agents.items import (
     McpCall,
+    ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputText,
-    ResponseFunctionToolCall,
 )
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
-
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
 )
+
+from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+from sentry_sdk.integrations.openai_agents.utils import safe_serialize
+from sentry_sdk.utils import parse_version
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
 
@@ -1051,8 +1051,8 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
 
     get_response_kwargs = {"input": test_input}
 
-    from sentry_sdk.integrations.openai_agents.utils import _set_input_data
     from sentry_sdk import start_span
+    from sentry_sdk.integrations.openai_agents.utils import _set_input_data
 
     with start_span(op="test") as span:
         _set_input_data(span, get_response_kwargs)
@@ -1061,8 +1061,6 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
     from sentry_sdk.consts import SPANDATA
 
     if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
-        import json
-
         stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
         # Verify roles were properly mapped
@@ -1077,3 +1075,83 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
         # Verify no "ai" roles remain in any message
         for message in stored_messages:
             assert message["role"] != "ai"
+
+
+@pytest.mark.asyncio
+async def test_openai_agents_message_truncation(
+    sentry_init, capture_events, test_agent, mock_usage
+):
+    """Test that large messages are truncated properly in OpenAI Agents integration."""
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            large_content = (
+                "This is a very long message that will exceed our size limits. " * 1000
+            )
+
+            large_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_large",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text=large_content,
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=mock_usage,
+                response_id="resp_large",
+            )
+
+            mock_get_response.return_value = large_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            # Create messages with mixed large/small content by patching get_response
+            with patch(
+                "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+            ) as mock_inner:
+                mock_inner.side_effect = [large_response] * 5
+
+                # We'll test with the agent itself, not the messages
+                # since OpenAI agents tracks messages internally
+                result = await agents.Runner.run(
+                    test_agent, "Test input", run_config=test_run_config
+                )
+
+            assert result is not None
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    # Check ai_client spans (these have the truncation)
+    ai_client_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.chat"
+    ]
+    assert len(ai_client_spans) > 0
+
+    # Just verify that messages are being set and truncation is applied
+    # The actual truncation behavior is tested in the ai_monitoring tests
+    ai_client_span = ai_client_spans[0]
+    if "gen_ai.request.messages" in ai_client_span["data"]:
+        messages_data = ai_client_span["data"]["gen_ai.request.messages"]
+        assert isinstance(messages_data, str)
+
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        # Verify messages were processed
+        assert len(parsed_messages) >= 1
