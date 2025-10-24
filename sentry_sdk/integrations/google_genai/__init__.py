@@ -92,6 +92,7 @@ def _wrap_generate_content_stream(f):
         chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
         set_span_data_for_request(chat_span, integration, model_name, contents, kwargs)
         chat_span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        chat_span.set_data(SPANDATA.GEN_AI_AGENT_NAME, model_name)
 
         try:
             stream = f(self, *args, **kwargs)
@@ -165,6 +166,7 @@ def _wrap_async_generate_content_stream(f):
         chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
         set_span_data_for_request(chat_span, integration, model_name, contents, kwargs)
         chat_span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        chat_span.set_data(SPANDATA.GEN_AI_AGENT_NAME, model_name)
 
         try:
             stream = await f(self, *args, **kwargs)
@@ -233,6 +235,7 @@ def _wrap_generate_content(f):
                 chat_span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
                 chat_span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
                 chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+                chat_span.set_data(SPANDATA.GEN_AI_AGENT_NAME, model_name)
                 set_span_data_for_request(
                     chat_span, integration, model_name, contents, kwargs
                 )
