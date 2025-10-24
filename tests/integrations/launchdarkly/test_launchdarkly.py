@@ -200,7 +200,6 @@ def test_launchdarkly_integration_did_not_enable(monkeypatch):
         LaunchDarklyIntegration()
 
     td = TestData.data_source()
-    td.update(td.flag("hello").variation_for_all(True))
     # Disable background requests as we aren't using a server.
     # Required because we corrupt the internal state above.
     config = Config(
