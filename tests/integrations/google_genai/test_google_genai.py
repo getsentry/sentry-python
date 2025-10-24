@@ -905,3 +905,51 @@ def test_tool_calls_extraction(sentry_init, capture_events, mock_genai_client):
     assert tool_calls[1]["type"] == "function_call"
     # Arguments are serialized as JSON strings
     assert json.loads(tool_calls[1]["arguments"]) == {"timezone": "PST"}
+
+
+def test_google_genai_message_truncation(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test that large messages are truncated properly in Google GenAI integration."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    small_content = "This is a small user message"
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=small_content,
+                config=create_test_config(
+                    system_instruction=large_content,
+                ),
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+
+    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+    assert parsed_messages[0]["role"] == "user"
+    assert small_content in parsed_messages[0]["content"]
+
+    assert (
+        event["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 2
+    )
