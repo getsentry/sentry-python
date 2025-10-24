@@ -199,8 +199,15 @@ def test_launchdarkly_integration_did_not_enable(monkeypatch):
     with pytest.raises(DidNotEnable):
         LaunchDarklyIntegration()
 
+    td = TestData.data_source()
+    td.update(td.flag("hello").variation_for_all(True))
+    # Disable background requests as we aren't using a server.
+    # Required because we corrupt the internal state above.
+    config = Config(
+        "sdk-key", update_processor_class=td, diagnostic_opt_out=True, send_events=False
+    )
     # Client not initialized.
-    client = LDClient(config=Config("sdk-key"))
+    client = LDClient(config=config)
     monkeypatch.setattr(client, "is_initialized", lambda: False)
     with pytest.raises(DidNotEnable):
         LaunchDarklyIntegration(ld_client=client)
