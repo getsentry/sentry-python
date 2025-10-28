@@ -168,6 +168,7 @@ def test_cache_spans_disabled_templatetag(
     assert len(second_event["spans"]) == 0
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_middleware(
