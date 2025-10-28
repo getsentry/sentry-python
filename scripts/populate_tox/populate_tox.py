@@ -7,6 +7,7 @@ See scripts/populate_tox/README.md for more info.
 import functools
 import hashlib
 import json
+import re
 import os
 import subprocess
 import sys
@@ -518,8 +519,35 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
     return []
 
 
+def get_abi_tag(wheel_filename: str) -> str:
+    return wheel_filename.removesuffix(".whl").split("-")[-2]
+
+
 def has_free_threading_dependencies(package_name: str, release: Version) -> bool:
-    pass
+    # Removing non-report output with -qqq may be brittle, but avoids file I/O
+    pip_report = subprocess.run(
+        [
+            "pip",
+            "install",
+            package_name,
+            "--dry-run",
+            "--ignore-installed",
+            "--report",
+            "-",
+            "-qqq",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    dependencies_info = json.loads(pip_report)["install"]
+    for dependency_info in dependencies_info:
+        wheel_filename = dependency_info["download_info"]["url"].split("/")[-1]
+        abi_tag = get_abi_tag(wheel_filename)
+        if abi_tag != "none" and not abi_tag.endswith("t"):
+            return False
+
+    return True
 
 
 def supports_free_threading(
@@ -539,7 +567,7 @@ def supports_free_threading(
     """
     for download in pypi_data["urls"]:
         if download["packagetype"] == "bdist_wheel":
-            abi_tag = download["filename"].removesuffix(".whl").split("-")[-2]
+            abi_tag = get_abi_tag(download["filename"])
 
             abi_tag_version = f"{python_version.major}{python_version.minor}"
             if (
