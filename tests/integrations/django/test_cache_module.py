@@ -509,6 +509,7 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
     assert second_event["spans"][1]["data"]["cache.item_size"] == 58
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_get_custom_default(
     sentry_init, capture_events, use_django_caching
