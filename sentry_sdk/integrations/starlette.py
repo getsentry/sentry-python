@@ -326,7 +326,7 @@ def _add_user_to_sentry_scope(scope):
         user_info.setdefault("email", starlette_user.email)
 
     sentry_scope = sentry_sdk.get_isolation_scope()
-    sentry_scope.user = user_info
+    sentry_scope.set_user(user_info)
 
 
 def patch_authentication_middleware(middleware_class):
