@@ -2,6 +2,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.tracing_utils import set_span_errored
 
 from typing import TYPE_CHECKING
 
@@ -57,7 +58,7 @@ def _patch_error_tracing():
         # Set the current Sentry span to errored
         current_span = sentry_sdk.get_current_span()
         if current_span is not None:
-            current_span.set_status(SPANSTATUS.ERROR)
+            set_span_errored(current_span)
             current_span.set_data("span.status", "error")
 
             # Optionally capture the error details if we have them
