@@ -33,7 +33,7 @@ def _patch_error_tracing():
     # Try older location (agents._utils)
     if error_tracing_module is None:
         try:
-            import agents._utils  # type: ignore[import-not-found]
+            import agents._utils
 
             error_tracing_module = agents._utils
         except (ImportError, AttributeError):
