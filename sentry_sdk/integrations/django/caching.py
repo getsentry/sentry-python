@@ -26,7 +26,7 @@ def _get_span_description(method_name, args, kwargs):
 
 
 def _set_address_and_port(span, address, port):
-    # type: (sentry_sdk.Span, Optional[str], Optional[int]) -> None
+    # type: (sentry_sdk.tracing.Span, Optional[str], Optional[int]) -> None
     if address is not None:
         span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
 
