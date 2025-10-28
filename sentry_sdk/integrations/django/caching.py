@@ -153,7 +153,7 @@ def _patch_cache(cache, address=None, port=None):
     if not hasattr(cache, "_sentry_patched"):
         _patch_cache_method(cache, "set", address, port)
         _patch_cache_method(cache, "set_many", address, port)
-        # Seperate patch as you can overwrite value on cache-miss
+        # Separate patch to account for custom default values on cache misses.
         _patch_get_cache(cache, address, port)
         _patch_cache_method(cache, "get_many", address, port)
         cache._sentry_patched = True
