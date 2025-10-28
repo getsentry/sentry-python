@@ -223,8 +223,8 @@ def test_cache_spans_middleware(
     assert second_event["spans"][0]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_header."
     )
-    assert not second_event["spans"][0]["data"]["cache.hit"]
-    assert "cache.item_size" not in second_event["spans"][0]["data"]
+    assert second_event["spans"][0]["data"]["cache.hit"]
+    assert "cache.item_size" in second_event["spans"][0]["data"]
     # second_event - cache.get 2
     assert second_event["spans"][1]["op"] == "cache.get"
     assert second_event["spans"][1]["description"].startswith(
@@ -501,8 +501,8 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
 
     assert len(second_event["spans"]) == 2
     assert second_event["spans"][0]["op"] == "cache.get"
-    assert not second_event["spans"][0]["data"]["cache.hit"]
-    assert "cache.item_size" not in second_event["spans"][0]["data"]
+    assert second_event["spans"][0]["data"]["cache.hit"]
+    assert "cache.item_size" in second_event["spans"][0]["data"]
 
     assert second_event["spans"][1]["op"] == "cache.get"
     assert second_event["spans"][1]["data"]["cache.hit"]
