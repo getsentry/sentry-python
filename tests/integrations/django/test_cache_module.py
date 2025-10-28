@@ -168,7 +168,6 @@ def test_cache_spans_disabled_templatetag(
     assert len(second_event["spans"]) == 0
 
 
-@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_middleware(
@@ -600,24 +599,30 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
 
     assert transaction["spans"][0]["op"] == "cache.get"
     assert transaction["spans"][0]["description"] == f"S{id}, S{id + 1}"
+    assert not transaction["spans"][0]["data"]["cache.hit"]
 
     assert transaction["spans"][1]["op"] == "cache.get"
     assert transaction["spans"][1]["description"] == f"S{id}"
+    assert not transaction["spans"][1]["data"]["cache.hit"]
 
     assert transaction["spans"][2]["op"] == "cache.get"
     assert transaction["spans"][2]["description"] == f"S{id + 1}"
+    assert not transaction["spans"][2]["data"]["cache.hit"]
 
     assert transaction["spans"][3]["op"] == "cache.put"
     assert transaction["spans"][3]["description"] == f"S{id}"
 
     assert transaction["spans"][4]["op"] == "cache.get"
     assert transaction["spans"][4]["description"] == f"S{id}, S{id + 1}"
+    assert transaction["spans"][4]["data"]["cache.hit"]
 
     assert transaction["spans"][5]["op"] == "cache.get"
     assert transaction["spans"][5]["description"] == f"S{id}"
+    assert not transaction["spans"][1]["data"]["cache.hit"]
 
     assert transaction["spans"][6]["op"] == "cache.get"
     assert transaction["spans"][6]["description"] == f"S{id + 1}"
+    assert not transaction["spans"][1]["data"]["cache.hit"]
 
 
 @pytest.mark.forked

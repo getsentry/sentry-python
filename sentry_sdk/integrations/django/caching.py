@@ -119,7 +119,7 @@ def _patch_cache_method(cache, method_name, address, port):
 
                 item_size = None
                 if is_get_operation:
-                    if value is not None:
+                    if value != {}:
                         item_size = len(str(value))
                         span.set_data(SPANDATA.CACHE_HIT, True)
                     else:
