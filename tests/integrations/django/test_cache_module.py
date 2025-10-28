@@ -619,11 +619,11 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
 
     assert transaction["spans"][5]["op"] == "cache.get"
     assert transaction["spans"][5]["description"] == f"S{id}"
-    assert not transaction["spans"][1]["data"]["cache.hit"]
+    assert transaction["spans"][5]["data"]["cache.hit"]
 
     assert transaction["spans"][6]["op"] == "cache.get"
     assert transaction["spans"][6]["description"] == f"S{id + 1}"
-    assert not transaction["spans"][1]["data"]["cache.hit"]
+    assert not transaction["spans"][6]["data"]["cache.hit"]
 
 
 @pytest.mark.forked
