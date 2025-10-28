@@ -45,6 +45,7 @@ ENV = Environment(
     trim_blocks=True,
     lstrip_blocks=True,
 )
+VENV_DIR = Path(__file__).resolve().parent / ".venv"
 
 PYPI_COOLDOWN = 0.05  # seconds to wait between requests to PyPI
 
@@ -517,14 +518,21 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
     return []
 
 
-def has_free_threading_wheel(pypi_data: dict, version: Version) -> bool:
+def has_free_threading_dependencies(package_name: str, release: Version) -> bool:
+    pass
+
+
+def supports_free_threading(
+    package_name: str, release: Version, python_version: Version, pypi_data: dict
+) -> bool:
     """
-    Check if the package distributes a wheel on the given Python minor
-    version which supports free-threading Python.
+    Check if the package version supports free-threading on the given Python minor
+    version.
 
     There are two cases in which we assume a package has free-threading
     support:
-    - The package is pure Python, indicated by a "none" abi tag in its wheels; or
+    - The package is pure Python, indicated by a "none" abi tag in its wheels,
+      and has dependencies supporting free-threading; or
     - the abi tag of one of its wheels has a "t" suffix to indicate a free-threaded build.
 
     See https://peps.python.org/pep-0427/#file-name-convention
@@ -533,9 +541,12 @@ def has_free_threading_wheel(pypi_data: dict, version: Version) -> bool:
         if download["packagetype"] == "bdist_wheel":
             abi_tag = download["filename"].removesuffix(".whl").split("-")[-2]
 
-            abi_tag_version = f"{version.major}{version.minor}"
-            if abi_tag == "none" or (
+            abi_tag_version = f"{python_version.major}{python_version.minor}"
+            if (
                 abi_tag.endswith("t") and abi_tag.startswith(f"cp{abi_tag_version}")
+            ) or (
+                abi_tag == "none"
+                and has_free_threading_dependencies(package_name, release)
             ):
                 return True
 
@@ -657,7 +668,7 @@ def _add_python_versions_to_release(
     py_versions_with_free_threaded_wheel = set(
         version
         for version in supported_py_versions
-        if has_free_threading_wheel(release_pypi_data, version)
+        if supports_free_threading(package, release, version, release_pypi_data)
     )
 
     release.python_versions = pick_python_versions_to_test(
