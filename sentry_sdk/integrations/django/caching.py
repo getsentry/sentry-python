@@ -33,15 +33,6 @@ def _get_span_description(method_name, args, kwargs):
     return _key_as_string(_get_safe_key(method_name, args, kwargs))
 
 
-def _set_address_and_port(span, address, port):
-    # type: (sentry_sdk.tracing.Span, Optional[str], Optional[int]) -> None
-    if address is not None:
-        span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
-
-    if port is not None:
-        span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
-
-
 def _patch_cache_method(cache, method_name, address, port):
     # type: (CacheHandler, str, Optional[str], Optional[int]) -> None
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -68,7 +59,11 @@ def _patch_cache_method(cache, method_name, address, port):
             value = original_method(*args, **kwargs)
 
             with capture_internal_exceptions():
-                _set_address_and_port(span, address, port)
+                if address is not None:
+                    span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
+
+                if port is not None:
+                    span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
 
                 key = _get_safe_key(method_name, args, kwargs)
                 if key is not None:
