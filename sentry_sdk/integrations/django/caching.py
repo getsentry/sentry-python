@@ -83,7 +83,7 @@ def _patch_get_cache(cache, address, port):
         # type: (*Any, **Any) -> Any
         return _instrument_call(cache, original_method, args, kwargs, address, port)
 
-    setattr(cache, sentry_method)
+    setattr(cache, "get", sentry_method)
 
 
 def _patch_cache_method(cache, method_name, address, port):
