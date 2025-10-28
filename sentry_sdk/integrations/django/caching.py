@@ -20,6 +20,14 @@ if TYPE_CHECKING:
     from typing import Optional
 
 
+METHODS_TO_INSTRUMENT = [
+    "set",
+    "set_many",
+    "get",
+    "get_many",
+]
+
+
 def _get_span_description(method_name, args, kwargs):
     # type: (str, tuple[Any], dict[str, Any]) -> str
     return _key_as_string(_get_safe_key(method_name, args, kwargs))
@@ -34,58 +42,6 @@ def _set_address_and_port(span, address, port):
         span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
 
 
-def _patch_get_cache(cache, address, port):
-    # type: (CacheHandler, Optional[str], Optional[int]) -> None
-    from sentry_sdk.integrations.django import DjangoIntegration
-
-    original_method = cache.get
-
-    @ensure_integration_enabled(DjangoIntegration, original_method)
-    def _instrument_call(cache, original_method, args, kwargs, address, port):
-        # type: (CacheHandler, Callable[..., Any], tuple[Any, ...], dict[str, Any], Optional[str], Optional[int]) -> Any
-        op = OP.CACHE_GET
-        description = _get_span_description("get", args, kwargs)
-
-        default_value = None
-        if len(args) >= 2:
-            default_value = args[1]
-        elif "default" in kwargs:
-            default_value = kwargs["default"]
-
-        with sentry_sdk.start_span(
-            op=op,
-            name=description,
-            origin=DjangoIntegration.origin,
-        ) as span:
-            value = original_method(*args, **kwargs)
-
-            with capture_internal_exceptions():
-                _set_address_and_port(span, address, port)
-
-                key = _get_safe_key("get", args, kwargs)
-                if key is not None:
-                    span.set_data(SPANDATA.CACHE_KEY, key)
-
-                item_size = None
-                if value != default_value:
-                    item_size = len(str(value))
-                    span.set_data(SPANDATA.CACHE_HIT, True)
-                else:
-                    span.set_data(SPANDATA.CACHE_HIT, False)
-
-                if item_size is not None:
-                    span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
-
-            return value
-
-    @functools.wraps(original_method)
-    def sentry_method(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
-        return _instrument_call(cache, original_method, args, kwargs, address, port)
-
-    setattr(cache, "get", sentry_method)
-
-
 def _patch_cache_method(cache, method_name, address, port):
     # type: (CacheHandler, str, Optional[str], Optional[int]) -> None
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -98,7 +54,8 @@ def _patch_cache_method(cache, method_name, address, port):
     ):
         # type: (CacheHandler, str, Callable[..., Any], tuple[Any, ...], dict[str, Any], Optional[str], Optional[int]) -> Any
         is_set_operation = method_name.startswith("set")
-        is_get_operation = not is_set_operation
+        is_get_method = method_name == "get"
+        is_get_many_method = method_name == "get_many"
 
         op = OP.CACHE_PUT if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
@@ -118,8 +75,20 @@ def _patch_cache_method(cache, method_name, address, port):
                     span.set_data(SPANDATA.CACHE_KEY, key)
 
                 item_size = None
-                if is_get_operation:
+                if is_get_many_method:
                     if value != {}:
+                        item_size = len(str(value))
+                        span.set_data(SPANDATA.CACHE_HIT, True)
+                    else:
+                        span.set_data(SPANDATA.CACHE_HIT, False)
+                elif is_get_method:
+                    default_value = None
+                    if len(args) >= 2:
+                        default_value = args[1]
+                    elif "default" in kwargs:
+                        default_value = kwargs["default"]
+
+                    if value != default_value:
                         item_size = len(str(value))
                         span.set_data(SPANDATA.CACHE_HIT, True)
                     else:
@@ -151,11 +120,8 @@ def _patch_cache_method(cache, method_name, address, port):
 def _patch_cache(cache, address=None, port=None):
     # type: (CacheHandler, Optional[str], Optional[int]) -> None
     if not hasattr(cache, "_sentry_patched"):
-        _patch_cache_method(cache, "set", address, port)
-        _patch_cache_method(cache, "set_many", address, port)
-        # Separate patch to account for custom default values on cache misses.
-        _patch_get_cache(cache, address, port)
-        _patch_cache_method(cache, "get_many", address, port)
+        for method_name in METHODS_TO_INSTRUMENT:
+            _patch_cache_method(cache, method_name, address, port)
         cache._sentry_patched = True
 
 
