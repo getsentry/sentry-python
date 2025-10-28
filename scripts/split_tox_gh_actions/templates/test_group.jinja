@@ -6,7 +6,7 @@
       fail-fast: false
       matrix:
         python-version: [{{ py_versions|join(",") }}]
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
 
     {% if needs_docker %}
     services:
