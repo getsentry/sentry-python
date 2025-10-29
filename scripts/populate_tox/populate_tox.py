@@ -610,7 +610,7 @@ def _has_free_threading_dependencies(
             supports_free_threading = False
 
             for download in pypi_data["urls"]:
-                abi_tag = _get_abi_tag(wheel_filename)
+                abi_tag = _get_abi_tag(download["filename"])
                 abi_tag_version = _get_abi_tag_version(python_version)
 
                 if download["packagetype"] == "bdist_wheel" and (
