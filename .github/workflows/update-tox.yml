@@ -20,7 +20,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: 3.13
+          python-version: 3.14t
 
       - name: Checkout repo
         uses: actions/checkout@v5.0.0
