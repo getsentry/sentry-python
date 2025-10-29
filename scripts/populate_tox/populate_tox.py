@@ -606,7 +606,10 @@ def _has_free_threading_dependencies(
         wheel_filename = dependency_info["download_info"]["url"].split("/")[-1]
 
         if wheel_filename.endswith(".tar.gz"):
-            pypi_data = fetch_release(package_name, release)
+            package_release = wheel_filename.rstrip(".tar.gz")
+            dependency_name, dependency_version = package_release.split("-")
+
+            pypi_data = fetch_release(dependency_name, Version(dependency_version))
             supports_free_threading = False
 
             for download in pypi_data["urls"]:
