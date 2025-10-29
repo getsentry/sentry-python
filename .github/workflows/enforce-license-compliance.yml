@@ -6,7 +6,7 @@ on:
       - master
       - main
       - release/*
-      - potel-base
+      - major/**
   pull_request:
 
 # Cancel in progress workflows on pull_requests.
