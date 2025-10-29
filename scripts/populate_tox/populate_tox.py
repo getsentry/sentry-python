@@ -7,7 +7,6 @@ See scripts/populate_tox/README.md for more info.
 import functools
 import hashlib
 import json
-import re
 import os
 import subprocess
 import sys
