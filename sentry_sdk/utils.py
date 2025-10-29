@@ -250,31 +250,6 @@ def format_timestamp(value):
     return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
-ISO_TZ_SEPARATORS = frozenset(("+", "-"))
-
-
-def datetime_from_isoformat(value):
-    # type: (str) -> datetime
-    try:
-        result = datetime.fromisoformat(value)
-    except (AttributeError, ValueError):
-        # py 3.6
-        timestamp_format = (
-            "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
-        )
-        if value.endswith("Z"):
-            value = value[:-1] + "+0000"
-
-        if value[-6] in ISO_TZ_SEPARATORS:
-            timestamp_format += "%z"
-            value = value[:-3] + value[-2:]
-        elif value[-5] in ISO_TZ_SEPARATORS:
-            timestamp_format += "%z"
-
-        result = datetime.strptime(value, timestamp_format)
-    return result.astimezone(timezone.utc)
-
-
 def event_hint_with_exc_info(exc_info=None):
     # type: (Optional[ExcInfo]) -> Dict[str, Optional[ExcInfo]]
     """Creates a hint with the exc info filled in."""

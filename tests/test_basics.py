@@ -8,7 +8,6 @@ from collections import Counter
 
 import pytest
 from sentry_sdk.client import Client
-from sentry_sdk.utils import datetime_from_isoformat
 
 import sentry_sdk
 import sentry_sdk.scope
@@ -421,7 +420,10 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
+        datetime.datetime.fromisoformat(x["timestamp"]).astimezone(
+            datetime.timezone.utc
+        )
+        for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
@@ -462,7 +464,10 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
+        datetime.datetime.fromisoformat(x["timestamp"]).astimezone(
+            datetime.timezone.utc
+        )
+        for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
