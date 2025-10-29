@@ -1,4 +1,5 @@
 from sentry_sdk import profiler
+from sentry_sdk import metrics
 from sentry_sdk.scope import Scope
 from sentry_sdk.transport import Transport, HttpTransport
 from sentry_sdk.client import Client
@@ -48,6 +49,7 @@ __all__ = [  # noqa
     "trace",
     "monitor",
     "logger",
+    "metrics",
     "profiler",
     "start_session",
     "end_session",
