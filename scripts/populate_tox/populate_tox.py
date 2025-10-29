@@ -583,16 +583,57 @@ def get_abi_tag(wheel_filename: str) -> str:
     return wheel_filename.removesuffix(".whl").split("-")[-2]
 
 
+def _get_abi_tag_version(python_version: Version):
+    return f"{python_version.major}{python_version.minor}"
+
+
 @functools.cache
-def has_free_threading_dependencies(package_name: str, release: Version) -> bool:
+def has_free_threading_dependencies(
+    package_name: str, release: Version, python_version: Version
+) -> bool:
+    """
+    Checks if all dependencies of a version of a package support free-threading.
+
+    A dependency supports free-threading if
+    - the dependency is pure Python, indicated by a "none" abi tag in its wheel name; or
+    - the abi tag of one of its wheels has a "t" suffix to indicate a free-threaded build; or
+    - no wheel targets the platform on which the script is run, but PyPI distributes a wheel
+      satisfying one of the above conditions.
+    """
     dependencies_info = fetch_package_dependencies(package_name, release)
 
     for dependency_info in dependencies_info:
         wheel_filename = dependency_info["download_info"]["url"].split("/")[-1]
-        print("wheel_filename", wheel_filename)
-        abi_tag = get_abi_tag(wheel_filename)
-        if abi_tag != "none" and not abi_tag.endswith("t"):
-            return False
+
+        if wheel_filename.endswith(".tar.gz"):
+            pypi_data = fetch_release(package_name, release)
+            supports_free_threading = False
+
+            for download in pypi_data["urls"]:
+                abi_tag = get_abi_tag(wheel_filename)
+                abi_tag_version = _get_abi_tag_version(python_version)
+
+                if download["packagetype"] == "bdist_wheel" and (
+                    (
+                        abi_tag.endswith("t")
+                        and abi_tag.startswith(f"cp{abi_tag_version}")
+                    )
+                    or abi_tag == "none"
+                ):
+                    supports_free_threading = True
+
+            if not supports_free_threading:
+                return False
+
+        elif wheel_filename.endswith(".whl"):
+            abi_tag = get_abi_tag(wheel_filename)
+            if abi_tag != "none" and not abi_tag.endswith("t"):
+                return False
+
+        else:
+            raise Exception(
+                f"Wheel filename with unhandled extension: {wheel_filename}"
+            )
 
     return True
 
@@ -606,7 +647,7 @@ def supports_free_threading(
 
     There are two cases in which we assume a package has free-threading
     support:
-    - The package is pure Python, indicated by a "none" abi tag in its wheels,
+    - The package is pure Python, indicated by a "none" abi tag in its wheel name,
       and has dependencies supporting free-threading; or
     - the abi tag of one of its wheels has a "t" suffix to indicate a free-threaded build.
 
@@ -616,7 +657,7 @@ def supports_free_threading(
         if download["packagetype"] == "bdist_wheel":
             abi_tag = get_abi_tag(download["filename"])
 
-            abi_tag_version = f"{python_version.major}{python_version.minor}"
+            abi_tag_version = _get_abi_tag_version(python_version)
             if (
                 abi_tag.endswith("t") and abi_tag.startswith(f"cp{abi_tag_version}")
             ) or (
