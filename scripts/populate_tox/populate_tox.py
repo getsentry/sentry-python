@@ -589,6 +589,7 @@ def has_free_threading_dependencies(package_name: str, release: Version) -> bool
 
     for dependency_info in dependencies_info:
         wheel_filename = dependency_info["download_info"]["url"].split("/")[-1]
+        print("wheel_filename", wheel_filename)
         abi_tag = get_abi_tag(wheel_filename)
         if abi_tag != "none" and not abi_tag.endswith("t"):
             return False
@@ -840,11 +841,19 @@ def _normalize_package_dependencies(package_dependencies: list[dict]) -> list[di
     return normalized
 
 
+def _exit_if_not_free_threaded_interpreter():
+    if "free-threading build" not in sys.version:
+        raise Exception("Running with a free-threaded interpreter is required.")
+
+
 def main() -> dict[str, list]:
     """
     Generate tox.ini from the tox.jinja template.
     """
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
+
+    _exit_if_not_free_threaded_interpreter()
+
     meta = _fetch_sdk_metadata()
     sdk_python_versions = _parse_python_versions_from_classifiers(
         meta.get_all("Classifier")
