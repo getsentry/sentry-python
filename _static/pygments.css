@@ -69,6 +69,75 @@
 --syntax-light-comment-multiline: #6E7781;
 --syntax-light-comment-single: #6E7781;
 --syntax-light-comment-special: #6E7781;
+}
+html.light .highlight .c { color: var(--syntax-light-comment) }
+html.light .highlight .err { color: var(--syntax-light-error) }
+html.light .highlight .esc { color: var(--syntax-light-escape) }
+html.light .highlight .k { color: var(--syntax-light-keyword) }
+html.light .highlight .l { color: var(--syntax-light-literal) }
+html.light .highlight .o { color: var(--syntax-light-operator) }
+html.light .highlight .ch { color: var(--syntax-light-comment-hashbang) }
+html.light .highlight .cm { color: var(--syntax-light-comment-multiline) }
+html.light .highlight .cp { color: var(--syntax-light-comment-preproc) }
+html.light .highlight .cpf { color: var(--syntax-light-comment-preprocfile) }
+html.light .highlight .c1 { color: var(--syntax-light-comment-single) }
+html.light .highlight .cs { color: var(--syntax-light-comment-special) }
+html.light .highlight .gd { color: var(--syntax-light-generic-deleted) }
+html.light .highlight .ge { color: var(--syntax-light-generic-emph); font-style: italic }
+html.light .highlight .ges { color: var(--syntax-light-generic-emphstrong); font-weight: bold; font-style: italic }
+html.light .highlight .gr { color: var(--syntax-light-generic-error) }
+html.light .highlight .gh { color: var(--syntax-light-generic-heading); font-weight: bold }
+html.light .highlight .gi { color: var(--syntax-light-generic-inserted) }
+html.light .highlight .go { color: var(--syntax-light-generic-output) }
+html.light .highlight .gp { color: var(--syntax-light-generic-prompt) }
+html.light .highlight .gs { color: var(--syntax-light-generic-strong); font-weight: bold }
+html.light .highlight .gu { color: var(--syntax-light-generic-subheading) }
+html.light .highlight .gt { color: var(--syntax-light-generic-traceback) }
+html.light .highlight .kc { color: var(--syntax-light-keyword-constant) }
+html.light .highlight .kd { color: var(--syntax-light-keyword-declaration) }
+html.light .highlight .kn { color: var(--syntax-light-keyword-namespace) }
+html.light .highlight .kp { color: var(--syntax-light-keyword-pseudo) }
+html.light .highlight .kr { color: var(--syntax-light-keyword-reserved) }
+html.light .highlight .kt { color: var(--syntax-light-keyword-type) }
+html.light .highlight .ld { color: var(--syntax-light-literal-date) }
+html.light .highlight .m { color: var(--syntax-light-literal-number) }
+html.light .highlight .s { color: var(--syntax-light-literal-string) }
+html.light .highlight .na { color: var(--syntax-light-name-attribute) }
+html.light .highlight .nb { color: var(--syntax-light-name-builtin) }
+html.light .highlight .nc { color: var(--syntax-light-name-class) }
+html.light .highlight .no { color: var(--syntax-light-name-constant) }
+html.light .highlight .nd { color: var(--syntax-light-name-decorator) }
+html.light .highlight .ni { color: var(--syntax-light-name-entity) }
+html.light .highlight .ne { color: var(--syntax-light-name-exception) }
+html.light .highlight .nf { color: var(--syntax-light-name-function) }
+html.light .highlight .nl { color: var(--syntax-light-name-label) }
+html.light .highlight .py { color: var(--syntax-light-name-property) }
+html.light .highlight .nt { color: var(--syntax-light-name-tag) }
+html.light .highlight .ow { color: var(--syntax-light-operator-word) }
+html.light .highlight .w { color: var(--syntax-light-text-whitespace) }
+html.light .highlight .mb { color: var(--syntax-light-literal-number-bin) }
+html.light .highlight .mf { color: var(--syntax-light-literal-number-float) }
+html.light .highlight .mh { color: var(--syntax-light-literal-number-hex) }
+html.light .highlight .mi { color: var(--syntax-light-literal-number-integer) }
+html.light .highlight .mo { color: var(--syntax-light-literal-number-oct) }
+html.light .highlight .sa { color: var(--syntax-light-literal-string-affix) }
+html.light .highlight .sb { color: var(--syntax-light-literal-string-backtick) }
+html.light .highlight .sc { color: var(--syntax-light-literal-string-char) }
+html.light .highlight .dl { color: var(--syntax-light-literal-string-delimiter) }
+html.light .highlight .sd { color: var(--syntax-light-literal-string-doc) }
+html.light .highlight .s2 { color: var(--syntax-light-literal-string-double) }
+html.light .highlight .se { color: var(--syntax-light-literal-string-escape) }
+html.light .highlight .sh { color: var(--syntax-light-literal-string-heredoc) }
+html.light .highlight .si { color: var(--syntax-light-literal-string-interpol) }
+html.light .highlight .sx { color: var(--syntax-light-literal-string-other) }
+html.light .highlight .sr { color: var(--syntax-light-literal-string-regex) }
+html.light .highlight .s1 { color: var(--syntax-light-literal-string-single) }
+html.light .highlight .ss { color: var(--syntax-light-literal-string-symbol) }
+html.light .highlight .bp { color: var(--syntax-light-name-builtin-pseudo) }
+html.light .highlight .fm { color: var(--syntax-light-name-function-magic) }
+html.light .highlight .vc { color: var(--syntax-light-name-variable-class) }
+html.light .highlight .il { color: var(--syntax-light-literal-number-integer-long) }
+:root {
 --syntax-dark-background: #0d1117;
 --syntax-dark-highlight: #3fb95040;
 --syntax-dark-text: #E6EDF3;
@@ -140,214 +209,70 @@
 --syntax-dark-comment-single: #8B949E;
 --syntax-dark-comment-special: #8B949E;
 }
-:root,html.light{
---syntax-background: var(--syntax-light-background);
---syntax-highlight: var(--syntax-light-highlight);
---syntax-text: var(--syntax-light-text);
---syntax-escape: var(--syntax-light-escape);
---syntax-error: var(--syntax-light-error);
---syntax-keyword: var(--syntax-light-keyword);
---syntax-keyword-constant: var(--syntax-light-keyword-constant);
---syntax-keyword-type: var(--syntax-light-keyword-type);
---syntax-name-attribute: var(--syntax-light-name-attribute);
---syntax-name-builtin: var(--syntax-light-name-builtin);
---syntax-name-class: var(--syntax-light-name-class);
---syntax-name-constant: var(--syntax-light-name-constant);
---syntax-name-decorator: var(--syntax-light-name-decorator);
---syntax-name-entity: var(--syntax-light-name-entity);
---syntax-name-exception: var(--syntax-light-name-exception);
---syntax-name-function: var(--syntax-light-name-function);
---syntax-name-function-magic: var(--syntax-light-name-function-magic);
---syntax-name-property: var(--syntax-light-name-property);
---syntax-name-label: var(--syntax-light-name-label);
---syntax-name-tag: var(--syntax-light-name-tag);
---syntax-name-variable-class: var(--syntax-light-name-variable-class);
---syntax-literal: var(--syntax-light-literal);
---syntax-literal-string: var(--syntax-light-literal-string);
---syntax-literal-string-affix: var(--syntax-light-literal-string-affix);
---syntax-literal-string-backtick: var(--syntax-light-literal-string-backtick);
---syntax-literal-string-interpol: var(--syntax-light-literal-string-interpol);
---syntax-literal-string-regex: var(--syntax-light-literal-string-regex);
---syntax-literal-string-symbol: var(--syntax-light-literal-string-symbol);
---syntax-literal-number: var(--syntax-light-literal-number);
---syntax-operator: var(--syntax-light-operator);
---syntax-operator-word: var(--syntax-light-operator-word);
---syntax-comment: var(--syntax-light-comment);
---syntax-comment-preproc: var(--syntax-light-comment-preproc);
---syntax-comment-preprocfile: var(--syntax-light-comment-preprocfile);
---syntax-generic-deleted: var(--syntax-light-generic-deleted);
---syntax-generic-emph: var(--syntax-light-generic-emph);
---syntax-generic-error: var(--syntax-light-generic-error);
---syntax-generic-heading: var(--syntax-light-generic-heading);
---syntax-generic-inserted: var(--syntax-light-generic-inserted);
---syntax-generic-output: var(--syntax-light-generic-output);
---syntax-generic-prompt: var(--syntax-light-generic-prompt);
---syntax-generic-strong: var(--syntax-light-generic-strong);
---syntax-generic-subheading: var(--syntax-light-generic-subheading);
---syntax-generic-emphstrong: var(--syntax-light-generic-emphstrong);
---syntax-generic-traceback: var(--syntax-light-generic-traceback);
---syntax-text-whitespace: var(--syntax-light-text-whitespace);
---syntax-keyword-declaration: var(--syntax-light-keyword-declaration);
---syntax-keyword-namespace: var(--syntax-light-keyword-namespace);
---syntax-keyword-pseudo: var(--syntax-light-keyword-pseudo);
---syntax-keyword-reserved: var(--syntax-light-keyword-reserved);
---syntax-name-builtin-pseudo: var(--syntax-light-name-builtin-pseudo);
---syntax-literal-date: var(--syntax-light-literal-date);
---syntax-literal-string-char: var(--syntax-light-literal-string-char);
---syntax-literal-string-delimiter: var(--syntax-light-literal-string-delimiter);
---syntax-literal-string-doc: var(--syntax-light-literal-string-doc);
---syntax-literal-string-double: var(--syntax-light-literal-string-double);
---syntax-literal-string-escape: var(--syntax-light-literal-string-escape);
---syntax-literal-string-heredoc: var(--syntax-light-literal-string-heredoc);
---syntax-literal-string-other: var(--syntax-light-literal-string-other);
---syntax-literal-string-single: var(--syntax-light-literal-string-single);
---syntax-literal-number-bin: var(--syntax-light-literal-number-bin);
---syntax-literal-number-float: var(--syntax-light-literal-number-float);
---syntax-literal-number-hex: var(--syntax-light-literal-number-hex);
---syntax-literal-number-integer: var(--syntax-light-literal-number-integer);
---syntax-literal-number-integer-long: var(--syntax-light-literal-number-integer-long);
---syntax-literal-number-oct: var(--syntax-light-literal-number-oct);
---syntax-comment-hashbang: var(--syntax-light-comment-hashbang);
---syntax-comment-multiline: var(--syntax-light-comment-multiline);
---syntax-comment-single: var(--syntax-light-comment-single);
---syntax-comment-special: var(--syntax-light-comment-special);
-}
-html.dark, html.light .dark-code{
---syntax-background: var(--syntax-dark-background);
---syntax-highlight: var(--syntax-dark-highlight);
---syntax-text: var(--syntax-dark-text);
---syntax-escape: var(--syntax-dark-escape);
---syntax-error: var(--syntax-dark-error);
---syntax-keyword: var(--syntax-dark-keyword);
---syntax-keyword-constant: var(--syntax-dark-keyword-constant);
---syntax-keyword-type: var(--syntax-dark-keyword-type);
---syntax-name-attribute: var(--syntax-dark-name-attribute);
---syntax-name-builtin: var(--syntax-dark-name-builtin);
---syntax-name-class: var(--syntax-dark-name-class);
---syntax-name-constant: var(--syntax-dark-name-constant);
---syntax-name-decorator: var(--syntax-dark-name-decorator);
---syntax-name-entity: var(--syntax-dark-name-entity);
---syntax-name-exception: var(--syntax-dark-name-exception);
---syntax-name-function: var(--syntax-dark-name-function);
---syntax-name-function-magic: var(--syntax-dark-name-function-magic);
---syntax-name-property: var(--syntax-dark-name-property);
---syntax-name-label: var(--syntax-dark-name-label);
---syntax-name-tag: var(--syntax-dark-name-tag);
---syntax-name-variable-class: var(--syntax-dark-name-variable-class);
---syntax-literal: var(--syntax-dark-literal);
---syntax-literal-string: var(--syntax-dark-literal-string);
---syntax-literal-string-affix: var(--syntax-dark-literal-string-affix);
---syntax-literal-string-backtick: var(--syntax-dark-literal-string-backtick);
---syntax-literal-string-interpol: var(--syntax-dark-literal-string-interpol);
---syntax-literal-string-regex: var(--syntax-dark-literal-string-regex);
---syntax-literal-string-symbol: var(--syntax-dark-literal-string-symbol);
---syntax-literal-number: var(--syntax-dark-literal-number);
---syntax-operator: var(--syntax-dark-operator);
---syntax-operator-word: var(--syntax-dark-operator-word);
---syntax-comment: var(--syntax-dark-comment);
---syntax-comment-preproc: var(--syntax-dark-comment-preproc);
---syntax-comment-preprocfile: var(--syntax-dark-comment-preprocfile);
---syntax-generic-deleted: var(--syntax-dark-generic-deleted);
---syntax-generic-emph: var(--syntax-dark-generic-emph);
---syntax-generic-error: var(--syntax-dark-generic-error);
---syntax-generic-heading: var(--syntax-dark-generic-heading);
---syntax-generic-inserted: var(--syntax-dark-generic-inserted);
---syntax-generic-output: var(--syntax-dark-generic-output);
---syntax-generic-prompt: var(--syntax-dark-generic-prompt);
---syntax-generic-strong: var(--syntax-dark-generic-strong);
---syntax-generic-subheading: var(--syntax-dark-generic-subheading);
---syntax-generic-emphstrong: var(--syntax-dark-generic-emphstrong);
---syntax-generic-traceback: var(--syntax-dark-generic-traceback);
---syntax-text-whitespace: var(--syntax-dark-text-whitespace);
---syntax-keyword-declaration: var(--syntax-dark-keyword-declaration);
---syntax-keyword-namespace: var(--syntax-dark-keyword-namespace);
---syntax-keyword-pseudo: var(--syntax-dark-keyword-pseudo);
---syntax-keyword-reserved: var(--syntax-dark-keyword-reserved);
---syntax-name-builtin-pseudo: var(--syntax-dark-name-builtin-pseudo);
---syntax-literal-date: var(--syntax-dark-literal-date);
---syntax-literal-string-char: var(--syntax-dark-literal-string-char);
---syntax-literal-string-delimiter: var(--syntax-dark-literal-string-delimiter);
---syntax-literal-string-doc: var(--syntax-dark-literal-string-doc);
---syntax-literal-string-double: var(--syntax-dark-literal-string-double);
---syntax-literal-string-escape: var(--syntax-dark-literal-string-escape);
---syntax-literal-string-heredoc: var(--syntax-dark-literal-string-heredoc);
---syntax-literal-string-other: var(--syntax-dark-literal-string-other);
---syntax-literal-string-single: var(--syntax-dark-literal-string-single);
---syntax-literal-number-bin: var(--syntax-dark-literal-number-bin);
---syntax-literal-number-float: var(--syntax-dark-literal-number-float);
---syntax-literal-number-hex: var(--syntax-dark-literal-number-hex);
---syntax-literal-number-integer: var(--syntax-dark-literal-number-integer);
---syntax-literal-number-integer-long: var(--syntax-dark-literal-number-integer-long);
---syntax-literal-number-oct: var(--syntax-dark-literal-number-oct);
---syntax-comment-hashbang: var(--syntax-dark-comment-hashbang);
---syntax-comment-multiline: var(--syntax-dark-comment-multiline);
---syntax-comment-single: var(--syntax-dark-comment-single);
---syntax-comment-special: var(--syntax-dark-comment-special);
-}
-.highlight .c { color: var(--syntax-comment) }
-.highlight .err { color: var(--syntax-error) }
-.highlight .esc { color: var(--syntax-escape) }
-.highlight .k { color: var(--syntax-keyword) }
-.highlight .l { color: var(--syntax-literal) }
-.highlight .o { color: var(--syntax-operator) }
-.highlight .ch { color: var(--syntax-comment-hashbang) }
-.highlight .cm { color: var(--syntax-comment-multiline) }
-.highlight .cp { color: var(--syntax-comment-preproc) }
-.highlight .cpf { color: var(--syntax-comment-preprocfile) }
-.highlight .c1 { color: var(--syntax-comment-single) }
-.highlight .cs { color: var(--syntax-comment-special) }
-.highlight .gd { color: var(--syntax-generic-deleted) }
-.highlight .ge { color: var(--syntax-generic-emph); font-style: italic }
-.highlight .ges { color: var(--syntax-generic-emphstrong); font-weight: bold; font-style: italic }
-.highlight .gr { color: var(--syntax-generic-error) }
-.highlight .gh { color: var(--syntax-generic-heading); font-weight: bold }
-.highlight .gi { color: var(--syntax-generic-inserted) }
-.highlight .go { color: var(--syntax-generic-output) }
-.highlight .gp { color: var(--syntax-generic-prompt) }
-.highlight .gs { color: var(--syntax-generic-strong); font-weight: bold }
-.highlight .gu { color: var(--syntax-generic-subheading) }
-.highlight .gt { color: var(--syntax-generic-traceback) }
-.highlight .kc { color: var(--syntax-keyword-constant) }
-.highlight .kd { color: var(--syntax-keyword-declaration) }
-.highlight .kn { color: var(--syntax-keyword-namespace) }
-.highlight .kp { color: var(--syntax-keyword-pseudo) }
-.highlight .kr { color: var(--syntax-keyword-reserved) }
-.highlight .kt { color: var(--syntax-keyword-type) }
-.highlight .ld { color: var(--syntax-literal-date) }
-.highlight .m { color: var(--syntax-literal-number) }
-.highlight .s { color: var(--syntax-literal-string) }
-.highlight .na { color: var(--syntax-name-attribute) }
-.highlight .nb { color: var(--syntax-name-builtin) }
-.highlight .nc { color: var(--syntax-name-class) }
-.highlight .no { color: var(--syntax-name-constant) }
-.highlight .nd { color: var(--syntax-name-decorator) }
-.highlight .ni { color: var(--syntax-name-entity) }
-.highlight .ne { color: var(--syntax-name-exception) }
-.highlight .nf { color: var(--syntax-name-function) }
-.highlight .nl { color: var(--syntax-name-label) }
-.highlight .py { color: var(--syntax-name-property) }
-.highlight .nt { color: var(--syntax-name-tag) }
-.highlight .ow { color: var(--syntax-operator-word) }
-.highlight .w { color: var(--syntax-text-whitespace) }
-.highlight .mb { color: var(--syntax-literal-number-bin) }
-.highlight .mf { color: var(--syntax-literal-number-float) }
-.highlight .mh { color: var(--syntax-literal-number-hex) }
-.highlight .mi { color: var(--syntax-literal-number-integer) }
-.highlight .mo { color: var(--syntax-literal-number-oct) }
-.highlight .sa { color: var(--syntax-literal-string-affix) }
-.highlight .sb { color: var(--syntax-literal-string-backtick) }
-.highlight .sc { color: var(--syntax-literal-string-char) }
-.highlight .dl { color: var(--syntax-literal-string-delimiter) }
-.highlight .sd { color: var(--syntax-literal-string-doc) }
-.highlight .s2 { color: var(--syntax-literal-string-double) }
-.highlight .se { color: var(--syntax-literal-string-escape) }
-.highlight .sh { color: var(--syntax-literal-string-heredoc) }
-.highlight .si { color: var(--syntax-literal-string-interpol) }
-.highlight .sx { color: var(--syntax-literal-string-other) }
-.highlight .sr { color: var(--syntax-literal-string-regex) }
-.highlight .s1 { color: var(--syntax-literal-string-single) }
-.highlight .ss { color: var(--syntax-literal-string-symbol) }
-.highlight .bp { color: var(--syntax-name-builtin-pseudo) }
-.highlight .fm { color: var(--syntax-name-function-magic) }
-.highlight .vc { color: var(--syntax-name-variable-class) }
-.highlight .il { color: var(--syntax-literal-number-integer-long) }
+html.dark .highlight .c, html.light .dark-code .highlight .c { color: var(--syntax-dark-comment) }
+html.dark .highlight .err, html.light .dark-code .highlight .err { color: var(--syntax-dark-error) }
+html.dark .highlight .esc, html.light .dark-code .highlight .esc { color: var(--syntax-dark-escape) }
+html.dark .highlight .k, html.light .dark-code .highlight .k { color: var(--syntax-dark-keyword) }
+html.dark .highlight .l, html.light .dark-code .highlight .l { color: var(--syntax-dark-literal) }
+html.dark .highlight .o, html.light .dark-code .highlight .o { color: var(--syntax-dark-operator) }
+html.dark .highlight .ch, html.light .dark-code .highlight .ch { color: var(--syntax-dark-comment-hashbang) }
+html.dark .highlight .cm, html.light .dark-code .highlight .cm { color: var(--syntax-dark-comment-multiline) }
+html.dark .highlight .cp, html.light .dark-code .highlight .cp { color: var(--syntax-dark-comment-preproc) }
+html.dark .highlight .cpf, html.light .dark-code .highlight .cpf { color: var(--syntax-dark-comment-preprocfile) }
+html.dark .highlight .c1, html.light .dark-code .highlight .c1 { color: var(--syntax-dark-comment-single) }
+html.dark .highlight .cs, html.light .dark-code .highlight .cs { color: var(--syntax-dark-comment-special) }
+html.dark .highlight .gd, html.light .dark-code .highlight .gd { color: var(--syntax-dark-generic-deleted) }
+html.dark .highlight .ge, html.light .dark-code .highlight .ge { color: var(--syntax-dark-generic-emph); font-style: italic }
+html.dark .highlight .ges, html.light .dark-code .highlight .ges { color: var(--syntax-dark-generic-emphstrong); font-weight: bold; font-style: italic }
+html.dark .highlight .gr, html.light .dark-code .highlight .gr { color: var(--syntax-dark-generic-error) }
+html.dark .highlight .gh, html.light .dark-code .highlight .gh { color: var(--syntax-dark-generic-heading); font-weight: bold }
+html.dark .highlight .gi, html.light .dark-code .highlight .gi { color: var(--syntax-dark-generic-inserted) }
+html.dark .highlight .go, html.light .dark-code .highlight .go { color: var(--syntax-dark-generic-output) }
+html.dark .highlight .gp, html.light .dark-code .highlight .gp { color: var(--syntax-dark-generic-prompt) }
+html.dark .highlight .gs, html.light .dark-code .highlight .gs { color: var(--syntax-dark-generic-strong); font-weight: bold }
+html.dark .highlight .gu, html.light .dark-code .highlight .gu { color: var(--syntax-dark-generic-subheading) }
+html.dark .highlight .gt, html.light .dark-code .highlight .gt { color: var(--syntax-dark-generic-traceback) }
+html.dark .highlight .kc, html.light .dark-code .highlight .kc { color: var(--syntax-dark-keyword-constant) }
+html.dark .highlight .kd, html.light .dark-code .highlight .kd { color: var(--syntax-dark-keyword-declaration) }
+html.dark .highlight .kn, html.light .dark-code .highlight .kn { color: var(--syntax-dark-keyword-namespace) }
+html.dark .highlight .kp, html.light .dark-code .highlight .kp { color: var(--syntax-dark-keyword-pseudo) }
+html.dark .highlight .kr, html.light .dark-code .highlight .kr { color: var(--syntax-dark-keyword-reserved) }
+html.dark .highlight .kt, html.light .dark-code .highlight .kt { color: var(--syntax-dark-keyword-type) }
+html.dark .highlight .ld, html.light .dark-code .highlight .ld { color: var(--syntax-dark-literal-date) }
+html.dark .highlight .m, html.light .dark-code .highlight .m { color: var(--syntax-dark-literal-number) }
+html.dark .highlight .s, html.light .dark-code .highlight .s { color: var(--syntax-dark-literal-string) }
+html.dark .highlight .na, html.light .dark-code .highlight .na { color: var(--syntax-dark-name-attribute) }
+html.dark .highlight .nb, html.light .dark-code .highlight .nb { color: var(--syntax-dark-name-builtin) }
+html.dark .highlight .nc, html.light .dark-code .highlight .nc { color: var(--syntax-dark-name-class) }
+html.dark .highlight .no, html.light .dark-code .highlight .no { color: var(--syntax-dark-name-constant) }
+html.dark .highlight .nd, html.light .dark-code .highlight .nd { color: var(--syntax-dark-name-decorator) }
+html.dark .highlight .ni, html.light .dark-code .highlight .ni { color: var(--syntax-dark-name-entity) }
+html.dark .highlight .ne, html.light .dark-code .highlight .ne { color: var(--syntax-dark-name-exception) }
+html.dark .highlight .nf, html.light .dark-code .highlight .nf { color: var(--syntax-dark-name-function) }
+html.dark .highlight .nl, html.light .dark-code .highlight .nl { color: var(--syntax-dark-name-label) }
+html.dark .highlight .py, html.light .dark-code .highlight .py { color: var(--syntax-dark-name-property) }
+html.dark .highlight .nt, html.light .dark-code .highlight .nt { color: var(--syntax-dark-name-tag) }
+html.dark .highlight .ow, html.light .dark-code .highlight .ow { color: var(--syntax-dark-operator-word) }
+html.dark .highlight .w, html.light .dark-code .highlight .w { color: var(--syntax-dark-text-whitespace) }
+html.dark .highlight .mb, html.light .dark-code .highlight .mb { color: var(--syntax-dark-literal-number-bin) }
+html.dark .highlight .mf, html.light .dark-code .highlight .mf { color: var(--syntax-dark-literal-number-float) }
+html.dark .highlight .mh, html.light .dark-code .highlight .mh { color: var(--syntax-dark-literal-number-hex) }
+html.dark .highlight .mi, html.light .dark-code .highlight .mi { color: var(--syntax-dark-literal-number-integer) }
+html.dark .highlight .mo, html.light .dark-code .highlight .mo { color: var(--syntax-dark-literal-number-oct) }
+html.dark .highlight .sa, html.light .dark-code .highlight .sa { color: var(--syntax-dark-literal-string-affix) }
+html.dark .highlight .sb, html.light .dark-code .highlight .sb { color: var(--syntax-dark-literal-string-backtick) }
+html.dark .highlight .sc, html.light .dark-code .highlight .sc { color: var(--syntax-dark-literal-string-char) }
+html.dark .highlight .dl, html.light .dark-code .highlight .dl { color: var(--syntax-dark-literal-string-delimiter) }
+html.dark .highlight .sd, html.light .dark-code .highlight .sd { color: var(--syntax-dark-literal-string-doc) }
+html.dark .highlight .s2, html.light .dark-code .highlight .s2 { color: var(--syntax-dark-literal-string-double) }
+html.dark .highlight .se, html.light .dark-code .highlight .se { color: var(--syntax-dark-literal-string-escape) }
+html.dark .highlight .sh, html.light .dark-code .highlight .sh { color: var(--syntax-dark-literal-string-heredoc) }
+html.dark .highlight .si, html.light .dark-code .highlight .si { color: var(--syntax-dark-literal-string-interpol) }
+html.dark .highlight .sx, html.light .dark-code .highlight .sx { color: var(--syntax-dark-literal-string-other) }
+html.dark .highlight .sr, html.light .dark-code .highlight .sr { color: var(--syntax-dark-literal-string-regex) }
+html.dark .highlight .s1, html.light .dark-code .highlight .s1 { color: var(--syntax-dark-literal-string-single) }
+html.dark .highlight .ss, html.light .dark-code .highlight .ss { color: var(--syntax-dark-literal-string-symbol) }
+html.dark .highlight .bp, html.light .dark-code .highlight .bp { color: var(--syntax-dark-name-builtin-pseudo) }
+html.dark .highlight .fm, html.light .dark-code .highlight .fm { color: var(--syntax-dark-name-function-magic) }
+html.dark .highlight .vc, html.light .dark-code .highlight .vc { color: var(--syntax-dark-name-variable-class) }
+html.dark .highlight .il, html.light .dark-code .highlight .il { color: var(--syntax-dark-literal-number-integer-long) }
