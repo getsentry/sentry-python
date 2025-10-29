@@ -5,6 +5,7 @@ from .patches import (
     _create_get_all_tools_wrapper,
     _create_run_wrapper,
     _patch_agent_run,
+    _patch_error_tracing,
 )
 
 try:
@@ -48,6 +49,7 @@ class OpenAIAgentsIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        _patch_error_tracing()
         _patch_tools()
         _patch_model()
         _patch_runner()

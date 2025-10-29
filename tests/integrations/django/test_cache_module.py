@@ -223,8 +223,8 @@ def test_cache_spans_middleware(
     assert second_event["spans"][0]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_header."
     )
-    assert not second_event["spans"][0]["data"]["cache.hit"]
-    assert "cache.item_size" not in second_event["spans"][0]["data"]
+    assert second_event["spans"][0]["data"]["cache.hit"]
+    assert second_event["spans"][0]["data"]["cache.item_size"] == 2
     # second_event - cache.get 2
     assert second_event["spans"][1]["op"] == "cache.get"
     assert second_event["spans"][1]["description"].startswith(
@@ -501,12 +501,74 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
 
     assert len(second_event["spans"]) == 2
     assert second_event["spans"][0]["op"] == "cache.get"
-    assert not second_event["spans"][0]["data"]["cache.hit"]
-    assert "cache.item_size" not in second_event["spans"][0]["data"]
+    assert second_event["spans"][0]["data"]["cache.hit"]
+    assert second_event["spans"][0]["data"]["cache.item_size"] == 2
 
     assert second_event["spans"][1]["op"] == "cache.get"
     assert second_event["spans"][1]["data"]["cache.hit"]
     assert second_event["spans"][1]["data"]["cache.item_size"] == 58
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_cache_spans_get_custom_default(
+    sentry_init, capture_events, use_django_caching
+):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    id = os.getpid()
+
+    from django.core.cache import cache
+
+    with sentry_sdk.start_transaction():
+        cache.set(f"S{id}", "Sensitive1")
+        cache.set(f"S{id + 1}", "")
+
+        cache.get(f"S{id}", "null")
+        cache.get(f"S{id}", default="null")
+
+        cache.get(f"S{id + 1}", "null")
+        cache.get(f"S{id + 1}", default="null")
+
+        cache.get(f"S{id + 2}", "null")
+        cache.get(f"S{id + 2}", default="null")
+
+    (transaction,) = events
+    assert len(transaction["spans"]) == 8
+
+    assert transaction["spans"][0]["op"] == "cache.put"
+    assert transaction["spans"][0]["description"] == f"S{id}"
+
+    assert transaction["spans"][1]["op"] == "cache.put"
+    assert transaction["spans"][1]["description"] == f"S{id + 1}"
+
+    for span in (transaction["spans"][2], transaction["spans"][3]):
+        assert span["op"] == "cache.get"
+        assert span["description"] == f"S{id}"
+        assert span["data"]["cache.hit"]
+        assert span["data"]["cache.item_size"] == 10
+
+    for span in (transaction["spans"][4], transaction["spans"][5]):
+        assert span["op"] == "cache.get"
+        assert span["description"] == f"S{id + 1}"
+        assert span["data"]["cache.hit"]
+        assert span["data"]["cache.item_size"] == 0
+
+    for span in (transaction["spans"][6], transaction["spans"][7]):
+        assert span["op"] == "cache.get"
+        assert span["description"] == f"S{id + 2}"
+        assert not span["data"]["cache.hit"]
+        assert "cache.item_size" not in span["data"]
 
 
 @pytest.mark.forked
@@ -538,24 +600,30 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
 
     assert transaction["spans"][0]["op"] == "cache.get"
     assert transaction["spans"][0]["description"] == f"S{id}, S{id + 1}"
+    assert not transaction["spans"][0]["data"]["cache.hit"]
 
     assert transaction["spans"][1]["op"] == "cache.get"
     assert transaction["spans"][1]["description"] == f"S{id}"
+    assert not transaction["spans"][1]["data"]["cache.hit"]
 
     assert transaction["spans"][2]["op"] == "cache.get"
     assert transaction["spans"][2]["description"] == f"S{id + 1}"
+    assert not transaction["spans"][2]["data"]["cache.hit"]
 
     assert transaction["spans"][3]["op"] == "cache.put"
     assert transaction["spans"][3]["description"] == f"S{id}"
 
     assert transaction["spans"][4]["op"] == "cache.get"
     assert transaction["spans"][4]["description"] == f"S{id}, S{id + 1}"
+    assert transaction["spans"][4]["data"]["cache.hit"]
 
     assert transaction["spans"][5]["op"] == "cache.get"
     assert transaction["spans"][5]["description"] == f"S{id}"
+    assert transaction["spans"][5]["data"]["cache.hit"]
 
     assert transaction["spans"][6]["op"] == "cache.get"
     assert transaction["spans"][6]["description"] == f"S{id + 1}"
+    assert not transaction["spans"][6]["data"]["cache.hit"]
 
 
 @pytest.mark.forked
