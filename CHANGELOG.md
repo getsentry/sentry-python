@@ -5,7 +5,7 @@
 ### Various fixes & improvements
 
 - Pydantic AI integration (#4906) by @constantinius
-  
+
   Enable the new Pydantic AI integration with the code snippet below, and you can use the Sentry AI dashboards to observe your AI calls:
 
   ```python
@@ -25,7 +25,7 @@
   )
   ```
 - MCP Python SDK (#4964) by @constantinius
-  
+
   Enable the new Python MCP integration with the code snippet below:
 
   ```python
@@ -44,13 +44,26 @@
       ],
   )
   ```
+- fix(strawberry): Remove autodetection, always use sync extension (#4984) by @sentrivana
+
+  Previously, `StrawberryIntegration` would try to guess whether it should install the sync or async version of itself. This auto-detection was very brittle and could lead to us auto-enabling async code in a sync context. With this change, `StrawberryIntegration` remains an auto-enabling integration, but it'll enable the sync version by default. If you want to enable the async version, pass the option explicitly:
+
+  ```python
+  sentry_sdk.init(
+      # ...
+      integrations=[
+          StrawberryIntegration(
+              async_execution=True
+          ),
+      ],
+  )
+  ```
 - fix(google-genai): Set agent name (#5038) by @constantinius
 - fix(integrations): hooking into error tracing function to find out if an execute tool span should be set to error (#4986) by @constantinius
 - fix(django): Improve logic for classifying cache hits and misses (#5029) by @alexander-alderman-webb
 - chore(metrics): Rename \_metrics to metrics (#5035) by @alexander-alderman-webb
 - fix(tracemetrics): Bump metric buffer size to 1k (#5031) by @k-fish
 - fix startlette deprecation warning (#5034) by @DeoLeung
-- fix(strawberry): Remove autodetection, always use sync extension (#4984) by @sentrivana
 - build(deps): bump actions/upload-artifact from 4 to 5 (#5032) by @dependabot
 - fix(ai): truncate messages for google genai (#4992) by @shellmayr
 - fix(ai): add message truncation to litellm (#4973) by @shellmayr
@@ -113,7 +126,7 @@
 ### Various fixes & improvements
 
 - feat: Add `concurrent.futures` patch to threading integration (#4770) by @alexander-alderman-webb
-  
+
   The SDK now makes sure to automatically preserve span relationships when using `ThreadPoolExecutor`.
 - chore: Remove old metrics code (#4899) by @sentrivana
 
@@ -128,7 +141,7 @@
 
 - Add LiteLLM integration (#4864) by @constantinius
   Once you've enabled the [new LiteLLM integration](https://docs.sentry.io/platforms/python/integrations/litellm/), you can use the Sentry AI Agents Monitoring, a Sentry dashboard that helps you understand what's going on with your AI requests:
-  
+
   ```python
   import sentry_sdk
   from sentry_sdk.integrations.litellm import LiteLLMIntegration
@@ -151,10 +164,10 @@
 - Also emit spans for MCP tool calls done by the LLM (#4875) by @constantinius
 - Option to not trace HTTP requests based on status codes (#4869) by @alexander-alderman-webb
   You can now disable transactions for incoming requests with specific HTTP status codes. The [new `trace_ignore_status_codes` option](https://docs.sentry.io/platforms/python/configuration/options/#trace_ignore_status_codes) accepts a `set` of status codes as integers. If a transaction wraps a request that results in one of the provided status codes, the transaction will be unsampled.
-    
+
   ```python
   import sentry_sdk
-  
+
   sentry_sdk.init(
       trace_ignore_status_codes={301, 302, 303, *range(305, 400), 404},
   )
