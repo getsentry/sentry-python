@@ -276,14 +276,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             elif "openai" in ai_type:
                 span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
 
-            agent_name = (
-                sentry_sdk.get_current_scope()
-                ._contexts.get("langchain_agent", {})
-                .get("agent_name")
-            )
-            if agent_name:
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
-
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
@@ -435,14 +427,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             tool_description = serialized.get("description")
             if tool_description is not None:
                 span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
-
-            agent_name = (
-                sentry_sdk.get_current_scope()
-                ._contexts.get("langchain_agent", {})
-                .get("agent_name")
-            )
-            if agent_name:
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
@@ -772,9 +756,6 @@ def _wrap_agent_executor_invoke(f):
             name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         ) as span:
-            sentry_sdk.get_current_scope().set_context(
-                "langchain_agent", {"agent_name": agent_name, "tools": tools}
-            )
             if agent_name:
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
@@ -813,8 +794,6 @@ def _wrap_agent_executor_invoke(f):
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-            sentry_sdk.get_current_scope().remove_context("langchain_agent")
-
             return result
 
     return new_invoke
@@ -835,14 +814,10 @@ def _wrap_agent_executor_stream(f):
 
         span = start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
+            name=f"invoke_agent {agent_name}".strip(),
             origin=LangchainIntegration.origin,
         )
         span.__enter__()
-
-        sentry_sdk.get_current_scope().set_context(
-            "langchain_agent", {"agent_name": agent_name, "tools": tools}
-        )
 
         if agent_name:
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
@@ -893,8 +868,6 @@ def _wrap_agent_executor_stream(f):
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-            sentry_sdk.get_current_scope().remove_context("langchain_agent")
-
             span.__exit__(None, None, None)
 
         async def new_iterator_async():
@@ -913,8 +886,6 @@ def _wrap_agent_executor_stream(f):
                 and integration.include_prompts
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
-
-            sentry_sdk.get_current_scope().remove_context("langchain_agent")
 
             span.__exit__(None, None, None)
 
