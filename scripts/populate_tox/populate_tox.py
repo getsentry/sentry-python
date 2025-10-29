@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from bisect import bisect_left
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone  # noqa: F401
@@ -39,6 +40,7 @@ CUTOFF = None
 
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 RELEASES_CACHE_FILE = Path(__file__).resolve().parent / "releases.jsonl"
+DEPENDENCIES_CACHE_FILE = Path(__file__).resolve().parent / "package_dependencies.jsonl"
 ENV = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent),
     trim_blocks=True,
@@ -52,6 +54,7 @@ PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
 CACHE = defaultdict(dict)
+DEPENDENCIES_CACHE = defaultdict(dict)
 
 IGNORE = {
     # Do not try auto-generating the tox entries for these. They will be
@@ -66,6 +69,26 @@ IGNORE = {
     "opentelemetry",
     "potel",
 }
+
+# Free-threading is experimentally supported in 3.13, and officially supported in 3.14.
+MIN_FREE_THREADING_SUPPORT = Version("3.14")
+
+
+@dataclass(order=True)
+class ThreadedVersion:
+    version: Version
+    no_gil: bool
+
+    def __init__(self, version: str | Version, no_gil=False):
+        self.version = Version(version) if isinstance(version, str) else version
+        self.no_gil = no_gil
+
+    def __str__(self):
+        version = f"py{self.version.major}.{self.version.minor}"
+        if self.no_gil:
+            version += "t"
+
+        return version
 
 
 def _fetch_sdk_metadata() -> PackageMetadata:
@@ -112,11 +135,54 @@ def fetch_release(package: str, version: Version) -> Optional[dict]:
     return release
 
 
+@functools.cache
+def fetch_package_dependencies(package: str, version: Version) -> dict:
+    """Fetch package dependencies metadata from cache or, failing that, PyPI."""
+    package_dependencies = _fetch_package_dependencies_from_cache(package, version)
+    if package_dependencies is not None:
+        return package_dependencies
+
+    # Removing non-report output with -qqq may be brittle, but avoids file I/O.
+    # Currently -qqq supresses all non-report output that would break json.loads().
+    pip_report = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            f"{package}=={str(version)}",
+            "--dry-run",
+            "--ignore-installed",
+            "--report",
+            "-",
+            "-qqq",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    dependencies_info = json.loads(pip_report)["install"]
+    _save_to_package_dependencies_cache(package, version, dependencies_info)
+
+    return dependencies_info
+
+
 def _fetch_from_cache(package: str, version: Version) -> Optional[dict]:
     package = _normalize_name(package)
     if package in CACHE and str(version) in CACHE[package]:
         CACHE[package][str(version)]["_accessed"] = True
         return CACHE[package][str(version)]
+
+    return None
+
+
+def _fetch_package_dependencies_from_cache(
+    package: str, version: Version
+) -> Optional[dict]:
+    package = _normalize_name(package)
+    if package in DEPENDENCIES_CACHE and str(version) in DEPENDENCIES_CACHE[package]:
+        DEPENDENCIES_CACHE[package][str(version)]["_accessed"] = True
+        return DEPENDENCIES_CACHE[package][str(version)]["dependencies"]
 
     return None
 
@@ -127,6 +193,23 @@ def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> N
 
     CACHE[_normalize_name(package)][str(version)] = release
     CACHE[_normalize_name(package)][str(version)]["_accessed"] = True
+
+
+def _save_to_package_dependencies_cache(
+    package: str, version: Version, release: Optional[dict]
+) -> None:
+    with open(DEPENDENCIES_CACHE_FILE, "a") as releases_cache:
+        line = {
+            "name": package,
+            "version": str(version),
+            "dependencies": _normalize_package_dependencies(release),
+        }
+        releases_cache.write(json.dumps(line) + "\n")
+
+    DEPENDENCIES_CACHE[_normalize_name(package)][str(version)] = {
+        "info": release,
+        "_accessed": True,
+    }
 
 
 def _prefilter_releases(
@@ -404,12 +487,19 @@ def supported_python_versions(
     return supported
 
 
-def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version]:
+def pick_python_versions_to_test(
+    python_versions: list[Version],
+    python_versions_with_supported_free_threaded_wheel: set[Version],
+) -> list[ThreadedVersion]:
     """
     Given a list of Python versions, pick those that make sense to test on.
 
     Currently, this is the oldest, the newest, and the second newest Python
     version.
+
+    A free-threaded variant is also chosen for the newest Python version for which
+    - a free-threaded wheel is distributed; and
+    - the SDK supports free-threading.
     """
     filtered_python_versions = {
         python_versions[0],
@@ -421,7 +511,21 @@ def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version
     except IndexError:
         pass
 
-    return sorted(filtered_python_versions)
+    versions_to_test = sorted(
+        ThreadedVersion(version) for version in filtered_python_versions
+    )
+
+    for python_version in reversed(python_versions):
+        if python_version < MIN_FREE_THREADING_SUPPORT:
+            break
+
+        if python_version in python_versions_with_supported_free_threaded_wheel:
+            versions_to_test.append(
+                ThreadedVersion(versions_to_test[-1].version, no_gil=True)
+            )
+            break
+
+    return versions_to_test
 
 
 def _parse_python_versions_from_classifiers(classifiers: list[str]) -> list[Version]:
@@ -475,12 +579,103 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
     return []
 
 
-def _render_python_versions(python_versions: list[Version]) -> str:
-    return (
-        "{"
-        + ",".join(f"py{version.major}.{version.minor}" for version in python_versions)
-        + "}"
-    )
+def _get_abi_tag(wheel_filename: str) -> str:
+    return wheel_filename.removesuffix(".whl").split("-")[-2]
+
+
+def _get_abi_tag_version(python_version: Version):
+    return f"{python_version.major}{python_version.minor}"
+
+
+@functools.cache
+def _has_free_threading_dependencies(
+    package_name: str, release: Version, python_version: Version
+) -> bool:
+    """
+    Checks if all dependencies of a version of a package support free-threading.
+
+    A dependency supports free-threading if
+    - the dependency is pure Python, indicated by a "none" abi tag in its wheel name; or
+    - the abi tag of one of its wheels has a "t" suffix to indicate a free-threaded build; or
+    - no wheel targets the platform on which the script is run, but PyPI distributes a wheel
+      satisfying one of the above conditions.
+    """
+    dependencies_info = fetch_package_dependencies(package_name, release)
+
+    for dependency_info in dependencies_info:
+        wheel_filename = dependency_info["download_info"]["url"].split("/")[-1]
+
+        if wheel_filename.endswith(".tar.gz"):
+            package_release = wheel_filename.rstrip(".tar.gz")
+            dependency_name, dependency_version = package_release.split("-")
+
+            pypi_data = fetch_release(dependency_name, Version(dependency_version))
+            supports_free_threading = False
+
+            for download in pypi_data["urls"]:
+                abi_tag = _get_abi_tag(download["filename"])
+                abi_tag_version = _get_abi_tag_version(python_version)
+
+                if download["packagetype"] == "bdist_wheel" and (
+                    (
+                        abi_tag.endswith("t")
+                        and abi_tag.startswith(f"cp{abi_tag_version}")
+                    )
+                    or abi_tag == "none"
+                ):
+                    supports_free_threading = True
+
+            if not supports_free_threading:
+                return False
+
+        elif wheel_filename.endswith(".whl"):
+            abi_tag = _get_abi_tag(wheel_filename)
+            if abi_tag != "none" and not abi_tag.endswith("t"):
+                return False
+
+        else:
+            raise Exception(
+                f"Wheel filename with unhandled extension: {wheel_filename}"
+            )
+
+    return True
+
+
+def _supports_free_threading(
+    package_name: str, release: Version, python_version: Version, pypi_data: dict
+) -> bool:
+    """
+    Check if the package version supports free-threading on the given Python minor
+    version.
+
+    There are two cases in which we assume a package has free-threading
+    support:
+    - The package is pure Python, indicated by a "none" abi tag in its wheel name,
+      and has dependencies supporting free-threading; or
+    - the abi tag of one of its wheels has a "t" suffix to indicate a free-threaded build.
+
+    See https://peps.python.org/pep-0427/#file-name-convention
+    """
+    for download in pypi_data["urls"]:
+        if download["packagetype"] == "bdist_wheel":
+            abi_tag = _get_abi_tag(download["filename"])
+
+            abi_tag_version = _get_abi_tag_version(python_version)
+            if (
+                abi_tag.endswith("t") and abi_tag.startswith(f"cp{abi_tag_version}")
+            ) or (
+                abi_tag == "none"
+                and _has_free_threading_dependencies(
+                    package_name, release, python_version
+                )
+            ):
+                return True
+
+    return False
+
+
+def _render_python_versions(python_versions: list[ThreadedVersion]) -> str:
+    return "{" + ",".join(str(version) for version in python_versions) + "}"
 
 
 def _render_dependencies(integration: str, releases: list[Version]) -> list[str]:
@@ -585,12 +780,22 @@ def _add_python_versions_to_release(
         TEST_SUITE_CONFIG[integration].get("python")
     )
 
+    supported_py_versions = supported_python_versions(
+        determine_python_versions(release_pypi_data),
+        target_python_versions,
+        release,
+    )
+
+    py_versions_with_supported_free_threaded_wheel = set(
+        version
+        for version in supported_py_versions
+        if version >= MIN_FREE_THREADING_SUPPORT
+        and _supports_free_threading(package, release, version, release_pypi_data)
+    )
+
     release.python_versions = pick_python_versions_to_test(
-        supported_python_versions(
-            determine_python_versions(release_pypi_data),
-            target_python_versions,
-            release,
-        )
+        supported_py_versions,
+        py_versions_with_supported_free_threaded_wheel,
     )
 
     release.rendered_python_versions = _render_python_versions(release.python_versions)
@@ -647,8 +852,16 @@ def _normalize_name(package: str) -> str:
     return package.lower().replace("-", "_")
 
 
+def _extract_wheel_info_to_cache(wheel: dict):
+    return {
+        "packagetype": wheel["packagetype"],
+        "filename": wheel["filename"],
+    }
+
+
 def _normalize_release(release: dict) -> dict:
     """Filter out unneeded parts of the release JSON."""
+    urls = [_extract_wheel_info_to_cache(wheel) for wheel in release["urls"]]
     normalized = {
         "info": {
             "classifiers": release["info"]["classifiers"],
@@ -657,8 +870,26 @@ def _normalize_release(release: dict) -> dict:
             "version": release["info"]["version"],
             "yanked": release["info"]["yanked"],
         },
+        "urls": urls,
     }
     return normalized
+
+
+def _normalize_package_dependencies(package_dependencies: list[dict]) -> list[dict]:
+    """Filter out unneeded parts of the package dependencies JSON."""
+    normalized = [
+        {
+            "download_info": {"url": depedency["download_info"]["url"]},
+        }
+        for depedency in package_dependencies
+    ]
+
+    return normalized
+
+
+def _exit_if_not_free_threaded_interpreter():
+    if "free-threading build" not in sys.version:
+        raise Exception("Running with a free-threaded interpreter is required.")
 
 
 def main() -> dict[str, list]:
@@ -666,6 +897,9 @@ def main() -> dict[str, list]:
     Generate tox.ini from the tox.jinja template.
     """
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
+
+    _exit_if_not_free_threaded_interpreter()
+
     meta = _fetch_sdk_metadata()
     sdk_python_versions = _parse_python_versions_from_classifiers(
         meta.get_all("Classifier")
@@ -675,6 +909,20 @@ def main() -> dict[str, list]:
     print(
         f"The SDK supports Python versions {MIN_PYTHON_VERSION} - {MAX_PYTHON_VERSION}."
     )
+
+    if not RELEASES_CACHE_FILE.exists():
+        print(
+            f"Creating {RELEASES_CACHE_FILE.name}."
+            "You should only see this message if you cleared the cache by removing the file."
+        )
+        RELEASES_CACHE_FILE.write_text("")
+
+    if not DEPENDENCIES_CACHE_FILE.exists():
+        print(
+            f"Creating {DEPENDENCIES_CACHE_FILE.name}."
+            "You should only see this message if you cleared the cache by removing the file."
+        )
+        DEPENDENCIES_CACHE_FILE.write_text("")
 
     # Load file cache
     global CACHE
@@ -688,6 +936,19 @@ def main() -> dict[str, list]:
             CACHE[name][version]["_accessed"] = (
                 False  # for cleaning up unused cache entries
             )
+
+    # Load package dependencies cache
+    global DEPENDENCIES_CACHE
+
+    with open(DEPENDENCIES_CACHE_FILE) as dependencies_cache:
+        for line in dependencies_cache:
+            release = json.loads(line)
+            name = _normalize_name(release["name"])
+            version = release["version"]
+            DEPENDENCIES_CACHE[name][version] = {
+                "dependencies": release["dependencies"],
+                "_accessed": False,
+            }
 
     # Process packages
     packages = defaultdict(list)
@@ -764,9 +1025,24 @@ def main() -> dict[str, list]:
             ):
                 releases_cache.write(json.dumps(release) + "\n")
 
+    # Sort the dependencies file
+    releases = []
+    with open(DEPENDENCIES_CACHE_FILE) as releases_cache:
+        releases = [json.loads(line) for line in releases_cache]
+    releases.sort(key=lambda r: (r["name"], r["version"]))
+    with open(DEPENDENCIES_CACHE_FILE, "w") as releases_cache:
+        for release in releases:
+            if (
+                DEPENDENCIES_CACHE[_normalize_name(release["name"])][
+                    release["version"]
+                ]["_accessed"]
+                is True
+            ):
+                releases_cache.write(json.dumps(release) + "\n")
+
     print(
         "Done generating tox.ini. Make sure to also update the CI YAML "
-        "files to reflect the new test targets."
+        "files by executing split_tox_gh_actions.py."
     )
 
     return packages
