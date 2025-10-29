@@ -55,7 +55,7 @@ jobs:
           # This will also trigger "make dist" that creates the Python packages
           make aws-lambda-layer
       - name: Upload Python Packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: artifact-build_lambda_layer
           path: |
@@ -79,7 +79,7 @@ jobs:
           make apidocs
           cd docs/_build && zip -r gh-pages ./
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: artifact-docs
           path: |
@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_lambda_layer, docs]
     steps:
-      - uses: actions/upload-artifact/merge@v4
+      - uses: actions/upload-artifact/merge@v5
         with:
           # Craft expects release assets from github to be a single artifact named after the sha.
           name: ${{ github.sha }}

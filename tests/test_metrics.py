@@ -4,7 +4,6 @@ from typing import List, Any, Mapping
 import pytest
 
 import sentry_sdk
-from sentry_sdk import _metrics
 from sentry_sdk import get_client
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.types import Metric
@@ -39,9 +38,9 @@ def test_metrics_disabled_by_default(sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    _metrics.count("test.counter", 1)
-    _metrics.gauge("test.gauge", 42)
-    _metrics.distribution("test.distribution", 200)
+    sentry_sdk.metrics.count("test.counter", 1)
+    sentry_sdk.metrics.gauge("test.gauge", 42)
+    sentry_sdk.metrics.distribution("test.distribution", 200)
 
     assert len(envelopes) == 0
 
@@ -50,9 +49,9 @@ def test_metrics_basics(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_metrics": True})
     envelopes = capture_envelopes()
 
-    _metrics.count("test.counter", 1)
-    _metrics.gauge("test.gauge", 42, unit="millisecond")
-    _metrics.distribution("test.distribution", 200, unit="second")
+    sentry_sdk.metrics.count("test.counter", 1)
+    sentry_sdk.metrics.gauge("test.gauge", 42, unit="millisecond")
+    sentry_sdk.metrics.distribution("test.distribution", 200, unit="second")
 
     get_client().flush()
     metrics = envelopes_to_metrics(envelopes)
@@ -81,7 +80,7 @@ def test_metrics_experimental_option(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_metrics": True})
     envelopes = capture_envelopes()
 
-    _metrics.count("test.counter", 5)
+    sentry_sdk.metrics.count("test.counter", 5)
 
     get_client().flush()
 
@@ -99,7 +98,7 @@ def test_metrics_with_attributes(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    _metrics.count(
+    sentry_sdk.metrics.count(
         "test.counter", 1, attributes={"endpoint": "/api/test", "status": "success"}
     )
 
@@ -121,7 +120,7 @@ def test_metrics_with_user(sentry_init, capture_envelopes):
     sentry_sdk.set_user(
         {"id": "user-123", "email": "test@example.com", "username": "testuser"}
     )
-    _metrics.count("test.user.counter", 1)
+    sentry_sdk.metrics.count("test.user.counter", 1)
 
     get_client().flush()
 
@@ -138,7 +137,7 @@ def test_metrics_with_span(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(op="test", name="test-span"):
-        _metrics.count("test.span.counter", 1)
+        sentry_sdk.metrics.count("test.span.counter", 1)
 
     get_client().flush()
 
@@ -154,7 +153,7 @@ def test_metrics_tracing_without_performance(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_metrics": True})
     envelopes = capture_envelopes()
 
-    _metrics.count("test.span.counter", 1)
+    sentry_sdk.metrics.count("test.span.counter", 1)
 
     get_client().flush()
 
@@ -197,8 +196,8 @@ def test_metrics_before_send(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    _metrics.count("test.skip", 1)
-    _metrics.count("test.keep", 1)
+    sentry_sdk.metrics.count("test.skip", 1)
+    sentry_sdk.metrics.count("test.keep", 1)
 
     get_client().flush()
 

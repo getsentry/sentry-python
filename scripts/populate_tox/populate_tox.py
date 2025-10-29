@@ -41,6 +41,7 @@ CUTOFF = None
 
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 RELEASES_CACHE_FILE = Path(__file__).resolve().parent / "releases.jsonl"
+DEPENDENCIES_CACHE_FILE = Path(__file__).resolve().parent / "package_dependencies.jsonl"
 ENV = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent),
     trim_blocks=True,
@@ -55,6 +56,7 @@ PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
 CACHE = defaultdict(dict)
+DEPENDENCIES_CACHE = defaultdict(dict)
 
 IGNORE = {
     # Do not try auto-generating the tox entries for these. They will be
@@ -135,11 +137,54 @@ def fetch_release(package: str, version: Version) -> Optional[dict]:
     return release
 
 
+@functools.cache
+def fetch_package_dependencies(package: str, version: Version) -> dict:
+    """Fetch package dependencies metadata from cache or, failing that, PyPI."""
+    package_dependencies = _fetch_package_dependencies_from_cache(package, version)
+    if package_dependencies is not None:
+        return package_dependencies
+
+    # Removing non-report output with -qqq may be brittle, but avoids file I/O.
+    # Currently -qqq supresses all non-report output that would break json.loads().
+    pip_report = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            f"{package}=={str(version)}",
+            "--dry-run",
+            "--ignore-installed",
+            "--report",
+            "-",
+            "-qqq",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    dependencies_info = json.loads(pip_report)["install"]
+    _save_to_package_dependencies_cache(package, version, dependencies_info)
+
+    return dependencies_info
+
+
 def _fetch_from_cache(package: str, version: Version) -> Optional[dict]:
     package = _normalize_name(package)
     if package in CACHE and str(version) in CACHE[package]:
         CACHE[package][str(version)]["_accessed"] = True
         return CACHE[package][str(version)]
+
+    return None
+
+
+def _fetch_package_dependencies_from_cache(
+    package: str, version: Version
+) -> Optional[dict]:
+    package = _normalize_name(package)
+    if package in DEPENDENCIES_CACHE and str(version) in DEPENDENCIES_CACHE[package]:
+        DEPENDENCIES_CACHE[package][str(version)]["_accessed"] = True
+        return DEPENDENCIES_CACHE[package][str(version)]["dependencies"]
 
     return None
 
@@ -150,6 +195,23 @@ def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> N
 
     CACHE[_normalize_name(package)][str(version)] = release
     CACHE[_normalize_name(package)][str(version)]["_accessed"] = True
+
+
+def _save_to_package_dependencies_cache(
+    package: str, version: Version, release: Optional[dict]
+) -> None:
+    with open(DEPENDENCIES_CACHE_FILE, "a") as releases_cache:
+        line = {
+            "name": package,
+            "version": str(version),
+            "dependencies": _normalize_package_dependencies(release),
+        }
+        releases_cache.write(json.dumps(line) + "\n")
+
+    DEPENDENCIES_CACHE[_normalize_name(package)][str(version)] = {
+        "info": release,
+        "_accessed": True,
+    }
 
 
 def _prefilter_releases(
@@ -429,7 +491,7 @@ def supported_python_versions(
 
 def pick_python_versions_to_test(
     python_versions: list[Version],
-    python_versions_with_free_threaded_wheel: set[Version],
+    python_versions_with_supported_free_threaded_wheel: set[Version],
 ) -> list[ThreadedVersion]:
     """
     Given a list of Python versions, pick those that make sense to test on.
@@ -459,7 +521,7 @@ def pick_python_versions_to_test(
         if python_version < MIN_FREE_THREADING_SUPPORT:
             break
 
-        if python_version in python_versions_with_free_threaded_wheel:
+        if python_version in python_versions_with_supported_free_threaded_wheel:
             versions_to_test.append(
                 ThreadedVersion(versions_to_test[-1].version, no_gil=True)
             )
@@ -523,24 +585,10 @@ def get_abi_tag(wheel_filename: str) -> str:
     return wheel_filename.removesuffix(".whl").split("-")[-2]
 
 
+@functools.cache
 def has_free_threading_dependencies(package_name: str, release: Version) -> bool:
-    # Removing non-report output with -qqq may be brittle, but avoids file I/O
-    pip_report = subprocess.run(
-        [
-            "pip",
-            "install",
-            package_name,
-            "--dry-run",
-            "--ignore-installed",
-            "--report",
-            "-",
-            "-qqq",
-        ],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    dependencies_info = fetch_package_dependencies(package_name, release)
 
-    dependencies_info = json.loads(pip_report)["install"]
     for dependency_info in dependencies_info:
         wheel_filename = dependency_info["download_info"]["url"].split("/")[-1]
         abi_tag = get_abi_tag(wheel_filename)
@@ -693,15 +741,16 @@ def _add_python_versions_to_release(
         release,
     )
 
-    py_versions_with_free_threaded_wheel = set(
+    py_versions_with_supported_free_threaded_wheel = set(
         version
         for version in supported_py_versions
-        if supports_free_threading(package, release, version, release_pypi_data)
+        if version >= MIN_FREE_THREADING_SUPPORT
+        and supports_free_threading(package, release, version, release_pypi_data)
     )
 
     release.python_versions = pick_python_versions_to_test(
         supported_py_versions,
-        py_versions_with_free_threaded_wheel,
+        py_versions_with_supported_free_threaded_wheel,
     )
 
     release.rendered_python_versions = _render_python_versions(release.python_versions)
@@ -781,6 +830,18 @@ def _normalize_release(release: dict) -> dict:
     return normalized
 
 
+def _normalize_package_dependencies(package_dependencies: list[dict]) -> list[dict]:
+    """Filter out unneeded parts of the package dependencies JSON."""
+    normalized = [
+        {
+            "download_info": {"url": depedency["download_info"]["url"]},
+        }
+        for depedency in package_dependencies
+    ]
+
+    return normalized
+
+
 def main() -> dict[str, list]:
     """
     Generate tox.ini from the tox.jinja template.
@@ -796,6 +857,20 @@ def main() -> dict[str, list]:
         f"The SDK supports Python versions {MIN_PYTHON_VERSION} - {MAX_PYTHON_VERSION}."
     )
 
+    if not RELEASES_CACHE_FILE.exists():
+        print(
+            f"Creating {RELEASES_CACHE_FILE.name}."
+            "You should only see this message if you cleared the cache by removing the file."
+        )
+        RELEASES_CACHE_FILE.write_text("")
+
+    if not DEPENDENCIES_CACHE_FILE.exists():
+        print(
+            f"Creating {DEPENDENCIES_CACHE_FILE.name}."
+            "You should only see this message if you cleared the cache by removing the file."
+        )
+        DEPENDENCIES_CACHE_FILE.write_text("")
+
     # Load file cache
     global CACHE
 
@@ -808,6 +883,19 @@ def main() -> dict[str, list]:
             CACHE[name][version]["_accessed"] = (
                 False  # for cleaning up unused cache entries
             )
+
+    # Load package dependencies cache
+    global DEPENDENCIES_CACHE
+
+    with open(DEPENDENCIES_CACHE_FILE) as dependencies_cache:
+        for line in dependencies_cache:
+            release = json.loads(line)
+            name = _normalize_name(release["name"])
+            version = release["version"]
+            DEPENDENCIES_CACHE[name][version] = {
+                "dependencies": release["dependencies"],
+                "_accessed": False,
+            }
 
     # Process packages
     packages = defaultdict(list)
@@ -879,6 +967,21 @@ def main() -> dict[str, list]:
             if (
                 CACHE[_normalize_name(release["info"]["name"])][
                     release["info"]["version"]
+                ]["_accessed"]
+                is True
+            ):
+                releases_cache.write(json.dumps(release) + "\n")
+
+    # Sort the dependencies file
+    releases = []
+    with open(DEPENDENCIES_CACHE_FILE) as releases_cache:
+        releases = [json.loads(line) for line in releases_cache]
+    releases.sort(key=lambda r: (r["name"], r["version"]))
+    with open(DEPENDENCIES_CACHE_FILE, "w") as releases_cache:
+        for release in releases:
+            if (
+                DEPENDENCIES_CACHE[_normalize_name(release["name"])][
+                    release["version"]
                 ]["_accessed"]
                 is True
             ):
