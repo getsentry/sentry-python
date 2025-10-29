@@ -4,19 +4,55 @@
 
 ### Various fixes & improvements
 
-- fix(google-genai): Set agent name (#5038) by @sentrivana
+- Pydantic AI integration (#4906) by @constantinius
+  
+  Enable the new Pydantic AI integration with the code snippet below, and you can use the Sentry AI dashboards to observe your AI calls:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          PydanticAIIntegration(),
+      ],
+  )
+  ```
+- MCP Python SDK (#4964) by @constantinius
+  
+  Enable the new Python MCP integration with the code snippet below:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.mcp import MCPIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          MCPIntegration(),
+      ],
+  )
+  ```
+- fix(google-genai): Set agent name (#5038) by @constantinius
 - fix(integrations): hooking into error tracing function to find out if an execute tool span should be set to error (#4986) by @constantinius
 - fix(django): Improve logic for classifying cache hits and misses (#5029) by @alexander-alderman-webb
 - chore(metrics): Rename \_metrics to metrics (#5035) by @alexander-alderman-webb
 - fix(tracemetrics): Bump metric buffer size to 1k (#5031) by @k-fish
 - fix startlette deprecation warning (#5034) by @DeoLeung
 - fix(strawberry): Remove autodetection, always use sync extension (#4984) by @sentrivana
-- ci: 🤖 Update test matrix with new releases (10/27) (#5033) by @github-actions
 - build(deps): bump actions/upload-artifact from 4 to 5 (#5032) by @dependabot
-- ci: Prepare for new major branch, remove potel-base from actions (#5003) by @sentrivana
 - fix(ai): truncate messages for google genai (#4992) by @shellmayr
-- feat(integrations): MCP Python SDK (#4964) by @constantinius
-- feat(integrations): pydantic-ai integration (#4906) by @constantinius
 - fix(ai): add message truncation to litellm (#4973) by @shellmayr
 - feat(langchain): Support v1 (#4874) by @sentrivana
 - ci: Run `common` test suite on Python 3.14t (#4969) by @alexander-alderman-webb
@@ -25,7 +61,6 @@
 - tests(huggingface): Support 1.0.0rc7 (#4979) by @alexander-alderman-webb
 - feat: Enable HTTP request code origin by default (#4967) by @alexander-alderman-webb
 - ci: Run `common` test suite on Python 3.14 (#4896) by @sentrivana
-- ci: 🤖 Update test matrix with new releases (10/20) (#4957) by @github-actions
 
 ## 2.42.1
 
