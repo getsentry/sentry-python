@@ -1082,6 +1082,7 @@ async def test_openai_agents_message_truncation(
     sentry_init, capture_events, test_agent, mock_usage
 ):
     """Test that large messages are truncated properly in OpenAI Agents integration."""
+
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
@@ -1155,3 +1156,110 @@ async def test_openai_agents_message_truncation(
         assert isinstance(parsed_messages, list)
         # Verify messages were processed
         assert len(parsed_messages) >= 1
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_error_tracing(sentry_init, capture_events, test_agent):
+    """
+    Test that tool execution errors are properly tracked via error tracing patch.
+
+    This tests the patch of agents error tracing function to ensure execute_tool
+    spans are set to error status when tool execution fails.
+
+    The function location varies by version:
+    - Newer versions: agents.util._error_tracing.attach_error_to_current_span
+    - Older versions: agents._utils.attach_error_to_current_span
+    """
+
+    @agents.function_tool
+    def failing_tool(message: str) -> str:
+        """A tool that fails"""
+        raise ValueError("Tool execution failed")
+
+    # Create agent with the failing tool
+    agent_with_tool = test_agent.clone(tools=[failing_tool])
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a mock response that includes tool call
+            tool_call = ResponseFunctionToolCall(
+                id="call_123",
+                call_id="call_123",
+                name="failing_tool",
+                type="function_call",
+                arguments='{"message": "test"}',
+                function=MagicMock(
+                    name="failing_tool", arguments='{"message": "test"}'
+                ),
+            )
+
+            # First response with tool call
+            tool_response = ModelResponse(
+                output=[tool_call],
+                usage=Usage(
+                    requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+                ),
+                response_id="resp_tool_123",
+            )
+
+            # Second response after tool error (agents library handles the error and continues)
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="An error occurred while running the tool",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1, input_tokens=15, output_tokens=10, total_tokens=25
+                ),
+                response_id="resp_final_123",
+            )
+
+            mock_get_response.side_effect = [tool_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            # Note: The agents library catches tool exceptions internally,
+            # so we don't expect this to raise
+            await agents.Runner.run(
+                agent_with_tool,
+                "Please use the failing tool",
+                run_config=test_run_config,
+            )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # Find the execute_tool span
+    execute_tool_span = None
+    for span in spans:
+        if span.get("description", "").startswith("execute_tool failing_tool"):
+            execute_tool_span = span
+            break
+
+    # Verify the execute_tool span was created
+    assert execute_tool_span is not None, "execute_tool span was not created"
+    assert execute_tool_span["description"] == "execute_tool failing_tool"
+    assert execute_tool_span["data"]["gen_ai.tool.name"] == "failing_tool"
+
+    # Verify error status was set (this is the key test for our patch)
+    # The span should be marked as error because the tool execution failed
+    assert execute_tool_span["tags"]["status"] == "error"
