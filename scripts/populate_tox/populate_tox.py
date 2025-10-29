@@ -662,7 +662,9 @@ def _supports_free_threading(
                 abi_tag.endswith("t") and abi_tag.startswith(f"cp{abi_tag_version}")
             ) or (
                 abi_tag == "none"
-                and _has_free_threading_dependencies(package_name, release)
+                and _has_free_threading_dependencies(
+                    package_name, release, python_version
+                )
             ):
                 return True
 
