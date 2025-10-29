@@ -46,7 +46,6 @@ ENV = Environment(
     trim_blocks=True,
     lstrip_blocks=True,
 )
-VENV_DIR = Path(__file__).resolve().parent / ".venv"
 
 PYPI_COOLDOWN = 0.05  # seconds to wait between requests to PyPI
 
