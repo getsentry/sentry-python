@@ -579,7 +579,7 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
     return []
 
 
-def get_abi_tag(wheel_filename: str) -> str:
+def _get_abi_tag(wheel_filename: str) -> str:
     return wheel_filename.removesuffix(".whl").split("-")[-2]
 
 
@@ -588,7 +588,7 @@ def _get_abi_tag_version(python_version: Version):
 
 
 @functools.cache
-def has_free_threading_dependencies(
+def _has_free_threading_dependencies(
     package_name: str, release: Version, python_version: Version
 ) -> bool:
     """
@@ -610,7 +610,7 @@ def has_free_threading_dependencies(
             supports_free_threading = False
 
             for download in pypi_data["urls"]:
-                abi_tag = get_abi_tag(wheel_filename)
+                abi_tag = _get_abi_tag(wheel_filename)
                 abi_tag_version = _get_abi_tag_version(python_version)
 
                 if download["packagetype"] == "bdist_wheel" and (
@@ -626,7 +626,7 @@ def has_free_threading_dependencies(
                 return False
 
         elif wheel_filename.endswith(".whl"):
-            abi_tag = get_abi_tag(wheel_filename)
+            abi_tag = _get_abi_tag(wheel_filename)
             if abi_tag != "none" and not abi_tag.endswith("t"):
                 return False
 
@@ -638,7 +638,7 @@ def has_free_threading_dependencies(
     return True
 
 
-def supports_free_threading(
+def _supports_free_threading(
     package_name: str, release: Version, python_version: Version, pypi_data: dict
 ) -> bool:
     """
@@ -655,14 +655,14 @@ def supports_free_threading(
     """
     for download in pypi_data["urls"]:
         if download["packagetype"] == "bdist_wheel":
-            abi_tag = get_abi_tag(download["filename"])
+            abi_tag = _get_abi_tag(download["filename"])
 
             abi_tag_version = _get_abi_tag_version(python_version)
             if (
                 abi_tag.endswith("t") and abi_tag.startswith(f"cp{abi_tag_version}")
             ) or (
                 abi_tag == "none"
-                and has_free_threading_dependencies(package_name, release)
+                and _has_free_threading_dependencies(package_name, release)
             ):
                 return True
 
@@ -785,7 +785,7 @@ def _add_python_versions_to_release(
         version
         for version in supported_py_versions
         if version >= MIN_FREE_THREADING_SUPPORT
-        and supports_free_threading(package, release, version, release_pypi_data)
+        and _supports_free_threading(package, release, version, release_pypi_data)
     )
 
     release.python_versions = pick_python_versions_to_test(
