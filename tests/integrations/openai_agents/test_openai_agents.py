@@ -24,6 +24,7 @@ from openai.types.responses.response_usage import (
     OutputTokensDetails,
 )
 
+import sentry_sdk
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import safe_serialize
 from sentry_sdk.utils import parse_version
@@ -1254,74 +1255,48 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
     assert execute_tool_span["tags"]["status"] == "error"
 
 
-@pytest.mark.asyncio
-async def test_openai_agents_message_truncation(
-    sentry_init, capture_events, test_agent, mock_usage
-):
+def test_openai_agents_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in OpenAI Agents integration."""
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            large_content = (
-                "This is a very long message that will exceed our size limits. " * 1000
-            )
+    from sentry_sdk import start_span
+    from sentry_sdk.consts import SPANDATA
+    from sentry_sdk.integrations.openai_agents.utils import _set_input_data
 
-            large_response = ModelResponse(
-                output=[
-                    ResponseOutputMessage(
-                        id="msg_large",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                text=large_content,
-                                type="output_text",
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                ],
-                usage=mock_usage,
-                response_id="resp_large",
-            )
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
 
-            mock_get_response.return_value = large_response
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
-
-            events = capture_events()
-
-            with patch(
-                "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-            ) as mock_inner:
-                mock_inner.side_effect = [large_response] * 5
-
-                result = await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
-                )
-
-            assert result is not None
-
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
-    ai_client_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.chat"
+    test_messages = [
+        {"role": "system", "content": "small message 1"},
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": "small message 4"},
+        {"role": "assistant", "content": "small message 5"},
     ]
-    assert len(ai_client_spans) > 0
 
-    ai_client_span = ai_client_spans[0]
-    if "gen_ai.request.messages" in ai_client_span["data"]:
-        messages_data = ai_client_span["data"]["gen_ai.request.messages"]
-        assert isinstance(messages_data, str)
+    get_response_kwargs = {"input": test_messages}
 
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) >= 1
+    with start_span(op="gen_ai.chat") as span:
+        scope = sentry_sdk.get_current_scope()
+        _set_input_data(span, get_response_kwargs)
+        # Assert that annotation for truncation metadata is present when messages are truncated
+        if hasattr(scope, "_gen_ai_original_message_count"):
+            truncated_count = scope._gen_ai_original_message_count.get(span.span_id)
+            assert truncated_count == 5, (
+                f"Expected 5 original messages, got {truncated_count}"
+            )
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data
+    messages_data = span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 2
+    assert "small message 4" in str(parsed_messages[0])
+    assert "small message 5" in str(parsed_messages[1])
