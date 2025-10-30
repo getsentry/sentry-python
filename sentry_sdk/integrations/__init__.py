@@ -307,6 +307,6 @@ class Integration(ABC):
     def setup_once_with_options(self, options=None):
         # type: (Optional[Dict[str, Any]]) -> None
         """
-        Called after setup_once in rare cases on the instance and options since we don't have those available above..
+        Called after setup_once in rare cases on the instance and with options since we don't have those available above.
         """
         pass
