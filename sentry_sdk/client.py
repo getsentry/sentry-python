@@ -409,6 +409,7 @@ class _Client(BaseClient):
                     "auto_enabling_integrations"
                 ],
                 disabled_integrations=self.options["disabled_integrations"],
+                options=self.options,
             )
 
             spotlight_config = self.options.get("spotlight")

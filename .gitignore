@@ -29,6 +29,7 @@ pip-wheel-metadata
 .mypy_cache
 .vscode/
 .claude/
+.tool-versions
 
 # for running AWS Lambda tests using AWS SAM
 sam.template.yaml

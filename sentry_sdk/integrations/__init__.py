@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from typing import Set
     from typing import Type
     from typing import Union
+    from typing import Any
 
 
 _DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
@@ -171,12 +172,13 @@ _MIN_VERSIONS = {
 
 
 def setup_integrations(
-    integrations,
-    with_defaults=True,
-    with_auto_enabling_integrations=False,
-    disabled_integrations=None,
+    integrations,  # type: Sequence[Integration]
+    with_defaults=True,  # type: bool
+    with_auto_enabling_integrations=False,  # type: bool
+    disabled_integrations=None,  #  type: Optional[Sequence[Union[type[Integration], Integration]]]
+    options=None,  # type: Optional[Dict[str, Any]]
 ):
-    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Union[type[Integration], Integration]]]) -> Dict[str, Integration]
+    # type: (...) -> Dict[str, Integration]
     """
     Given a list of integration instances, this installs them all.
 
@@ -221,6 +223,7 @@ def setup_integrations(
                     )
                     try:
                         type(integration).setup_once()
+                        integration.setup_once_with_options(options)
                     except DidNotEnable as e:
                         if identifier not in used_as_default_integration:
                             raise
@@ -298,5 +301,12 @@ class Integration(ABC):
 
         Inside those hooks `Integration.current` can be used to access the
         instance again.
+        """
+        pass
+
+    def setup_once_with_options(self, options=None):
+        # type: (Optional[Dict[str, Any]]) -> None
+        """
+        Called after setup_once in rare cases on the instance and with options since we don't have those available above.
         """
         pass
