@@ -46,7 +46,7 @@ def test_metrics_disabled_by_default(sentry_init, capture_envelopes):
 
 
 def test_metrics_basics(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True})
+    sentry_init()
     envelopes = capture_envelopes()
 
     sentry_sdk.metrics.count("test.counter", 1)
@@ -77,7 +77,7 @@ def test_metrics_basics(sentry_init, capture_envelopes):
 
 
 def test_metrics_experimental_option(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True})
+    sentry_init()
     envelopes = capture_envelopes()
 
     sentry_sdk.metrics.count("test.counter", 5)
@@ -93,9 +93,7 @@ def test_metrics_experimental_option(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_attributes(sentry_init, capture_envelopes):
-    sentry_init(
-        _experiments={"enable_metrics": True}, release="1.0.0", environment="test"
-    )
+    sentry_init(release="1.0.0", environment="test")
     envelopes = capture_envelopes()
 
     sentry_sdk.metrics.count(
@@ -114,7 +112,7 @@ def test_metrics_with_attributes(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_user(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True})
+    sentry_init()
     envelopes = capture_envelopes()
 
     sentry_sdk.set_user(
@@ -133,7 +131,7 @@ def test_metrics_with_user(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_span(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True}, traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0)
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(op="test", name="test-span"):
@@ -150,7 +148,7 @@ def test_metrics_with_span(sentry_init, capture_envelopes):
 
 
 def test_metrics_tracing_without_performance(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True})
+    sentry_init()
     envelopes = capture_envelopes()
 
     sentry_sdk.metrics.count("test.span.counter", 1)
@@ -190,7 +188,6 @@ def test_metrics_before_send(sentry_init, capture_envelopes):
 
     sentry_init(
         _experiments={
-            "enable_metrics": True,
             "before_send_metric": _before_metric,
         },
     )

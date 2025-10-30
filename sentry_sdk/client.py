@@ -10,6 +10,7 @@ import warnings
 
 import sentry_sdk
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
+from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk.utils import (
     AnnotatedValue,
     ContextVar,
@@ -26,7 +27,6 @@ from sentry_sdk.utils import (
     get_before_send_log,
     get_before_send_metric,
     has_logs_enabled,
-    has_metrics_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -374,12 +374,7 @@ class _Client(BaseClient):
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
 
-            self.metrics_batcher = None
-
-            if has_metrics_enabled(self.options):
-                from sentry_sdk._metrics_batcher import MetricsBatcher
-
-                self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
+            self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -978,7 +973,7 @@ class _Client(BaseClient):
 
     def _capture_metric(self, metric):
         # type: (Optional[Metric]) -> None
-        if not has_metrics_enabled(self.options) or metric is None:
+        if metric is None:
             return
 
         isolation_scope = sentry_sdk.get_isolation_scope()
