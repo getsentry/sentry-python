@@ -310,7 +310,7 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
     """
     Log messages are also tied to transactions.
     """
-    sentry_init(enable_logs=True)
+    sentry_init(enable_logs=True, traces_sample_rate=1.0)
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(name="test-transaction") as trx:
@@ -326,7 +326,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
     """
     Log messages are also tied to spans.
     """
-    sentry_init(enable_logs=True)
+    sentry_init(enable_logs=True, traces_sample_rate=1.0)
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(name="test-transaction"):

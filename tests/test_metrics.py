@@ -122,7 +122,7 @@ def test_metrics_with_span(sentry_init, capture_envelopes):
     sentry_init(traces_sample_rate=1.0)
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_transaction(op="test", name="test-span"):
+    with sentry_sdk.start_transaction(op="test", name="test-span") as transaction:
         sentry_sdk.metrics.count("test.span.counter", 1)
 
     get_client().flush()
@@ -131,24 +131,26 @@ def test_metrics_with_span(sentry_init, capture_envelopes):
     assert len(metrics) == 1
 
     assert metrics[0]["trace_id"] is not None
-    assert metrics[0]["trace_id"] != "00000000-0000-0000-0000-000000000000"
-    assert metrics[0]["span_id"] is not None
+    assert metrics[0]["trace_id"] == transaction.trace_id
+    assert metrics[0]["span_id"] == transaction.span_id
 
 
 def test_metrics_tracing_without_performance(sentry_init, capture_envelopes):
     sentry_init()
     envelopes = capture_envelopes()
 
-    sentry_sdk.metrics.count("test.span.counter", 1)
+    with sentry_sdk.isolation_scope() as isolation_scope:
+        sentry_sdk.metrics.count("test.span.counter", 1)
 
     get_client().flush()
 
     metrics = envelopes_to_metrics(envelopes)
     assert len(metrics) == 1
 
-    assert metrics[0]["trace_id"] is not None
-    assert metrics[0]["trace_id"] != "00000000-0000-0000-0000-000000000000"
-    assert metrics[0]["span_id"] is None
+    propagation_context = isolation_scope._propagation_context
+    assert propagation_context is not None
+    assert metrics[0]["trace_id"] == propagation_context.trace_id
+    assert metrics[0]["span_id"] == propagation_context.span_id
 
 
 def test_metrics_before_send(sentry_init, capture_envelopes):
