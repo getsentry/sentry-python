@@ -294,9 +294,6 @@ async def test_handoff_span(sentry_init, capture_events, mock_usage):
                         name="transfer_to_secondary_agent",
                         type="function_call",
                         arguments="{}",
-                        function=MagicMock(
-                            name="transfer_to_secondary_agent", arguments="{}"
-                        ),
                     )
                 ],
                 usage=mock_usage,
@@ -377,9 +374,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                 name="simple_test_tool",
                 type="function_call",
                 arguments='{"message": "hello"}',
-                function=MagicMock(
-                    name="simple_test_tool", arguments='{"message": "hello"}'
-                ),
             )
 
             # First response with tool call
@@ -1111,9 +1105,6 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
                 name="failing_tool",
                 type="function_call",
                 arguments='{"message": "test"}',
-                function=MagicMock(
-                    name="failing_tool", arguments='{"message": "test"}'
-                ),
             )
 
             # First response with tool call
