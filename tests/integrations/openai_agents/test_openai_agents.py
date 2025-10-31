@@ -501,11 +501,8 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-    assert re.sub(
-        r"SerializationIterator\(.*\)",
-        "NOT_CHECKED",
-        ai_client_span1["data"]["gen_ai.response.tool_calls"],
-    ) == safe_serialize(
+
+    assert ai_client_span1["data"]["gen_ai.response.tool_calls"] == safe_serialize(
         [
             {
                 "arguments": '{"message": "hello"}',
@@ -514,7 +511,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                 "type": "function_call",
                 "id": "call_123",
                 "status": None,
-                "function": "NOT_CHECKED",
             }
         ]
     )
@@ -553,11 +549,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         == available_tools
     )
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
-    assert re.sub(
-        r"SerializationIterator\(.*\)",
-        "NOT_CHECKED",
-        ai_client_span2["data"]["gen_ai.request.messages"],
-    ) == safe_serialize(
+    assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
         [
             {
                 "role": "system",
@@ -580,7 +572,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                         "name": "simple_test_tool",
                         "type": "function_call",
                         "id": "call_123",
-                        "function": "NOT_CHECKED",
                     }
                 ],
             },
