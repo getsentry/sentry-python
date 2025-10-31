@@ -45,7 +45,8 @@ def _patch_cache_method(cache, method_name, address, port):
     ):
         # type: (CacheHandler, str, Callable[..., Any], tuple[Any, ...], dict[str, Any], Optional[str], Optional[int]) -> Any
         is_set_operation = method_name.startswith("set")
-        is_get_operation = not is_set_operation
+        is_get_method = method_name == "get"
+        is_get_many_method = method_name == "get_many"
 
         op = OP.CACHE_PUT if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
@@ -69,8 +70,20 @@ def _patch_cache_method(cache, method_name, address, port):
                     span.set_data(SPANDATA.CACHE_KEY, key)
 
                 item_size = None
-                if is_get_operation:
-                    if value:
+                if is_get_many_method:
+                    if value != {}:
+                        item_size = len(str(value))
+                        span.set_data(SPANDATA.CACHE_HIT, True)
+                    else:
+                        span.set_data(SPANDATA.CACHE_HIT, False)
+                elif is_get_method:
+                    default_value = None
+                    if len(args) >= 2:
+                        default_value = args[1]
+                    elif "default" in kwargs:
+                        default_value = kwargs["default"]
+
+                    if value != default_value:
                         item_size = len(str(value))
                         span.set_data(SPANDATA.CACHE_HIT, True)
                     else:

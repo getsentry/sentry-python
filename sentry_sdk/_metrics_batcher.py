@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class MetricsBatcher:
-    MAX_METRICS_BEFORE_FLUSH = 100
+    MAX_METRICS_BEFORE_FLUSH = 1000
     FLUSH_WAIT_TIME = 5.0
 
     def __init__(

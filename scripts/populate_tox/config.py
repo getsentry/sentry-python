@@ -48,6 +48,9 @@ TEST_SUITE_CONFIG = {
         "package": "apache-beam",
         "python": ">=3.7",
         "num_versions": 2,
+        "deps": {
+            "*": ["dill"],
+        },
     },
     "boto3": {
         "package": "boto3",
@@ -142,6 +145,13 @@ TEST_SUITE_CONFIG = {
         "package": "gql[all]",
         "num_versions": 2,
     },
+    "google_genai": {
+        "package": "google-genai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.9",
+    },
     "graphene": {
         "package": "graphene",
         "deps": {
@@ -192,8 +202,11 @@ TEST_SUITE_CONFIG = {
             "*": ["openai", "tiktoken", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
+            ">=1.0": ["langchain-classic"],
         },
-        "include": "<1.0",
+        "python": {
+            "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
+        },
     },
     "langchain-notiktoken": {
         "package": "langchain",
@@ -202,8 +215,11 @@ TEST_SUITE_CONFIG = {
             "*": ["openai", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
+            ">=1.0": ["langchain-classic"],
         },
-        "include": "<1.0",
+        "python": {
+            "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
+        },
     },
     "langgraph": {
         "package": "langgraph",
@@ -226,6 +242,12 @@ TEST_SUITE_CONFIG = {
         "package": "loguru",
         "num_versions": 2,
     },
+    "mcp": {
+        "package": "mcp",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
     "openai-base": {
         "package": "openai",
         "integration_name": "openai",
@@ -233,7 +255,10 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "tiktoken"],
             "<1.55": ["httpx<0.28"],
         },
-        "python": ">=3.8",
+        "python": {
+            ">0.0,<2.3": ">=3.8",
+            ">=2.3": ">=3.9",
+        },
     },
     "openai-notiktoken": {
         "package": "openai",
@@ -242,7 +267,10 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
             "<1.55": ["httpx<0.28"],
         },
-        "python": ">=3.8",
+        "python": {
+            ">0.0,<2.3": ">=3.8",
+            ">=2.3": ">=3.9",
+        },
     },
     "openai_agents": {
         "package": "openai-agents",
@@ -258,6 +286,12 @@ TEST_SUITE_CONFIG = {
     "pure_eval": {
         "package": "pure_eval",
         "num_versions": 2,
+    },
+    "pydantic_ai": {
+        "package": "pydantic-ai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
     },
     "pymongo": {
         "package": "pymongo",

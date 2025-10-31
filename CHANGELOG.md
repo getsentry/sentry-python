@@ -1,11 +1,132 @@
 # Changelog
 
+## 2.43.0
+
+### Various fixes & improvements
+
+- Pydantic AI integration (#4906) by @constantinius
+
+  Enable the new Pydantic AI integration with the code snippet below, and you can use the Sentry AI dashboards to observe your AI calls:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          PydanticAIIntegration(),
+      ],
+  )
+  ```
+- MCP Python SDK (#4964) by @constantinius
+
+  Enable the new Python MCP integration with the code snippet below:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.mcp import MCPIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          MCPIntegration(),
+      ],
+  )
+  ```
+- fix(strawberry): Remove autodetection, always use sync extension (#4984) by @sentrivana
+
+  Previously, `StrawberryIntegration` would try to guess whether it should install the sync or async version of itself. This auto-detection was very brittle and could lead to us auto-enabling async code in a sync context. With this change, `StrawberryIntegration` remains an auto-enabling integration, but it'll enable the sync version by default. If you want to enable the async version, pass the option explicitly:
+
+  ```python
+  sentry_sdk.init(
+      # ...
+      integrations=[
+          StrawberryIntegration(
+              async_execution=True
+          ),
+      ],
+  )
+  ```
+- fix(google-genai): Set agent name (#5038) by @constantinius
+- fix(integrations): hooking into error tracing function to find out if an execute tool span should be set to error (#4986) by @constantinius
+- fix(django): Improve logic for classifying cache hits and misses (#5029) by @alexander-alderman-webb
+- chore(metrics): Rename \_metrics to metrics (#5035) by @alexander-alderman-webb
+- fix(tracemetrics): Bump metric buffer size to 1k (#5031) by @k-fish
+- fix startlette deprecation warning (#5034) by @DeoLeung
+- build(deps): bump actions/upload-artifact from 4 to 5 (#5032) by @dependabot
+- fix(ai): truncate messages for google genai (#4992) by @shellmayr
+- fix(ai): add message truncation to litellm (#4973) by @shellmayr
+- feat(langchain): Support v1 (#4874) by @sentrivana
+- ci: Run `common` test suite on Python 3.14t (#4969) by @alexander-alderman-webb
+- feat: Officially support 3.14 & run integration tests on 3.14 (#4974) by @sentrivana
+- Make logger template format safer to missing kwargs (#4981) by @sl0thentr0py
+- tests(huggingface): Support 1.0.0rc7 (#4979) by @alexander-alderman-webb
+- feat: Enable HTTP request code origin by default (#4967) by @alexander-alderman-webb
+- ci: Run `common` test suite on Python 3.14 (#4896) by @sentrivana
+
+## 2.42.1
+
+### Various fixes & improvements
+
+- fix(gcp): Inject scopes in TimeoutThread exception with GCP (#4959) by @alexander-alderman-webb
+- fix(aws): Inject scopes in TimeoutThread exception with AWS lambda (#4914) by @alexander-alderman-webb
+- fix(ai): add message trunction to anthropic (#4953) by @shellmayr
+- fix(ai): add message truncation to langgraph (#4954) by @shellmayr
+- fix: Default breadcrumbs value for events without breadcrumbs (#4952) by @alexander-alderman-webb
+- fix(ai): add message truncation in langchain (#4950) by @shellmayr
+- fix(ai): correct size calculation, rename internal property for message truncation & add test (#4949) by @shellmayr
+- fix(ai): introduce message truncation for openai (#4946) by @shellmayr
+- fix(openai): Use non-deprecated Pydantic method to extract response text  (#4942) by @JasonLovesDoggo
+- ci: 🤖 Update test matrix with new releases (10/16) (#4945) by @github-actions
+- Handle ValueError in scope resets (#4928) by @sl0thentr0py
+- fix(litellm): Classify embeddings correctly (#4918) by @alexander-alderman-webb
+- Generalize NOT_GIVEN check with omit for openai (#4926) by @sl0thentr0py
+- ⚡️ Speed up function `_get_db_span_description` (#4924) by @misrasaurabh1
+
+## 2.42.0
+
+### Various fixes & improvements
+
+- feat: Add source information for slow outgoing HTTP requests (#4902) by @alexander-alderman-webb
+- tests: Update tox (#4913) by @sentrivana
+- fix(Ray): Retain the original function name when patching Ray tasks (#4858) by @svartalf
+- feat(ai): Add `python-genai` integration (#4891) by @vgrozdanic
+  Enable the new Google GenAI integration with the code snippet below, and you can use the Sentry AI dashboards to observe your AI calls:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          GoogleGenAIIntegration(),
+      ],
+  )
+  ```
+
 ## 2.41.0
 
 ### Various fixes & improvements
 
 - feat: Add `concurrent.futures` patch to threading integration (#4770) by @alexander-alderman-webb
-  
+
   The SDK now makes sure to automatically preserve span relationships when using `ThreadPoolExecutor`.
 - chore: Remove old metrics code (#4899) by @sentrivana
 
@@ -20,7 +141,7 @@
 
 - Add LiteLLM integration (#4864) by @constantinius
   Once you've enabled the [new LiteLLM integration](https://docs.sentry.io/platforms/python/integrations/litellm/), you can use the Sentry AI Agents Monitoring, a Sentry dashboard that helps you understand what's going on with your AI requests:
-  
+
   ```python
   import sentry_sdk
   from sentry_sdk.integrations.litellm import LiteLLMIntegration
@@ -43,10 +164,10 @@
 - Also emit spans for MCP tool calls done by the LLM (#4875) by @constantinius
 - Option to not trace HTTP requests based on status codes (#4869) by @alexander-alderman-webb
   You can now disable transactions for incoming requests with specific HTTP status codes. The [new `trace_ignore_status_codes` option](https://docs.sentry.io/platforms/python/configuration/options/#trace_ignore_status_codes) accepts a `set` of status codes as integers. If a transaction wraps a request that results in one of the provided status codes, the transaction will be unsampled.
-    
+
   ```python
   import sentry_sdk
-  
+
   sentry_sdk.init(
       trace_ignore_status_codes={301, 302, 303, *range(305, 400), 404},
   )

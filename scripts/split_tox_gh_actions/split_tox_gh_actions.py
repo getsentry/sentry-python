@@ -28,7 +28,7 @@ from jinja2 import Environment, FileSystemLoader
 
 TOXENV_REGEX = re.compile(
     r"""
-    {?(?P<py_versions>(py\d+\.\d+,?)+)}?
+    {?(?P<py_versions>(py\d+\.\d+t?,?)+)}?
     -(?P<framework>[a-z](?:[a-z_]|-(?!v{?\d))*[a-z0-9])
     (?:-(
         (v{?(?P<framework_versions>[0-9.]+[0-9a-z,.]*}?))
@@ -72,14 +72,17 @@ GROUPS = {
     "AI": [
         "anthropic",
         "cohere",
+        "google_genai",
+        "huggingface_hub",
         "langchain-base",
         "langchain-notiktoken",
+        "langgraph",
         "litellm",
+        "mcp",
         "openai-base",
         "openai-notiktoken",
-        "langgraph",
         "openai_agents",
-        "huggingface_hub",
+        "pydantic_ai",
     ],
     "Cloud": [
         "aws_lambda",
@@ -249,11 +252,19 @@ def find_frameworks_missing_from_groups(py_versions):
     return all_frameworks - frameworks_in_a_group
 
 
+def _version_key(v):
+    major_version, minor_version_and_suffix = v.split(".")
+    if minor_version_and_suffix.endswith("t"):
+        return int(major_version), int(minor_version_and_suffix.rstrip("t")), 1
+
+    return int(major_version), int(minor_version_and_suffix), 0
+
+
 def _normalize_py_versions(py_versions):
     def replace_and_sort(versions):
         return sorted(
             [py.replace("py", "") for py in versions],
-            key=lambda v: tuple(map(int, v.split("."))),
+            key=_version_key,
         )
 
     if isinstance(py_versions, dict):

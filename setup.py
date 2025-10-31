@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.41.0",
+    version="2.43.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -68,11 +68,13 @@ setup(
         "litellm": ["litellm>=1.77.5"],
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
+        "mcp": ["mcp>=1.15.0"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "openfeature": ["openfeature-sdk>=0.7.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": ["opentelemetry-distro"],
         "pure-eval": ["pure_eval", "executing", "asttokens"],
+        "pydantic_ai": ["pydantic-ai>=1.0.0"],
         "pymongo": ["pymongo>=3.1"],
         "pyspark": ["pyspark>=2.4.4"],
         "quart": ["quart>=0.16.1", "blinker>=1.1"],
@@ -84,6 +86,7 @@ setup(
         "statsig": ["statsig>=0.55.3"],
         "tornado": ["tornado>=6"],
         "unleash": ["UnleashClient>=6.0.1"],
+        "google-genai": ["google-genai>=1.29.0"],
     },
     entry_points={
         "opentelemetry_propagator": [
@@ -106,6 +109,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     options={"bdist_wheel": {"universal": "1"}},

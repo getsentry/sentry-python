@@ -751,7 +751,7 @@ def test_cyclic_data(sentry_init, capture_events):
     assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
 
 
-def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
+def test_databag_depth_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
@@ -759,58 +759,71 @@ def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
     for _ in range(100000):
         value = [value]
 
-    @benchmark
-    def inner():
-        del events[:]
-        try:
-            a = value  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
+    del events[:]
+    try:
+        a = value  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
 
-        (event,) = events
+    (event,) = events
 
-        assert len(json.dumps(event)) < 10000
+    stacktrace_frame = event["exception"]["values"][0]["stacktrace"]["frames"][0]
+    a_var = stacktrace_frame["vars"]["a"]
+
+    assert type(a_var) == list
+    assert len(a_var) == 1 and type(a_var[0]) == list
+
+    first_level_list = a_var[0]
+    assert type(first_level_list) == list
+    assert len(first_level_list) == 1
+
+    second_level_list = first_level_list[0]
+    assert type(second_level_list) == list
+    assert len(second_level_list) == 1
+
+    third_level_list = second_level_list[0]
+    assert type(third_level_list) == list
+    assert len(third_level_list) == 1
+
+    inner_value_repr = third_level_list[0]
+    assert type(inner_value_repr) == str
 
 
-def test_databag_string_stripping(sentry_init, capture_events, benchmark):
+def test_databag_string_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    @benchmark
-    def inner():
-        del events[:]
-        try:
-            a = "A" * DEFAULT_MAX_VALUE_LENGTH * 10  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
+    del events[:]
+    try:
+        a = "A" * DEFAULT_MAX_VALUE_LENGTH * 10  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
 
-        (event,) = events
+    (event,) = events
 
-        assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
+    assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
 
 
-def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
+def test_databag_breadth_stripping(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    @benchmark
-    def inner():
-        del events[:]
-        try:
-            a = ["a"] * 1000000  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
+    del events[:]
+    try:
+        a = ["a"] * 1000000  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
 
-        (event,) = events
+    (event,) = events
 
-        assert (
-            len(event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"])
-            == MAX_DATABAG_BREADTH
-        )
-        assert len(json.dumps(event)) < 10000
+    assert (
+        len(event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"])
+        == MAX_DATABAG_BREADTH
+    )
+    assert len(json.dumps(event)) < 10000
 
 
 def test_chained_exceptions(sentry_init, capture_events):

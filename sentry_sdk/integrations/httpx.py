@@ -1,8 +1,13 @@
 import sentry_sdk
+from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
-from sentry_sdk.tracing_utils import Baggage, should_propagate_trace
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    should_propagate_trace,
+    add_http_request_source,
+)
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
@@ -52,7 +57,7 @@ def _install_httpx_client():
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        with sentry_sdk.start_span(
+        with start_span(
             op=OP.HTTP_CLIENT,
             name="%s %s"
             % (
@@ -88,7 +93,10 @@ def _install_httpx_client():
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
-            return rv
+        with capture_internal_exceptions():
+            add_http_request_source(span)
+
+        return rv
 
     Client.send = send
 
@@ -106,7 +114,7 @@ def _install_httpx_async_client():
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        with sentry_sdk.start_span(
+        with start_span(
             op=OP.HTTP_CLIENT,
             name="%s %s"
             % (
@@ -144,7 +152,10 @@ def _install_httpx_async_client():
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
-            return rv
+        with capture_internal_exceptions():
+            add_http_request_source(span)
+
+        return rv
 
     AsyncClient.send = send
 
