@@ -928,17 +928,18 @@ class _Client(BaseClient):
         if release is not None and "sentry.release" not in log["attributes"]:
             log["attributes"]["sentry.release"] = release
 
-        span = current_scope.span
-        if span is not None and "sentry.trace.parent_span_id" not in log["attributes"]:
-            log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
+        trace_context = current_scope.get_trace_context()
+        trace_id = trace_context.get("trace_id")
+        span_id = trace_context.get("span_id")
 
-        if log.get("trace_id") is None:
-            transaction = current_scope.transaction
-            propagation_context = isolation_scope.get_active_propagation_context()
-            if transaction is not None:
-                log["trace_id"] = transaction.trace_id
-            elif propagation_context is not None:
-                log["trace_id"] = propagation_context.trace_id
+        if trace_id is not None and log.get("trace_id") is None:
+            log["trace_id"] = trace_id
+
+        if (
+            span_id is not None
+            and "sentry.trace.parent_span_id" not in log["attributes"]
+        ):
+            log["attributes"]["sentry.trace.parent_span_id"] = span_id
 
         # The user, if present, is always set on the isolation scope.
         if isolation_scope._user is not None:
@@ -977,6 +978,7 @@ class _Client(BaseClient):
         if metric is None:
             return
 
+        current_scope = sentry_sdk.get_current_scope()
         isolation_scope = sentry_sdk.get_isolation_scope()
 
         metric["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
@@ -990,16 +992,13 @@ class _Client(BaseClient):
         if release is not None and "sentry.release" not in metric["attributes"]:
             metric["attributes"]["sentry.release"] = release
 
-        span = sentry_sdk.get_current_span()
-        metric["trace_id"] = "00000000-0000-0000-0000-000000000000"
+        trace_context = current_scope.get_trace_context()
+        trace_id = trace_context.get("trace_id")
+        span_id = trace_context.get("span_id")
 
-        if span:
-            metric["trace_id"] = span.trace_id
-            metric["span_id"] = span.span_id
-        else:
-            propagation_context = isolation_scope.get_active_propagation_context()
-            if propagation_context and propagation_context.trace_id:
-                metric["trace_id"] = propagation_context.trace_id
+        metric["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
+        if span_id is not None:
+            metric["span_id"] = span_id
 
         if isolation_scope._user is not None:
             for metric_attribute, user_attribute in (
