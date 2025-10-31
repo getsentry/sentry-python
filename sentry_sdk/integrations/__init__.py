@@ -208,7 +208,7 @@ def setup_integrations(
 
     logger.debug("Setting up integrations (with default = %s)", with_defaults)
 
-    user_provided_integrations = set[Any](integrations.keys())
+    user_provided_integrations = set(integrations.keys())
 
     # Integrations that will not be enabled
     disabled_integrations = [
