@@ -24,6 +24,7 @@ from openai.types.responses.response_usage import (
     OutputTokensDetails,
 )
 
+import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
@@ -1056,9 +1057,6 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
     with start_span(op="test") as span:
         _set_input_data(span, get_response_kwargs)
 
-    # Verify that messages were processed and roles were mapped
-    from sentry_sdk.consts import SPANDATA
-
     if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
         stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
@@ -1207,8 +1205,6 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
     get_response_kwargs = {"input": test_messages}
 
     with start_span(op="gen_ai.chat") as span:
-        import sentry_sdk
-
         scope = sentry_sdk.get_current_scope()
         _set_input_data(span, get_response_kwargs)
         if hasattr(scope, "_gen_ai_original_message_count"):
