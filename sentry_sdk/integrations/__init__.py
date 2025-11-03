@@ -3,7 +3,7 @@ from threading import Lock
 
 from sentry_sdk.utils import logger
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -172,7 +172,7 @@ _MIN_VERSIONS = {
 
 
 _INTEGRATION_DEACTIVATES = {
-    "langchain": ["openai", "anthropic"],
+    "langchain": {"openai", "anthropic"},
 }
 
 
