@@ -22,9 +22,14 @@ from sentry_sdk.utils import (
 
 try:
     try:
-        from anthropic import NOT_GIVEN
+        from anthropic import NotGiven
     except ImportError:
-        NOT_GIVEN = None
+        NotGiven = None
+
+    try:
+        from anthropic import Omit
+    except ImportError:
+        Omit = None
 
     from anthropic.resources import AsyncMessages, Messages
 
@@ -168,12 +173,13 @@ def _set_input_data(span, kwargs, integration):
     }
     for key, attribute in kwargs_keys_to_attributes.items():
         value = kwargs.get(key)
-        if value is not NOT_GIVEN and value is not None:
+
+        if value is not None and _is_given(value):
             set_data_normalized(span, attribute, value)
 
     # Input attributes: Tools
     tools = kwargs.get("tools")
-    if tools is not NOT_GIVEN and tools is not None and len(tools) > 0:
+    if tools is not None and _is_given(tools) and len(tools) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
         )
@@ -419,3 +425,15 @@ def _wrap_message_create_async(f):
                     span.__exit__(None, None, None)
 
     return _sentry_patched_create_async
+
+
+def _is_given(obj):
+    # type: (Any) -> bool
+    """
+    Check for givenness safely across different anthropic versions.
+    """
+    if NotGiven is not None and isinstance(obj, NotGiven):
+        return False
+    if Omit is not None and isinstance(obj, Omit):
+        return False
+    return True
