@@ -38,7 +38,6 @@ def test_integration_deactivates_map_exists():
     assert "anthropic" in _INTEGRATION_DEACTIVATES["langchain"]
 
 
-@pytest.mark.forked
 def test_langchain_auto_deactivates_openai_and_anthropic(
     sentry_init, reset_integrations
 ):
@@ -57,7 +56,6 @@ def test_langchain_auto_deactivates_openai_and_anthropic(
         assert AnthropicIntegration not in integration_types
 
 
-@pytest.mark.forked
 def test_user_can_override_with_explicit_openai(sentry_init, reset_integrations):
     sentry_init(
         default_integrations=False,
@@ -73,7 +71,6 @@ def test_user_can_override_with_explicit_openai(sentry_init, reset_integrations)
     assert OpenAIIntegration in integration_types
 
 
-@pytest.mark.forked
 def test_user_can_override_with_explicit_anthropic(sentry_init, reset_integrations):
     sentry_init(
         default_integrations=False,
@@ -89,7 +86,6 @@ def test_user_can_override_with_explicit_anthropic(sentry_init, reset_integratio
     assert AnthropicIntegration in integration_types
 
 
-@pytest.mark.forked
 def test_user_can_override_with_both_explicit_integrations(
     sentry_init, reset_integrations
 ):
@@ -108,7 +104,6 @@ def test_user_can_override_with_both_explicit_integrations(
     assert AnthropicIntegration in integration_types
 
 
-@pytest.mark.forked
 def test_disabling_langchain_allows_openai_and_anthropic(
     sentry_init, reset_integrations
 ):
@@ -126,7 +121,6 @@ def test_disabling_langchain_allows_openai_and_anthropic(
     assert LangchainIntegration not in integration_types
 
 
-@pytest.mark.forked
 def test_explicit_langchain_still_deactivates_others(sentry_init, reset_integrations):
     sentry_init(
         default_integrations=False,
@@ -144,7 +138,6 @@ def test_explicit_langchain_still_deactivates_others(sentry_init, reset_integrat
         assert AnthropicIntegration not in integration_types
 
 
-@pytest.mark.forked
 def test_langchain_and_openai_both_explicit_both_active(
     sentry_init, reset_integrations
 ):
@@ -163,7 +156,6 @@ def test_langchain_and_openai_both_explicit_both_active(
     assert OpenAIIntegration in integration_types
 
 
-@pytest.mark.forked
 def test_no_langchain_means_openai_and_anthropic_can_auto_enable(
     sentry_init, reset_integrations, monkeypatch
 ):
@@ -194,7 +186,6 @@ def test_no_langchain_means_openai_and_anthropic_can_auto_enable(
     assert LangchainIntegration not in integration_types
 
 
-@pytest.mark.forked
 def test_deactivation_with_default_integrations_enabled(
     sentry_init, reset_integrations
 ):
@@ -213,7 +204,6 @@ def test_deactivation_with_default_integrations_enabled(
         assert AnthropicIntegration not in integration_types
 
 
-@pytest.mark.forked
 def test_only_auto_enabling_integrations_without_defaults(
     sentry_init, reset_integrations
 ):
