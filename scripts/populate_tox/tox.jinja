@@ -23,6 +23,9 @@ envlist =
     # === Gevent ===
     {py3.6,py3.8,py3.10,py3.11,py3.12}-gevent
 
+    # === Integration Deactivation ===
+    {py3.9,py3.10,py3.11,py3.12,py3.13,py3.14,py3.14t}-integration-deactivation
+
     # === Integrations ===
 
     # Asgi
@@ -87,6 +90,11 @@ deps =
     gevent: pytest-asyncio
     {py3.10,py3.11}-gevent: zope.event<5.0.0
     {py3.10,py3.11}-gevent: zope.interface<8.0
+
+    # === Integration Deactivation ===
+    integration_deactivation: openai
+    integration_deactivation: anthropic
+    integration_deactivation: langchain
 
     # === Integrations ===
 
