@@ -57,9 +57,10 @@ def _patch_tool_execution():
             )
             agent = agent_data.get("_agent")
 
-            # Get args for span (before validation)
-            # call.args can be a string (JSON) or dict
-            args_dict = call.args if isinstance(call.args, dict) else {}
+            try:
+                args_dict = call.args_as_dict()
+            except Exception:
+                args_dict = call.args if isinstance(call.args, dict) else {}
 
             with execute_tool_span(name, args_dict, agent, tool_type=tool_type) as span:
                 try:
