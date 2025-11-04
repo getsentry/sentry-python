@@ -69,9 +69,6 @@ GROUPS = {
     "Common": [
         "common",
     ],
-    "Integration Deactivation": [
-        "integration_deactivation",
-    ],
     "AI": [
         "anthropic",
         "cohere",
@@ -157,6 +154,7 @@ GROUPS = {
         "pure_eval",
         "trytond",
         "typer",
+        "integration_deactivation",
     ],
 }
 
