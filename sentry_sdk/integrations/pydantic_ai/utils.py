@@ -7,7 +7,7 @@ from sentry_sdk.utils import event_from_exception, safe_serialize
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any  # type: ignore
+    from typing import Any
 
 
 def _should_send_prompts():
