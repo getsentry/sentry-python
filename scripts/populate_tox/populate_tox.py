@@ -64,6 +64,7 @@ IGNORE = {
     "aws_lambda",
     "cloud_resource_context",
     "common",
+    "integration_deactivation",
     "gcp",
     "gevent",
     "opentelemetry",

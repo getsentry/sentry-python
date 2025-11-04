@@ -154,6 +154,7 @@ GROUPS = {
         "pure_eval",
         "trytond",
         "typer",
+        "integration_deactivation",
     ],
 }
 
