@@ -107,6 +107,10 @@ _current_scope = ContextVar("current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
 
+# A function returning a (trace_id, span_id) tuple
+# from an external tracing source (such as otel)
+_external_propagation_context_fn = None  # type: Optional[Callable[[], Optional[Tuple[str, str]]]]
+
 
 class ScopeType(Enum):
     CURRENT = "current"
@@ -140,6 +144,25 @@ class _ScopeManager:
 def add_global_event_processor(processor):
     # type: (EventProcessor) -> None
     global_event_processors.append(processor)
+
+
+def register_external_propagation_context(fn):
+    # type: (Callable[[], Optional[Tuple[str, str]]]) -> None
+    global _external_propagation_context_fn
+    _external_propagation_context_fn = fn
+
+
+def remove_external_propagation_context():
+    # type: () -> None
+    global _external_propagation_context_fn
+    _external_propagation_context_fn = None
+
+
+def get_external_propagation_context():
+    # type: () -> Optional[Tuple[str, str]]
+    return (
+        _external_propagation_context_fn() if _external_propagation_context_fn else None
+    )
 
 
 def _attr_setter(fn):
@@ -562,21 +585,29 @@ class Scope:
         return self.get_isolation_scope().get_baggage()
 
     def get_trace_context(self):
-        # type: () -> Any
+        # type: () -> Dict[str, Any]
         """
         Returns the Sentry "trace" context from the Propagation Context.
         """
-        if self._propagation_context is None:
-            return None
+        if has_tracing_enabled(self.get_client().options) and self._span is not None:
+            return self._span.get_trace_context()
 
-        trace_context = {
-            "trace_id": self._propagation_context.trace_id,
-            "span_id": self._propagation_context.span_id,
-            "parent_span_id": self._propagation_context.parent_span_id,
+        # if we are tracing externally (otel), those values take precedence
+        external_propagation_context = get_external_propagation_context()
+        if external_propagation_context:
+            trace_id, span_id = external_propagation_context
+            return {"trace_id": trace_id, "span_id": span_id}
+
+        propagation_context = self.get_active_propagation_context()
+        if propagation_context is None:
+            return {}
+
+        return {
+            "trace_id": propagation_context.trace_id,
+            "span_id": propagation_context.span_id,
+            "parent_span_id": propagation_context.parent_span_id,
             "dynamic_sampling_context": self.get_dynamic_sampling_context(),
-        }  # type: Dict[str, Any]
-
-        return trace_context
+        }
 
     def trace_propagation_meta(self, *args, **kwargs):
         # type: (*Any, **Any) -> str
@@ -1438,10 +1469,7 @@ class Scope:
 
         # Add "trace" context
         if contexts.get("trace") is None:
-            if has_tracing_enabled(options) and self._span is not None:
-                contexts["trace"] = self._span.get_trace_context()
-            else:
-                contexts["trace"] = self.get_trace_context()
+            contexts["trace"] = self.get_trace_context()
 
     def _apply_flags_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
