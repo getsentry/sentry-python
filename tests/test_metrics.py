@@ -217,8 +217,8 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
 
     lost_event_calls = []
 
-    def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
-        lost_event_calls.append((reason, data_category, item, quantity))
+    def record_lost_event(reason, data_category, quantity):
+        lost_event_calls.append((reason, data_category, quantity))
 
     monkeypatch.setattr(client.metrics_batcher, "_record_lost_func", record_lost_event)
 
@@ -227,4 +227,4 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
 
     assert len(lost_event_calls) == 5
     for lost_event_call in lost_event_calls:
-        assert lost_event_call == ("queue_overflow", "trace_metric", None, 1)
+        assert lost_event_call == ("queue_overflow", "trace_metric", 1)

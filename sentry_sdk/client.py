@@ -357,13 +357,14 @@ class _Client(BaseClient):
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
-        def _record_batcher_overflow_lost_event(
+        def _record_lost_event(
+            reason,  # type: str
             data_category,  # type: EventDataCategory
             quantity=1,  # type: int
         ):
             if self.transport is not None:
                 self.transport.record_lost_event(
-                    reason="queue_overflow",
+                    reason=reason,
                     data_category=data_category,
                     quantity=quantity,
                 )
@@ -390,7 +391,7 @@ class _Client(BaseClient):
             if has_metrics_enabled(self.options):
                 self.metrics_batcher = MetricsBatcher(
                     capture_func=_capture_envelope,
-                    record_lost_func=_record_batcher_overflow_lost_event,
+                    record_lost_func=_record_lost_event,
                 )
 
             max_request_body_size = ("always", "never", "small", "medium")
