@@ -373,7 +373,10 @@ class _Client(BaseClient):
             if has_logs_enabled(self.options):
                 from sentry_sdk._log_batcher import LogBatcher
 
-                self.log_batcher = LogBatcher(capture_func=_capture_envelope)
+                self.log_batcher = LogBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=self.transport.record_lost_event,
+                )
 
             self.metrics_batcher = None
             if has_metrics_enabled(self.options):

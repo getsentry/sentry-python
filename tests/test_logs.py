@@ -446,3 +446,27 @@ def test_logs_with_literal_braces(
         assert logs[0]["attributes"]["sentry.message.template"] == message
     else:
         assert "sentry.message.template" not in logs[0]["attributes"]
+
+
+def test_batcher_drops_logs(sentry_init, monkeypatch):
+    sentry_init(enable_logs=True)
+    client = sentry_sdk.get_client()
+
+    def no_op_flush():
+        pass
+
+    monkeypatch.setattr(client.log_batcher, "_flush", no_op_flush)
+
+    lost_event_calls = []
+
+    def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
+        lost_event_calls.append((reason, data_category, item, quantity))
+
+    monkeypatch.setattr(client.log_batcher, "_record_lost_func", record_lost_event)
+
+    for i in range(1_005):  # 5 logs over the hard limit
+        sentry_sdk.logger.info("This is a 'info' log...")
+
+    assert len(lost_event_calls) == 5
+    for lost_event_call in lost_event_calls:
+        assert lost_event_call == ("queue_overflow", "log_item", None, 1)

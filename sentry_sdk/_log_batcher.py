@@ -19,10 +19,12 @@ class LogBatcher:
     def __init__(
         self,
         capture_func,  # type: Callable[[Envelope], None]
+        record_lost_func,  # type: Callable[..., None]
     ):
         # type: (...) -> None
         self._log_buffer = []  # type: List[Log]
         self._capture_func = capture_func
+        self._record_lost_func = record_lost_func
         self._running = True
         self._lock = threading.Lock()
 
@@ -81,6 +83,11 @@ class LogBatcher:
 
         with self._lock:
             if len(self._log_buffer) >= self.MAX_LOGS_BEFORE_DROP:
+                self._record_lost_func(
+                    reason="queue_overflow",
+                    data_category="log_item",
+                    quantity=1,
+                )
                 return None
 
             self._log_buffer.append(log)
