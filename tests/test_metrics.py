@@ -8,8 +8,6 @@ from sentry_sdk import get_client
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.types import Metric
 
-from sentry_sdk._metrics_batcher import MetricsBatcher
-
 
 def envelopes_to_metrics(envelopes):
     # type: (List[Envelope]) -> List[Metric]
