@@ -1,6 +1,7 @@
 import json
 import sys
 from typing import List, Any, Mapping
+from unittest import mock
 import pytest
 
 import sentry_sdk
@@ -337,5 +338,43 @@ def test_metrics_no_sample_rate(sentry_init, capture_envelopes):
 
     assert len(metrics) == 1
 
-    # Should not have sample_rate attribute when not provided
     assert "sentry.client_sample_rate" not in metrics[0]["attributes"]
+
+
+@pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
+@pytest.mark.parametrize("sample_rate", (0.0, 0.25, 0.5, 0.75, 1.0))
+def test_metrics_sampling_decision(
+    sentry_init, capture_envelopes, sample_rate, sample_rand, monkeypatch
+):
+    sentry_init(traces_sample_rate=1.0)
+    envelopes = capture_envelopes()
+    client = sentry_sdk.get_client()
+
+    lost_event_calls = []
+
+    def record_lost_event(reason, data_category, quantity):
+        lost_event_calls.append((reason, data_category, quantity))
+
+    monkeypatch.setattr(client.transport, "record_lost_event", record_lost_event)
+
+    with mock.patch(
+        "sentry_sdk.tracing_utils.Random.randrange",
+        return_value=int(sample_rand * 1000000),
+    ):
+        with sentry_sdk.start_transaction() as transaction:
+            sentry_sdk.metrics.count("test.counter", 1, sample_rate=sample_rate)
+
+    get_client().flush()
+    metrics = envelopes_to_metrics(envelopes)
+
+    should_be_sampled = sample_rand < sample_rate and sample_rate > 0.0
+    assert len(metrics) == int(should_be_sampled)
+
+    if sample_rate <= 0.0:
+        assert len(lost_event_calls) == 1
+        assert lost_event_calls[0] == ("invalid_sample_rate", "trace_metric", 1)
+    elif not should_be_sampled:
+        assert len(lost_event_calls) == 1
+        assert lost_event_calls[0] == ("sample_rate", "trace_metric", 1)
+    else:
+        assert len(lost_event_calls) == 0
