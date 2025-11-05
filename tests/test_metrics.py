@@ -33,6 +33,18 @@ def envelopes_to_metrics(envelopes):
     return res
 
 
+def test_metrics_disabled(sentry_init, capture_envelopes):
+    sentry_init(enable_metrics=False)
+
+    envelopes = capture_envelopes()
+
+    sentry_sdk.metrics.count("test.counter", 1)
+    sentry_sdk.metrics.gauge("test.gauge", 42)
+    sentry_sdk.metrics.distribution("test.distribution", 200)
+
+    assert len(envelopes) == 0
+
+
 def test_metrics_basics(sentry_init, capture_envelopes):
     sentry_init()
     envelopes = capture_envelopes()
