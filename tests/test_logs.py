@@ -448,6 +448,7 @@ def test_logs_with_literal_braces(
         assert "sentry.message.template" not in logs[0]["attributes"]
 
 
+@minimum_python_37
 def test_batcher_drops_logs(sentry_init, monkeypatch):
     sentry_init(enable_logs=True)
     client = sentry_sdk.get_client()
