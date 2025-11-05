@@ -189,6 +189,45 @@ def test_metrics_before_send(sentry_init, capture_envelopes):
         return record
 
     sentry_init(
+        before_send_metric=_before_metric,
+    )
+    envelopes = capture_envelopes()
+
+    sentry_sdk.metrics.count("test.skip", 1)
+    sentry_sdk.metrics.count("test.keep", 1)
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    assert len(metrics) == 1
+    assert metrics[0]["name"] == "test.keep"
+    assert before_metric_called
+
+
+def test_metrics_experimental_before_send(sentry_init, capture_envelopes):
+    before_metric_called = False
+
+    def _before_metric(record, hint):
+        nonlocal before_metric_called
+
+        assert set(record.keys()) == {
+            "timestamp",
+            "trace_id",
+            "span_id",
+            "name",
+            "type",
+            "value",
+            "unit",
+            "attributes",
+        }
+
+        if record["name"] == "test.skip":
+            return None
+
+        before_metric_called = True
+        return record
+
+    sentry_init(
         _experiments={
             "before_send_metric": _before_metric,
         },
