@@ -1,14 +1,13 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import safe_serialize
+from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.utils import event_from_exception, safe_serialize
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, List, Dict
-    from pydantic_ai.usage import RequestUsage  # type: ignore
+    from typing import Any
 
 
 def _should_send_prompts():
@@ -173,3 +172,15 @@ def _set_available_tools(span, agent):
     except Exception:
         # If we can't extract tools, just skip it
         pass
+
+
+def _capture_exception(exc):
+    # type: (Any) -> None
+    set_span_errored()
+
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "pydantic_ai", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)

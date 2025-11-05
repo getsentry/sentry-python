@@ -393,7 +393,10 @@ class _Client(BaseClient):
 
             self.metrics_batcher = None
             if has_metrics_enabled(self.options):
-                self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
+                self.metrics_batcher = MetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:

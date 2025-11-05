@@ -2060,4 +2060,6 @@ def get_before_send_metric(options):
     if options is None:
         return None
 
-    return options["_experiments"].get("before_send_metric")
+    return options.get("before_send_metric") or options["_experiments"].get(
+        "before_send_metric"
+    )

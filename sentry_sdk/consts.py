@@ -1012,6 +1012,7 @@ class ClientConstructor:
         before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
         trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
         enable_metrics=True,  # type: bool
+        before_send_metric=None,  # type: Optional[Callable[[Metric, Hint], Optional[Metric]]]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
