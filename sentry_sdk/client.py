@@ -362,6 +362,7 @@ class _Client(BaseClient):
             data_category,  # type: EventDataCategory
             quantity=1,  # type: int
         ):
+            # type: (...) -> None
             if self.transport is not None:
                 self.transport.record_lost_event(
                     reason=reason,
