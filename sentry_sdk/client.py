@@ -31,6 +31,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
+from sentry_sdk.tracing_utils import _generate_sample_rand
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
     SPANDATA,
@@ -181,7 +182,9 @@ class BaseClient:
 
     def __init__(self, options=None):
         # type: (Optional[Dict[str, Any]]) -> None
-        self.options = options if options is not None else DEFAULT_OPTIONS  # type: Dict[str, Any]
+        self.options = (
+            options if options is not None else DEFAULT_OPTIONS
+        )  # type: Dict[str, Any]
 
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
@@ -614,7 +617,9 @@ class _Client(BaseClient):
                 event_scrubber.scrub_event(event)
 
         if scope is not None and scope._gen_ai_original_message_count:
-            spans = event.get("spans", [])  # type: List[Dict[str, Any]] | AnnotatedValue
+            spans = event.get(
+                "spans", []
+            )  # type: List[Dict[str, Any]] | AnnotatedValue
             if isinstance(spans, list):
                 for span in spans:
                     span_id = span.get("span_id", None)
@@ -1000,6 +1005,50 @@ class _Client(BaseClient):
         current_scope = sentry_sdk.get_current_scope()
         isolation_scope = sentry_sdk.get_isolation_scope()
 
+        # Determine trace_id and span_id using the same logic as the original metrics.py
+        trace_id = None
+        span_id = None
+        if current_scope.span is not None:
+            trace_id = current_scope.span.trace_id
+            span_id = current_scope.span.span_id
+        elif current_scope._propagation_context is not None:
+            trace_id = current_scope._propagation_context.trace_id
+            span_id = current_scope._propagation_context.span_id
+
+        sample_rate = metric["attributes"].get("sentry.client_sample_rate")
+        if sample_rate is not None:
+            sample_rate = float(sample_rate)
+            
+            # Always validate sample_rate range, regardless of trace context
+            if sample_rate <= 0.0 or sample_rate > 1.0:
+                if self.transport is not None:
+                    self.transport.record_lost_event(
+                        "invalid_sample_rate",
+                        data_category="trace_metric",
+                        quantity=1,
+                    )
+                return
+            
+            # If there's no trace context, remove the sample_rate attribute and continue
+            if trace_id is None:
+                del metric["attributes"]["sentry.client_sample_rate"]
+            else:
+                # There is a trace context, apply sampling logic
+                if sample_rate < 1.0:
+                    sample_rand = _generate_sample_rand(trace_id)
+                    if sample_rand >= sample_rate:
+                        if self.transport is not None:
+                            self.transport.record_lost_event(
+                                "sample_rate",
+                                data_category="trace_metric",
+                                quantity=1,
+                            )
+                        return
+                
+                # If sample_rate is 1.0, remove the attribute as it's implied
+                if sample_rate == 1.0:
+                    del metric["attributes"]["sentry.client_sample_rate"]
+
         metric["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
         metric["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
 
@@ -1010,10 +1059,6 @@ class _Client(BaseClient):
         release = self.options.get("release")
         if release is not None and "sentry.release" not in metric["attributes"]:
             metric["attributes"]["sentry.release"] = release
-
-        trace_context = current_scope.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        span_id = trace_context.get("span_id")
 
         metric["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
         if span_id is not None:

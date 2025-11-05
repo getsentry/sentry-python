@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.utils import safe_repr
-from sentry_sdk.tracing_utils import _generate_sample_rand
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
@@ -41,35 +40,7 @@ def _capture_metric(
             )
 
     if sample_rate is not None:
-        if sample_rate <= 0.0 or sample_rate > 1.0:
-            if client.transport is not None:
-                client.transport.record_lost_event(
-                    "invalid_sample_rate",
-                    data_category="trace_metric",
-                    quantity=1,
-                )
-            return
-
-        trace_id = None
-        scope = sentry_sdk.get_current_scope()
-        if scope.span is not None:
-            trace_id = scope.span.trace_id
-        elif scope._propagation_context is not None:
-            trace_id = scope._propagation_context.trace_id
-
-        if trace_id is not None and sample_rate < 1.0:
-            sample_rand = _generate_sample_rand(trace_id)
-            if sample_rand >= sample_rate:
-                if client.transport is not None:
-                    client.transport.record_lost_event(
-                        "sample_rate",
-                        data_category="trace_metric",
-                        quantity=1,
-                    )
-                return
-
-        if sample_rate != 1.0 and trace_id is not None:
-            attrs["sentry.client_sample_rate"] = sample_rate
+        attrs["sentry.client_sample_rate"] = sample_rate
 
     metric = {
         "timestamp": time.time(),
