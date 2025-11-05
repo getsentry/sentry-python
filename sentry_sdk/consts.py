@@ -706,6 +706,12 @@ class SPANDATA:
     Example: 6379
     """
 
+    NETWORK_TRANSPORT = "network.transport"
+    """
+    The transport protocol used for the network connection.
+    Example: "tcp", "udp", "unix"
+    """
+
     PROFILER_ID = "profiler_id"
     """
     Label identifying the profiler id that the span occurred in. This should be a string.
@@ -824,7 +830,7 @@ class SPANDATA:
     MCP_TRANSPORT = "mcp.transport"
     """
     The transport method used for MCP communication.
-    Example: "pipe" (stdio), "tcp" (HTTP/WebSocket/SSE)
+    Example: "http", "sse", "stdio"
     """
 
     MCP_SESSION_ID = "mcp.session.id"
@@ -1005,6 +1011,7 @@ class ClientConstructor:
         enable_logs=False,  # type: bool
         before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
         trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
+        enable_metrics=True,  # type: bool
         before_send_metric=None,  # type: Optional[Callable[[Metric, Hint], Optional[Metric]]]
     ):
         # type: (...) -> None

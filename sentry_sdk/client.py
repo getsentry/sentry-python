@@ -27,6 +27,7 @@ from sentry_sdk.utils import (
     get_before_send_log,
     get_before_send_metric,
     has_logs_enabled,
+    has_metrics_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -374,7 +375,9 @@ class _Client(BaseClient):
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
 
-            self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
+            self.metrics_batcher = None
+            if has_metrics_enabled(self.options):
+                self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -975,7 +978,7 @@ class _Client(BaseClient):
 
     def _capture_metric(self, metric):
         # type: (Optional[Metric]) -> None
-        if metric is None:
+        if not has_metrics_enabled(self.options) or metric is None:
             return
 
         current_scope = sentry_sdk.get_current_scope()

@@ -171,6 +171,11 @@ _MIN_VERSIONS = {
 }
 
 
+_INTEGRATION_DEACTIVATES = {
+    "langchain": {"openai", "anthropic"},
+}
+
+
 def setup_integrations(
     integrations,  # type: Sequence[Integration]
     with_defaults=True,  # type: bool
@@ -187,12 +192,23 @@ def setup_integrations(
 
     `disabled_integrations` takes precedence over `with_defaults` and
     `with_auto_enabling_integrations`.
+
+    Some integrations are designed to automatically deactivate other integrations
+    in order to avoid conflicts and prevent duplicate telemetry from being collected.
+    For example, enabling the `langchain` integration will auto-deactivate both the
+    `openai` and `anthropic` integrations.
+
+    Users can override this behavior by:
+      - Explicitly providing an integration in the `integrations=[]` list, or
+      - Disabling the higher-level integration via the `disabled_integrations` option.
     """
     integrations = dict(
         (integration.identifier, integration) for integration in integrations or ()
     )
 
     logger.debug("Setting up integrations (with default = %s)", with_defaults)
+
+    user_provided_integrations = set(integrations.keys())
 
     # Integrations that will not be enabled
     disabled_integrations = [
@@ -211,6 +227,27 @@ def setup_integrations(
                 instance = integration_cls()
                 integrations[instance.identifier] = instance
                 used_as_default_integration.add(instance.identifier)
+
+    disabled_integration_identifiers = {
+        integration.identifier for integration in disabled_integrations
+    }
+
+    for integration, targets_to_deactivate in _INTEGRATION_DEACTIVATES.items():
+        if (
+            integration in integrations
+            and integration not in disabled_integration_identifiers
+        ):
+            for target in targets_to_deactivate:
+                if target not in user_provided_integrations:
+                    for cls in iter_default_integrations(True):
+                        if cls.identifier == target:
+                            if cls not in disabled_integrations:
+                                disabled_integrations.append(cls)
+                                logger.debug(
+                                    "Auto-deactivating %s integration because %s integration is active",
+                                    target,
+                                    integration,
+                                )
 
     for identifier, integration in integrations.items():
         with _installer_lock:
