@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 class LogBatcher:
     MAX_LOGS_BEFORE_FLUSH = 100
+    MAX_LOGS_BEFORE_DROP = 1_000
     FLUSH_WAIT_TIME = 5.0
 
     def __init__(
@@ -79,6 +80,9 @@ class LogBatcher:
             return None
 
         with self._lock:
+            if len(self._log_buffer) >= self.MAX_LOGS_BEFORE_DROP:
+                return None
+
             self._log_buffer.append(log)
             if len(self._log_buffer) >= self.MAX_LOGS_BEFORE_FLUSH:
                 self._flush_event.set()
