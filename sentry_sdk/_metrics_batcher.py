@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 class MetricsBatcher:
     MAX_METRICS_BEFORE_FLUSH = 1000
+    MAX_METRICS_BEFORE_DROP = 10_000
     FLUSH_WAIT_TIME = 5.0
 
     def __init__(
@@ -72,6 +73,9 @@ class MetricsBatcher:
             return None
 
         with self._lock:
+            if len(self._metric_buffer) >= self.MAX_METRICS_BEFORE_DROP:
+                return None
+
             self._metric_buffer.append(metric)
             if len(self._metric_buffer) >= self.MAX_METRICS_BEFORE_FLUSH:
                 self._flush_event.set()
