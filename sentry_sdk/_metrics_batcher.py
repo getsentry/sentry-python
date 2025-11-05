@@ -77,7 +77,6 @@ class MetricsBatcher:
         with self._lock:
             if len(self._metric_buffer) >= self.MAX_METRICS_BEFORE_DROP:
                 self._record_lost_func(
-                    reason="queue_overflow",
                     data_category="trace_metric",
                     quantity=1,
                 )
