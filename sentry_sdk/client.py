@@ -357,6 +357,19 @@ class _Client(BaseClient):
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
+        def _record_lost_event(
+            reason,  # type: str
+            data_category,  # type: EventDataCategory
+            quantity=1,  # type: int
+        ):
+            # type: (...) -> None
+            if self.transport is not None:
+                self.transport.record_lost_event(
+                    reason=reason,
+                    data_category=data_category,
+                    quantity=quantity,
+                )
+
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
@@ -375,7 +388,7 @@ class _Client(BaseClient):
 
                 self.log_batcher = LogBatcher(
                     capture_func=_capture_envelope,
-                    record_lost_func=self.transport.record_lost_event,
+                    record_lost_func=_record_lost_event,
                 )
 
             self.metrics_batcher = None
