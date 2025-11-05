@@ -68,7 +68,7 @@ def _capture_metric(
                     )
                 return
 
-        if sample_rate != 1.0:
+        if sample_rate != 1.0 and trace_id is not None:
             attrs["sentry.client_sample_rate"] = sample_rate
 
     metric = {

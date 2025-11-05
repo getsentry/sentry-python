@@ -284,10 +284,12 @@ def test_metrics_sample_rate_basic(sentry_init, capture_envelopes):
     assert len(metrics) == 3
 
     assert metrics[0]["name"] == "test.counter"
-    assert metrics[0]["attributes"]["sentry.client_sample_rate"] == 0.5
+    # No sentry.client_sample_rate when there's no trace context
+    assert "sentry.client_sample_rate" not in metrics[0]["attributes"]
 
     assert metrics[1]["name"] == "test.gauge"
-    assert metrics[1]["attributes"]["sentry.client_sample_rate"] == 0.8
+    # No sentry.client_sample_rate when there's no trace context
+    assert "sentry.client_sample_rate" not in metrics[1]["attributes"]
 
     assert metrics[2]["name"] == "test.distribution"
     assert "sentry.client_sample_rate" not in metrics[2]["attributes"]
@@ -316,7 +318,8 @@ def test_metrics_sample_rate_normalization(sentry_init, capture_envelopes, monke
 
     assert len(metrics) == 2
 
-    assert metrics[0]["attributes"]["sentry.client_sample_rate"] == 0.5
+    # No sentry.client_sample_rate when there's no trace context
+    assert "sentry.client_sample_rate" not in metrics[0]["attributes"]
     assert (
         "sentry.client_sample_rate" not in metrics[1]["attributes"]
     )  # 1.0 does not need a sample rate, it's implied to be 1.0
@@ -341,6 +344,56 @@ def test_metrics_no_sample_rate(sentry_init, capture_envelopes):
     assert "sentry.client_sample_rate" not in metrics[0]["attributes"]
 
 
+def test_metrics_sample_rate_no_trace_context(sentry_init, capture_envelopes):
+    """Test sentry.client_sample_rate not set when there's no trace context."""
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    # Send metrics with sample_rate but without any active transaction/span
+    sentry_sdk.metrics.count("test.counter", 1, sample_rate=0.5)
+    sentry_sdk.metrics.gauge("test.gauge", 42, sample_rate=0.8)
+
+    get_client().flush()
+    metrics = envelopes_to_metrics(envelopes)
+
+    assert len(metrics) == 2
+
+    # When there's no trace context, no sampling is performed,
+    # so sentry.client_sample_rate should not be set
+    assert "sentry.client_sample_rate" not in metrics[0]["attributes"]
+    assert "sentry.client_sample_rate" not in metrics[1]["attributes"]
+
+
+def test_metrics_sample_rate_with_trace_context(
+    sentry_init, capture_envelopes, monkeypatch
+):
+    """Test sentry.client_sample_rate is set when there's a trace context."""
+    sentry_init(traces_sample_rate=1.0)
+    envelopes = capture_envelopes()
+
+    # Mock the random sampling to ensure all metrics are included
+    with mock.patch(
+        "sentry_sdk.tracing_utils.Random.randrange",
+        return_value=0,  # Always sample (0 < any positive sample_rate)
+    ):
+        # Send metrics with sample_rate within an active transaction
+        with sentry_sdk.start_transaction() as _:
+            sentry_sdk.metrics.count("test.counter", 1, sample_rate=0.5)
+            sentry_sdk.metrics.gauge("test.gauge", 42, sample_rate=0.8)
+            sentry_sdk.metrics.distribution("test.distribution", 200, sample_rate=1.0)
+
+    get_client().flush()
+    metrics = envelopes_to_metrics(envelopes)
+
+    assert len(metrics) == 3
+
+    # When there's a trace context and sample_rate < 1.0, set attribute
+    assert metrics[0]["attributes"]["sentry.client_sample_rate"] == 0.5
+    assert metrics[1]["attributes"]["sentry.client_sample_rate"] == 0.8
+    # sample_rate=1.0 doesn't need the attribute
+    assert "sentry.client_sample_rate" not in metrics[2]["attributes"]
+
+
 @pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
 @pytest.mark.parametrize("sample_rate", (0.0, 0.25, 0.5, 0.75, 1.0))
 def test_metrics_sampling_decision(
@@ -361,7 +414,7 @@ def test_metrics_sampling_decision(
         "sentry_sdk.tracing_utils.Random.randrange",
         return_value=int(sample_rand * 1000000),
     ):
-        with sentry_sdk.start_transaction() as transaction:
+        with sentry_sdk.start_transaction() as _:
             sentry_sdk.metrics.count("test.counter", 1, sample_rate=sample_rate)
 
     get_client().flush()
