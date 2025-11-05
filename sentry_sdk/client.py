@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric, EventDataCategory
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
@@ -357,6 +357,19 @@ class _Client(BaseClient):
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
+        def _record_lost_event(
+            reason,  # type: str
+            data_category,  # type: EventDataCategory
+            quantity=1,  # type: int
+        ):
+            # type: (...) -> None
+            if self.transport is not None:
+                self.transport.record_lost_event(
+                    reason=reason,
+                    data_category=data_category,
+                    quantity=quantity,
+                )
+
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
@@ -377,7 +390,10 @@ class _Client(BaseClient):
 
             self.metrics_batcher = None
             if has_metrics_enabled(self.options):
-                self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
+                self.metrics_batcher = MetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:

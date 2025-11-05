@@ -243,3 +243,27 @@ def test_metrics_experimental_before_send(sentry_init, capture_envelopes):
     assert len(metrics) == 1
     assert metrics[0]["name"] == "test.keep"
     assert before_metric_called
+
+
+def test_batcher_drops_metrics(sentry_init, monkeypatch):
+    sentry_init()
+    client = sentry_sdk.get_client()
+
+    def no_op_flush():
+        pass
+
+    monkeypatch.setattr(client.metrics_batcher, "_flush", no_op_flush)
+
+    lost_event_calls = []
+
+    def record_lost_event(reason, data_category, quantity):
+        lost_event_calls.append((reason, data_category, quantity))
+
+    monkeypatch.setattr(client.metrics_batcher, "_record_lost_func", record_lost_event)
+
+    for i in range(10_005):  # 5 metrics over the hard limit
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    assert len(lost_event_calls) == 5
+    for lost_event_call in lost_event_calls:
+        assert lost_event_call == ("queue_overflow", "trace_metric", 1)
