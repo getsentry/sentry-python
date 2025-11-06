@@ -1,3 +1,5 @@
+import warnings
+
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.redis.consts import _DEFAULT_MAX_DATA_SIZE
 from sentry_sdk.integrations.redis.rb import _patch_rb
@@ -16,9 +18,17 @@ class RedisIntegration(Integration):
     identifier = "redis"
 
     def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE, cache_prefixes=None):
-        # type: (int, Optional[list[str]]) -> None
+        # type: (Optional[int], Optional[list[str]]) -> None
         self.max_data_size = max_data_size
         self.cache_prefixes = cache_prefixes if cache_prefixes is not None else []
+
+        if max_data_size is not None:
+            warnings.warn(
+                "The `max_data_size` parameter of the `RedisIntegration() constructor is"
+                "deprecated and will be removed in version 3.0 of sentry-sdk.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     @staticmethod
     def setup_once():
