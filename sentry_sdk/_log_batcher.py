@@ -13,15 +13,18 @@ if TYPE_CHECKING:
 
 class LogBatcher:
     MAX_LOGS_BEFORE_FLUSH = 100
+    MAX_LOGS_BEFORE_DROP = 1_000
     FLUSH_WAIT_TIME = 5.0
 
     def __init__(
         self,
         capture_func,  # type: Callable[[Envelope], None]
+        record_lost_func,  # type: Callable[..., None]
     ):
         # type: (...) -> None
         self._log_buffer = []  # type: List[Log]
         self._capture_func = capture_func
+        self._record_lost_func = record_lost_func
         self._running = True
         self._lock = threading.Lock()
 
@@ -79,6 +82,14 @@ class LogBatcher:
             return None
 
         with self._lock:
+            if len(self._log_buffer) >= self.MAX_LOGS_BEFORE_DROP:
+                self._record_lost_func(
+                    reason="queue_overflow",
+                    data_category="log_item",
+                    quantity=1,
+                )
+                return None
+
             self._log_buffer.append(log)
             if len(self._log_buffer) >= self.MAX_LOGS_BEFORE_FLUSH:
                 self._flush_event.set()
