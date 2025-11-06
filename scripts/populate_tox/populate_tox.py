@@ -892,7 +892,7 @@ def _exit_if_not_free_threaded_interpreter():
     if "free-threading build" not in sys.version:
         exc = Exception("Running with a free-threaded interpreter is required.")
         exc.add_note(
-            "A dry run of pip is used to determine free-threading support of integrations."
+            "A dry run of pip is used to determine free-threading support of packages."
         )
         raise exc
 
@@ -912,7 +912,7 @@ def _exit_if_pip_unavailable():
     if pip_help_return_code != 0:
         exc = Exception("pip must be available.")
         exc.add_note(
-            "A dry run of pip is used to determine free-threading support of integrations."
+            "A dry run of pip is used to determine free-threading support of packages."
         )
         raise exc
 
