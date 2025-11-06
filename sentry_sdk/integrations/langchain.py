@@ -84,7 +84,7 @@ class LangchainIntegration(Integration):
 
         if max_spans is not None:
             warnings.warn(
-                "The `max_spans` parameter of the `LangchainIntegration` constructor is"
+                "The `max_spans` parameter of `LangchainIntegration` is "
                 "deprecated and will be removed in version 3.0 of sentry-sdk.",
                 DeprecationWarning,
                 stacklevel=2,
