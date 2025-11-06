@@ -1,4 +1,5 @@
 import pytest
+import responses
 
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -125,7 +126,14 @@ def test_does_not_set_propagator_if_disabled(sentry_init):
     assert propagator is original_propagator
 
 
+@responses.activate
 def test_otel_propagation_context(sentry_init):
+    responses.add(
+        responses.POST,
+        url="https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/",
+        status=200,
+    )
+
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
         integrations=[OTLPIntegration()],
@@ -135,6 +143,9 @@ def test_otel_propagation_context(sentry_init):
     with tracer.start_as_current_span("foo") as root_span:
         with tracer.start_as_current_span("bar") as span:
             external_propagation_context = get_external_propagation_context()
+
+    # Force flush to ensure spans are exported while mock is active
+    get_tracer_provider().force_flush()
 
     assert external_propagation_context is not None
     (trace_id, span_id) = external_propagation_context
