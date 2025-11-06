@@ -248,6 +248,12 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
         },
     },
+    "fastmcp": {
+        "package": "fastmcp",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
     "openai-base": {
         "package": "openai",
         "integration_name": "openai",
