@@ -24,7 +24,7 @@ class RedisIntegration(Integration):
 
         if max_data_size is not None:
             warnings.warn(
-                "The `max_data_size` parameter of the `RedisIntegration() constructor is"
+                "The `max_data_size` parameter of `RedisIntegration` is "
                 "deprecated and will be removed in version 3.0 of sentry-sdk.",
                 DeprecationWarning,
                 stacklevel=2,
