@@ -78,7 +78,7 @@ class LangchainIntegration(Integration):
     origin = f"auto.ai.{identifier}"
 
     def __init__(self, include_prompts=True, max_spans=None):
-        # type: (LangchainIntegration, bool, int) -> None
+        # type: (LangchainIntegration, bool, Optional[int]) -> None
         self.include_prompts = include_prompts
         self.max_spans = max_spans
 
