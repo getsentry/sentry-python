@@ -107,7 +107,7 @@ Here are all resources to help you make the most of Sentry:
 
 - [Documentation](https://docs.sentry.io/platforms/python/) - Official documentation to get started.
 - [Discord](https://discord.com/invite/Ww9hbqr) - Join our Discord community.
-- [X/Twitter](https://twitter.com/intent/follow?screen_name=getsentry) -  Follow us on X (Twitter) for updates.
+- [X/Twitter](https://x.com/intent/follow?screen_name=sentry) -  Follow us on X (Twitter) for updates.
 - [Stack Overflow](https://stackoverflow.com/questions/tagged/sentry) - Questions and answers related to Sentry.
 
 <a name="license"></a>
