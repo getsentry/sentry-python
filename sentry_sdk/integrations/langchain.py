@@ -1,3 +1,4 @@
+import contextvars
 import itertools
 from collections import OrderedDict
 from functools import wraps
@@ -70,6 +71,40 @@ DATA_FIELDS = {
     "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
     "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
 }
+
+
+# Contextvar to track agent names in a stack for re-entrant agent support
+_agent_stack = contextvars.ContextVar("langchain_agent_stack", default=None)
+
+
+def _push_agent(agent_name):
+    # type: (Optional[str]) -> None
+    """Push an agent name onto the stack."""
+    stack = _agent_stack.get()
+    if stack is None:
+        stack = []
+    stack.append(agent_name)
+    _agent_stack.set(stack)
+
+
+def _pop_agent():
+    # type: () -> Optional[str]
+    """Pop an agent name from the stack and return it."""
+    stack = _agent_stack.get()
+    if stack and len(stack) > 0:
+        agent_name = stack.pop()
+        _agent_stack.set(stack)
+        return agent_name
+    return None
+
+
+def _get_current_agent():
+    # type: () -> Optional[str]
+    """Get the current agent name (top of stack) without removing it."""
+    stack = _agent_stack.get()
+    if stack and len(stack) > 0:
+        return stack[-1]
+    return None
 
 
 class LangchainIntegration(Integration):
@@ -276,11 +311,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             elif "openai" in ai_type:
                 span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
 
-            agent_name = (
-                sentry_sdk.get_current_scope()
-                ._contexts.get("langchain_agent", {})
-                .get("agent_name")
-            )
+            agent_name = _get_current_agent()
             if agent_name:
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
@@ -436,11 +467,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if tool_description is not None:
                 span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
 
-            agent_name = (
-                sentry_sdk.get_current_scope()
-                ._contexts.get("langchain_agent", {})
-                .get("agent_name")
-            )
+            agent_name = _get_current_agent()
             if agent_name:
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
@@ -772,9 +799,7 @@ def _wrap_agent_executor_invoke(f):
             name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         ) as span:
-            sentry_sdk.get_current_scope().set_context(
-                "langchain_agent", {"agent_name": agent_name, "tools": tools}
-            )
+            _push_agent(agent_name)
             if agent_name:
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
@@ -813,7 +838,7 @@ def _wrap_agent_executor_invoke(f):
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-            sentry_sdk.get_current_scope().remove_context("langchain_agent")
+            _pop_agent()
 
             return result
 
@@ -840,9 +865,7 @@ def _wrap_agent_executor_stream(f):
         )
         span.__enter__()
 
-        sentry_sdk.get_current_scope().set_context(
-            "langchain_agent", {"agent_name": agent_name, "tools": tools}
-        )
+        _push_agent(agent_name)
 
         if agent_name:
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
@@ -893,7 +916,7 @@ def _wrap_agent_executor_stream(f):
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-            sentry_sdk.get_current_scope().remove_context("langchain_agent")
+            _pop_agent()
 
             span.__exit__(None, None, None)
 
@@ -914,7 +937,7 @@ def _wrap_agent_executor_stream(f):
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-            sentry_sdk.get_current_scope().remove_context("langchain_agent")
+            _pop_agent()
 
             span.__exit__(None, None, None)
 
