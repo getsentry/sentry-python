@@ -101,6 +101,30 @@ def get_start_span_function():
     return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
 
 
+def _truncate_single_message(message, max_bytes):
+    # type: (Dict[str, Any], int) -> Dict[str, Any]
+    """
+    Truncate a single message to fit within max_bytes.
+    If the message is too large, truncate the content field.
+    """
+    if not isinstance(message, dict) or "content" not in message:
+        return message
+    content = message.get("content", "")
+
+    if not isinstance(content, str) or len(content) <= max_bytes:
+        return message
+
+    overhead_message = message.copy()
+    overhead_message["content"] = ""
+    overhead_size = len(
+        json.dumps(overhead_message, separators=(",", ":")).encode("utf-8")
+    )
+
+    available_content_bytes = max_bytes - overhead_size - 20
+    message["content"] = content[:available_content_bytes] + "..."
+    return message
+
+
 def _find_truncation_index(messages, max_bytes):
     # type: (List[Dict[str, Any]], int) -> int
     """
@@ -120,14 +144,20 @@ def _find_truncation_index(messages, max_bytes):
 
 def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
     # type: (List[Dict[str, Any]], int) -> Tuple[List[Dict[str, Any]], int]
-    serialized_json = json.dumps(messages, separators=(",", ":"))
+    messages_with_truncated_content = [
+        _truncate_single_message(msg, max_bytes) for msg in messages
+    ]
+
+    serialized_json = json.dumps(messages_with_truncated_content, separators=(",", ":"))
     current_size = len(serialized_json.encode("utf-8"))
 
     if current_size <= max_bytes:
-        return messages, 0
+        return messages_with_truncated_content, 0
 
-    truncation_index = _find_truncation_index(messages, max_bytes)
-    return messages[truncation_index:], truncation_index
+    truncation_index = _find_truncation_index(
+        messages_with_truncated_content, max_bytes
+    )
+    return messages_with_truncated_content[truncation_index:], truncation_index
 
 
 def truncate_and_annotate_messages(

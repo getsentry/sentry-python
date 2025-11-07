@@ -278,6 +278,84 @@ class TestTruncateMessagesBySize:
             assert current_count >= 1
             prev_count = current_count
 
+    def test_individual_message_truncation(self):
+        large_content = "This is a very long message. " * 1000
+
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": large_content},
+        ]
+
+        result, truncation_index = truncate_messages_by_size(
+            messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
+        )
+
+        assert len(result) > 0
+
+        total_size = len(json.dumps(result, separators=(",", ":")).encode("utf-8"))
+        assert total_size <= MAX_GEN_AI_MESSAGE_BYTES
+
+        for msg in result:
+            msg_size = len(json.dumps(msg, separators=(",", ":")).encode("utf-8"))
+            assert msg_size <= MAX_GEN_AI_MESSAGE_BYTES
+
+        # If the last message is too large, the system message is not present
+        system_msgs = [m for m in result if m.get("role") == "system"]
+        assert len(system_msgs) == 0
+
+        # Confirm the user message is truncated with '...'
+        user_msgs = [m for m in result if m.get("role") == "user"]
+        assert len(user_msgs) == 1
+        assert user_msgs[0]["content"].endswith("...")
+        assert len(user_msgs[0]["content"]) < len(large_content)
+
+    def test_combined_individual_and_array_truncation(self):
+        huge_content = "X" * 25000
+        medium_content = "Y" * 5000
+
+        messages = [
+            {"role": "system", "content": medium_content},
+            {"role": "user", "content": huge_content},
+            {"role": "assistant", "content": medium_content},
+            {"role": "user", "content": "small"},
+        ]
+
+        result, truncation_index = truncate_messages_by_size(
+            messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
+        )
+
+        assert len(result) > 0
+
+        total_size = len(json.dumps(result, separators=(",", ":")).encode("utf-8"))
+        assert total_size <= MAX_GEN_AI_MESSAGE_BYTES
+
+        for msg in result:
+            msg_size = len(json.dumps(msg, separators=(",", ":")).encode("utf-8"))
+            assert msg_size <= MAX_GEN_AI_MESSAGE_BYTES
+
+        # The last user "small" message should always be present and untruncated
+        last_user_msgs = [
+            m for m in result if m.get("role") == "user" and m["content"] == "small"
+        ]
+        assert len(last_user_msgs) == 1
+
+        # If the huge message is present, it must be truncated
+        for user_msg in [
+            m for m in result if m.get("role") == "user" and "X" in m["content"]
+        ]:
+            assert user_msg["content"].endswith("...")
+            assert len(user_msg["content"]) < len(huge_content)
+
+        # The medium messages, if present, should not be truncated
+        for expected_role in ["system", "assistant"]:
+            role_msgs = [m for m in result if m.get("role") == expected_role]
+            if role_msgs:
+                assert role_msgs[0]["content"].startswith("Y")
+                assert len(role_msgs[0]["content"]) <= len(medium_content)
+                assert not role_msgs[0]["content"].endswith("...") or len(
+                    role_msgs[0]["content"]
+                ) == len(medium_content)
+
 
 class TestTruncateAndAnnotateMessages:
     def test_no_truncation_returns_list(self, sample_messages):
