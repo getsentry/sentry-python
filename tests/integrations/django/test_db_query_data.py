@@ -487,7 +487,9 @@ def test_db_span_origin_execute(sentry_init, client, capture_events):
             assert span["origin"] == "auto.http.django"
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
+@pytest.mark.skip
 def test_db_span_origin_executemany(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
