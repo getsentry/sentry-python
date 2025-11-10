@@ -103,7 +103,6 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
-            "py3.14,py3.14t": ["pytest<7.11.1"],
         },
     },
     "dramatiq": {
