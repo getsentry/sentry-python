@@ -787,12 +787,14 @@ def _add_python_versions_to_release(
         release,
     )
 
-    py_versions_with_supported_free_threaded_wheel = set(
-        version
-        for version in supported_py_versions
-        if version >= MIN_FREE_THREADING_SUPPORT
-        and _supports_free_threading(package, release, version, release_pypi_data)
-    )
+    py_versions_with_supported_free_threaded_wheel = set()
+    if not TEST_SUITE_CONFIG[integration].get("free-threading", True):
+        py_versions_with_supported_free_threaded_wheel.update(
+            version
+            for version in supported_py_versions
+            if version >= MIN_FREE_THREADING_SUPPORT
+            and _supports_free_threading(package, release, version, release_pypi_data)
+        )
 
     release.python_versions = pick_python_versions_to_test(
         supported_py_versions,

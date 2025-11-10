@@ -104,6 +104,7 @@ TEST_SUITE_CONFIG = {
             ],
             "<3.1": ["pytest-django<4.0"],
         },
+        "free-threading": False,
     },
     "dramatiq": {
         "package": "dramatiq",
