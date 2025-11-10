@@ -1757,7 +1757,8 @@ def _generate_installed_modules():
 
 def _normalize_module_name(name):
     # type: (str) -> str
-    return name.lower()
+    # https://peps.python.org/pep-0503/#normalized-names
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def _get_installed_modules():
@@ -1770,8 +1771,10 @@ def _get_installed_modules():
 
 def package_version(package):
     # type: (str) -> Optional[Tuple[int, ...]]
+    normalized_package = _normalize_module_name(package)
+
     installed_packages = _get_installed_modules()
-    version = installed_packages.get(package)
+    version = installed_packages.get(normalized_package)
     if version is None:
         return None
 

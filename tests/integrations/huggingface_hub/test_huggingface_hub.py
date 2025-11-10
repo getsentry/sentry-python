@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-HF_VERSION = package_version("huggingface-hub") or package_version("huggingface_hub")
+HF_VERSION = package_version("huggingface-hub")
 
 if HF_VERSION and HF_VERSION < (0, 30, 0):
     MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/{model_name}"
