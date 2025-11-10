@@ -1782,7 +1782,7 @@ def package_version(package):
 
     installed_packages = {
         _replace_hyphens_dots_and_underscores_with_dashes(module): v
-        for module, v in _get_installed_modules()
+        for module, v in _get_installed_modules().items()
     }
     version = installed_packages.get(normalized_package)
     if version is None:
