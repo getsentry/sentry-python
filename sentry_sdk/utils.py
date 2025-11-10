@@ -1780,10 +1780,10 @@ def package_version(package):
         _replace_hyphens_dots_and_underscores_with_dashes(package)
     )
 
-    installed_packages = [
-        _replace_hyphens_dots_and_underscores_with_dashes(module)
-        for module in _get_installed_modules()
-    ]
+    installed_packages = {
+        _replace_hyphens_dots_and_underscores_with_dashes(module): v
+        for module, v in _get_installed_modules()
+    }
     version = installed_packages.get(normalized_package)
     if version is None:
         return None
