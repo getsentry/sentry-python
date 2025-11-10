@@ -8,11 +8,13 @@ from ..utils import _set_agent_data, _should_send_prompts
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional
 
 
-def execute_tool_span(tool_name, tool_args, agent, tool_type="function"):
-    # type: (str, Any, Any, str) -> sentry_sdk.tracing.Span
+def execute_tool_span(
+    tool_name, tool_args, agent, tool_type="function", parent_span=None
+):
+    # type: (str, Any, Any, str, Optional[sentry_sdk.tracing.Span]) -> sentry_sdk.tracing.Span
     """Create a span for tool execution.
 
     Args:
@@ -20,12 +22,24 @@ def execute_tool_span(tool_name, tool_args, agent, tool_type="function"):
         tool_args: The arguments passed to the tool
         agent: The agent executing the tool
         tool_type: The type of tool ("function" for regular tools, "mcp" for MCP services)
+        parent_span: Optional parent span to create this as a child of. If provided,
+            uses parent_span.start_child() to ensure parallel tools are siblings.
     """
-    span = sentry_sdk.start_span(
-        op=OP.GEN_AI_EXECUTE_TOOL,
-        name=f"execute_tool {tool_name}",
-        origin=SPAN_ORIGIN,
-    )
+    if parent_span:
+        # Create as child of the specified parent span
+        # This ensures parallel tool calls are siblings under the same parent
+        span = parent_span.start_child(
+            op=OP.GEN_AI_EXECUTE_TOOL,
+            name=f"execute_tool {tool_name}",
+            origin=SPAN_ORIGIN,
+        )
+    else:
+        # Create as child of current span
+        span = sentry_sdk.start_span(
+            op=OP.GEN_AI_EXECUTE_TOOL,
+            name=f"execute_tool {tool_name}",
+            origin=SPAN_ORIGIN,
+        )
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
     span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, tool_type)

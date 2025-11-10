@@ -5,7 +5,11 @@ from pydantic_ai._tool_manager import ToolManager  # type: ignore
 import sentry_sdk
 
 from ..spans import execute_tool_span, update_execute_tool_span
-from ..utils import _capture_exception
+from ..utils import (
+    _capture_exception,
+    get_current_agent,
+    get_current_invoke_agent_span,
+)
 
 from typing import TYPE_CHECKING
 
@@ -49,20 +53,21 @@ def _patch_tool_execution():
         if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
             tool_type = "mcp"
 
-        # Get agent from Sentry scope
-        current_span = sentry_sdk.get_current_span()
-        if current_span and tool:
-            agent_data = (
-                sentry_sdk.get_current_scope()._contexts.get("pydantic_ai_agent") or {}
-            )
-            agent = agent_data.get("_agent")
+        # Get agent and invoke_agent span from contextvar
+        agent = get_current_agent()
+        invoke_span = get_current_invoke_agent_span()
 
+        if invoke_span and tool:
             try:
                 args_dict = call.args_as_dict()
             except Exception:
                 args_dict = call.args if isinstance(call.args, dict) else {}
 
-            with execute_tool_span(name, args_dict, agent, tool_type=tool_type) as span:
+            # Create execute_tool span as a child of invoke_agent span
+            # Passing parent_span ensures parallel tools are siblings under the same parent
+            with execute_tool_span(
+                name, args_dict, agent, tool_type=tool_type, parent_span=invoke_span
+            ) as span:
                 try:
                     result = await original_call_tool(
                         self, call, allow_partial, wrap_validation_errors
