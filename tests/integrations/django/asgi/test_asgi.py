@@ -306,9 +306,7 @@ async def test_async_middleware_spans(
 
 @pytest.mark.asyncio
 @pytest.mark.forked
-@pytest.mark.skipif(
-    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
-)
+@pytest.mark.skip
 async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
