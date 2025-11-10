@@ -255,7 +255,6 @@ async def test_async_middleware_that_is_function_concurrent_execution(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
