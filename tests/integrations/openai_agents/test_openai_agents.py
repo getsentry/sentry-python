@@ -665,6 +665,60 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
+async def test_error_captures_input_data(sentry_init, capture_events, test_agent):
+    """
+    Test that input data is captured even when the API call raises an exception.
+    This verifies that _set_input_data is called before the API call.
+    """
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.side_effect = Exception("API Error")
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            with pytest.raises(Exception, match="API Error"):
+                await agents.Runner.run(
+                    test_agent, "Test input", run_config=test_run_config
+                )
+
+    (
+        error_event,
+        transaction,
+    ) = events
+
+    assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert error_event["exception"]["values"][0]["value"] == "API Error"
+
+    spans = transaction["spans"]
+    ai_client_span = [s for s in spans if s["op"] == "gen_ai.chat"][0]
+
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["tags"]["status"] == "internal_error"
+
+    assert "gen_ai.request.messages" in ai_client_span["data"]
+    request_messages = safe_serialize(
+        [
+            {
+                "role": "system",
+                "content": [
+                    {"type": "text", "text": "You are a helpful test assistant."}
+                ],
+            },
+            {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+        ]
+    )
+    assert ai_client_span["data"]["gen_ai.request.messages"] == request_messages
+
+
+@pytest.mark.asyncio
 async def test_span_status_error(sentry_init, capture_events, test_agent):
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
