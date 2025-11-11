@@ -13,8 +13,7 @@ if TYPE_CHECKING:
 
 # Store the current invoke_agent span in a contextvar for re-entrant safety
 # Using a list as a stack to support nested agent calls
-_invoke_agent_span_stack = ContextVar("pydantic_ai_invoke_agent_span_stack", default=[])
-# type: ContextVar[list[dict[str, Any]]]
+_invoke_agent_span_stack = ContextVar("pydantic_ai_invoke_agent_span_stack", default=[])  # type: ContextVar[list[dict[str, Any]]]
 
 
 def push_invoke_agent_span(span, agent, is_streaming=False):
@@ -101,7 +100,7 @@ def _set_agent_data(span, agent):
 
 
 def _get_model_name(model_obj):
-    # type: (Any) -> str | None
+    # type: (Any) -> Optional[str]
     """Extract model name from a model object.
 
     Args:
