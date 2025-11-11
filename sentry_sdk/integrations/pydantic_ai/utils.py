@@ -17,11 +17,11 @@ _invoke_agent_span_stack = ContextVar("pydantic_ai_invoke_agent_span_stack", def
 # type: ContextVar[list[dict[str, Any]]]
 
 
-def push_invoke_agent_span(span, agent):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
-    """Push an invoke_agent span onto the stack along with its agent."""
+def push_invoke_agent_span(span, agent, is_streaming=False):
+    # type: (sentry_sdk.tracing.Span, Any, bool) -> None
+    """Push an invoke_agent span onto the stack along with its agent and streaming flag."""
     stack = _invoke_agent_span_stack.get().copy()
-    stack.append({"span": span, "agent": agent})
+    stack.append({"span": span, "agent": agent, "is_streaming": is_streaming})
     _invoke_agent_span_stack.set(stack)
 
 
@@ -50,6 +50,15 @@ def get_current_agent():
     if stack:
         return stack[-1]["agent"]
     return None
+
+
+def get_is_streaming():
+    # type: () -> bool
+    """Get the streaming flag from the contextvar stack."""
+    stack = _invoke_agent_span_stack.get()
+    if stack:
+        return stack[-1].get("is_streaming", False)
+    return False
 
 
 def _should_send_prompts():

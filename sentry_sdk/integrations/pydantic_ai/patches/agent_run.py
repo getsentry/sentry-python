@@ -48,7 +48,7 @@ class _StreamingContextManagerWrapper:
         self._span.__enter__()
 
         # Push span and agent to contextvar stack
-        push_invoke_agent_span(self._span, self.agent)
+        push_invoke_agent_span(self._span, self.agent, self.is_streaming)
 
         # Enter the original context manager
         result = await self.original_ctx_manager.__aenter__()
@@ -105,7 +105,7 @@ def _create_run_wrapper(original_func, is_streaming=False):
             # Create invoke_agent span
             with invoke_agent_span(user_prompt, self, model, model_settings) as span:
                 # Push span and agent to contextvar stack
-                push_invoke_agent_span(span, self)
+                push_invoke_agent_span(span, self, is_streaming)
                 try:
                     result = await original_func(self, *args, **kwargs)
 
