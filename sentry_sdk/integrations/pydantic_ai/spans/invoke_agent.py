@@ -8,6 +8,7 @@ from ..utils import (
     _set_available_tools,
     _set_model_data,
     _should_send_prompts,
+    push_invoke_agent_span,
 )
 
 from typing import TYPE_CHECKING
@@ -16,8 +17,8 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def invoke_agent_span(user_prompt, agent, model, model_settings):
-    # type: (Any, Any, Any, Any) -> sentry_sdk.tracing.Span
+def invoke_agent_span(user_prompt, agent, model, model_settings, is_streaming=False):
+    # type: (Any, Any, Any, Any, bool) -> sentry_sdk.tracing.Span
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
@@ -31,6 +32,10 @@ def invoke_agent_span(user_prompt, agent, model, model_settings):
     )
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+
+    # Push span and agent to contextvar stack immediately after span creation
+    # This ensures the agent is available in get_current_agent() before _set_model_data is called
+    push_invoke_agent_span(span, agent, is_streaming)
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
