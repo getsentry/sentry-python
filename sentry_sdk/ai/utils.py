@@ -107,8 +107,8 @@ def get_start_span_function():
 def _truncate_single_message_content_if_present(message, max_chars):
     # type: (Dict[str, Any], int) -> Dict[str, Any]
     """
-    Truncate a single message to fit within max_chars.
-    If the message is too large, truncate the content field.
+    Truncate a message's content to at most `max_chars` characters and append an
+    ellipsis if truncation occurs.
     """
     if not isinstance(message, dict) or "content" not in message:
         return message
@@ -146,10 +146,13 @@ def truncate_messages_by_size(
     # type: (List[Dict[str, Any]], int, int) -> Tuple[List[Dict[str, Any]], int]
     """
     Returns a truncated messages array, consisting of
-    - the last message, with the messages's content truncated to `max_single_message_chars` characters,
+    - the last message, with its content truncated to `max_single_message_chars` characters,
       if the last message's size exceeds `max_bytes`; otherwise,
     - the maximum number of messages, starting from the end of the `messages` array, whose total
       serialized size does not exceed `max_bytes` bytes.
+
+    In the single message case, the serialized message size may exceed `max_bytes`, because
+    truncation is based only on character count in that case.
     """
     serialized_json = json.dumps(messages, separators=(",", ":"))
     current_size = len(serialized_json.encode("utf-8"))
@@ -158,11 +161,12 @@ def truncate_messages_by_size(
         return messages, 0
 
     truncation_index = _find_truncation_index(messages, max_bytes)
-    truncated_messages = (
-        messages[truncation_index:]
-        if truncation_index < len(messages)
-        else messages[-1:]
-    )
+    if truncation_index < len(messages):
+        truncated_messages = messages[truncation_index:]
+    else:
+        truncation_index = len(messages) - 1
+        truncated_messages = messages[-1:]
+
     if len(truncated_messages) == 1:
         truncated_messages[0] = _truncate_single_message_content_if_present(
             deepcopy(truncated_messages[0]), max_chars=max_single_message_chars
