@@ -145,10 +145,10 @@ def truncate_messages_by_size(
 ):
     # type: (List[Dict[str, Any]], int, int) -> Tuple[List[Dict[str, Any]], int]
     """
-    Returns a truncated messages array, consisting of
+    Returns a truncated messages list, consisting of
     - the last message, with its content truncated to `max_single_message_chars` characters,
       if the last message's size exceeds `max_bytes` bytes; otherwise,
-    - the maximum number of messages, starting from the end of the `messages` array, whose total
+    - the maximum number of messages, starting from the end of the `messages` list, whose total
       serialized size does not exceed `max_bytes` bytes.
 
     In the single message case, the serialized message size may exceed `max_bytes`, because
