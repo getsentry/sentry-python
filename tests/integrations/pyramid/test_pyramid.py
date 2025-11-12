@@ -9,7 +9,6 @@ from pyramid.response import Response
 from werkzeug.test import Client
 
 from sentry_sdk import capture_message, add_breadcrumb
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from tests.conftest import unpack_werkzeug_response
@@ -156,10 +155,17 @@ def test_transaction_style(
     assert event["transaction_info"] == {"source": expected_source}
 
 
-def test_large_json_request(sentry_init, capture_events, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_large_json_request(
+    sentry_init, capture_events, route, get_client, max_value_length
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
-    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
+    data = {"foo": {"bar": "a" * (1034)}}
 
     @route("/")
     def index(request):
@@ -175,15 +181,17 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
     client.post("/", content_type="application/json", data=json.dumps(data))
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1034
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -233,11 +241,18 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     assert event["request"]["data"] == data
 
 
-def test_files_and_form(sentry_init, capture_events, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_files_and_form(
+    sentry_init, capture_events, route, get_client, max_value_length
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
     data = {
-        "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
+        "foo": "a" * (1034),
         "file": (BytesIO(b"hello"), "hello.txt"),
     }
 
@@ -252,15 +267,16 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
     client.post("/", data=data)
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]) == 1034
 
     assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]

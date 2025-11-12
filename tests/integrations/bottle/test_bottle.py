@@ -5,7 +5,6 @@ import logging
 from io import BytesIO
 from bottle import Bottle, debug as set_debug, abort, redirect, HTTPResponse
 from sentry_sdk import capture_message
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.bottle import BottleIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
@@ -121,10 +120,17 @@ def test_errors(
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
 
 
-def test_large_json_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_large_json_request(
+    sentry_init, capture_events, app, get_client, max_value_length
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
-    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
+    data = {"foo": {"bar": "a" * (1034)}}
 
     @app.route("/", method="POST")
     def index():
@@ -144,15 +150,17 @@ def test_large_json_request(sentry_init, capture_events, app, get_client):
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1034
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -179,10 +187,17 @@ def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
     assert event["request"]["data"] == data
 
 
-def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_medium_formdata_request(
+    sentry_init, capture_events, app, get_client, max_value_length
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
-    data = {"foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}
+    data = {"foo": "a" * (1034)}
 
     @app.route("/", method="POST")
     def index():
@@ -199,15 +214,17 @@ def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]) == 1034
 
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
@@ -241,11 +258,16 @@ def test_too_large_raw_request(
     assert not event["request"]["data"]
 
 
-def test_files_and_form(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_files_and_form(sentry_init, capture_events, app, get_client, max_value_length):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
     data = {
-        "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
+        "foo": "a" * (1034),
         "file": (BytesIO(b"hello"), "hello.txt"),
     }
 
@@ -266,15 +288,16 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]) == 1034
 
     assert event["_meta"]["request"]["data"]["file"] == {
         "": {
