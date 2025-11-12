@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
@@ -226,14 +226,16 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     assert description.endswith("SELECT 98 UNION SELECT 99")
 
 
-def test_large_event_not_truncated(sentry_init, capture_events):
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_large_event_not_truncated(sentry_init, capture_events, max_value_length):
     sentry_init(
         traces_sample_rate=1,
         integrations=[SqlalchemyIntegration()],
+        max_value_length=max_value_length,
     )
     events = capture_events()
 
-    long_str = "x" * (DEFAULT_MAX_VALUE_LENGTH + 10)
+    long_str = "x" * (1034)
 
     scope = sentry_sdk.get_isolation_scope()
 
@@ -270,18 +272,19 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     assert description.startswith("SELECT 0")
     assert description.endswith("SELECT 98 UNION SELECT 99")
 
-    # Smoke check that truncation of other fields has not changed.
-    assert len(event["message"]) == DEFAULT_MAX_VALUE_LENGTH
+    if max_value_length:
+        # Smoke check that truncation of other fields has not changed.
+        assert len(event["message"]) == 1024
 
-    # The _meta for other truncated fields should be there as well.
-    assert event["_meta"]["message"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+        # The _meta for other truncated fields should be there as well.
+        assert event["_meta"]["message"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
+    else:
+        assert len(event["message"]) == 1034
 
 
 def test_engine_name_not_string(sentry_init):
