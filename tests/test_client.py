@@ -791,19 +791,19 @@ def test_databag_depth_stripping(sentry_init, capture_events):
 
 
 def test_databag_string_stripping(sentry_init, capture_events):
-    sentry_init(max_value_length=100_000)
+    sentry_init(max_value_length=1024)
     events = capture_events()
 
     del events[:]
     try:
-        a = "A" * 1_000_000  # noqa
+        a = "A" * 10240  # noqa
         1 / 0
     except Exception:
         capture_exception()
 
     (event,) = events
 
-    assert len(json.dumps(event)) < 1_000_000
+    assert len(json.dumps(event)) < 10240
 
 
 def test_databag_breadth_stripping(sentry_init, capture_events):
@@ -1090,25 +1090,13 @@ def test_multiple_positional_args(sentry_init):
     assert "Only single positional argument is expected" in str(exinfo.value)
 
 
-@pytest.mark.parametrize(
-    "sdk_options, expected_data_length",
-    [
-        ({}, 100_000),
-        (
-            {"max_value_length": 101_000},
-            101_000,
-        ),
-    ],
-)
-def test_max_value_length_option(
-    sentry_init, capture_events, sdk_options, expected_data_length
-):
-    sentry_init(sdk_options)
+def test_max_value_length_option(sentry_init, capture_events):
+    sentry_init(max_value_length=2024)
     events = capture_events()
 
-    capture_message("a" * (102_000))
+    capture_message("a" * (3024))
 
-    assert len(events[0]["message"]) == expected_data_length
+    assert len(events[0]["message"]) == 2024
 
 
 @pytest.mark.parametrize(

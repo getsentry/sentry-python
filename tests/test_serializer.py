@@ -166,11 +166,11 @@ def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):
 
 
 def test_no_value_truncation_by_default(body_normalizer):
-    data = {"key": "a" * (1_000_000)}
+    data = {"key": "a" * (10240)}
 
     result = body_normalizer(data)
 
-    assert len(result["key"]) == 1_000_000  # fallback max length
+    assert len(result["key"]) == 10240  # fallback max length
 
 
 def test_max_value_length(body_normalizer):
