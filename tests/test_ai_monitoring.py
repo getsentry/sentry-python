@@ -178,6 +178,7 @@ async def test_ai_track_async_with_explicit_op(sentry_init, capture_events):
 
 @pytest.fixture
 def sample_messages():
+    """Sample messages similar to what gen_ai integrations would use"""
     return [
         {"role": "system", "content": "You are a helpful assistant."},
         {
