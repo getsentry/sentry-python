@@ -3,7 +3,7 @@ from functools import wraps
 import sentry_sdk
 
 from ..spans import invoke_agent_span, update_invoke_agent_span
-from ..utils import _capture_exception, push_invoke_agent_span, pop_invoke_agent_span
+from ..utils import _capture_exception, pop_agent
 
 from typing import TYPE_CHECKING
 from pydantic_ai.agent import Agent  # type: ignore
@@ -70,8 +70,8 @@ class _StreamingContextManagerWrapper:
                 if self._span is not None:
                     update_invoke_agent_span(self._span, output)
         finally:
-            # Pop span from contextvar stack
-            pop_invoke_agent_span()
+            # Pop agent from contextvar stack
+            pop_agent()
 
             # Clean up invoke span
             if self._span:
@@ -119,8 +119,8 @@ def _create_run_wrapper(original_func, is_streaming=False):
                     _capture_exception(exc)
                     raise exc from None
                 finally:
-                    # Pop span from contextvar stack
-                    pop_invoke_agent_span()
+                    # Pop agent from contextvar stack
+                    pop_agent()
 
     return wrapper
 

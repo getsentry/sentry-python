@@ -8,7 +8,6 @@ from ..spans import execute_tool_span, update_execute_tool_span
 from ..utils import (
     _capture_exception,
     get_current_agent,
-    get_current_invoke_agent_span,
 )
 
 from typing import TYPE_CHECKING
@@ -53,30 +52,33 @@ def _patch_tool_execution():
         if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
             tool_type = "mcp"
 
-        # Get agent and invoke_agent span from contextvar
+        # Get agent from contextvar
         agent = get_current_agent()
-        invoke_span = get_current_invoke_agent_span()
 
-        if invoke_span and tool:
+        if agent and tool:
             try:
                 args_dict = call.args_as_dict()
             except Exception:
                 args_dict = call.args if isinstance(call.args, dict) else {}
 
-            # Create execute_tool span as a child of invoke_agent span
-            # Passing parent_span ensures parallel tools are siblings under the same parent
-            with execute_tool_span(
-                name, args_dict, agent, tool_type=tool_type, parent_span=invoke_span
-            ) as span:
-                try:
-                    result = await original_call_tool(
-                        self, call, allow_partial, wrap_validation_errors
-                    )
-                    update_execute_tool_span(span, result)
-                    return result
-                except Exception as exc:
-                    _capture_exception(exc)
-                    raise exc from None
+            # Create execute_tool span
+            # Nesting is handled by isolation_scope() to ensure proper parent-child relationships
+            with sentry_sdk.isolation_scope():
+                with execute_tool_span(
+                    name,
+                    args_dict,
+                    agent,
+                    tool_type=tool_type,
+                ) as span:
+                    try:
+                        result = await original_call_tool(
+                            self, call, allow_partial, wrap_validation_errors
+                        )
+                        update_execute_tool_span(span, result)
+                        return result
+                    except Exception as exc:
+                        _capture_exception(exc)
+                        raise exc from None
 
         # No span context - just call original
         return await original_call_tool(

@@ -8,7 +8,7 @@ from ..utils import (
     _set_available_tools,
     _set_model_data,
     _should_send_prompts,
-    push_invoke_agent_span,
+    push_agent,
 )
 
 from typing import TYPE_CHECKING
@@ -33,9 +33,9 @@ def invoke_agent_span(user_prompt, agent, model, model_settings, is_streaming=Fa
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
-    # Push span and agent to contextvar stack immediately after span creation
+    # Push agent to contextvar stack immediately after span creation
     # This ensures the agent is available in get_current_agent() before _set_model_data is called
-    push_invoke_agent_span(span, agent, is_streaming)
+    push_agent(agent, is_streaming)
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)

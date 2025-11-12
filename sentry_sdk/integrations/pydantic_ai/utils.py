@@ -11,41 +11,32 @@ if TYPE_CHECKING:
     from typing import Any, Optional
 
 
-# Store the current invoke_agent span in a contextvar for re-entrant safety
+# Store the current agent context in a contextvar for re-entrant safety
 # Using a list as a stack to support nested agent calls
-_invoke_agent_span_stack = ContextVar("pydantic_ai_invoke_agent_span_stack", default=[])  # type: ContextVar[list[dict[str, Any]]]
+_agent_context_stack = ContextVar("pydantic_ai_agent_context_stack", default=[])  # type: ContextVar[list[dict[str, Any]]]
 
 
-def push_invoke_agent_span(span, agent, is_streaming=False):
-    # type: (sentry_sdk.tracing.Span, Any, bool) -> None
-    """Push an invoke_agent span onto the stack along with its agent and streaming flag."""
-    stack = _invoke_agent_span_stack.get().copy()
-    stack.append({"span": span, "agent": agent, "is_streaming": is_streaming})
-    _invoke_agent_span_stack.set(stack)
+def push_agent(agent, is_streaming=False):
+    # type: (Any, bool) -> None
+    """Push an agent context onto the stack along with its streaming flag."""
+    stack = _agent_context_stack.get().copy()
+    stack.append({"agent": agent, "is_streaming": is_streaming})
+    _agent_context_stack.set(stack)
 
 
-def pop_invoke_agent_span():
+def pop_agent():
     # type: () -> None
-    """Pop an invoke_agent span from the stack."""
-    stack = _invoke_agent_span_stack.get().copy()
+    """Pop an agent context from the stack."""
+    stack = _agent_context_stack.get().copy()
     if stack:
         stack.pop()
-    _invoke_agent_span_stack.set(stack)
-
-
-def get_current_invoke_agent_span():
-    # type: () -> Optional[sentry_sdk.tracing.Span]
-    """Get the current invoke_agent span (top of stack)."""
-    stack = _invoke_agent_span_stack.get()
-    if stack:
-        return stack[-1]["span"]
-    return None
+    _agent_context_stack.set(stack)
 
 
 def get_current_agent():
     # type: () -> Any
     """Get the current agent from the contextvar stack."""
-    stack = _invoke_agent_span_stack.get()
+    stack = _agent_context_stack.get()
     if stack:
         return stack[-1]["agent"]
     return None
@@ -54,7 +45,7 @@ def get_current_agent():
 def get_is_streaming():
     # type: () -> bool
     """Get the streaming flag from the contextvar stack."""
-    stack = _invoke_agent_span_stack.get()
+    stack = _agent_context_stack.get()
     if stack:
         return stack[-1].get("is_streaming", False)
     return False
