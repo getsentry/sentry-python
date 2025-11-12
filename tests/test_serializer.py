@@ -165,7 +165,7 @@ def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):
     assert result == data
 
 
-def test_max_value_length_default(body_normalizer):
+def test_no_value_truncation_by_default(body_normalizer):
     data = {"key": "a" * (1_000_000)}
 
     result = body_normalizer(data)
