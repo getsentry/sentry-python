@@ -147,7 +147,7 @@ def truncate_messages_by_size(
     """
     Returns a truncated messages array, consisting of
     - the last message, with its content truncated to `max_single_message_chars` characters,
-      if the last message's size exceeds `max_bytes`; otherwise,
+      if the last message's size exceeds `max_bytes` bytes; otherwise,
     - the maximum number of messages, starting from the end of the `messages` array, whose total
       serialized size does not exceed `max_bytes` bytes.
 
