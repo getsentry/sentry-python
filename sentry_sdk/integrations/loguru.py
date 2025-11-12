@@ -8,7 +8,7 @@ from sentry_sdk.integrations.logging import (
     _BaseHandler,
 )
 from sentry_sdk.logger import _log_level_to_otel
-from sentry_sdk.utils import has_logs_enabled
+from sentry_sdk.utils import has_logs_enabled, safe_repr
 
 from typing import TYPE_CHECKING
 
@@ -192,6 +192,14 @@ def loguru_sentry_logs_handler(message):
 
     if record.get("name"):
         attrs["logger.name"] = record["name"]
+
+    extra = record.get("extra")
+    if extra:
+        for key, value in extra.items():
+            if isinstance(value, (str, int, float, bool)):
+                attrs[f"sentry.message.parameter.{key}"] = value
+            else:
+                attrs[f"sentry.message.parameter.{key}"] = safe_repr(value)
 
     client._capture_log(
         {
