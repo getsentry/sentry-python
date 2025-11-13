@@ -30,6 +30,7 @@ def ai_client_span(agent, get_response_kwargs):
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     _set_agent_data(span, agent)
+    _set_input_data(span, get_response_kwargs)
 
     return span
 
@@ -37,6 +38,5 @@ def ai_client_span(agent, get_response_kwargs):
 def update_ai_client_span(span, agent, get_response_kwargs, result):
     # type: (sentry_sdk.tracing.Span, Agent, dict[str, Any], Any) -> None
     _set_usage_data(span, result.usage)
-    _set_input_data(span, get_response_kwargs)
     _set_output_data(span, result)
     _create_mcp_execute_tool_spans(span, result)

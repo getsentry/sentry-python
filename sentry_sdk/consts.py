@@ -21,6 +21,7 @@ class EndpointType(Enum):
     """
 
     ENVELOPE = "envelope"
+    OTLP_TRACES = "integration/otlp/v1/traces"
 
 
 class CompressionAlgo(Enum):
@@ -706,6 +707,12 @@ class SPANDATA:
     Example: 6379
     """
 
+    NETWORK_TRANSPORT = "network.transport"
+    """
+    The transport protocol used for the network connection.
+    Example: "tcp", "udp", "unix"
+    """
+
     PROFILER_ID = "profiler_id"
     """
     Label identifying the profiler id that the span occurred in. This should be a string.
@@ -824,7 +831,7 @@ class SPANDATA:
     MCP_TRANSPORT = "mcp.transport"
     """
     The transport method used for MCP communication.
-    Example: "pipe" (stdio), "tcp" (HTTP/WebSocket/SSE)
+    Example: "http", "sse", "stdio"
     """
 
     MCP_SESSION_ID = "mcp.session.id"
@@ -1005,6 +1012,8 @@ class ClientConstructor:
         enable_logs=False,  # type: bool
         before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
         trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
+        enable_metrics=True,  # type: bool
+        before_send_metric=None,  # type: Optional[Callable[[Metric, Hint], Optional[Metric]]]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1433,4 +1442,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.42.1"
+VERSION = "2.44.0"

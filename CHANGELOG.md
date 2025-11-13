@@ -1,5 +1,105 @@
 # Changelog
 
+## 2.44.0
+
+### Various fixes & improvements
+
+- fix(openai): Check response text is present to avoid AttributeError (#5081) by @alexander-alderman-webb
+- fix(pydantic-ai): Do not fail on new `ToolManager._call_tool()` parameters (#5084) by @alexander-alderman-webb
+- tests(huggingface): Avoid `None` version (#5083) by @alexander-alderman-webb
+- ci: Pin `coverage` version for 3.14 Django tests (#5088) by @alexander-alderman-webb
+- chore: X handle update (#5078) by @cleptric
+- fix(openai-agents): add input messages to errored spans as well (#5077) by @shellmayr
+- fix: Add hard limit to log batcher (#5069) by @alexander-alderman-webb
+- fix: Add hard limit to metrics batcher (#5068) by @alexander-alderman-webb
+- fix(integrations): properly handle exceptions in tool calls (#5065) by @constantinius
+- feat: non-experimental `before_send_metric` option (#5064) by @alexander-alderman-webb
+- feat: non-experimental `enable_metrics` option (#5056) by @alexander-alderman-webb
+- fix(integrations): properly distinguish between network.transport and mcp.transport (#5063) by @constantinius
+- feat(integrations): add ability to auto-deactivate lower-level integrations based on map (#5052) by @shellmayr
+- Fix NOT_GIVEN check in anthropic (#5058) by @sl0thentr0py
+- ci: 🤖 Update test matrix with new releases (11/03) (#5054) by @github-actions
+- Add external_propagation_context support (#5051) by @sl0thentr0py
+- chore: Remove `enable_metrics` option (#5046) by @alexander-alderman-webb
+- Allow new integration setup on the instance with config options (#5047) by @sl0thentr0py
+- ci: Run integration tests on Python 3.14t (#4995) by @alexander-alderman-webb
+- docs: Elaborate on Strawberry autodetection in changelog (#5039) by @sentrivana
+
+## 2.43.0
+
+### Various fixes & improvements
+
+- Pydantic AI integration (#4906) by @constantinius
+
+  Enable the new Pydantic AI integration with the code snippet below, and you can use the Sentry AI dashboards to observe your AI calls:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          PydanticAIIntegration(),
+      ],
+  )
+  ```
+- MCP Python SDK (#4964) by @constantinius
+
+  Enable the new Python MCP integration with the code snippet below:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.mcp import MCPIntegration
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      # Set traces_sample_rate to 1.0 to capture 100%
+      # of transactions for tracing.
+      traces_sample_rate=1.0,
+      # Add data like inputs and responses;
+      # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+      send_default_pii=True,
+      integrations=[
+          MCPIntegration(),
+      ],
+  )
+  ```
+- fix(strawberry): Remove autodetection, always use sync extension (#4984) by @sentrivana
+
+  Previously, `StrawberryIntegration` would try to guess whether it should install the sync or async version of itself. This auto-detection was very brittle and could lead to us auto-enabling async code in a sync context. With this change, `StrawberryIntegration` remains an auto-enabling integration, but it'll enable the sync version by default. If you want to enable the async version, pass the option explicitly:
+
+  ```python
+  sentry_sdk.init(
+      # ...
+      integrations=[
+          StrawberryIntegration(
+              async_execution=True
+          ),
+      ],
+  )
+  ```
+- fix(google-genai): Set agent name (#5038) by @constantinius
+- fix(integrations): hooking into error tracing function to find out if an execute tool span should be set to error (#4986) by @constantinius
+- fix(django): Improve logic for classifying cache hits and misses (#5029) by @alexander-alderman-webb
+- chore(metrics): Rename \_metrics to metrics (#5035) by @alexander-alderman-webb
+- fix(tracemetrics): Bump metric buffer size to 1k (#5031) by @k-fish
+- fix startlette deprecation warning (#5034) by @DeoLeung
+- build(deps): bump actions/upload-artifact from 4 to 5 (#5032) by @dependabot
+- fix(ai): truncate messages for google genai (#4992) by @shellmayr
+- fix(ai): add message truncation to litellm (#4973) by @shellmayr
+- feat(langchain): Support v1 (#4874) by @sentrivana
+- ci: Run `common` test suite on Python 3.14t (#4969) by @alexander-alderman-webb
+- feat: Officially support 3.14 & run integration tests on 3.14 (#4974) by @sentrivana
+- Make logger template format safer to missing kwargs (#4981) by @sl0thentr0py
+- tests(huggingface): Support 1.0.0rc7 (#4979) by @alexander-alderman-webb
+- feat: Enable HTTP request code origin by default (#4967) by @alexander-alderman-webb
+- ci: Run `common` test suite on Python 3.14 (#4896) by @sentrivana
+
 ## 2.42.1
 
 ### Various fixes & improvements
@@ -51,7 +151,7 @@
 ### Various fixes & improvements
 
 - feat: Add `concurrent.futures` patch to threading integration (#4770) by @alexander-alderman-webb
-  
+
   The SDK now makes sure to automatically preserve span relationships when using `ThreadPoolExecutor`.
 - chore: Remove old metrics code (#4899) by @sentrivana
 
@@ -66,7 +166,7 @@
 
 - Add LiteLLM integration (#4864) by @constantinius
   Once you've enabled the [new LiteLLM integration](https://docs.sentry.io/platforms/python/integrations/litellm/), you can use the Sentry AI Agents Monitoring, a Sentry dashboard that helps you understand what's going on with your AI requests:
-  
+
   ```python
   import sentry_sdk
   from sentry_sdk.integrations.litellm import LiteLLMIntegration
@@ -89,10 +189,10 @@
 - Also emit spans for MCP tool calls done by the LLM (#4875) by @constantinius
 - Option to not trace HTTP requests based on status codes (#4869) by @alexander-alderman-webb
   You can now disable transactions for incoming requests with specific HTTP status codes. The [new `trace_ignore_status_codes` option](https://docs.sentry.io/platforms/python/configuration/options/#trace_ignore_status_codes) accepts a `set` of status codes as integers. If a transaction wraps a request that results in one of the provided status codes, the transaction will be unsampled.
-    
+
   ```python
   import sentry_sdk
-  
+
   sentry_sdk.init(
       trace_ignore_status_codes={301, 302, 303, *range(305, 400), 404},
   )

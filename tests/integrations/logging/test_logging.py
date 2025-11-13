@@ -478,6 +478,10 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
 
     assert attributes.pop("sentry.sdk.name").startswith("sentry.python")
 
+    assert "sentry.trace.parent_span_id" in attributes
+    assert isinstance(attributes["sentry.trace.parent_span_id"], str)
+    del attributes["sentry.trace.parent_span_id"]
+
     # Assert on the remaining non-dynamic attributes.
     assert attributes == {
         "foo": "bar",

@@ -23,6 +23,9 @@ envlist =
     # === Gevent ===
     {py3.6,py3.8,py3.10,py3.11,py3.12}-gevent
 
+    # === Integration Deactivation ===
+    {py3.9,py3.10,py3.11,py3.12,py3.13,py3.14}-integration_deactivation
+
     # === Integrations ===
 
     # Asgi
@@ -39,6 +42,9 @@ envlist =
 
     # OpenTelemetry (OTel)
     {py3.7,py3.9,py3.12,py3.13,py3.14,py3.14t}-opentelemetry
+
+    # OpenTelemetry with OTLP
+    {py3.7,py3.9,py3.12,py3.13,py3.14}-otlp
 
     # OpenTelemetry Experimental (POTel)
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
@@ -88,6 +94,11 @@ deps =
     {py3.10,py3.11}-gevent: zope.event<5.0.0
     {py3.10,py3.11}-gevent: zope.interface<8.0
 
+    # === Integration Deactivation ===
+    integration_deactivation: openai
+    integration_deactivation: anthropic
+    integration_deactivation: langchain
+
     # === Integrations ===
 
     # Asgi
@@ -104,6 +115,9 @@ deps =
 
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
+
+    # OpenTelemetry with OTLP
+    otlp: opentelemetry-distro[otlp]
 
     # OpenTelemetry Experimental (POTel)
     potel: -e .[opentelemetry-experimental]
@@ -144,11 +158,13 @@ setenv =
     # TESTPATH definitions for test suites not managed by toxgen
     common: TESTPATH=tests
     gevent: TESTPATH=tests
+    integration_deactivation: TESTPATH=tests/test_ai_integration_deactivation.py
     asgi: TESTPATH=tests/integrations/asgi
     aws_lambda: TESTPATH=tests/integrations/aws_lambda
     cloud_resource_context: TESTPATH=tests/integrations/cloud_resource_context
     gcp: TESTPATH=tests/integrations/gcp
     opentelemetry: TESTPATH=tests/integrations/opentelemetry
+    otlp: TESTPATH=tests/integrations/otlp
     potel: TESTPATH=tests/integrations/opentelemetry
     socket: TESTPATH=tests/integrations/socket
 
