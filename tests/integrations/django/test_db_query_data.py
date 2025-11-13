@@ -5,7 +5,7 @@ from datetime import datetime
 from unittest import mock
 
 from django import VERSION as DJANGO_VERSION
-from django.db import connections
+from django.db import connection, connections, transaction
 
 try:
     from django.urls import reverse
@@ -15,7 +15,7 @@ except ImportError:
 from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, DBOPERATION
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
 
@@ -481,6 +481,7 @@ def test_db_span_origin_execute(sentry_init, client, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.http.django"
 
     for span in event["spans"]:
+        print("span is", span["op"], span["description"])
         if span["op"] == "db":
             assert span["origin"] == "auto.db.django"
         else:
@@ -524,3 +525,190 @@ def test_db_span_origin_executemany(sentry_init, client, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.db.django"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_no_autocommit_execute(sentry_init, client, capture_events):
+    """
+    Verify we record a breadcrumb when opening a new database.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    client.get(reverse("postgres_select_orm_no_autocommit"))
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    for span in event["spans"]:
+        if span["op"] == "db":
+            assert span["origin"] == "auto.db.django"
+        else:
+            assert span["origin"] == "auto.http.django"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_no_autocommit_executemany(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    with start_transaction(name="test_transaction"):
+        from django.db import connection, transaction
+
+        cursor = connection.cursor()
+
+        query = """UPDATE auth_user SET username = %s where id = %s;"""
+        query_list = (
+            (
+                "test1",
+                1,
+            ),
+            (
+                "test2",
+                2,
+            ),
+        )
+        cursor.executemany(query, query_list)
+
+        transaction.commit()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.db.django"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_atomic_execute(sentry_init, client, capture_events):
+    """
+    Verify we record a breadcrumb when opening a new database.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    with transaction.atomic():
+        client.get(reverse("postgres_select_orm_atomic"))
+        connections["postgres"].commit()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_atomic_executemany(sentry_init, client, capture_events):
+    """
+    Verify we record a breadcrumb when opening a new database.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        with transaction.atomic():
+            cursor = connection.cursor()
+
+            query = """UPDATE auth_user SET username = %s where id = %s;"""
+            query_list = (
+                (
+                    "test1",
+                    1,
+                ),
+                (
+                    "test2",
+                    2,
+                ),
+            )
+            cursor.executemany(query, query_list)
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
