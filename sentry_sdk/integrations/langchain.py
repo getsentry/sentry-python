@@ -1,3 +1,4 @@
+import contextvars
 import itertools
 from collections import OrderedDict
 from functools import wraps
@@ -70,6 +71,40 @@ DATA_FIELDS = {
     "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
     "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
 }
+
+
+# Contextvar to track agent names in a stack for re-entrant agent support
+_agent_stack = contextvars.ContextVar("langchain_agent_stack", default=None)
+
+
+def _push_agent(agent_name):
+    # type: (Optional[str]) -> None
+    """Push an agent name onto the stack."""
+    stack = _agent_stack.get()
+    if stack is None:
+        stack = []
+    stack.append(agent_name)
+    _agent_stack.set(stack)
+
+
+def _pop_agent():
+    # type: () -> Optional[str]
+    """Pop an agent name from the stack and return it."""
+    stack = _agent_stack.get()
+    if stack and len(stack) > 0:
+        agent_name = stack.pop()
+        _agent_stack.set(stack)
+        return agent_name
+    return None
+
+
+def _get_current_agent():
+    # type: () -> Optional[str]
+    """Get the current agent name (top of stack) without removing it."""
+    stack = _agent_stack.get()
+    if stack and len(stack) > 0:
+        return stack[-1]
+    return None
 
 
 class LangchainIntegration(Integration):
@@ -276,6 +311,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             elif "openai" in ai_type:
                 span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
 
+            agent_name = _get_current_agent()
+            if agent_name:
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
@@ -427,6 +466,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             tool_description = serialized.get("description")
             if tool_description is not None:
                 span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
+
+            agent_name = _get_current_agent()
+            if agent_name:
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
@@ -756,6 +799,7 @@ def _wrap_agent_executor_invoke(f):
             name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         ) as span:
+            _push_agent(agent_name)
             if agent_name:
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
@@ -794,6 +838,8 @@ def _wrap_agent_executor_invoke(f):
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
+            _pop_agent()
+
             return result
 
     return new_invoke
@@ -814,10 +860,12 @@ def _wrap_agent_executor_stream(f):
 
         span = start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent_name}".strip(),
+            name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         )
         span.__enter__()
+
+        _push_agent(agent_name)
 
         if agent_name:
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
@@ -868,6 +916,8 @@ def _wrap_agent_executor_stream(f):
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
+            _pop_agent()
+
             span.__exit__(None, None, None)
 
         async def new_iterator_async():
@@ -886,6 +936,8 @@ def _wrap_agent_executor_stream(f):
                 and integration.include_prompts
             ):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+            _pop_agent()
 
             span.__exit__(None, None, None)
 
