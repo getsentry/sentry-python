@@ -16,4 +16,4 @@ _COMMANDS_INCLUDING_SENSITIVE_DATA = [
 ]
 _MAX_NUM_ARGS = 10  # Trim argument lists to this many values
 _MAX_NUM_COMMANDS = 10  # Trim command lists to this many values
-_DEFAULT_MAX_DATA_SIZE = 1024
+_DEFAULT_MAX_DATA_SIZE = None

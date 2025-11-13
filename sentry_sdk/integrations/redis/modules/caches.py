@@ -66,10 +66,7 @@ def _get_cache_span_description(redis_command, args, kwargs, integration):
     # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> str
     description = _key_as_string(_get_safe_key(redis_command, args, kwargs))
 
-    data_should_be_truncated = (
-        integration.max_data_size and len(description) > integration.max_data_size
-    )
-    if data_should_be_truncated:
+    if integration.max_data_size and len(description) > integration.max_data_size:
         description = description[: integration.max_data_size - len("...")] + "..."
 
     return description
