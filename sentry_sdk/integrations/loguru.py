@@ -194,7 +194,7 @@ def loguru_sentry_logs_handler(message):
         attrs["logger.name"] = record["name"]
 
     extra = record.get("extra")
-    if isinstance(extra, dict) and extra:
+    if isinstance(extra, dict):
         for key, value in extra.items():
             if isinstance(value, (str, int, float, bool)):
                 attrs[f"sentry.message.parameter.{key}"] = value
