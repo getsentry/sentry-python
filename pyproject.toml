@@ -4,6 +4,7 @@
 
 [tool.coverage.run]
 branch = true
+core = "ctrace"
 omit = [
     "/tmp/*",
     "*/tests/*",
