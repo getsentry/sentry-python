@@ -63,7 +63,7 @@ jobs:
       - name: Generate coverage XML
         if: ${{ !cancelled() && matrix.python-version != '3.6' }}
         run: |
-          coverage combine .coverage-sentry-*
+          coverage --debug=sys,core combine .coverage-sentry-*
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
