@@ -477,7 +477,7 @@ def test_logger_capture_parameters_from_args(
     sentry_init, capture_envelopes, uninstall_integration, request
 ):
     # This is currently not supported as regular args don't get added to extra
-    # (which we use for populating the parameters). Adding this test to make that
+    # (which we use for populating parameters). Adding this test to make that
     # explicit and so that it's easy to change later.
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
