@@ -40,10 +40,8 @@ def _patch_tool_execution():
     original_call_tool = ToolManager._call_tool
 
     @wraps(original_call_tool)
-    async def wrapped_call_tool(
-        self, call, *, allow_partial, wrap_validation_errors, approved
-    ):
-        # type: (Any, Any, bool, bool, bool) -> Any
+    async def wrapped_call_tool(self, call, *args, **kwargs):
+        # type: (Any, Any, *Any, **Any) -> Any
 
         # Extract tool info before calling original
         name = call.tool_name
@@ -76,9 +74,8 @@ def _patch_tool_execution():
                         result = await original_call_tool(
                             self,
                             call,
-                            allow_partial=allow_partial,
-                            wrap_validation_errors=wrap_validation_errors,
-                            approved=approved,
+                            *args,
+                            **kwargs,
                         )
                         update_execute_tool_span(span, result)
                         return result
@@ -90,9 +87,8 @@ def _patch_tool_execution():
         return await original_call_tool(
             self,
             call,
-            allow_partial=allow_partial,
-            wrap_validation_errors=wrap_validation_errors,
-            approved=approved,
+            *args,
+            **kwargs,
         )
 
     ToolManager._call_tool = wrapped_call_tool
