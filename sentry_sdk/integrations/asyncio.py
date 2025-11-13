@@ -1,4 +1,5 @@
 import sys
+import functools
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -39,6 +40,7 @@ def patch_asyncio():
         def _sentry_task_factory(loop, coro, **kwargs):
             # type: (asyncio.AbstractEventLoop, Coroutine[Any, Any, Any], Any) -> asyncio.Future[Any]
 
+            @functools.wraps(coro)
             async def _task_with_sentry_span_creation():
                 # type: () -> Any
                 result = None
