@@ -3,7 +3,7 @@ from functools import wraps
 import sentry_sdk
 
 from ..spans import invoke_agent_span, update_invoke_agent_span
-from ..utils import _capture_exception, pop_agent
+from ..utils import _capture_exception, pop_agent, push_agent
 
 from typing import TYPE_CHECKING
 from pydantic_ai.agent import Agent  # type: ignore
@@ -50,6 +50,10 @@ class _StreamingContextManagerWrapper:
             self.is_streaming,
         )
         self._span.__enter__()
+
+        # Push agent to contextvar stack after span is successfully created and entered
+        # This ensures proper pairing with pop_agent() in __aexit__ even if exceptions occur
+        push_agent(self.agent, self.is_streaming)
 
         # Enter the original context manager
         result = await self.original_ctx_manager.__aenter__()
@@ -107,6 +111,10 @@ def _create_run_wrapper(original_func, is_streaming=False):
             with invoke_agent_span(
                 user_prompt, self, model, model_settings, is_streaming
             ) as span:
+                # Push agent to contextvar stack after span is successfully created and entered
+                # This ensures proper pairing with pop_agent() in finally even if exceptions occur
+                push_agent(self, is_streaming)
+
                 try:
                     result = await original_func(self, *args, **kwargs)
 
