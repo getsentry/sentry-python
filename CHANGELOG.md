@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.44.0
+
+### Various fixes & improvements
+
+- fix(openai): Check response text is present to avoid AttributeError (#5081) by @alexander-alderman-webb
+- fix(pydantic-ai): Do not fail on new `ToolManager._call_tool()` parameters (#5084) by @alexander-alderman-webb
+- tests(huggingface): Avoid `None` version (#5083) by @alexander-alderman-webb
+- ci: Pin `coverage` version for 3.14 Django tests (#5088) by @alexander-alderman-webb
+- chore: X handle update (#5078) by @cleptric
+- fix(openai-agents): add input messages to errored spans as well (#5077) by @shellmayr
+- fix: Add hard limit to log batcher (#5069) by @alexander-alderman-webb
+- fix: Add hard limit to metrics batcher (#5068) by @alexander-alderman-webb
+- fix(integrations): properly handle exceptions in tool calls (#5065) by @constantinius
+- feat: non-experimental `before_send_metric` option (#5064) by @alexander-alderman-webb
+- feat: non-experimental `enable_metrics` option (#5056) by @alexander-alderman-webb
+- fix(integrations): properly distinguish between network.transport and mcp.transport (#5063) by @constantinius
+- feat(integrations): add ability to auto-deactivate lower-level integrations based on map (#5052) by @shellmayr
+- Fix NOT_GIVEN check in anthropic (#5058) by @sl0thentr0py
+- ci: 🤖 Update test matrix with new releases (11/03) (#5054) by @github-actions
+- Add external_propagation_context support (#5051) by @sl0thentr0py
+- chore: Remove `enable_metrics` option (#5046) by @alexander-alderman-webb
+- Allow new integration setup on the instance with config options (#5047) by @sl0thentr0py
+- ci: Run integration tests on Python 3.14t (#4995) by @alexander-alderman-webb
+- docs: Elaborate on Strawberry autodetection in changelog (#5039) by @sentrivana
+
 ## 2.43.0
 
 ### Various fixes & improvements
