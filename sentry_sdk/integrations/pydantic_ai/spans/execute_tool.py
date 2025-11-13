@@ -8,7 +8,7 @@ from ..utils import _set_agent_data, _should_send_prompts
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional
 
 
 def execute_tool_span(tool_name, tool_args, agent, tool_type="function"):
