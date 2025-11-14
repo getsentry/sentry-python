@@ -15,9 +15,10 @@ Tests focus on verifying Sentry integration behavior:
 - Request context data extraction
 - Transport detection (stdio, http, sse)
 
-Note: Many tests call tools directly (bypassing MCP Server protocol) to verify
-the integration doesn't break functionality. Real span creation happens when
-tools are invoked through the MCP Server's protocol dispatch mechanism.
+All tests invoke tools/prompts/resources through the MCP Server's low-level
+request handlers (via CallToolRequest, GetPromptRequest, ReadResourceRequest)
+to properly trigger Sentry instrumentation and span creation. This ensures
+accurate testing of the integration's behavior in real MCP Server scenarios.
 """
 
 import pytest
@@ -73,32 +74,125 @@ if HAS_STANDALONE_FASTMCP:
     fastmcp_ids.append("fastmcp")
 
 
-# Helper function to call tools - handles different APIs
-def call_tool(tool, *args, **kwargs):
+# Helper functions to call tools through MCP Server protocol
+def call_tool_through_mcp(mcp_instance, tool_name, arguments):
     """
-    Call a tool function, handling both FastMCP implementations.
+    Call a tool through MCP Server's low-level handler.
+    This properly triggers Sentry instrumentation.
 
-    - mcp.server.fastmcp: decorator returns function directly
-    - fastmcp: decorator returns FunctionTool with .fn attribute
+    Args:
+        mcp_instance: The FastMCP instance
+        tool_name: Name of the tool to call
+        arguments: Dictionary of arguments to pass to the tool
+
+    Returns:
+        The tool result (extracted from CallToolResult)
     """
-    if hasattr(tool, "fn"):
-        # Standalone fastmcp: FunctionTool object
-        return tool.fn(*args, **kwargs)
-    else:
-        # mcp.server.fastmcp: function directly
-        return tool(*args, **kwargs)
+    import asyncio
+    import json
+    from mcp.types import CallToolRequest
+
+    handler = mcp_instance._mcp_server.request_handlers[CallToolRequest]
+    request = CallToolRequest(
+        method="tools/call", params={"name": tool_name, "arguments": arguments}
+    )
+
+    result = asyncio.run(handler(request))
+
+    if hasattr(result, "root"):
+        result = result.root
+    if hasattr(result, "structuredContent") and result.structuredContent:
+        return result.structuredContent
+    if hasattr(result, "content") and result.content:
+        text = result.content[0].text
+        try:
+            return json.loads(text)
+        except (json.JSONDecodeError, TypeError):
+            return text
+    return result
 
 
-async def call_tool_async(tool, *args, **kwargs):
-    """
-    Async version of call_tool.
-    """
-    if hasattr(tool, "fn"):
-        # Standalone fastmcp: FunctionTool object
-        return await tool.fn(*args, **kwargs)
-    else:
-        # mcp.server.fastmcp: function directly
-        return await tool(*args, **kwargs)
+async def call_tool_through_mcp_async(mcp_instance, tool_name, arguments):
+    """Async version of call_tool_through_mcp."""
+    import json
+    from mcp.types import CallToolRequest
+
+    handler = mcp_instance._mcp_server.request_handlers[CallToolRequest]
+    request = CallToolRequest(
+        method="tools/call", params={"name": tool_name, "arguments": arguments}
+    )
+
+    result = await handler(request)
+
+    if hasattr(result, "root"):
+        result = result.root
+    if hasattr(result, "structuredContent") and result.structuredContent:
+        return result.structuredContent
+    if hasattr(result, "content") and result.content:
+        text = result.content[0].text
+        try:
+            return json.loads(text)
+        except (json.JSONDecodeError, TypeError):
+            return text
+    return result
+
+
+def call_prompt_through_mcp(mcp_instance, prompt_name, arguments=None):
+    """Call a prompt through MCP Server's low-level handler."""
+    import asyncio
+    from mcp.types import GetPromptRequest
+
+    handler = mcp_instance._mcp_server.request_handlers[GetPromptRequest]
+    request = GetPromptRequest(
+        method="prompts/get", params={"name": prompt_name, "arguments": arguments or {}}
+    )
+
+    result = asyncio.run(handler(request))
+    if hasattr(result, "root"):
+        result = result.root
+    return result
+
+
+async def call_prompt_through_mcp_async(mcp_instance, prompt_name, arguments=None):
+    """Async version of call_prompt_through_mcp."""
+    from mcp.types import GetPromptRequest
+
+    handler = mcp_instance._mcp_server.request_handlers[GetPromptRequest]
+    request = GetPromptRequest(
+        method="prompts/get", params={"name": prompt_name, "arguments": arguments or {}}
+    )
+
+    result = await handler(request)
+    if hasattr(result, "root"):
+        result = result.root
+    return result
+
+
+def call_resource_through_mcp(mcp_instance, uri):
+    """Call a resource through MCP Server's low-level handler."""
+    import asyncio
+    from mcp.types import ReadResourceRequest
+
+    handler = mcp_instance._mcp_server.request_handlers[ReadResourceRequest]
+    request = ReadResourceRequest(method="resources/read", params={"uri": str(uri)})
+
+    result = asyncio.run(handler(request))
+    if hasattr(result, "root"):
+        result = result.root
+    return result
+
+
+async def call_resource_through_mcp_async(mcp_instance, uri):
+    """Async version of call_resource_through_mcp."""
+    from mcp.types import ReadResourceRequest
+
+    handler = mcp_instance._mcp_server.request_handlers[ReadResourceRequest]
+    request = ReadResourceRequest(method="resources/read", params={"uri": str(uri)})
+
+    result = await handler(request)
+    if hasattr(result, "root"):
+        result = result.root
+    return result
 
 
 # Skip all tests if neither implementation is available
@@ -224,27 +318,30 @@ def test_fastmcp_tool_sync(
         return {"result": a + b, "operation": "addition"}
 
     with start_transaction(name="fastmcp tx"):
-        # Call the tool's underlying function
-        result = call_tool(add_numbers, 10, 5)
+        # Call through MCP protocol to trigger instrumentation
+        result = call_tool_through_mcp(mcp, "add_numbers", {"a": 10, "b": 5})
 
     assert result == {"result": 15, "operation": "addition"}
 
     (tx,) = events
     assert tx["type"] == "transaction"
+    assert len(tx["spans"]) == 1
 
-    # Note: Calling .fn() directly bypasses MCP Server's handler dispatch,
-    # so spans are only created if tools are called through the MCP protocol.
-    # This test verifies FastMCP integration works without protocol-level calls.
+    # Verify span structure
+    span = tx["spans"][0]
+    assert span["op"] == OP.MCP_SERVER
+    assert span["origin"] == "auto.ai.mcp"
+    assert span["description"] == "tools/call add_numbers"
+    assert span["data"][SPANDATA.MCP_TOOL_NAME] == "add_numbers"
+    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
+    assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-123"
 
-    # Find any MCP tool spans (may be 0 when calling .fn() directly)
-    tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-
-    # If spans were created, verify they have correct structure
-    if len(tool_spans) > 0:
-        span = tool_spans[0]
-        assert span["op"] == OP.MCP_SERVER
-        assert span["origin"] == "auto.ai.mcp"
-        assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    # Check PII-sensitive data
+    if send_default_pii and include_prompts:
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["data"]
+    else:
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -279,21 +376,32 @@ async def test_fastmcp_tool_async(
         return {"result": x * y, "operation": "multiplication"}
 
     with start_transaction(name="fastmcp tx"):
-        result = await call_tool_async(multiply_numbers, 7, 6)
+        result = await call_tool_through_mcp_async(
+            mcp, "multiply_numbers", {"x": 7, "y": 6}
+        )
 
     assert result == {"result": 42, "operation": "multiplication"}
 
     (tx,) = events
     assert tx["type"] == "transaction"
+    assert len(tx["spans"]) == 1
 
-    # Note: Calling .fn() directly bypasses MCP Server's handler dispatch
-    tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+    # Verify span structure
+    span = tx["spans"][0]
+    assert span["op"] == OP.MCP_SERVER
+    assert span["origin"] == "auto.ai.mcp"
+    assert span["description"] == "tools/call multiply_numbers"
+    assert span["data"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
+    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
+    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-789"
 
-    # If spans were created, verify they have correct structure
-    if len(tool_spans) > 0:
-        span = tool_spans[0]
-        assert span["op"] == OP.MCP_SERVER
-        assert span["origin"] == "auto.ai.mcp"
+    # Check PII-sensitive data
+    if send_default_pii and include_prompts:
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["data"]
+    else:
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -318,21 +426,32 @@ def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP):
         raise ValueError("Tool execution failed")
 
     with start_transaction(name="fastmcp tx"):
-        with pytest.raises(ValueError):
-            call_tool(failing_tool, 42)
+        # MCP protocol may raise the error or return it as an error result
+        try:
+            result = call_tool_through_mcp(mcp, "failing_tool", {"value": 42})
+            # If no exception raised, check if result indicates error
+            if hasattr(result, "isError"):
+                assert result.isError is True
+        except ValueError:
+            # Error was raised as expected
+            pass
 
-    # Note: Error capture only happens when going through MCP Server handlers
-    # When calling .fn() directly, errors propagate but may not be captured by Sentry
-
-    # Should have at least transaction event
+    # Should have transaction and error events
     assert len(events) >= 1
 
-    # Find error event if present
+    # Check span was created
+    tx = [e for e in events if e.get("type") == "transaction"][0]
+    tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+    assert len(tool_spans) == 1
+
+    # Error event may or may not be captured depending on MCP error handling
     error_events = [e for e in events if e.get("level") == "error"]
     if len(error_events) > 0:
         error_event = error_events[0]
         assert error_event["exception"]["values"][0]["type"] == "ValueError"
         assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
+        # Verify span is marked with error
+        assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -367,23 +486,23 @@ def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP):
         return z - 5
 
     with start_transaction(name="fastmcp tx"):
-        result1 = call_tool(tool_one, 5)
-        result2 = call_tool(tool_two, result1)
-        result3 = call_tool(tool_three, result2)
+        result1 = call_tool_through_mcp(mcp, "tool_one", {"x": 5})
+        result2 = call_tool_through_mcp(mcp, "tool_two", {"y": result1["result"]})
+        result3 = call_tool_through_mcp(mcp, "tool_three", {"z": result2["result"]})
 
-    assert result1 == 10
-    assert result2 == 20
-    assert result3 == 15
+    assert result1["result"] == 10
+    assert result2["result"] == 20
+    assert result3["result"] == 15
 
     (tx,) = events
     assert tx["type"] == "transaction"
 
-    # Note: Calling .fn() directly bypasses MCP Server instrumentation
-    # Span creation only happens when tools are called through MCP protocol
+    # Verify three spans were created
     tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    # If spans exist, verify there are multiple
-    if len(tool_spans) > 0:
-        assert len(tool_spans) >= 3
+    assert len(tool_spans) == 3
+    assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_one"
+    assert tool_spans[1]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_two"
+    assert tool_spans[2]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_three"
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -414,19 +533,22 @@ def test_fastmcp_tool_with_complex_return(sentry_init, capture_events, FastMCP):
         }
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool(get_user_data, 123)
+        result = call_tool_through_mcp(mcp, "get_user_data", {"user_id": 123})
 
     assert result["id"] == 123
     assert result["name"] == "Alice"
     assert result["nested"]["preferences"]["theme"] == "dark"
 
     (tx,) = events
-    # Note: Direct .fn() calls don't create MCP spans
-    # This test verifies the tool works correctly with complex data
+    assert tx["type"] == "transaction"
+
+    # Verify span was created with complex data
     tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    # Spans may or may not be present depending on how tool is invoked
-    if len(tool_spans) > 0:
-        assert tool_spans[0]["op"] == OP.MCP_SERVER
+    assert len(tool_spans) == 1
+    assert tool_spans[0]["op"] == OP.MCP_SERVER
+    assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "get_user_data"
+    # Complex return value should be captured since include_prompts=True and send_default_pii=True
+    assert SPANDATA.MCP_TOOL_RESULT_CONTENT in tool_spans[0]["data"]
 
 
 # =============================================================================
@@ -462,14 +584,22 @@ def test_fastmcp_prompt_sync(
         if hasattr(mcp, "prompt"):
 
             @mcp.prompt()
-            def code_help_prompt(language: str) -> MockGetPromptResult:
+            def code_help_prompt(language: str):
                 """Get help for a programming language"""
-                return MockGetPromptResult(
-                    [MockPromptMessage("user", f"Tell me about {language}")]
-                )
+                return [
+                    {
+                        "role": "user",
+                        "content": {
+                            "type": "text",
+                            "text": f"Tell me about {language}",
+                        },
+                    }
+                ]
 
             with start_transaction(name="fastmcp tx"):
-                result = call_tool(code_help_prompt, "python")
+                result = call_prompt_through_mcp(
+                    mcp, "code_help_prompt", {"language": "python"}
+                )
 
             assert result.messages[0].role == "user"
             assert "python" in result.messages[0].content.text.lower()
@@ -477,15 +607,19 @@ def test_fastmcp_prompt_sync(
             (tx,) = events
             assert tx["type"] == "transaction"
 
-            # Find prompt spans
-            prompt_spans = [
-                s
-                for s in tx["spans"]
-                if s["op"] == OP.MCP_SERVER and "prompt" in s["description"].lower()
-            ]
-            if len(prompt_spans) > 0:
-                span = prompt_spans[0]
-                assert span["origin"] == "auto.ai.mcp"
+            # Verify prompt span was created
+            prompt_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+            assert len(prompt_spans) == 1
+            span = prompt_spans[0]
+            assert span["origin"] == "auto.ai.mcp"
+            assert span["description"] == "prompts/get code_help_prompt"
+            assert span["data"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
+
+            # Check PII-sensitive data
+            if send_default_pii and include_prompts:
+                assert SPANDATA.MCP_PROMPT_CONTENT in span["data"]
+            else:
+                assert SPANDATA.MCP_PROMPT_CONTENT not in span["data"]
     except AttributeError:
         # Prompt handler not supported in this version
         pytest.skip("Prompt handlers not supported in this FastMCP version")
@@ -515,17 +649,26 @@ async def test_fastmcp_prompt_async(sentry_init, capture_events, FastMCP):
         if hasattr(mcp, "prompt"):
 
             @mcp.prompt()
-            async def async_prompt(topic: str) -> MockGetPromptResult:
+            async def async_prompt(topic: str):
                 """Get async prompt for a topic"""
-                return MockGetPromptResult(
-                    [
-                        MockPromptMessage("system", "You are a helpful assistant"),
-                        MockPromptMessage("user", f"What is {topic}?"),
-                    ]
-                )
+                return [
+                    {
+                        "role": "user",
+                        "content": {"type": "text", "text": f"What is {topic}?"},
+                    },
+                    {
+                        "role": "assistant",
+                        "content": {
+                            "type": "text",
+                            "text": "Let me explain that",
+                        },
+                    },
+                ]
 
             with start_transaction(name="fastmcp tx"):
-                result = await call_tool_async(async_prompt, "MCP")
+                result = await call_prompt_through_mcp_async(
+                    mcp, "async_prompt", {"topic": "MCP"}
+                )
 
             assert len(result.messages) == 2
 
@@ -562,27 +705,26 @@ def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP):
         if hasattr(mcp, "resource"):
 
             @mcp.resource("file:///{path}")
-            def read_file(path: str) -> dict:
+            def read_file(path: str):
                 """Read a file resource"""
-                return {"content": "file contents", "mime_type": "text/plain"}
+                return "file contents"
 
             with start_transaction(name="fastmcp tx"):
-                result = call_tool(read_file, "path/to/file.txt")
+                result = call_resource_through_mcp(mcp, "file:///test.txt")
 
-            assert result["content"] == "file contents"
+            # Resource content is returned as-is
+            assert "file contents" in result.contents[0].text
 
             (tx,) = events
             assert tx["type"] == "transaction"
 
-            # Find resource spans
-            resource_spans = [
-                s
-                for s in tx["spans"]
-                if s["op"] == OP.MCP_SERVER and "resource" in s["description"].lower()
-            ]
-            if len(resource_spans) > 0:
-                span = resource_spans[0]
-                assert span["origin"] == "auto.ai.mcp"
+            # Verify resource span was created
+            resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+            assert len(resource_spans) == 1
+            span = resource_spans[0]
+            assert span["origin"] == "auto.ai.mcp"
+            assert span["description"] == "resources/read file:///test.txt"
+            assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
     except (AttributeError, TypeError):
         # Resource handler not supported in this version
         pytest.skip("Resource handlers not supported in this FastMCP version")
@@ -612,17 +754,24 @@ async def test_fastmcp_resource_async(sentry_init, capture_events, FastMCP):
         if hasattr(mcp, "resource"):
 
             @mcp.resource("https://example.com/{resource}")
-            async def read_url(resource: str) -> dict:
+            async def read_url(resource: str):
                 """Read a URL resource"""
-                return {"data": "resource data", "status": 200}
+                return "resource data"
 
             with start_transaction(name="fastmcp tx"):
-                result = await call_tool_async(read_url, "resource")
+                result = await call_resource_through_mcp_async(
+                    mcp, "https://example.com/resource"
+                )
 
-            assert result["data"] == "resource data"
+            assert "resource data" in result.contents[0].text
 
             (tx,) = events
             assert tx["type"] == "transaction"
+
+            # Verify span was created
+            resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+            assert len(resource_spans) == 1
+            assert resource_spans[0]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
     except (AttributeError, TypeError):
         # Resource handler not supported in this version
         pytest.skip("Resource handlers not supported in this FastMCP version")
@@ -655,16 +804,16 @@ def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP):
         return value * 2
 
     with start_transaction(name="fastmcp tx"):
-        call_tool(test_tool, 21)
+        call_tool_through_mcp(mcp, "test_tool", {"value": 21})
 
     (tx,) = events
 
     assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    # Find MCP spans and check origin
+    # Verify MCP span has correct origin
     mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    if len(mcp_spans) > 0:
-        assert mcp_spans[0]["origin"] == "auto.ai.mcp"
+    assert len(mcp_spans) == 1
+    assert mcp_spans[0]["origin"] == "auto.ai.mcp"
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -688,7 +837,7 @@ def test_fastmcp_without_request_context(sentry_init, capture_events, FastMCP):
         return {"result": x + 1}
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool(test_tool_no_ctx, 99)
+        result = call_tool_through_mcp(mcp, "test_tool_no_ctx", {"x": 99})
 
     assert result == {"result": 100}
 
@@ -726,7 +875,7 @@ def test_fastmcp_sse_transport(sentry_init, capture_events, FastMCP):
         return {"message": f"Received: {value}"}
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool(sse_tool, "hello")
+        result = call_tool_through_mcp(mcp, "sse_tool", {"value": "hello"})
 
     assert result == {"message": "Received: hello"}
 
@@ -764,7 +913,7 @@ def test_fastmcp_http_transport(sentry_init, capture_events, FastMCP):
         return {"processed": data.upper()}
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool(http_tool, "test")
+        result = call_tool_through_mcp(mcp, "http_tool", {"data": "test"})
 
     assert result == {"processed": "TEST"}
 
@@ -800,7 +949,7 @@ def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP):
         return {"squared": n * n}
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool(stdio_tool, 7)
+        result = call_tool_through_mcp(mcp, "stdio_tool", {"n": 7})
 
     assert result == {"squared": 49}
 
@@ -838,9 +987,9 @@ def test_mcp_fastmcp_specific_features(sentry_init, capture_events):
         return x + 100
 
     with start_transaction(name="mcp.server.fastmcp tx"):
-        result = call_tool(package_specific_tool, 50)
+        result = call_tool_through_mcp(mcp, "package_specific_tool", {"x": 50})
 
-    assert result == 150
+    assert result["result"] == 150
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -867,7 +1016,9 @@ def test_standalone_fastmcp_specific_features(sentry_init, capture_events):
         return {"echo": message, "length": len(message)}
 
     with start_transaction(name="standalone fastmcp tx"):
-        result = call_tool(standalone_specific_tool, "Hello FastMCP")
+        result = call_tool_through_mcp(
+            mcp, "standalone_specific_tool", {"message": "Hello FastMCP"}
+        )
 
     assert result["echo"] == "Hello FastMCP"
     assert result["length"] == 13
@@ -898,9 +1049,9 @@ def test_fastmcp_tool_with_no_arguments(sentry_init, capture_events, FastMCP):
         return "success"
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool(no_args_tool)
+        result = call_tool_through_mcp(mcp, "no_args_tool", {})
 
-    assert result == "success"
+    assert result["result"] == "success"
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -923,9 +1074,23 @@ def test_fastmcp_tool_with_none_return(sentry_init, capture_events, FastMCP):
         pass
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool(none_return_tool, "log")
+        result = call_tool_through_mcp(mcp, "none_return_tool", {"action": "log"})
 
-    assert result is None
+    # Handle different return types between mcp.server.fastmcp and fastmcp
+    if isinstance(result, dict):
+        # mcp.server.fastmcp wraps in dict
+        assert result["result"] is None
+    elif hasattr(result, "content"):
+        # fastmcp package returns CallToolResult directly
+        # For None returns, content is empty or contains null/None
+        if result.content:
+            assert result.content[0].text in ("null", "None", "")
+        else:
+            # Empty content means None
+            assert result.content == []
+    else:
+        # Some versions might return None directly
+        assert result is None
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -943,6 +1108,11 @@ async def test_fastmcp_mixed_sync_async_tools(sentry_init, capture_events, FastM
 
     mcp = FastMCP("Test Server")
 
+    # Set up mock request context
+    if request_ctx is not None:
+        mock_ctx = MockRequestContext(request_id="req-mixed", transport="stdio")
+        request_ctx.set(mock_ctx)
+
     @mcp.tool()
     def sync_add(a: int, b: int) -> int:
         """Sync addition"""
@@ -954,18 +1124,20 @@ async def test_fastmcp_mixed_sync_async_tools(sentry_init, capture_events, FastM
         return x * y
 
     with start_transaction(name="fastmcp tx"):
-        result1 = call_tool(sync_add, 3, 4)
-        result2 = await call_tool_async(async_multiply, 5, 6)
+        # Use async version for both since we're in an async context
+        result1 = await call_tool_through_mcp_async(mcp, "sync_add", {"a": 3, "b": 4})
+        result2 = await call_tool_through_mcp_async(
+            mcp, "async_multiply", {"x": 5, "y": 6}
+        )
 
-    assert result1 == 7
-    assert result2 == 30
+    assert result1["result"] == 7
+    assert result2["result"] == 30
 
     (tx,) = events
     assert tx["type"] == "transaction"
 
-    # Note: Direct .fn() calls don't create MCP spans
-    # This test verifies that both sync and async tools work
+    # Verify both sync and async tool spans were created
     mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    if len(mcp_spans) > 0:
-        # If spans exist, should have multiple for sync and async tools
-        assert len(mcp_spans) >= 2
+    assert len(mcp_spans) == 2
+    assert mcp_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "sync_add"
+    assert mcp_spans[1]["data"][SPANDATA.MCP_TOOL_NAME] == "async_multiply"
