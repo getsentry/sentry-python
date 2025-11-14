@@ -79,6 +79,7 @@ GROUPS = {
         "langgraph",
         "litellm",
         "mcp",
+        "fastmcp",
         "openai-base",
         "openai-notiktoken",
         "openai_agents",
