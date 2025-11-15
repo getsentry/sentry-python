@@ -2,6 +2,7 @@ import asyncio
 import json
 import threading
 
+from django.db import transaction
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -243,6 +244,21 @@ def postgres_select(request, *args, **kwargs):
 @csrf_exempt
 def postgres_select_orm(request, *args, **kwargs):
     user = User.objects.using("postgres").all().first()
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
+def postgres_select_orm_no_autocommit(request, *args, **kwargs):
+    transaction.set_autocommit(False)
+    user = User.objects.using("postgres").all().first()
+    transaction.commit()
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
+def postgres_select_orm_atomic(request, *args, **kwargs):
+    with transaction.atomic():
+        user = User.objects.using("postgres").all().first()
     return HttpResponse("ok {}".format(user))
 
 
