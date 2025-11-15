@@ -1,15 +1,16 @@
 """
-NOTE: This file contains experimental code that may be changed or removed at any
-time without prior notice.
+NOTE: This file contains experimental code that may be changed or removed at
+any time without prior notice.
 """
 
 import time
-from typing import Any, Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.utils import safe_repr
 
 if TYPE_CHECKING:
+    from typing import Any, Optional, Union
     from sentry_sdk._types import Metric, MetricType
 
 
@@ -19,6 +20,7 @@ def _capture_metric(
     value,  # type: float
     unit=None,  # type: Optional[str]
     attributes=None,  # type: Optional[dict[str, Any]]
+    sample_rate=None,  # type: Optional[float]
 ):
     # type: (...) -> None
     client = sentry_sdk.get_client()
@@ -36,6 +38,9 @@ def _capture_metric(
                 )
                 else safe_repr(v)
             )
+
+    if sample_rate is not None:
+        attrs["sentry.client_sample_rate"] = sample_rate
 
     metric = {
         "timestamp": time.time(),
@@ -56,9 +61,10 @@ def count(
     value,  # type: float
     unit=None,  # type: Optional[str]
     attributes=None,  # type: Optional[dict[str, Any]]
+    sample_rate=None,  # type: Optional[float]
 ):
     # type: (...) -> None
-    _capture_metric(name, "counter", value, unit, attributes)
+    _capture_metric(name, "counter", value, unit, attributes, sample_rate)
 
 
 def gauge(
@@ -66,9 +72,10 @@ def gauge(
     value,  # type: float
     unit=None,  # type: Optional[str]
     attributes=None,  # type: Optional[dict[str, Any]]
+    sample_rate=None,  # type: Optional[float]
 ):
     # type: (...) -> None
-    _capture_metric(name, "gauge", value, unit, attributes)
+    _capture_metric(name, "gauge", value, unit, attributes, sample_rate)
 
 
 def distribution(
@@ -76,6 +83,7 @@ def distribution(
     value,  # type: float
     unit=None,  # type: Optional[str]
     attributes=None,  # type: Optional[dict[str, Any]]
+    sample_rate=None,  # type: Optional[float]
 ):
     # type: (...) -> None
-    _capture_metric(name, "distribution", value, unit, attributes)
+    _capture_metric(name, "distribution", value, unit, attributes, sample_rate)
