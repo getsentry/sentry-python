@@ -67,6 +67,8 @@ def test_include_local_variables_enabled(sentry_init, capture_events, integratio
             "e",
             "w",
             "q",
+            "(q, w, e, r, t, y, u, i, o, p, a, s)",
+            "str((q, w, e, r, t, y, u, i, o, p, a, s))",
             "events",
         ]
         assert list(frame_vars.keys()) == expected_keys
