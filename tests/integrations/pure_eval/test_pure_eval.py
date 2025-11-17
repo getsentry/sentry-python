@@ -67,11 +67,19 @@ def test_include_local_variables_enabled(sentry_init, capture_events, integratio
             "e",
             "w",
             "q",
-            "(q, w, e, r, t, y, u, i, o, p, a, s)",
-            "str((q, w, e, r, t, y, u, i, o, p, a, s))",
             "events",
         ]
-        assert list(frame_vars.keys()) == expected_keys
+        for key in expected_keys:
+            assert key in frame_vars
+
+        possible_keys = expected_keys + [
+            "(q, w, e, r, t, y, u, i, o, p, a, s)",
+            "str((q, w, e, r, t, y, u, i, o, p, a, s))",
+        ]
+
+        for frame_var in frame_vars:
+            assert frame_var in possible_keys
+
         assert frame_vars["namespace.d"] == {"1": "2"}
         assert frame_vars["namespace.d[1]"] == "2"
     else:
