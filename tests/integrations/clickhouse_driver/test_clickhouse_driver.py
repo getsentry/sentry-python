@@ -711,7 +711,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
 
-    assert event["breadcrumbs"]["values"][0]["data"] == expected_breadcrumbs[0]["data"]
+    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
 def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) -> None:
