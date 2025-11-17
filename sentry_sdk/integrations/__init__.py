@@ -101,7 +101,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.loguru.LoguruIntegration",
     "sentry_sdk.integrations.mcp.MCPIntegration",
     "sentry_sdk.integrations.openai.OpenAIIntegration",
-    "sentry_sdk.integrations.openai_agents.OpenaiAgentsIntegration",
+    "sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration",
     "sentry_sdk.integrations.pydantic_ai.PydanticAIIntegration",
     "sentry_sdk.integrations.pymongo.PyMongoIntegration",
     "sentry_sdk.integrations.pyramid.PyramidIntegration",
