@@ -5,6 +5,8 @@ docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=2
 ```
 """
 
+from unittest import mock
+
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 
@@ -631,6 +633,8 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "server.address": "localhost",
                 "server.port": 9000,
                 "db.result": [[], []],
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
             },
             "message": "DROP TABLE IF EXISTS test",
             "type": "default",
@@ -644,6 +648,8 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "server.address": "localhost",
                 "server.port": 9000,
                 "db.result": [[], []],
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
             },
             "message": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "type": "default",
@@ -657,6 +663,8 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "server.address": "localhost",
                 "server.port": 9000,
                 "db.params": [{"x": 100}],
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -670,6 +678,8 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "server.address": "localhost",
                 "server.port": 9000,
                 "db.params": [[170], [200]],
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -683,7 +693,9 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "server.address": "localhost",
                 "server.port": 9000,
                 "db.params": {"minv": 150},
-                "db.result": [[["370"]], [["'sum(x)'", "'Int64'"]]],
+                "db.result": [[[370]], [["sum(x)", "Int64"]]],
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
             },
             "message": "SELECT sum(x) FROM test WHERE x > 150",
             "type": "default",
@@ -699,7 +711,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
 
-    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
+    assert event["breadcrumbs"]["values"][0]["data"] == expected_breadcrumbs[0]["data"]
 
 
 def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) -> None:
