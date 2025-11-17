@@ -56,17 +56,17 @@ class MCPIntegration(Integration):
 def _get_request_context_data():
     # type: () -> tuple[Optional[str], Optional[str], str]
     """
-    Extract request ID, session ID, and transport type from the MCP request context.
+    Extract request ID, session ID, and MCP transport type from the request context.
 
     Returns:
-        Tuple of (request_id, session_id, transport).
+        Tuple of (request_id, session_id, mcp_transport).
         - request_id: May be None if not available
         - session_id: May be None if not available
-        - transport: "tcp" for HTTP-based, "pipe" for stdio
+        - mcp_transport: "http", "sse", "stdio"
     """
     request_id = None  # type: Optional[str]
     session_id = None  # type: Optional[str]
-    transport = "pipe"  # type: str
+    mcp_transport = "stdio"  # type: str
 
     try:
         ctx = request_ctx.get()
@@ -74,16 +74,26 @@ def _get_request_context_data():
         if ctx is not None:
             request_id = ctx.request_id
             if hasattr(ctx, "request") and ctx.request is not None:
-                transport = "tcp"
                 request = ctx.request
-                if hasattr(request, "headers"):
+                # Detect transport type by checking request characteristics
+                if hasattr(request, "query_params") and request.query_params.get(
+                    "session_id"
+                ):
+                    # SSE transport uses query parameter
+                    mcp_transport = "sse"
+                    session_id = request.query_params.get("session_id")
+                elif hasattr(request, "headers") and request.headers.get(
+                    "mcp-session-id"
+                ):
+                    # StreamableHTTP transport uses header
+                    mcp_transport = "http"
                     session_id = request.headers.get("mcp-session-id")
 
     except LookupError:
-        # No request context available - default to pipe
+        # No request context available - default to stdio
         pass
 
-    return request_id, session_id, transport
+    return request_id, session_id, mcp_transport
 
 
 def _get_span_config(handler_type, item_name):
@@ -120,16 +130,20 @@ def _set_span_input_data(
     arguments,
     request_id,
     session_id,
-    transport,
+    mcp_transport,
 ):
     # type: (Any, str, str, str, dict[str, Any], Optional[str], Optional[str], str) -> None
     """Set input span data for MCP handlers."""
+
     # Set handler identifier
     span.set_data(span_data_key, handler_name)
     span.set_data(SPANDATA.MCP_METHOD_NAME, mcp_method_name)
 
-    # Set transport type
-    span.set_data(SPANDATA.MCP_TRANSPORT, transport)
+    # Set transport/MCP transport type
+    span.set_data(
+        SPANDATA.NETWORK_TRANSPORT, "pipe" if mcp_transport == "stdio" else "tcp"
+    )
+    span.set_data(SPANDATA.MCP_TRANSPORT, mcp_transport)
 
     # Set request_id if provided
     if request_id:
@@ -331,7 +345,7 @@ async def _async_handler_wrapper(handler_type, func, original_args):
         origin=MCPIntegration.origin,
     ) as span:
         # Get request ID, session ID, and transport from context
-        request_id, session_id, transport = _get_request_context_data()
+        request_id, session_id, mcp_transport = _get_request_context_data()
 
         # Set input span data
         _set_span_input_data(
@@ -342,7 +356,7 @@ async def _async_handler_wrapper(handler_type, func, original_args):
             arguments,
             request_id,
             session_id,
-            transport,
+            mcp_transport,
         )
 
         # For resources, extract and set protocol
@@ -396,7 +410,7 @@ def _sync_handler_wrapper(handler_type, func, original_args):
         origin=MCPIntegration.origin,
     ) as span:
         # Get request ID, session ID, and transport from context
-        request_id, session_id, transport = _get_request_context_data()
+        request_id, session_id, mcp_transport = _get_request_context_data()
 
         # Set input span data
         _set_span_input_data(
@@ -407,7 +421,7 @@ def _sync_handler_wrapper(handler_type, func, original_args):
             arguments,
             request_id,
             session_id,
-            transport,
+            mcp_transport,
         )
 
         # For resources, extract and set protocol

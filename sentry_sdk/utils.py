@@ -1760,6 +1760,12 @@ def _normalize_module_name(name):
     return name.lower()
 
 
+def _replace_hyphens_dots_and_underscores_with_dashes(name):
+    # type: (str) -> str
+    # https://peps.python.org/pep-0503/#normalized-names
+    return re.sub(r"[-_.]+", "-", name)
+
+
 def _get_installed_modules():
     # type: () -> Dict[str, str]
     global _installed_modules
@@ -1770,8 +1776,15 @@ def _get_installed_modules():
 
 def package_version(package):
     # type: (str) -> Optional[Tuple[int, ...]]
-    installed_packages = _get_installed_modules()
-    version = installed_packages.get(package)
+    normalized_package = _normalize_module_name(
+        _replace_hyphens_dots_and_underscores_with_dashes(package)
+    )
+
+    installed_packages = {
+        _replace_hyphens_dots_and_underscores_with_dashes(module): v
+        for module, v in _get_installed_modules().items()
+    }
+    version = installed_packages.get(normalized_package)
     if version is None:
         return None
 
@@ -2052,7 +2065,7 @@ def has_metrics_enabled(options):
     if options is None:
         return False
 
-    return bool(options["_experiments"].get("enable_metrics", False))
+    return bool(options.get("enable_metrics", True))
 
 
 def get_before_send_metric(options):
@@ -2060,4 +2073,6 @@ def get_before_send_metric(options):
     if options is None:
         return None
 
-    return options["_experiments"].get("before_send_metric")
+    return options.get("before_send_metric") or options["_experiments"].get(
+        "before_send_metric"
+    )

@@ -10,6 +10,7 @@ import warnings
 
 import sentry_sdk
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
+from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk.utils import (
     AnnotatedValue,
     ContextVar,
@@ -61,7 +62,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric, EventDataCategory
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
@@ -356,6 +357,19 @@ class _Client(BaseClient):
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
+        def _record_lost_event(
+            reason,  # type: str
+            data_category,  # type: EventDataCategory
+            quantity=1,  # type: int
+        ):
+            # type: (...) -> None
+            if self.transport is not None:
+                self.transport.record_lost_event(
+                    reason=reason,
+                    data_category=data_category,
+                    quantity=quantity,
+                )
+
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
@@ -372,14 +386,17 @@ class _Client(BaseClient):
             if has_logs_enabled(self.options):
                 from sentry_sdk._log_batcher import LogBatcher
 
-                self.log_batcher = LogBatcher(capture_func=_capture_envelope)
+                self.log_batcher = LogBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                )
 
             self.metrics_batcher = None
-
             if has_metrics_enabled(self.options):
-                from sentry_sdk._metrics_batcher import MetricsBatcher
-
-                self.metrics_batcher = MetricsBatcher(capture_func=_capture_envelope)
+                self.metrics_batcher = MetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -409,6 +426,7 @@ class _Client(BaseClient):
                     "auto_enabling_integrations"
                 ],
                 disabled_integrations=self.options["disabled_integrations"],
+                options=self.options,
             )
 
             spotlight_config = self.options.get("spotlight")
@@ -932,17 +950,18 @@ class _Client(BaseClient):
         if release is not None and "sentry.release" not in log["attributes"]:
             log["attributes"]["sentry.release"] = release
 
-        span = current_scope.span
-        if span is not None and "sentry.trace.parent_span_id" not in log["attributes"]:
-            log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
+        trace_context = current_scope.get_trace_context()
+        trace_id = trace_context.get("trace_id")
+        span_id = trace_context.get("span_id")
 
-        if log.get("trace_id") is None:
-            transaction = current_scope.transaction
-            propagation_context = isolation_scope.get_active_propagation_context()
-            if transaction is not None:
-                log["trace_id"] = transaction.trace_id
-            elif propagation_context is not None:
-                log["trace_id"] = propagation_context.trace_id
+        if trace_id is not None and log.get("trace_id") is None:
+            log["trace_id"] = trace_id
+
+        if (
+            span_id is not None
+            and "sentry.trace.parent_span_id" not in log["attributes"]
+        ):
+            log["attributes"]["sentry.trace.parent_span_id"] = span_id
 
         # The user, if present, is always set on the isolation scope.
         if isolation_scope._user is not None:
@@ -981,6 +1000,7 @@ class _Client(BaseClient):
         if not has_metrics_enabled(self.options) or metric is None:
             return
 
+        current_scope = sentry_sdk.get_current_scope()
         isolation_scope = sentry_sdk.get_isolation_scope()
 
         metric["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
@@ -994,16 +1014,13 @@ class _Client(BaseClient):
         if release is not None and "sentry.release" not in metric["attributes"]:
             metric["attributes"]["sentry.release"] = release
 
-        span = sentry_sdk.get_current_span()
-        metric["trace_id"] = "00000000-0000-0000-0000-000000000000"
+        trace_context = current_scope.get_trace_context()
+        trace_id = trace_context.get("trace_id")
+        span_id = trace_context.get("span_id")
 
-        if span:
-            metric["trace_id"] = span.trace_id
-            metric["span_id"] = span.span_id
-        else:
-            propagation_context = isolation_scope.get_active_propagation_context()
-            if propagation_context and propagation_context.trace_id:
-                metric["trace_id"] = propagation_context.trace_id
+        metric["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
+        if span_id is not None:
+            metric["span_id"] = span_id
 
         if isolation_scope._user is not None:
             for metric_attribute, user_attribute in (

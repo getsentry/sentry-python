@@ -13,15 +13,18 @@ if TYPE_CHECKING:
 
 class MetricsBatcher:
     MAX_METRICS_BEFORE_FLUSH = 1000
+    MAX_METRICS_BEFORE_DROP = 10_000
     FLUSH_WAIT_TIME = 5.0
 
     def __init__(
         self,
         capture_func,  # type: Callable[[Envelope], None]
+        record_lost_func,  # type: Callable[..., None]
     ):
         # type: (...) -> None
         self._metric_buffer = []  # type: List[Metric]
         self._capture_func = capture_func
+        self._record_lost_func = record_lost_func
         self._running = True
         self._lock = threading.Lock()
 
@@ -72,6 +75,14 @@ class MetricsBatcher:
             return None
 
         with self._lock:
+            if len(self._metric_buffer) >= self.MAX_METRICS_BEFORE_DROP:
+                self._record_lost_func(
+                    reason="queue_overflow",
+                    data_category="trace_metric",
+                    quantity=1,
+                )
+                return None
+
             self._metric_buffer.append(metric)
             if len(self._metric_buffer) >= self.MAX_METRICS_BEFORE_FLUSH:
                 self._flush_event.set()

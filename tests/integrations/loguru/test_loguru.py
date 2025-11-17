@@ -458,6 +458,10 @@ def test_logger_with_all_attributes(
 
     assert attributes.pop("sentry.sdk.name").startswith("sentry.python")
 
+    assert "sentry.trace.parent_span_id" in attributes
+    assert isinstance(attributes["sentry.trace.parent_span_id"], str)
+    del attributes["sentry.trace.parent_span_id"]
+
     # Assert on the remaining non-dynamic attributes.
     assert attributes == {
         "logger.name": "tests.integrations.loguru.test_loguru",
@@ -467,6 +471,103 @@ def test_logger_with_all_attributes(
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",
     }
+
+
+def test_logger_capture_parameters_from_args(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    # This is currently not supported as regular args don't get added to extra
+    # (which we use for populating parameters). Adding this test to make that
+    # explicit and so that it's easy to change later.
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    logger.warning("Task ID: {}", 123)
+
+    sentry_sdk.get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    attributes = logs[0]["attributes"]
+    assert "sentry.message.parameter.0" not in attributes
+
+
+def test_logger_capture_parameters_from_kwargs(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    logger.warning("Task ID: {task_id}", task_id=123)
+
+    sentry_sdk.get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    attributes = logs[0]["attributes"]
+    assert attributes["sentry.message.parameter.task_id"] == 123
+
+
+def test_logger_capture_parameters_from_contextualize(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    with logger.contextualize(task_id=123):
+        logger.warning("Log")
+
+    sentry_sdk.get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    attributes = logs[0]["attributes"]
+    assert attributes["sentry.message.parameter.task_id"] == 123
+
+
+def test_logger_capture_parameters_from_bind(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    logger.bind(task_id=123).warning("Log")
+    sentry_sdk.get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    attributes = logs[0]["attributes"]
+    assert attributes["sentry.message.parameter.task_id"] == 123
+
+
+def test_logger_capture_parameters_from_patch(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    logger.patch(lambda record: record["extra"].update(task_id=123)).warning("Log")
+    sentry_sdk.get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    attributes = logs[0]["attributes"]
+    assert attributes["sentry.message.parameter.task_id"] == 123
 
 
 def test_no_parameters_no_template(
