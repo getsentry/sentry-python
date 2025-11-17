@@ -10,6 +10,8 @@ from ..utils import (
     _set_model_data,
     _should_send_prompts,
     _get_model_name,
+    get_current_agent,
+    get_is_streaming,
 )
 
 from typing import TYPE_CHECKING
@@ -216,20 +218,11 @@ def ai_client_span(messages, agent, model, model_settings):
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
 
-    # Set streaming flag
-    agent_data = sentry_sdk.get_current_scope()._contexts.get("pydantic_ai_agent") or {}
-    is_streaming = agent_data.get("_streaming", False)
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming)
+    # Set streaming flag from contextvar
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
 
     # Add available tools if agent is available
-    agent_obj = agent
-    if not agent_obj:
-        # Try to get from Sentry scope
-        agent_data = (
-            sentry_sdk.get_current_scope()._contexts.get("pydantic_ai_agent") or {}
-        )
-        agent_obj = agent_data.get("_agent")
-
+    agent_obj = agent or get_current_agent()
     _set_available_tools(span, agent_obj)
 
     # Set input messages (full conversation history)

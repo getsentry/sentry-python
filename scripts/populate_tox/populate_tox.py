@@ -68,6 +68,7 @@ IGNORE = {
     "gcp",
     "gevent",
     "opentelemetry",
+    "otlp",
     "potel",
 }
 

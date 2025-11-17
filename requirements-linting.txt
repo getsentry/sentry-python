@@ -7,7 +7,7 @@ types-greenlet
 types-redis
 types-setuptools
 types-webob
-opentelemetry-distro
+opentelemetry-distro[otlp]
 pymongo # There is no separate types module.
 loguru # There is no separate types module.
 pre-commit # local linting
