@@ -33,8 +33,8 @@ def envelopes_to_metrics(envelopes):
     return res
 
 
-def test_metrics_disabled_by_default(sentry_init, capture_envelopes):
-    sentry_init()
+def test_metrics_disabled(sentry_init, capture_envelopes):
+    sentry_init(enable_metrics=False)
 
     envelopes = capture_envelopes()
 
@@ -46,7 +46,7 @@ def test_metrics_disabled_by_default(sentry_init, capture_envelopes):
 
 
 def test_metrics_basics(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True})
+    sentry_init()
     envelopes = capture_envelopes()
 
     sentry_sdk.metrics.count("test.counter", 1)
@@ -77,7 +77,7 @@ def test_metrics_basics(sentry_init, capture_envelopes):
 
 
 def test_metrics_experimental_option(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True})
+    sentry_init()
     envelopes = capture_envelopes()
 
     sentry_sdk.metrics.count("test.counter", 5)
@@ -93,9 +93,7 @@ def test_metrics_experimental_option(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_attributes(sentry_init, capture_envelopes):
-    sentry_init(
-        _experiments={"enable_metrics": True}, release="1.0.0", environment="test"
-    )
+    sentry_init(release="1.0.0", environment="test")
     envelopes = capture_envelopes()
 
     sentry_sdk.metrics.count(
@@ -114,7 +112,7 @@ def test_metrics_with_attributes(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_user(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True})
+    sentry_init()
     envelopes = capture_envelopes()
 
     sentry_sdk.set_user(
@@ -133,10 +131,10 @@ def test_metrics_with_user(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_span(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True}, traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0)
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_transaction(op="test", name="test-span"):
+    with sentry_sdk.start_transaction(op="test", name="test-span") as transaction:
         sentry_sdk.metrics.count("test.span.counter", 1)
 
     get_client().flush()
@@ -145,24 +143,26 @@ def test_metrics_with_span(sentry_init, capture_envelopes):
     assert len(metrics) == 1
 
     assert metrics[0]["trace_id"] is not None
-    assert metrics[0]["trace_id"] != "00000000-0000-0000-0000-000000000000"
-    assert metrics[0]["span_id"] is not None
+    assert metrics[0]["trace_id"] == transaction.trace_id
+    assert metrics[0]["span_id"] == transaction.span_id
 
 
 def test_metrics_tracing_without_performance(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_metrics": True})
+    sentry_init()
     envelopes = capture_envelopes()
 
-    sentry_sdk.metrics.count("test.span.counter", 1)
+    with sentry_sdk.isolation_scope() as isolation_scope:
+        sentry_sdk.metrics.count("test.span.counter", 1)
 
     get_client().flush()
 
     metrics = envelopes_to_metrics(envelopes)
     assert len(metrics) == 1
 
-    assert metrics[0]["trace_id"] is not None
-    assert metrics[0]["trace_id"] != "00000000-0000-0000-0000-000000000000"
-    assert metrics[0]["span_id"] is None
+    propagation_context = isolation_scope._propagation_context
+    assert propagation_context is not None
+    assert metrics[0]["trace_id"] == propagation_context.trace_id
+    assert metrics[0]["span_id"] == propagation_context.span_id
 
 
 def test_metrics_before_send(sentry_init, capture_envelopes):
@@ -189,8 +189,46 @@ def test_metrics_before_send(sentry_init, capture_envelopes):
         return record
 
     sentry_init(
+        before_send_metric=_before_metric,
+    )
+    envelopes = capture_envelopes()
+
+    sentry_sdk.metrics.count("test.skip", 1)
+    sentry_sdk.metrics.count("test.keep", 1)
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    assert len(metrics) == 1
+    assert metrics[0]["name"] == "test.keep"
+    assert before_metric_called
+
+
+def test_metrics_experimental_before_send(sentry_init, capture_envelopes):
+    before_metric_called = False
+
+    def _before_metric(record, hint):
+        nonlocal before_metric_called
+
+        assert set(record.keys()) == {
+            "timestamp",
+            "trace_id",
+            "span_id",
+            "name",
+            "type",
+            "value",
+            "unit",
+            "attributes",
+        }
+
+        if record["name"] == "test.skip":
+            return None
+
+        before_metric_called = True
+        return record
+
+    sentry_init(
         _experiments={
-            "enable_metrics": True,
             "before_send_metric": _before_metric,
         },
     )
@@ -205,3 +243,27 @@ def test_metrics_before_send(sentry_init, capture_envelopes):
     assert len(metrics) == 1
     assert metrics[0]["name"] == "test.keep"
     assert before_metric_called
+
+
+def test_batcher_drops_metrics(sentry_init, monkeypatch):
+    sentry_init()
+    client = sentry_sdk.get_client()
+
+    def no_op_flush():
+        pass
+
+    monkeypatch.setattr(client.metrics_batcher, "_flush", no_op_flush)
+
+    lost_event_calls = []
+
+    def record_lost_event(reason, data_category, quantity):
+        lost_event_calls.append((reason, data_category, quantity))
+
+    monkeypatch.setattr(client.metrics_batcher, "_record_lost_func", record_lost_event)
+
+    for i in range(10_005):  # 5 metrics over the hard limit
+        sentry_sdk.metrics.count("test.counter", 1)
+
+    assert len(lost_event_calls) == 5
+    for lost_event_call in lost_event_calls:
+        assert lost_event_call == ("queue_overflow", "trace_metric", 1)

@@ -51,6 +51,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry"
+      - name: Test otlp
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-otlp"
       - name: Test potel
         run: |
           set -x # print commands that are executed
@@ -67,6 +71,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-typer"
+      - name: Test integration_deactivation
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-integration_deactivation"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |
