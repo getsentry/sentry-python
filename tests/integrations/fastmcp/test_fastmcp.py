@@ -86,7 +86,7 @@ def call_tool_through_mcp(mcp_instance, tool_name, arguments):
         arguments: Dictionary of arguments to pass to the tool
 
     Returns:
-        The tool result (extracted from CallToolResult)
+        The tool result normalized to {"result": value} format
     """
     import asyncio
     import json
@@ -102,14 +102,29 @@ def call_tool_through_mcp(mcp_instance, tool_name, arguments):
     if hasattr(result, "root"):
         result = result.root
     if hasattr(result, "structuredContent") and result.structuredContent:
-        return result.structuredContent
-    if hasattr(result, "content") and result.content:
-        text = result.content[0].text
-        try:
-            return json.loads(text)
-        except (json.JSONDecodeError, TypeError):
-            return text
-    return result
+        result = result.structuredContent
+    elif hasattr(result, "content"):
+        if result.content:
+            text = result.content[0].text
+            try:
+                result = json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                result = text
+        else:
+            # Empty content means None return
+            result = None
+
+    # Normalize return value to consistent format
+    # If already a dict, return as-is (tool functions return dicts directly)
+    if isinstance(result, dict):
+        return result
+
+    # Handle string "None" or "null" as actual None
+    if isinstance(result, str) and result in ("None", "null"):
+        result = None
+
+    # Wrap primitive values (int, str, bool, None) in dict format for consistency
+    return {"result": result}
 
 
 async def call_tool_through_mcp_async(mcp_instance, tool_name, arguments):
@@ -127,14 +142,29 @@ async def call_tool_through_mcp_async(mcp_instance, tool_name, arguments):
     if hasattr(result, "root"):
         result = result.root
     if hasattr(result, "structuredContent") and result.structuredContent:
-        return result.structuredContent
-    if hasattr(result, "content") and result.content:
-        text = result.content[0].text
-        try:
-            return json.loads(text)
-        except (json.JSONDecodeError, TypeError):
-            return text
-    return result
+        result = result.structuredContent
+    elif hasattr(result, "content"):
+        if result.content:
+            text = result.content[0].text
+            try:
+                result = json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                result = text
+        else:
+            # Empty content means None return
+            result = None
+
+    # Normalize return value to consistent format
+    # If already a dict, return as-is (tool functions return dicts directly)
+    if isinstance(result, dict):
+        return result
+
+    # Handle string "None" or "null" as actual None
+    if isinstance(result, str) and result in ("None", "null"):
+        result = None
+
+    # Wrap primitive values (int, str, bool, None) in dict format for consistency
+    return {"result": result}
 
 
 def call_prompt_through_mcp(mcp_instance, prompt_name, arguments=None):
@@ -710,7 +740,15 @@ def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP):
                 return "file contents"
 
             with start_transaction(name="fastmcp tx"):
-                result = call_resource_through_mcp(mcp, "file:///test.txt")
+                try:
+                    result = call_resource_through_mcp(mcp, "file:///test.txt")
+                except ValueError as e:
+                    # Older FastMCP versions may not support this URI pattern
+                    if "Unknown resource" in str(e):
+                        pytest.skip(
+                            f"Resource URI not supported in this FastMCP version: {e}"
+                        )
+                    raise
 
             # Resource content is returned as-is
             assert "file contents" in result.contents[0].text
@@ -759,9 +797,17 @@ async def test_fastmcp_resource_async(sentry_init, capture_events, FastMCP):
                 return "resource data"
 
             with start_transaction(name="fastmcp tx"):
-                result = await call_resource_through_mcp_async(
-                    mcp, "https://example.com/resource"
-                )
+                try:
+                    result = await call_resource_through_mcp_async(
+                        mcp, "https://example.com/resource"
+                    )
+                except ValueError as e:
+                    # Older FastMCP versions may not support this URI pattern
+                    if "Unknown resource" in str(e):
+                        pytest.skip(
+                            f"Resource URI not supported in this FastMCP version: {e}"
+                        )
+                    raise
 
             assert "resource data" in result.contents[0].text
 
@@ -1076,21 +1122,8 @@ def test_fastmcp_tool_with_none_return(sentry_init, capture_events, FastMCP):
     with start_transaction(name="fastmcp tx"):
         result = call_tool_through_mcp(mcp, "none_return_tool", {"action": "log"})
 
-    # Handle different return types between mcp.server.fastmcp and fastmcp
-    if isinstance(result, dict):
-        # mcp.server.fastmcp wraps in dict
-        assert result["result"] is None
-    elif hasattr(result, "content"):
-        # fastmcp package returns CallToolResult directly
-        # For None returns, content is empty or contains null/None
-        if result.content:
-            assert result.content[0].text in ("null", "None", "")
-        else:
-            # Empty content means None
-            assert result.content == []
-    else:
-        # Some versions might return None directly
-        assert result is None
+    # Helper function normalizes to {"result": value} format
+    assert result["result"] is None
 
     (tx,) = events
     assert tx["type"] == "transaction"
