@@ -75,7 +75,7 @@ DATA_FIELDS = {
 
 
 # Contextvar to track agent names in a stack for re-entrant agent support
-_agent_stack = contextvars.ContextVar("langchain_agent_stack", default=None)
+_agent_stack = contextvars.ContextVar("langchain_agent_stack", default=None)  # type: contextvars.ContextVar[Optional[List[Optional[str]]]]
 
 
 def _push_agent(agent_name):
@@ -84,6 +84,9 @@ def _push_agent(agent_name):
     stack = _agent_stack.get()
     if stack is None:
         stack = []
+    else:
+        # Copy the list to maintain contextvar isolation across async contexts
+        stack = stack.copy()
     stack.append(agent_name)
     _agent_stack.set(stack)
 
@@ -92,7 +95,9 @@ def _pop_agent():
     # type: () -> Optional[str]
     """Pop an agent name from the stack and return it."""
     stack = _agent_stack.get()
-    if stack and len(stack) > 0:
+    if stack:
+        # Copy the list to maintain contextvar isolation across async contexts
+        stack = stack.copy()
         agent_name = stack.pop()
         _agent_stack.set(stack)
         return agent_name
@@ -103,7 +108,7 @@ def _get_current_agent():
     # type: () -> Optional[str]
     """Get the current agent name (top of stack) without removing it."""
     stack = _agent_stack.get()
-    if stack and len(stack) > 0:
+    if stack:
         return stack[-1]
     return None
 
@@ -807,47 +812,49 @@ def _wrap_agent_executor_invoke(f):
             origin=LangchainIntegration.origin,
         ) as span:
             _push_agent(agent_name)
-            if agent_name:
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+            try:
+                if agent_name:
+                    span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            _set_tools_on_span(span, tools)
+                _set_tools_on_span(span, tools)
 
-            # Run the agent
-            result = f(self, *args, **kwargs)
+                # Run the agent
+                result = f(self, *args, **kwargs)
 
-            input = result.get("input")
-            if (
-                input is not None
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                normalized_messages = normalize_message_roles([input])
-                scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
-                )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
+                input = result.get("input")
+                if (
+                    input is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    normalized_messages = normalize_message_roles([input])
+                    scope = sentry_sdk.get_current_scope()
+                    messages_data = truncate_and_annotate_messages(
+                        normalized_messages, span, scope
                     )
+                    if messages_data is not None:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                            messages_data,
+                            unpack=False,
+                        )
 
-            output = result.get("output")
-            if (
-                output is not None
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                output = result.get("output")
+                if (
+                    output is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-            _pop_agent()
-
-            return result
+                return result
+            finally:
+                # Ensure agent is popped even if an exception occurs
+                _pop_agent()
 
     return new_invoke
 
@@ -908,45 +915,47 @@ def _wrap_agent_executor_stream(f):
 
         def new_iterator():
             # type: () -> Iterator[Any]
-            for event in old_iterator:
-                yield event
-
             try:
-                output = event.get("output")
-            except Exception:
-                output = None
+                for event in old_iterator:
+                    yield event
 
-            if (
-                output is not None
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                try:
+                    output = event.get("output")
+                except Exception:
+                    output = None
 
-            _pop_agent()
-
-            span.__exit__(None, None, None)
+                if (
+                    output is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+            finally:
+                # Ensure cleanup happens even if iterator is abandoned or fails
+                _pop_agent()
+                span.__exit__(None, None, None)
 
         async def new_iterator_async():
             # type: () -> AsyncIterator[Any]
-            async for event in old_iterator:
-                yield event
-
             try:
-                output = event.get("output")
-            except Exception:
-                output = None
+                async for event in old_iterator:
+                    yield event
 
-            if (
-                output is not None
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                try:
+                    output = event.get("output")
+                except Exception:
+                    output = None
 
-            _pop_agent()
-
-            span.__exit__(None, None, None)
+                if (
+                    output is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+            finally:
+                # Ensure cleanup happens even if iterator is abandoned or fails
+                _pop_agent()
+                span.__exit__(None, None, None)
 
         if str(type(result)) == "<class 'async_generator'>":
             result = new_iterator_async()
