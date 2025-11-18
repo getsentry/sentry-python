@@ -655,8 +655,8 @@ def get_errno(exc_value):
 def get_error_message(exc_value):
     # type: (Optional[BaseException]) -> str
     message = (
-        getattr(exc_value, "message", "")
-        or getattr(exc_value, "detail", "")
+        str(getattr(exc_value, "message", ""))
+        or str(getattr(exc_value, "detail", ""))
         or safe_str(exc_value)
     )  # type: str
 
