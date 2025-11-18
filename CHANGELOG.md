@@ -1,5 +1,50 @@
 # Changelog
 
+## 2.45.0
+
+### Various fixes & improvements
+
+- OTLPIntegration (#4877) by @sl0thentr0py
+
+  Enable the new OTLP integration with the code snippet below, and your OpenTelemetry instrumentation will be automatically sent to Sentry's OTLP ingestion endpoint.
+
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.otlp import OTLPIntegration
+
+    sentry_sdk.init(
+        dsn="<your-dsn>",
+        # Add data like inputs and responses;
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+        send_default_pii=True,
+        integrations=[
+            OTLPIntegration(),
+        ],
+    )
+  ```
+
+  Under the hood, this will setup:
+  - A `SpanExporter` that will automatically set up the OTLP ingestion endpoint from your DSN
+  - A `Propagator` that ensures Distributed Tracing works
+  - Trace/Span linking for all other Sentry events such as Errors, Logs, Crons and Metrics
+
+  If you were using the `SentrySpanProcessor` before, we recommend migrating over to `OTLPIntegration` since it's a much simpler setup.
+
+- feat(integrations): implement context management for invoke_agent spans (#5089) by @constantinius
+- feat(loguru): Capture extra (#5096) by @sentrivana
+- feat: Attach `server.address` to metrics (#5113) by @alexander-alderman-webb
+- fix: Cast message and detail attributes before appending exception notes (#5114) by @alexander-alderman-webb
+- fix(integrations): ensure that GEN_AI_AGENT_NAME is properly set for GEN_AI spans under an invoke_agent span (#5030) by @constantinius
+- fix(logs): Update `sentry.origin` (#5112) by @sentrivana
+- chore: Deprecate description truncation option for Redis spans (#5073) by @alexander-alderman-webb
+- chore: Deprecate `max_spans` LangChain parameter (#5074) by @alexander-alderman-webb
+- chore(toxgen): Check availability of pip and add detail to exceptions (#5076) by @alexander-alderman-webb
+- chore: add MCP SDK Pydantic AI and OpenAI Agents to the list of auto enabled integrations (#5111) by @constantinius
+- test: add tests for either FastMCP implementation (#5075) by @constantinius
+- fix(ci): Re-enable skipped tests (#5104) by @sentrivana
+- ci: 🤖 Update test matrix with new releases (11/17) (#5110) by @github-actions
+- ci: Force coverage core ctrace for 3.14 (#5108) by @sl0thentr0py
+
 ## 2.44.0
 
 ### Various fixes & improvements
