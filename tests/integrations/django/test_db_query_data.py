@@ -642,6 +642,118 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True, databases=["postgres"])
+def test_db_no_autocommit_rollback_execute(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    client.get(reverse("postgres_insert_orm_no_autocommit_rollback"))
+
+    (event,) = events
+
+    # Ensure operation is rolled back
+    assert not User.objects.using("postgres").exists()
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    for span in event["spans"]:
+        if span["op"] == "db":
+            assert span["origin"] == "auto.db.django"
+        else:
+            assert span["origin"] == "auto.http.django"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_no_autocommit_rollback_executemany(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    with start_transaction(name="test_transaction"):
+        from django.db import connection, transaction
+
+        cursor = connection.cursor()
+
+        query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
+        query_list = (
+            (
+                "user1",
+                "John",
+                "Doe",
+                "user1@example.com",
+                datetime(1970, 1, 1),
+            ),
+            (
+                "user2",
+                "Max",
+                "Mustermann",
+                "user2@example.com",
+                datetime(1970, 1, 1),
+            ),
+        )
+
+        transaction.set_autocommit(False)
+        cursor.executemany(query, query_list)
+        transaction.rollback()
+        transaction.set_autocommit(True)
+
+    (event,) = events
+
+    # Ensure operation is rolled back
+    assert not User.objects.exists()
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.db.django"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True, databases=["postgres"])
 def test_db_atomic_execute(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -739,6 +851,112 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
         span
         for span in event["spans"]
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True, databases=["postgres"])
+def test_db_atomic_rollback_execute(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    client.get(reverse("postgres_insert_orm_atomic_rollback"))
+
+    (event,) = events
+
+    # Ensure operation is rolled back
+    assert not User.objects.using("postgres").exists()
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+    ]
+    assert len(commit_spans) == 1
+    commit_span = commit_spans[0]
+    assert commit_span["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_atomic_rollback_executemany(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        with transaction.atomic():
+            cursor = connection.cursor()
+
+            query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
+            query_list = (
+                (
+                    "user1",
+                    "John",
+                    "Doe",
+                    "user1@example.com",
+                    datetime(1970, 1, 1),
+                ),
+                (
+                    "user2",
+                    "Max",
+                    "Mustermann",
+                    "user2@example.com",
+                    datetime(1970, 1, 1),
+                ),
+            )
+            cursor.executemany(query, query_list)
+            transaction.set_rollback(True)
+
+    (event,) = events
+
+    # Ensure operation is rolled back
+    assert not User.objects.exists()
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    commit_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
