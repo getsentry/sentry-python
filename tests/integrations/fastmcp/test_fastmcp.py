@@ -21,6 +21,8 @@ to properly trigger Sentry instrumentation and span creation. This ensures
 accurate testing of the integration's behavior in real MCP Server scenarios.
 """
 
+import asyncio
+import json
 import pytest
 from unittest import mock
 
@@ -60,6 +62,15 @@ try:
 except ImportError:
     request_ctx = None
 
+# Try to import MCP types for helper functions
+try:
+    from mcp.types import CallToolRequest, GetPromptRequest, ReadResourceRequest
+except ImportError:
+    # If mcp.types not available, tests will be skipped anyway
+    CallToolRequest = None
+    GetPromptRequest = None
+    ReadResourceRequest = None
+
 
 # Collect available FastMCP implementations for parametrization
 fastmcp_implementations = []
@@ -88,10 +99,6 @@ def call_tool_through_mcp(mcp_instance, tool_name, arguments):
     Returns:
         The tool result normalized to {"result": value} format
     """
-    import asyncio
-    import json
-    from mcp.types import CallToolRequest
-
     handler = mcp_instance._mcp_server.request_handlers[CallToolRequest]
     request = CallToolRequest(
         method="tools/call", params={"name": tool_name, "arguments": arguments}
@@ -129,9 +136,6 @@ def call_tool_through_mcp(mcp_instance, tool_name, arguments):
 
 async def call_tool_through_mcp_async(mcp_instance, tool_name, arguments):
     """Async version of call_tool_through_mcp."""
-    import json
-    from mcp.types import CallToolRequest
-
     handler = mcp_instance._mcp_server.request_handlers[CallToolRequest]
     request = CallToolRequest(
         method="tools/call", params={"name": tool_name, "arguments": arguments}
@@ -169,9 +173,6 @@ async def call_tool_through_mcp_async(mcp_instance, tool_name, arguments):
 
 def call_prompt_through_mcp(mcp_instance, prompt_name, arguments=None):
     """Call a prompt through MCP Server's low-level handler."""
-    import asyncio
-    from mcp.types import GetPromptRequest
-
     handler = mcp_instance._mcp_server.request_handlers[GetPromptRequest]
     request = GetPromptRequest(
         method="prompts/get", params={"name": prompt_name, "arguments": arguments or {}}
@@ -185,8 +186,6 @@ def call_prompt_through_mcp(mcp_instance, prompt_name, arguments=None):
 
 async def call_prompt_through_mcp_async(mcp_instance, prompt_name, arguments=None):
     """Async version of call_prompt_through_mcp."""
-    from mcp.types import GetPromptRequest
-
     handler = mcp_instance._mcp_server.request_handlers[GetPromptRequest]
     request = GetPromptRequest(
         method="prompts/get", params={"name": prompt_name, "arguments": arguments or {}}
@@ -200,9 +199,6 @@ async def call_prompt_through_mcp_async(mcp_instance, prompt_name, arguments=Non
 
 def call_resource_through_mcp(mcp_instance, uri):
     """Call a resource through MCP Server's low-level handler."""
-    import asyncio
-    from mcp.types import ReadResourceRequest
-
     handler = mcp_instance._mcp_server.request_handlers[ReadResourceRequest]
     request = ReadResourceRequest(method="resources/read", params={"uri": str(uri)})
 
@@ -214,8 +210,6 @@ def call_resource_through_mcp(mcp_instance, uri):
 
 async def call_resource_through_mcp_async(mcp_instance, uri):
     """Async version of call_resource_through_mcp."""
-    from mcp.types import ReadResourceRequest
-
     handler = mcp_instance._mcp_server.request_handlers[ReadResourceRequest]
     request = ReadResourceRequest(method="resources/read", params={"uri": str(uri)})
 
@@ -251,19 +245,6 @@ def reset_request_ctx():
             pass
 
 
-# Mock classes for testing
-class MockURI:
-    """Mock URI object for resource testing"""
-
-    def __init__(self, uri_string):
-        self.scheme = uri_string.split("://")[0] if "://" in uri_string else ""
-        self.path = uri_string.split("://")[1] if "://" in uri_string else uri_string
-        self._uri_string = uri_string
-
-    def __str__(self):
-        return self._uri_string
-
-
 class MockRequestContext:
     """Mock MCP request context"""
 
@@ -290,28 +271,6 @@ class MockHTTPRequest:
             # StreamableHTTP transport uses header
             if session_id:
                 self.headers["mcp-session-id"] = session_id
-
-
-class MockTextContent:
-    """Mock TextContent object"""
-
-    def __init__(self, text):
-        self.text = text
-
-
-class MockPromptMessage:
-    """Mock PromptMessage object"""
-
-    def __init__(self, role, content_text):
-        self.role = role
-        self.content = MockTextContent(content_text)
-
-
-class MockGetPromptResult:
-    """Mock GetPromptResult object"""
-
-    def __init__(self, messages):
-        self.messages = messages
 
 
 # =============================================================================
