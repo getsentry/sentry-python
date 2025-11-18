@@ -482,7 +482,6 @@ def test_db_span_origin_execute(sentry_init, client, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.http.django"
 
     for span in event["spans"]:
-        print("span is", span["op"], span["description"])
         if span["op"] == "db":
             assert span["origin"] == "auto.db.django"
         else:
@@ -529,7 +528,7 @@ def test_db_span_origin_executemany(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator(transaction=True, databases=["postgres"])
+@pytest_mark_django_db_decorator(transaction=True)
 def test_db_no_autocommit_execute(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -641,7 +640,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator(transaction=True, databases=["postgres"])
+@pytest_mark_django_db_decorator(transaction=True)
 def test_db_atomic_execute(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
