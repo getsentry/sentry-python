@@ -634,6 +634,7 @@ def install_sql_hook():
         real_executemany = CursorWrapper.executemany
         real_connect = BaseDatabaseWrapper.connect
         real_commit = BaseDatabaseWrapper.commit
+        ignore_logger("django.db.backends")
     except AttributeError:
         # This won't work on Django versions < 1.6
         return
@@ -694,10 +695,9 @@ def install_sql_hook():
     @ensure_integration_enabled(DjangoIntegration, real_commit)
     def commit(self):
         # type: (BaseDatabaseWrapper) -> None
-        print("commiting")
         with sentry_sdk.start_span(
             op=OP.DB,
-            name="commit",  # DBOPERATION.COMMIT,
+            name=DBOPERATION.COMMIT,
             origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self, DBOPERATION.COMMIT)
