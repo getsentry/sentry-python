@@ -1006,6 +1006,13 @@ class _Client(BaseClient):
         metric["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
         metric["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
 
+        server_name = self.options.get("server_name")
+        if (
+            server_name is not None
+            and SPANDATA.SERVER_ADDRESS not in metric["attributes"]
+        ):
+            metric["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
+
         environment = self.options.get("environment")
         if environment is not None and "sentry.environment" not in metric["attributes"]:
             metric["attributes"]["sentry.environment"] = environment

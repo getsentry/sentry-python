@@ -70,7 +70,6 @@ async def test_trace_decorator_async():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(sys.version_info >= (3, 14), reason="Test flakes blocking release.")
 async def test_trace_decorator_async_no_trx():
     with patch_start_tracing_child(fake_transaction_is_none=True):
         with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:

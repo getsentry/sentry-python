@@ -1,5 +1,6 @@
 import contextvars
 import itertools
+import warnings
 from collections import OrderedDict
 from functools import wraps
 
@@ -111,13 +112,18 @@ class LangchainIntegration(Integration):
     identifier = "langchain"
     origin = f"auto.ai.{identifier}"
 
-    # The most number of spans (e.g., LLM calls) that can be processed at the same time.
-    max_spans = 1024
-
-    def __init__(self, include_prompts=True, max_spans=1024):
-        # type: (LangchainIntegration, bool, int) -> None
+    def __init__(self, include_prompts=True, max_spans=None):
+        # type: (LangchainIntegration, bool, Optional[int]) -> None
         self.include_prompts = include_prompts
         self.max_spans = max_spans
+
+        if max_spans is not None:
+            warnings.warn(
+                "The `max_spans` parameter of `LangchainIntegration` is "
+                "deprecated and will be removed in version 3.0 of sentry-sdk.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     @staticmethod
     def setup_once():
@@ -143,7 +149,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     """Callback handler that creates Sentry spans."""
 
     def __init__(self, max_span_map_size, include_prompts):
-        # type: (int, bool) -> None
+        # type: (Optional[int], bool) -> None
         self.span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
@@ -151,9 +157,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def gc_span_map(self):
         # type: () -> None
 
-        while len(self.span_map) > self.max_span_map_size:
-            run_id, watched_span = self.span_map.popitem(last=False)
-            self._exit_span(watched_span, run_id)
+        if self.max_span_map_size is not None:
+            while len(self.span_map) > self.max_span_map_size:
+                run_id, watched_span = self.span_map.popitem(last=False)
+                self._exit_span(watched_span, run_id)
 
     def _handle_error(self, run_id, error):
         # type: (UUID, Any) -> None

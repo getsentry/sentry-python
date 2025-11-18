@@ -167,7 +167,7 @@ def loguru_sentry_logs_handler(message):
         record["level"].no, SEVERITY_TO_OTEL_SEVERITY
     )
 
-    attrs = {"sentry.origin": "auto.logger.loguru"}  # type: dict[str, Any]
+    attrs = {"sentry.origin": "auto.log.loguru"}  # type: dict[str, Any]
 
     project_root = client.options["project_root"]
     if record.get("file"):

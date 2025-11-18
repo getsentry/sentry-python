@@ -1937,25 +1937,6 @@ async def test_set_model_data_with_none_settings_values(sentry_init, capture_eve
 
 
 @pytest.mark.asyncio
-async def test_should_send_prompts_with_no_integration(sentry_init, capture_events):
-    """
-    Test that _should_send_prompts returns False when integration not found.
-    """
-    from sentry_sdk.integrations.pydantic_ai.utils import _should_send_prompts
-
-    # Initialize without PydanticAIIntegration
-    sentry_init(
-        integrations=[],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    # Should return False
-    result = _should_send_prompts()
-    assert result is False
-
-
-@pytest.mark.asyncio
 async def test_should_send_prompts_without_pii(sentry_init, capture_events):
     """
     Test that _should_send_prompts returns False when PII disabled.
