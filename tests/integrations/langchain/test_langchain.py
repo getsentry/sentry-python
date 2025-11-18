@@ -63,7 +63,6 @@ class MockOpenAI(ChatOpenAI):
         return llm_type
 
 
-@pytest.mark.xfail
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts, use_unknown_llm_type",
     [
@@ -223,8 +222,8 @@ def test_langchain_agent(
             in chat_spans[0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
         assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])
+        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
+        assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
         assert (
             "You are very powerful"
             in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -248,8 +247,8 @@ def test_langchain_agent(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in tool_exec_span.get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in tool_exec_span.get("data", {})
+        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
+        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
 
         # Verify tool calls are NOT recorded when PII is disabled
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(

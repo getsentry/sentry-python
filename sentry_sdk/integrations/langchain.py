@@ -3,6 +3,7 @@ import itertools
 import warnings
 from collections import OrderedDict
 from functools import wraps
+import sys
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
@@ -915,6 +916,7 @@ def _wrap_agent_executor_stream(f):
 
         def new_iterator():
             # type: () -> Iterator[Any]
+            exc_info = (None, None, None)  # type: tuple[Any, Any, Any]
             try:
                 for event in old_iterator:
                     yield event
@@ -930,13 +932,18 @@ def _wrap_agent_executor_stream(f):
                     and integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+            except Exception:
+                exc_info = sys.exc_info()
+                set_span_errored(span)
+                raise
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
                 _pop_agent()
-                span.__exit__(None, None, None)
+                span.__exit__(*exc_info)
 
         async def new_iterator_async():
             # type: () -> AsyncIterator[Any]
+            exc_info = (None, None, None)  # type: tuple[Any, Any, Any]
             try:
                 async for event in old_iterator:
                     yield event
@@ -952,10 +959,14 @@ def _wrap_agent_executor_stream(f):
                     and integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+            except Exception:
+                exc_info = sys.exc_info()
+                set_span_errored(span)
+                raise
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
                 _pop_agent()
-                span.__exit__(None, None, None)
+                span.__exit__(*exc_info)
 
         if str(type(result)) == "<class 'async_generator'>":
             result = new_iterator_async()
