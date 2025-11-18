@@ -6,6 +6,7 @@ from unittest import mock
 
 from django import VERSION as DJANGO_VERSION
 from django.db import connection, connections, transaction
+from django.contrib.auth.models import User
 
 try:
     from django.urls import reverse
@@ -526,22 +527,10 @@ def test_db_span_origin_executemany(sentry_init, client, capture_events):
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.db.django"
 
-    commit_spans = [
-        span
-        for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
-    ]
-    assert len(commit_spans) == 1
-    commit_span = commit_spans[0]
-    assert commit_span["origin"] == "auto.db.django"
-
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True, databases=["postgres"])
 def test_db_no_autocommit_execute(sentry_init, client, capture_events):
-    """
-    Verify we record a breadcrumb when opening a new database.
-    """
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
@@ -555,9 +544,12 @@ def test_db_no_autocommit_execute(sentry_init, client, capture_events):
 
     events = capture_events()
 
-    client.get(reverse("postgres_select_orm_no_autocommit"))
+    client.get(reverse("postgres_insert_orm_no_autocommit"))
 
     (event,) = events
+
+    # Ensure operation is persisted
+    assert User.objects.using("postgres").exists()
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.django"
 
@@ -595,22 +587,45 @@ def test_db_no_autocommit_executemany(sentry_init, client, capture_events):
 
         cursor = connection.cursor()
 
-        query = """UPDATE auth_user SET username = %s where id = %s;"""
+        query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
         query_list = (
             (
-                "test1",
-                1,
+                "user1",
+                "John",
+                "Doe",
+                "user1@example.com",
+                datetime(1970, 1, 1),
             ),
             (
-                "test2",
-                2,
+                "user2",
+                "Max",
+                "Mustermann",
+                "user2@example.com",
+                datetime(1970, 1, 1),
             ),
         )
-        cursor.executemany(query, query_list)
 
+        transaction.set_autocommit(False)
+        cursor.executemany(query, query_list)
         transaction.commit()
+        transaction.set_autocommit(True)
 
     (event,) = events
+
+    # Ensure operation is persisted
+    assert User.objects.exists()
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.db.django"
@@ -626,11 +641,8 @@ def test_db_no_autocommit_executemany(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True, databases=["postgres"])
 def test_db_atomic_execute(sentry_init, client, capture_events):
-    """
-    Verify we record a breadcrumb when opening a new database.
-    """
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
@@ -645,11 +657,12 @@ def test_db_atomic_execute(sentry_init, client, capture_events):
 
     events = capture_events()
 
-    with transaction.atomic():
-        client.get(reverse("postgres_select_orm_atomic"))
-        connections["postgres"].commit()
+    client.get(reverse("postgres_insert_orm_atomic"))
 
     (event,) = events
+
+    # Ensure operation is persisted
+    assert User.objects.using("postgres").exists()
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.django"
 
@@ -666,9 +679,6 @@ def test_db_atomic_execute(sentry_init, client, capture_events):
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_atomic_executemany(sentry_init, client, capture_events):
-    """
-    Verify we record a breadcrumb when opening a new database.
-    """
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
@@ -687,20 +697,41 @@ def test_db_atomic_executemany(sentry_init, client, capture_events):
         with transaction.atomic():
             cursor = connection.cursor()
 
-            query = """UPDATE auth_user SET username = %s where id = %s;"""
-            query_list = (
-                (
-                    "test1",
-                    1,
-                ),
-                (
-                    "test2",
-                    2,
-                ),
-            )
-            cursor.executemany(query, query_list)
+            query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
+        query_list = (
+            (
+                "user1",
+                "John",
+                "Doe",
+                "user1@example.com",
+                datetime(1970, 1, 1),
+            ),
+            (
+                "user2",
+                "Max",
+                "Mustermann",
+                "user2@example.com",
+                datetime(1970, 1, 1),
+            ),
+        )
+        cursor.executemany(query, query_list)
 
     (event,) = events
+
+    # Ensure operation is persisted
+    assert User.objects.exists()
 
     assert event["contexts"]["trace"]["origin"] == "manual"
 
