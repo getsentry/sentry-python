@@ -718,8 +718,8 @@ def install_sql_hook():
     CursorWrapper.executemany = executemany
     BaseDatabaseWrapper.connect = connect
     BaseDatabaseWrapper.commit = commit
-    ignore_logger("django.db.backends")
     BaseDatabaseWrapper.rollback = rollback
+    ignore_logger("django.db.backends")
 
 
 def _set_db_data(span, cursor_or_db, db_operation=None):
