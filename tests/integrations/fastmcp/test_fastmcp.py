@@ -474,14 +474,14 @@ def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP):
     tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
     assert len(tool_spans) == 1
 
-    # Error event may or may not be captured depending on MCP error handling
+    # Check error event was captured
     error_events = [e for e in events if e.get("level") == "error"]
-    if len(error_events) > 0:
-        error_event = error_events[0]
-        assert error_event["exception"]["values"][0]["type"] == "ValueError"
-        assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
-        # Verify span is marked with error
-        assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
+    assert len(error_events) >= 1
+    error_event = error_events[0]
+    assert error_event["exception"]["values"][0]["type"] == "ValueError"
+    assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
+    # Verify span is marked with error
+    assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -929,10 +929,10 @@ def test_fastmcp_sse_transport(sentry_init, capture_events, FastMCP):
 
     # Find MCP spans
     mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    if len(mcp_spans) > 0 and request_ctx is not None:
-        span = mcp_spans[0]
-        # Check that SSE transport is detected
-        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "sse"
+    assert len(mcp_spans) >= 1
+    span = mcp_spans[0]
+    # Check that SSE transport is detected
+    assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "sse"
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -967,10 +967,10 @@ def test_fastmcp_http_transport(sentry_init, capture_events, FastMCP):
 
     # Find MCP spans
     mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    if len(mcp_spans) > 0 and request_ctx is not None:
-        span = mcp_spans[0]
-        # Check that HTTP transport is detected
-        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
+    assert len(mcp_spans) >= 1
+    span = mcp_spans[0]
+    # Check that HTTP transport is detected
+    assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -1003,10 +1003,10 @@ def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP):
 
     # Find MCP spans
     mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    if len(mcp_spans) > 0 and request_ctx is not None:
-        span = mcp_spans[0]
-        # Check that stdio transport is detected
-        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
+    assert len(mcp_spans) >= 1
+    span = mcp_spans[0]
+    # Check that stdio transport is detected
+    assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
 
 
 # =============================================================================
