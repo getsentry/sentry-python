@@ -248,17 +248,23 @@ def postgres_select_orm(request, *args, **kwargs):
 
 
 @csrf_exempt
-def postgres_select_orm_no_autocommit(request, *args, **kwargs):
-    transaction.set_autocommit(False)
-    user = User.objects.using("postgres").all().first()
-    transaction.commit()
+def postgres_insert_orm_no_autocommit(request, *args, **kwargs):
+    transaction.set_autocommit(False, using="postgres")
+    user = User.objects.db_manager("postgres").create_user(
+        username="user1",
+    )
+    transaction.commit(using="postgres")
+    transaction.set_autocommit(True, using="postgres")
+
     return HttpResponse("ok {}".format(user))
 
 
 @csrf_exempt
-def postgres_select_orm_atomic(request, *args, **kwargs):
-    with transaction.atomic():
-        user = User.objects.using("postgres").all().first()
+def postgres_insert_orm_atomic(request, *args, **kwargs):
+    with transaction.atomic(using="postgres"):
+        user = User.objects.db_manager("postgres").create_user(
+            username="user1",
+        )
     return HttpResponse("ok {}".format(user))
 
 
