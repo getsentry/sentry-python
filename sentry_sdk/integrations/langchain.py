@@ -1,7 +1,9 @@
+import contextvars
 import itertools
 import warnings
 from collections import OrderedDict
 from functools import wraps
+import sys
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
@@ -71,6 +73,45 @@ DATA_FIELDS = {
     "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
     "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
 }
+
+
+# Contextvar to track agent names in a stack for re-entrant agent support
+_agent_stack = contextvars.ContextVar("langchain_agent_stack", default=None)  # type: contextvars.ContextVar[Optional[List[Optional[str]]]]
+
+
+def _push_agent(agent_name):
+    # type: (Optional[str]) -> None
+    """Push an agent name onto the stack."""
+    stack = _agent_stack.get()
+    if stack is None:
+        stack = []
+    else:
+        # Copy the list to maintain contextvar isolation across async contexts
+        stack = stack.copy()
+    stack.append(agent_name)
+    _agent_stack.set(stack)
+
+
+def _pop_agent():
+    # type: () -> Optional[str]
+    """Pop an agent name from the stack and return it."""
+    stack = _agent_stack.get()
+    if stack:
+        # Copy the list to maintain contextvar isolation across async contexts
+        stack = stack.copy()
+        agent_name = stack.pop()
+        _agent_stack.set(stack)
+        return agent_name
+    return None
+
+
+def _get_current_agent():
+    # type: () -> Optional[str]
+    """Get the current agent name (top of stack) without removing it."""
+    stack = _agent_stack.get()
+    if stack:
+        return stack[-1]
+    return None
 
 
 class LangchainIntegration(Integration):
@@ -283,6 +324,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             elif "openai" in ai_type:
                 span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
 
+            agent_name = _get_current_agent()
+            if agent_name:
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
@@ -434,6 +479,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             tool_description = serialized.get("description")
             if tool_description is not None:
                 span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
+
+            agent_name = _get_current_agent()
+            if agent_name:
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
@@ -763,45 +812,50 @@ def _wrap_agent_executor_invoke(f):
             name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         ) as span:
-            if agent_name:
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+            _push_agent(agent_name)
+            try:
+                if agent_name:
+                    span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            _set_tools_on_span(span, tools)
+                _set_tools_on_span(span, tools)
 
-            # Run the agent
-            result = f(self, *args, **kwargs)
+                # Run the agent
+                result = f(self, *args, **kwargs)
 
-            input = result.get("input")
-            if (
-                input is not None
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                normalized_messages = normalize_message_roles([input])
-                scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
-                )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
+                input = result.get("input")
+                if (
+                    input is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    normalized_messages = normalize_message_roles([input])
+                    scope = sentry_sdk.get_current_scope()
+                    messages_data = truncate_and_annotate_messages(
+                        normalized_messages, span, scope
                     )
+                    if messages_data is not None:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                            messages_data,
+                            unpack=False,
+                        )
 
-            output = result.get("output")
-            if (
-                output is not None
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                output = result.get("output")
+                if (
+                    output is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-            return result
+                return result
+            finally:
+                # Ensure agent is popped even if an exception occurs
+                _pop_agent()
 
     return new_invoke
 
@@ -821,10 +875,12 @@ def _wrap_agent_executor_stream(f):
 
         span = start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent_name}".strip(),
+            name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         )
         span.__enter__()
+
+        _push_agent(agent_name)
 
         if agent_name:
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
@@ -860,41 +916,57 @@ def _wrap_agent_executor_stream(f):
 
         def new_iterator():
             # type: () -> Iterator[Any]
-            for event in old_iterator:
-                yield event
-
+            exc_info = (None, None, None)  # type: tuple[Any, Any, Any]
             try:
-                output = event.get("output")
+                for event in old_iterator:
+                    yield event
+
+                try:
+                    output = event.get("output")
+                except Exception:
+                    output = None
+
+                if (
+                    output is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
             except Exception:
-                output = None
-
-            if (
-                output is not None
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
-
-            span.__exit__(None, None, None)
+                exc_info = sys.exc_info()
+                set_span_errored(span)
+                raise
+            finally:
+                # Ensure cleanup happens even if iterator is abandoned or fails
+                _pop_agent()
+                span.__exit__(*exc_info)
 
         async def new_iterator_async():
             # type: () -> AsyncIterator[Any]
-            async for event in old_iterator:
-                yield event
-
+            exc_info = (None, None, None)  # type: tuple[Any, Any, Any]
             try:
-                output = event.get("output")
+                async for event in old_iterator:
+                    yield event
+
+                try:
+                    output = event.get("output")
+                except Exception:
+                    output = None
+
+                if (
+                    output is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
             except Exception:
-                output = None
-
-            if (
-                output is not None
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
-
-            span.__exit__(None, None, None)
+                exc_info = sys.exc_info()
+                set_span_errored(span)
+                raise
+            finally:
+                # Ensure cleanup happens even if iterator is abandoned or fails
+                _pop_agent()
+                span.__exit__(*exc_info)
 
         if str(type(result)) == "<class 'async_generator'>":
             result = new_iterator_async()
