@@ -634,7 +634,6 @@ def install_sql_hook():
         real_executemany = CursorWrapper.executemany
         real_connect = BaseDatabaseWrapper.connect
         real_commit = BaseDatabaseWrapper.commit
-        ignore_logger("django.db.backends")
     except AttributeError:
         # This won't work on Django versions < 1.6
         return
@@ -707,6 +706,7 @@ def install_sql_hook():
     CursorWrapper.executemany = executemany
     BaseDatabaseWrapper.connect = connect
     BaseDatabaseWrapper.commit = commit
+    ignore_logger("django.db.backends")
 
 
 def _set_db_data(span, cursor_or_db, db_operation=None):
