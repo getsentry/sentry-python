@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.integrations.logging - sentry-python 2.44.0 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.integrations.logging - sentry-python 2.45.0 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=e1a1ceaf" />
@@ -475,7 +475,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="358">        <span class="n">project_root</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;project_root&quot;</span><span class="p">]</span>
 </span><span data-line="359">
 </span><span data-line="360">        <span class="n">attrs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>  <span class="c1"># type: Any</span>
-</span><span data-line="361">        <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;sentry.origin&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;auto.logger.log&quot;</span>
+</span><span data-line="361">        <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;sentry.origin&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;auto.log.stdlib&quot;</span>
 </span><span data-line="362">
 </span><span data-line="363">        <span class="n">parameters_set</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="364">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -566,7 +566,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../../_static/documentation_options.js?v=2268e961"></script>
+      <script src="../../../_static/documentation_options.js?v=53bda338"></script>
       <script src="../../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../../_static/shibuya.js?v=c1cf1a6b"></script></body>

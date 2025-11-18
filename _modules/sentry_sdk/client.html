@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.client - sentry-python 2.44.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.client - sentry-python 2.45.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
@@ -1134,181 +1134,188 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1006">        <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="s2">&quot;sentry.sdk.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SDK_INFO</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
 </span><span data-line="1007">        <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="s2">&quot;sentry.sdk.version&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SDK_INFO</span><span class="p">[</span><span class="s2">&quot;version&quot;</span><span class="p">]</span>
 </span><span data-line="1008">
-</span><span data-line="1009">        <span class="n">environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;environment&quot;</span><span class="p">)</span>
-</span><span data-line="1010">        <span class="k">if</span> <span class="n">environment</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">&quot;sentry.environment&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">]:</span>
-</span><span data-line="1011">            <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="s2">&quot;sentry.environment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environment</span>
-</span><span data-line="1012">
-</span><span data-line="1013">        <span class="n">release</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;release&quot;</span><span class="p">)</span>
-</span><span data-line="1014">        <span class="k">if</span> <span class="n">release</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">&quot;sentry.release&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">]:</span>
-</span><span data-line="1015">            <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="s2">&quot;sentry.release&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">release</span>
-</span><span data-line="1016">
-</span><span data-line="1017">        <span class="n">trace_context</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">get_trace_context</span><span class="p">()</span>
-</span><span data-line="1018">        <span class="n">trace_id</span> <span class="o">=</span> <span class="n">trace_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace_id&quot;</span><span class="p">)</span>
-</span><span data-line="1019">        <span class="n">span_id</span> <span class="o">=</span> <span class="n">trace_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;span_id&quot;</span><span class="p">)</span>
-</span><span data-line="1020">
-</span><span data-line="1021">        <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;trace_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trace_id</span> <span class="ow">or</span> <span class="s2">&quot;00000000-0000-0000-0000-000000000000&quot;</span>
-</span><span data-line="1022">        <span class="k">if</span> <span class="n">span_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1023">            <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;span_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">span_id</span>
-</span><span data-line="1024">
-</span><span data-line="1025">        <span class="k">if</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1026">            <span class="k">for</span> <span class="n">metric_attribute</span><span class="p">,</span> <span class="n">user_attribute</span> <span class="ow">in</span> <span class="p">(</span>
-</span><span data-line="1027">                <span class="p">(</span><span class="s2">&quot;user.id&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">),</span>
-</span><span data-line="1028">                <span class="p">(</span><span class="s2">&quot;user.name&quot;</span><span class="p">,</span> <span class="s2">&quot;username&quot;</span><span class="p">),</span>
-</span><span data-line="1029">                <span class="p">(</span><span class="s2">&quot;user.email&quot;</span><span class="p">,</span> <span class="s2">&quot;email&quot;</span><span class="p">),</span>
-</span><span data-line="1030">            <span class="p">):</span>
-</span><span data-line="1031">                <span class="k">if</span> <span class="p">(</span>
-</span><span data-line="1032">                    <span class="n">user_attribute</span> <span class="ow">in</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">_user</span>
-</span><span data-line="1033">                    <span class="ow">and</span> <span class="n">metric_attribute</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">]</span>
-</span><span data-line="1034">                <span class="p">):</span>
-</span><span data-line="1035">                    <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="n">metric_attribute</span><span class="p">]</span> <span class="o">=</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">_user</span><span class="p">[</span>
-</span><span data-line="1036">                        <span class="n">user_attribute</span>
-</span><span data-line="1037">                    <span class="p">]</span>
-</span><span data-line="1038">
-</span><span data-line="1039">        <span class="n">debug</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
-</span><span data-line="1040">        <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
-</span><span data-line="1041">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="1042">                <span class="sa">f</span><span class="s2">&quot;[Sentry Metrics] [</span><span class="si">{</span><span class="n">metric</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">metric</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">metric</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span data-line="1043">            <span class="p">)</span>
-</span><span data-line="1044">
-</span><span data-line="1045">        <span class="n">before_send_metric</span> <span class="o">=</span> <span class="n">get_before_send_metric</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
-</span><span data-line="1046">        <span class="k">if</span> <span class="n">before_send_metric</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1047">            <span class="n">metric</span> <span class="o">=</span> <span class="n">before_send_metric</span><span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="p">{})</span>
-</span><span data-line="1048">
-</span><span data-line="1049">        <span class="k">if</span> <span class="n">metric</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1050">            <span class="k">return</span>
+</span><span data-line="1009">        <span class="n">server_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;server_name&quot;</span><span class="p">)</span>
+</span><span data-line="1010">        <span class="k">if</span> <span class="p">(</span>
+</span><span data-line="1011">            <span class="n">server_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span data-line="1012">            <span class="ow">and</span> <span class="n">SPANDATA</span><span class="o">.</span><span class="n">SERVER_ADDRESS</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">]</span>
+</span><span data-line="1013">        <span class="p">):</span>
+</span><span data-line="1014">            <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">SERVER_ADDRESS</span><span class="p">]</span> <span class="o">=</span> <span class="n">server_name</span>
+</span><span data-line="1015">
+</span><span data-line="1016">        <span class="n">environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;environment&quot;</span><span class="p">)</span>
+</span><span data-line="1017">        <span class="k">if</span> <span class="n">environment</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">&quot;sentry.environment&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">]:</span>
+</span><span data-line="1018">            <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="s2">&quot;sentry.environment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environment</span>
+</span><span data-line="1019">
+</span><span data-line="1020">        <span class="n">release</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;release&quot;</span><span class="p">)</span>
+</span><span data-line="1021">        <span class="k">if</span> <span class="n">release</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="s2">&quot;sentry.release&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">]:</span>
+</span><span data-line="1022">            <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="s2">&quot;sentry.release&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">release</span>
+</span><span data-line="1023">
+</span><span data-line="1024">        <span class="n">trace_context</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">get_trace_context</span><span class="p">()</span>
+</span><span data-line="1025">        <span class="n">trace_id</span> <span class="o">=</span> <span class="n">trace_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace_id&quot;</span><span class="p">)</span>
+</span><span data-line="1026">        <span class="n">span_id</span> <span class="o">=</span> <span class="n">trace_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;span_id&quot;</span><span class="p">)</span>
+</span><span data-line="1027">
+</span><span data-line="1028">        <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;trace_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trace_id</span> <span class="ow">or</span> <span class="s2">&quot;00000000-0000-0000-0000-000000000000&quot;</span>
+</span><span data-line="1029">        <span class="k">if</span> <span class="n">span_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1030">            <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;span_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">span_id</span>
+</span><span data-line="1031">
+</span><span data-line="1032">        <span class="k">if</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1033">            <span class="k">for</span> <span class="n">metric_attribute</span><span class="p">,</span> <span class="n">user_attribute</span> <span class="ow">in</span> <span class="p">(</span>
+</span><span data-line="1034">                <span class="p">(</span><span class="s2">&quot;user.id&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">),</span>
+</span><span data-line="1035">                <span class="p">(</span><span class="s2">&quot;user.name&quot;</span><span class="p">,</span> <span class="s2">&quot;username&quot;</span><span class="p">),</span>
+</span><span data-line="1036">                <span class="p">(</span><span class="s2">&quot;user.email&quot;</span><span class="p">,</span> <span class="s2">&quot;email&quot;</span><span class="p">),</span>
+</span><span data-line="1037">            <span class="p">):</span>
+</span><span data-line="1038">                <span class="k">if</span> <span class="p">(</span>
+</span><span data-line="1039">                    <span class="n">user_attribute</span> <span class="ow">in</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">_user</span>
+</span><span data-line="1040">                    <span class="ow">and</span> <span class="n">metric_attribute</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">]</span>
+</span><span data-line="1041">                <span class="p">):</span>
+</span><span data-line="1042">                    <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;attributes&quot;</span><span class="p">][</span><span class="n">metric_attribute</span><span class="p">]</span> <span class="o">=</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">_user</span><span class="p">[</span>
+</span><span data-line="1043">                        <span class="n">user_attribute</span>
+</span><span data-line="1044">                    <span class="p">]</span>
+</span><span data-line="1045">
+</span><span data-line="1046">        <span class="n">debug</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+</span><span data-line="1047">        <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
+</span><span data-line="1048">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span data-line="1049">                <span class="sa">f</span><span class="s2">&quot;[Sentry Metrics] [</span><span class="si">{</span><span class="n">metric</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">metric</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">metric</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span data-line="1050">            <span class="p">)</span>
 </span><span data-line="1051">
-</span><span data-line="1052">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span><span class="p">:</span>
-</span><span data-line="1053">            <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">metric</span><span class="p">)</span>
-</span><span data-line="1054">
-</span><span data-line="1055">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_session</span><span class="p">(</span>
-</span><span data-line="1056">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="1057">        <span class="n">session</span><span class="p">,</span>  <span class="c1"># type: Session</span>
-</span><span data-line="1058">    <span class="p">):</span>
-</span><span data-line="1059">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span data-line="1060">        <span class="k">if</span> <span class="ow">not</span> <span class="n">session</span><span class="o">.</span><span class="n">release</span><span class="p">:</span>
-</span><span data-line="1061">            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Discarded session update because of missing release&quot;</span><span class="p">)</span>
-</span><span data-line="1062">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="1063">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">add_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
-</span><span data-line="1064">
-</span><span data-line="1065">    <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="1066">
-</span><span data-line="1067">        <span class="nd">@overload</span>
-</span><span data-line="1068">        <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
-</span><span data-line="1069">            <span class="c1"># type: (str) -&gt; Optional[Integration]</span>
-</span><span data-line="1070">            <span class="o">...</span>
+</span><span data-line="1052">        <span class="n">before_send_metric</span> <span class="o">=</span> <span class="n">get_before_send_metric</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+</span><span data-line="1053">        <span class="k">if</span> <span class="n">before_send_metric</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1054">            <span class="n">metric</span> <span class="o">=</span> <span class="n">before_send_metric</span><span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="p">{})</span>
+</span><span data-line="1055">
+</span><span data-line="1056">        <span class="k">if</span> <span class="n">metric</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1057">            <span class="k">return</span>
+</span><span data-line="1058">
+</span><span data-line="1059">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span><span class="p">:</span>
+</span><span data-line="1060">            <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">metric</span><span class="p">)</span>
+</span><span data-line="1061">
+</span><span data-line="1062">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_session</span><span class="p">(</span>
+</span><span data-line="1063">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="1064">        <span class="n">session</span><span class="p">,</span>  <span class="c1"># type: Session</span>
+</span><span data-line="1065">    <span class="p">):</span>
+</span><span data-line="1066">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span data-line="1067">        <span class="k">if</span> <span class="ow">not</span> <span class="n">session</span><span class="o">.</span><span class="n">release</span><span class="p">:</span>
+</span><span data-line="1068">            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Discarded session update because of missing release&quot;</span><span class="p">)</span>
+</span><span data-line="1069">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="1070">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">add_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
 </span><span data-line="1071">
-</span><span data-line="1072">        <span class="nd">@overload</span>
-</span><span data-line="1073">        <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
-</span><span data-line="1074">            <span class="c1"># type: (type[I]) -&gt; Optional[I]</span>
-</span><span data-line="1075">            <span class="o">...</span>
-</span><span data-line="1076">
+</span><span data-line="1072">    <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span data-line="1073">
+</span><span data-line="1074">        <span class="nd">@overload</span>
+</span><span data-line="1075">        <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+</span><span data-line="1076">            <span class="c1"># type: (str) -&gt; Optional[Integration]</span>
+</span><span data-line="1077">            <span class="o">...</span>
+</span><span data-line="1078">
+</span><span data-line="1079">        <span class="nd">@overload</span>
+</span><span data-line="1080">        <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+</span><span data-line="1081">            <span class="c1"># type: (type[I]) -&gt; Optional[I]</span>
+</span><span data-line="1082">            <span class="o">...</span>
+</span><span data-line="1083">
 <div class="viewcode-block" id="_Client.get_integration">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.get_integration">[docs]</a>
-</span><span data-line="1077">    <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span>
-</span><span data-line="1078">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="1079">        <span class="n">name_or_class</span><span class="p">,</span>  <span class="c1"># type: Union[str, Type[Integration]]</span>
-</span><span data-line="1080">    <span class="p">):</span>
-</span><span data-line="1081">        <span class="c1"># type: (...) -&gt; Optional[Integration]</span>
-</span><span data-line="1082"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the integration for this client by name or class.</span>
-</span><span data-line="1083"><span class="sd">        If the client does not have that integration then `None` is returned.</span>
-</span><span data-line="1084"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="1085">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-</span><span data-line="1086">            <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span>
-</span><span data-line="1087">        <span class="k">elif</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1088">            <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
-</span><span data-line="1089">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="1090">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Integration has no name&quot;</span><span class="p">)</span>
-</span><span data-line="1091">
-</span><span data-line="1092">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span></div>
+</span><span data-line="1084">    <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span>
+</span><span data-line="1085">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="1086">        <span class="n">name_or_class</span><span class="p">,</span>  <span class="c1"># type: Union[str, Type[Integration]]</span>
+</span><span data-line="1087">    <span class="p">):</span>
+</span><span data-line="1088">        <span class="c1"># type: (...) -&gt; Optional[Integration]</span>
+</span><span data-line="1089"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the integration for this client by name or class.</span>
+</span><span data-line="1090"><span class="sd">        If the client does not have that integration then `None` is returned.</span>
+</span><span data-line="1091"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="1092">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+</span><span data-line="1093">            <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span>
+</span><span data-line="1094">        <span class="k">elif</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1095">            <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
+</span><span data-line="1096">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="1097">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Integration has no name&quot;</span><span class="p">)</span>
+</span><span data-line="1098">
+</span><span data-line="1099">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span></div>
 
-</span><span data-line="1093">
+</span><span data-line="1100">
 <div class="viewcode-block" id="_Client.close">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.close">[docs]</a>
-</span><span data-line="1094">    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span>
-</span><span data-line="1095">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="1096">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span data-line="1097">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
-</span><span data-line="1098">    <span class="p">):</span>
-</span><span data-line="1099">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span data-line="1100"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="1101"><span class="sd">        Close the client and shut down the transport. Arguments have the same</span>
-</span><span data-line="1102"><span class="sd">        semantics as :py:meth:`Client.flush`.</span>
-</span><span data-line="1103"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="1104">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1105">            <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
-</span><span data-line="1106">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span data-line="1107">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_batcher</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1108">                <span class="bp">self</span><span class="o">.</span><span class="n">log_batcher</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span data-line="1109">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1110">                <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span data-line="1111">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="p">:</span>
-</span><span data-line="1112">                <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span data-line="1113">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span data-line="1114">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="kc">None</span></div>
+</span><span data-line="1101">    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span>
+</span><span data-line="1102">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="1103">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+</span><span data-line="1104">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+</span><span data-line="1105">    <span class="p">):</span>
+</span><span data-line="1106">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span data-line="1107"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="1108"><span class="sd">        Close the client and shut down the transport. Arguments have the same</span>
+</span><span data-line="1109"><span class="sd">        semantics as :py:meth:`Client.flush`.</span>
+</span><span data-line="1110"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="1111">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1112">            <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
+</span><span data-line="1113">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span data-line="1114">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_batcher</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1115">                <span class="bp">self</span><span class="o">.</span><span class="n">log_batcher</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span data-line="1116">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1117">                <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span data-line="1118">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="p">:</span>
+</span><span data-line="1119">                <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span data-line="1120">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span data-line="1121">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="kc">None</span></div>
 
-</span><span data-line="1115">
+</span><span data-line="1122">
 <div class="viewcode-block" id="_Client.flush">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.flush">[docs]</a>
-</span><span data-line="1116">    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span>
-</span><span data-line="1117">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="1118">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span data-line="1119">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
-</span><span data-line="1120">    <span class="p">):</span>
-</span><span data-line="1121">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span data-line="1122"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="1123"><span class="sd">        Wait for the current events to be sent.</span>
-</span><span data-line="1124">
-</span><span data-line="1125"><span class="sd">        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.</span>
-</span><span data-line="1126">
-</span><span data-line="1127"><span class="sd">        :param callback: Is invoked with the number of pending events and the configured timeout.</span>
-</span><span data-line="1128"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="1129">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1130">            <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1131">                <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;shutdown_timeout&quot;</span><span class="p">]</span>
-</span><span data-line="1132">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-</span><span data-line="1133">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_batcher</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1134">                <span class="bp">self</span><span class="o">.</span><span class="n">log_batcher</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-</span><span data-line="1135">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1136">                <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-</span><span data-line="1137">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
+</span><span data-line="1123">    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span>
+</span><span data-line="1124">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="1125">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+</span><span data-line="1126">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+</span><span data-line="1127">    <span class="p">):</span>
+</span><span data-line="1128">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span data-line="1129"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="1130"><span class="sd">        Wait for the current events to be sent.</span>
+</span><span data-line="1131">
+</span><span data-line="1132"><span class="sd">        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.</span>
+</span><span data-line="1133">
+</span><span data-line="1134"><span class="sd">        :param callback: Is invoked with the number of pending events and the configured timeout.</span>
+</span><span data-line="1135"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="1136">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1137">            <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1138">                <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;shutdown_timeout&quot;</span><span class="p">]</span>
+</span><span data-line="1139">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+</span><span data-line="1140">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_batcher</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1141">                <span class="bp">self</span><span class="o">.</span><span class="n">log_batcher</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+</span><span data-line="1142">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1143">                <span class="bp">self</span><span class="o">.</span><span class="n">metrics_batcher</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+</span><span data-line="1144">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
 
-</span><span data-line="1138">
-</span><span data-line="1139">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span data-line="1140">        <span class="c1"># type: () -&gt; _Client</span>
-</span><span data-line="1141">        <span class="k">return</span> <span class="bp">self</span>
-</span><span data-line="1142">
-</span><span data-line="1143">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
-</span><span data-line="1144">        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
-</span><span data-line="1145">        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
-
-</span><span data-line="1146">
-</span><span data-line="1147">
-</span><span data-line="1148"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="1145">
+</span><span data-line="1146">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1147">        <span class="c1"># type: () -&gt; _Client</span>
+</span><span data-line="1148">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="1149">
-</span><span data-line="1150"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="1151">    <span class="c1"># Make mypy, PyCharm and other static analyzers think `get_options` is a</span>
-</span><span data-line="1152">    <span class="c1"># type to have nicer autocompletion for params.</span>
-</span><span data-line="1153">    <span class="c1">#</span>
-</span><span data-line="1154">    <span class="c1"># Use `ClientConstructor` to define the argument types of `init` and</span>
-</span><span data-line="1155">    <span class="c1"># `Dict[str, Any]` to tell static analyzers about the return type.</span>
+</span><span data-line="1150">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+</span><span data-line="1151">        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
+</span><span data-line="1152">        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+</span><span data-line="1153">
+</span><span data-line="1154">
+</span><span data-line="1155"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span data-line="1156">
-</span><span data-line="1157">    <span class="k">class</span><span class="w"> </span><span class="nc">get_options</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>  <span class="c1"># noqa: N801</span>
-</span><span data-line="1158">        <span class="k">pass</span>
-</span><span data-line="1159">
+</span><span data-line="1157"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span data-line="1158">    <span class="c1"># Make mypy, PyCharm and other static analyzers think `get_options` is a</span>
+</span><span data-line="1159">    <span class="c1"># type to have nicer autocompletion for params.</span>
+</span><span data-line="1160">    <span class="c1">#</span>
+</span><span data-line="1161">    <span class="c1"># Use `ClientConstructor` to define the argument types of `init` and</span>
+</span><span data-line="1162">    <span class="c1"># `Dict[str, Any]` to tell static analyzers about the return type.</span>
+</span><span data-line="1163">
+</span><span data-line="1164">    <span class="k">class</span><span class="w"> </span><span class="nc">get_options</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>  <span class="c1"># noqa: N801</span>
+</span><span data-line="1165">        <span class="k">pass</span>
+</span><span data-line="1166">
 <div class="viewcode-block" id="Client">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Client">[docs]</a>
-</span><span data-line="1160">    <span class="k">class</span><span class="w"> </span><span class="nc">Client</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">_Client</span><span class="p">):</span>
-</span><span data-line="1161">        <span class="k">pass</span></div>
+</span><span data-line="1167">    <span class="k">class</span><span class="w"> </span><span class="nc">Client</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">_Client</span><span class="p">):</span>
+</span><span data-line="1168">        <span class="k">pass</span></div>
 
-</span><span data-line="1162">
-</span><span data-line="1163"><span class="k">else</span><span class="p">:</span>
-</span><span data-line="1164">    <span class="c1"># Alias `get_options` for actual usage. Go through the lambda indirection</span>
-</span><span data-line="1165">    <span class="c1"># to throw PyCharm off of the weakly typed signature (it would otherwise</span>
-</span><span data-line="1166">    <span class="c1"># discover both the weakly typed signature of `_init` and our faked `init`</span>
-</span><span data-line="1167">    <span class="c1"># type).</span>
-</span><span data-line="1168">
-</span><span data-line="1169">    <span class="n">get_options</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_get_options</span><span class="p">)()</span>
-</span><span data-line="1170">    <span class="n">Client</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_Client</span><span class="p">)()</span>
+</span><span data-line="1169">
+</span><span data-line="1170"><span class="k">else</span><span class="p">:</span>
+</span><span data-line="1171">    <span class="c1"># Alias `get_options` for actual usage. Go through the lambda indirection</span>
+</span><span data-line="1172">    <span class="c1"># to throw PyCharm off of the weakly typed signature (it would otherwise</span>
+</span><span data-line="1173">    <span class="c1"># discover both the weakly typed signature of `_init` and our faked `init`</span>
+</span><span data-line="1174">    <span class="c1"># type).</span>
+</span><span data-line="1175">
+</span><span data-line="1176">    <span class="n">get_options</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_get_options</span><span class="p">)()</span>
+</span><span data-line="1177">    <span class="n">Client</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_Client</span><span class="p">)()</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -1339,7 +1346,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=2268e961"></script>
+      <script src="../../_static/documentation_options.js?v=53bda338"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=c1cf1a6b"></script></body>
