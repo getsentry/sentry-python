@@ -644,15 +644,14 @@ def test_is_sentry_url_no_client():
     ],
 )
 def test_get_error_message(error, expected_result):
-    with pytest.raises(BaseException) as exc_value:
-        exc_value.message = error
-        raise Exception
-    assert get_error_message(exc_value) == expected_result(exc_value)
+    class CustomException(Exception):
+        def __str__(self):
+            return expected_result(self)
 
-    with pytest.raises(BaseException) as exc_value:
-        exc_value.detail = error
-        raise Exception
-    assert get_error_message(exc_value) == expected_result(exc_value)
+    with pytest.raises(CustomException) as exc:
+        raise CustomException
+
+    assert get_error_message(exc.value) == expected_result(exc.value)
 
 
 def test_safe_str_fails():

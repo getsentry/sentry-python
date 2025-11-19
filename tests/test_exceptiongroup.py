@@ -105,7 +105,7 @@ def test_exceptiongroup():
                 "type": "chained",
             },
             "type": "ExceptionGroup",
-            "value": "imports",
+            "value": "imports (2 sub-exceptions)",
         },
         {
             "mechanism": {
@@ -137,7 +137,7 @@ def test_exceptiongroup():
                 "type": "test_suite",
             },
             "type": "ExceptionGroup",
-            "value": "nested",
+            "value": "nested (3 sub-exceptions)",
         },
     ]
 
@@ -183,7 +183,7 @@ def test_exceptiongroup_simple():
     }
 
     assert exception_values[1]["type"] == "ExceptionGroup"
-    assert exception_values[1]["value"] == "simple"
+    assert exception_values[1]["value"] == "simple (1 sub-exception)"
     assert exception_values[1]["mechanism"] == {
         "type": "test_suite",
         "handled": False,
