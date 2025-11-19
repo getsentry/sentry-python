@@ -34,10 +34,7 @@ def _get_db_span_description(integration, command_name, args):
     with capture_internal_exceptions():
         description = _get_safe_command(command_name, args)
 
-    data_should_be_truncated = (
-        integration.max_data_size and len(description) > integration.max_data_size
-    )
-    if data_should_be_truncated:
+    if integration.max_data_size and len(description) > integration.max_data_size:
         description = description[: integration.max_data_size - len("...")] + "..."
 
     return description

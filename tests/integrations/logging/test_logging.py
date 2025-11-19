@@ -320,7 +320,7 @@ def test_sentry_logs_warning(sentry_init, capture_envelopes):
     assert attrs["sentry.environment"] == "production"
     assert attrs["sentry.message.parameter.0"] == "1"
     assert attrs["sentry.message.parameter.1"] == "2"
-    assert attrs["sentry.origin"] == "auto.logger.log"
+    assert attrs["sentry.origin"] == "auto.log.stdlib"
     assert logs[0]["severity_number"] == 13
     assert logs[0]["severity_text"] == "warn"
 
@@ -488,7 +488,7 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
         "numeric": 42,
         "more_complex": "{'nested': 'data'}",
         "logger.name": "test-logger",
-        "sentry.origin": "auto.logger.log",
+        "sentry.origin": "auto.log.stdlib",
         "sentry.message.template": "log #%d",
         "sentry.message.parameter.0": 1,
         "sentry.environment": "production",
@@ -538,7 +538,7 @@ def test_sentry_logs_named_parameters(sentry_init, capture_envelopes):
 
     # Check other standard attributes
     assert attrs["logger.name"] == "test-logger"
-    assert attrs["sentry.origin"] == "auto.logger.log"
+    assert attrs["sentry.origin"] == "auto.log.stdlib"
     assert logs[0]["severity_number"] == 9  # info level
     assert logs[0]["severity_text"] == "info"
 
