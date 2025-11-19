@@ -1,6 +1,10 @@
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.integrations.openai_agents.spans.guardrail import (
+    guardrail_span,
+    update_guardrail_span,
+)
 from ..spans import invoke_agent_span, update_invoke_agent_span, handoff_span
 
 from typing import TYPE_CHECKING
@@ -25,6 +29,13 @@ def _patch_agent_run():
     original_run_single_turn = agents.run.AgentRunner._run_single_turn
     original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
+
+    original_run_single_input_guardrail = (
+        agents._run_impl.RunImpl.run_single_input_guardrail
+    )
+    original_run_single_output_guardrail = (
+        agents._run_impl.RunImpl.run_single_output_guardrail
+    )
 
     def _start_invoke_agent_span(context_wrapper, agent, kwargs):
         # type: (agents.RunContextWrapper, agents.Agent, dict[str, Any]) -> None
@@ -132,9 +143,47 @@ def _patch_agent_run():
 
         return result
 
+    @wraps(
+        original_run_single_input_guardrail.__func__
+        if hasattr(original_run_single_input_guardrail, "__func__")
+        else original_run_single_input_guardrail
+    )
+    async def patched_run_single_input_guardrail(cls, *args, **kwargs):
+        # type: (agents.Runner, *Any, **Any) -> Any
+        agent = args[0]
+        guardrail = args[1]
+
+        with guardrail_span(guardrail, "input", args, kwargs) as span:
+            result = await original_run_single_input_guardrail(*args, **kwargs)
+            update_guardrail_span(span, agent, guardrail, "input", result)
+
+        return result
+
+    @wraps(
+        original_run_single_output_guardrail.__func__
+        if hasattr(original_run_single_output_guardrail, "__func__")
+        else original_run_single_output_guardrail
+    )
+    async def patched_run_single_output_guardrail(cls, *args, **kwargs):
+        # type: (agents.Runner, *Any, **Any) -> Any
+        guardrail = args[0]
+        agent = args[1]
+
+        with guardrail_span(guardrail, "output", args, kwargs) as span:
+            result = await original_run_single_output_guardrail(*args, **kwargs)
+            update_guardrail_span(span, agent, guardrail, "output", result)
+
+        return result
+
     # Apply patches
     agents.run.AgentRunner._run_single_turn = classmethod(patched_run_single_turn)
     agents._run_impl.RunImpl.execute_handoffs = classmethod(patched_execute_handoffs)
     agents._run_impl.RunImpl.execute_final_output = classmethod(
         patched_execute_final_output
+    )
+    agents._run_impl.RunImpl.run_single_input_guardrail = classmethod(
+        patched_run_single_input_guardrail
+    )
+    agents._run_impl.RunImpl.run_single_output_guardrail = classmethod(
+        patched_run_single_output_guardrail
     )

@@ -465,6 +465,12 @@ class SPANDATA:
     Example: "The weather in Paris is rainy and overcast, with temperatures around 57°F"
     """
 
+    GEN_AI_GUARDRAIL_TRIPWIRE_TRIGGERED = "gen_ai.guardrail.tripwire_triggered"
+    """
+    Whether the guardrail tripwire was triggered.
+    Example: true
+    """
+
     GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
     """
     The name of the operation being performed.
@@ -886,6 +892,8 @@ class OP:
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
     GEN_AI_GENERATE_TEXT = "gen_ai.generate_text"
+    GEN_AI_GUARDRAIL_INPUT = "gen_ai.guardrail.input"
+    GEN_AI_GUARDRAIL_OUTPUT = "gen_ai.guardrail.output"
     GEN_AI_HANDOFF = "gen_ai.handoff"
     GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
