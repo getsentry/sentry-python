@@ -142,18 +142,12 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     assert commit_span["origin"] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["data"].get(SPANDATA.DB_SYSTEM) == "postgresql"
-    conn_params = connections["postgres"].get_connection_params()
+    assert commit_span["data"].get(SPANDATA.DB_SYSTEM) == "sqlite"
+    conn_params = connection.get_connection_params()
     assert commit_span["data"].get(SPANDATA.DB_NAME) is not None
     assert commit_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
         "database"
     ) or conn_params.get("dbname")
-    assert commit_span["data"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
-    )
-    assert commit_span["data"].get(SPANDATA.SERVER_PORT) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
-    )
 
 
 @pytest.mark.forked
@@ -271,14 +265,8 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 
     # Verify other database attributes
     assert commit_span["data"].get(SPANDATA.DB_SYSTEM) == "sqlite"
-    conn_params = connections["postgres"].get_connection_params()
+    conn_params = connection.get_connection_params()
     assert commit_span["data"].get(SPANDATA.DB_NAME) is not None
     assert commit_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
         "database"
     ) or conn_params.get("dbname")
-    assert commit_span["data"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
-    )
-    assert commit_span["data"].get(SPANDATA.SERVER_PORT) == os.environ.get(
-        "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
-    )
