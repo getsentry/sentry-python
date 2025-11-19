@@ -336,3 +336,5 @@ if TYPE_CHECKING:
     )
 
     HttpStatusCodeRange = Union[int, Container[int]]
+
+    TraceLifecycleMode = Literal["static", "stream"]
