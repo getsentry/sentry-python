@@ -643,10 +643,36 @@ def test_user_information_transaction_no_pii(sentry_init, capture_events):
     assert "user" not in transaction_event
 
 
-def test_middleware_spans(sentry_init, capture_events):
+def test_middleware_spans_single_span_default(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    # Should only have one middleware.starlette span for the whole stack
+    middleware_spans = [
+        s for s in transaction_event["spans"] if s["op"] == "middleware.starlette"
+    ]
+    assert len(middleware_spans) == 1
+    assert middleware_spans[0]["description"] == "StarletteMiddlewareStack"
+
+
+def test_middleware_spans_legacy_multiple_spans(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration(single_middleware_span=False)],
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -671,16 +697,12 @@ def test_middleware_spans(sentry_init, capture_events):
         "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
     ]
 
-    assert len(transaction_event["spans"]) == len(expected_middleware_spans)
-
-    idx = 0
-    for span in transaction_event["spans"]:
-        if span["op"].startswith("middleware.starlette"):
-            assert (
-                span["tags"]["starlette.middleware_name"]
-                == expected_middleware_spans[idx]
-            )
-            idx += 1
+    actual = [
+        s["tags"]["starlette.middleware_name"]
+        for s in transaction_event["spans"]
+        if s["op"].startswith("middleware.starlette")
+    ]
+    assert actual == expected_middleware_spans
 
 
 def test_middleware_spans_disabled(sentry_init, capture_events):

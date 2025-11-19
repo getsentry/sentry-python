@@ -91,6 +91,7 @@ class StarletteIntegration(Integration):
         failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Union[Set[int], list[HttpStatusCodeRange], None]
         middleware_spans=True,  # type: bool
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
+        single_middleware_span=True,  # type: bool
     ):
         # type: (...) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
@@ -101,6 +102,7 @@ class StarletteIntegration(Integration):
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
+        self.single_middleware_span = single_middleware_span
 
         if isinstance(failed_request_status_codes, Set):
             self.failed_request_status_codes = failed_request_status_codes  # type: Container[int]
@@ -362,11 +364,16 @@ def patch_middlewares():
 
         def _sentry_middleware_init(self, cls, *args, **kwargs):
             # type: (Any, Any, Any, Any) -> None
+            integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
             if cls == SentryAsgiMiddleware:
                 return old_middleware_init(self, cls, *args, **kwargs)
 
-            span_enabled_cls = _enable_span_for_middleware(cls)
-            old_middleware_init(self, span_enabled_cls, *args, **kwargs)
+            # If single_middleware_span is enabled, do not patch individual middlewares
+            if integration and getattr(integration, "single_middleware_span", False):
+                old_middleware_init(self, cls, *args, **kwargs)
+            else:
+                span_enabled_cls = _enable_span_for_middleware(cls)
+                old_middleware_init(self, span_enabled_cls, *args, **kwargs)
 
             if cls == AuthenticationMiddleware:
                 patch_authentication_middleware(cls)
@@ -389,6 +396,15 @@ def patch_asgi_app():
         integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
         if integration is None:
             return await old_app(self, scope, receive, send)
+
+        # If single_middleware_span is enabled, wrap the whole middleware stack in one span
+        if getattr(integration, "single_middleware_span", False):
+            with sentry_sdk.start_span(
+                op=OP.MIDDLEWARE_STARLETTE,
+                name="StarletteMiddlewareStack",
+                origin=StarletteIntegration.origin,
+            ):
+                return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
