@@ -22,6 +22,7 @@ from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
+    has_streaming_enabled,
     has_tracing_enabled,
     normalize_incoming_data,
     PropagationContext,
@@ -1124,9 +1125,10 @@ class Scope:
                 transaction.set_profiler_id(get_profiler_id())
 
             # we don't bother to keep spans if we already know we're not going to
-            # send the transaction
-            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
+            # send the transaction or if we're in streaming mode
+            if not has_streaming_enabled(client.options):
+                max_spans = (client.options["_experiments"].get("max_spans")) or 1000
+                transaction.init_span_recorder(maxlen=max_spans)
 
         return transaction
 

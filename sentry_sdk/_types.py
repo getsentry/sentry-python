@@ -1,3 +1,4 @@
+from consts import SPANSTATUS
 from typing import TYPE_CHECKING, TypeVar, Union
 
 
@@ -222,6 +223,17 @@ if TYPE_CHECKING:
     # TODO: Make a proper type definition for this (PRs welcome!)
     Hint = Dict[str, Any]
 
+    # TODO: Consolidate attribute types. E.g. metrics use the same attr structure.
+    # I'm keeping span attrs separate for now so that the span first stuff is
+    # isolated until it's not experimental.
+    SpanAttributeValue = TypedDict(
+        "SpanAttributeValue",
+        {
+            "type": Literal["string", "boolean", "double", "integer"],
+            "value": str | bool | float | int,
+        },
+    )
+
     Log = TypedDict(
         "Log",
         {
@@ -259,6 +271,23 @@ if TYPE_CHECKING:
     )
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
+
+    # This is the V2 span format
+    # https://develop.sentry.dev/sdk/telemetry/spans/span-protocol/
+    SpanV2 = TypedDict(
+        "SpanV2",
+        {
+            "trace_id": str,
+            "span_id": str,
+            "parent_span_id": Optional[str],
+            "name": str,
+            "status": Literal[SPANSTATUS.OK, SPANSTATUS.ERROR],
+            "is_segment": bool,
+            "start_timestamp": float,
+            "end_timestamp": float,
+            "attributes": Optional[dict[str, SpanAttributeValue]],
+        },
+    )
 
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]

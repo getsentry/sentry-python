@@ -11,6 +11,7 @@ import warnings
 import sentry_sdk
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk._metrics_batcher import MetricsBatcher
+from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.utils import (
     AnnotatedValue,
     ContextVar,
@@ -187,6 +188,7 @@ class BaseClient:
         self.monitor = None  # type: Optional[Monitor]
         self.log_batcher = None  # type: Optional[LogBatcher]
         self.metrics_batcher = None  # type: Optional[MetricsBatcher]
+        self._span_batcher = None  # type: Optional[SpanBatcher]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -394,6 +396,13 @@ class _Client(BaseClient):
             self.metrics_batcher = None
             if has_metrics_enabled(self.options):
                 self.metrics_batcher = MetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                )
+
+            self._span_batcher = None
+            if self.options["_experiments"].get("trace_lifecycle", None) == "stream":
+                self._span_batcher = SpanBatcher(
                     capture_func=_capture_envelope,
                     record_lost_func=_record_lost_event,
                 )

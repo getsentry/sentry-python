@@ -711,6 +711,14 @@ class Span:
         scope = scope or sentry_sdk.get_current_scope()
         maybe_create_breadcrumbs_from_span(scope, self)
 
+        client = sentry_sdk.get_client()
+        if client.is_active():
+            if (
+                has_span_streaming_enabled(client.options)
+                and self.containing_transaction.sampled
+            ):
+                client._span_batcher.add(self)
+
         return None
 
     def to_json(self):
@@ -857,6 +865,12 @@ class Transaction(Span):
         else:
             self._sample_rand = _generate_sample_rand(self.trace_id)
 
+        self._mode = "static"
+        client = sentry_sdk.get_client()
+        if client.is_active():
+            if has_span_streaming_enabled(client.options):
+                self._mode = "stream"
+
     def __repr__(self):
         # type: () -> str
         return (
@@ -882,9 +896,11 @@ class Transaction(Span):
         with sentry_sdk.start_transaction, and therefore the transaction will
         be discarded.
         """
-
-        # We must explicitly check self.sampled is False since self.sampled can be None
-        return self._span_recorder is not None or self.sampled is False
+        if self._mode == "static":
+            # We must explicitly check self.sampled is False since self.sampled can be None
+            return self._span_recorder is not None or self.sampled is False
+        else:
+            return True
 
     def __enter__(self):
         # type: () -> Transaction
@@ -972,7 +988,8 @@ class Transaction(Span):
     ):
         # type: (...) -> Optional[str]
         """Finishes the transaction and sends it to Sentry.
-        All finished spans in the transaction will also be sent to Sentry.
+        If we're in non-streaming mode, all finished spans in the transaction
+        will also be sent to Sentry at this point.
 
         :param scope: The Scope to use for this transaction.
             If not provided, the current Scope will be used.
@@ -1000,7 +1017,7 @@ class Transaction(Span):
             # We have no active client and therefore nowhere to send this transaction.
             return None
 
-        if self._span_recorder is None:
+        if self._mode == "static" and self._span_recorder is None:
             # Explicit check against False needed because self.sampled might be None
             if self.sampled is False:
                 logger.debug("Discarding transaction because sampled = False")
@@ -1482,5 +1499,6 @@ from sentry_sdk.tracing_utils import (
     extract_sentrytrace_data,
     _generate_sample_rand,
     has_tracing_enabled,
+    has_span_streaming_enabled,
     maybe_create_breadcrumbs_from_span,
 )
