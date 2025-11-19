@@ -79,6 +79,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-mcp"
+      - name: Test fastmcp
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-fastmcp"
       - name: Test openai-base
         run: |
           set -x # print commands that are executed
