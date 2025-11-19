@@ -728,6 +728,9 @@ def _set_db_data(span, cursor_or_db, db_operation=None):
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
 
+    if db_operation is not None:
+        span.set_data(SPANDATA.DB_OPERATION, db_operation)
+
     # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
     # actually has a `connection` and the `connection` has a `get_dsn_parameters`
     # attribute, only to throw an error once you actually want to call it.
@@ -760,9 +763,6 @@ def _set_db_data(span, cursor_or_db, db_operation=None):
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
         span.set_data(SPANDATA.DB_NAME, db_name)
-
-    if db_operation is not None:
-        span.set_data(SPANDATA.DB_OPERATION, db_operation)
 
     server_address = connection_params.get("host")
     if server_address is not None:
