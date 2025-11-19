@@ -6,10 +6,6 @@
       fail-fast: false
       matrix:
         python-version: [{{ py_versions|join(",") }}]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-22.04]
 
     {% if needs_docker %}
@@ -34,17 +30,14 @@
         ports:
           - 5432:5432
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}{% endraw %}
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
 
     {% endif %}
-    # Use Docker container only for Python 3.6
-    {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
     steps:
       - uses: actions/checkout@v5.0.0
       - uses: actions/setup-python@v6
-        {% raw %}if: ${{ matrix.python-version != '3.6' }}{% endraw %}
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
@@ -81,15 +74,8 @@
           ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
       {% endfor %}
 
-      - name: Generate coverage XML (Python 3.6)
-        if: {% raw %}${{ !cancelled() && matrix.python-version == '3.6' }}{% endraw %}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-
       - name: Generate coverage XML
-        if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %}
+        if: {% raw %}${{ !cancelled() }}{% endraw %}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
