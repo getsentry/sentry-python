@@ -1,6 +1,6 @@
-from consts import SPANSTATUS
 from typing import TYPE_CHECKING, TypeVar, Union
 
+from sentry_sdk.consts import SPANSTATUS
 
 # Re-exported for compat, since code out there in the wild might use this variable.
 MYPY = TYPE_CHECKING

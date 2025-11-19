@@ -281,6 +281,7 @@ class Span:
         "name",
         "_flags",
         "_flags_capacity",
+        "_mode",
     )
 
     def __init__(
