@@ -41,8 +41,6 @@ def clear_litellm_cache():
     The LiteLLM integration uses setup_once() which only runs once per Python process.
     This fixture ensures the integration is properly re-initialized for each test.
     """
-    # Import here to avoid circular dependencies
-    from sentry_sdk.integrations import _processed_integrations, _installed_integrations
 
     # Stop all existing mocks
     mock.patch.stopall()
@@ -54,10 +52,6 @@ def clear_litellm_cache():
     ):
         litellm.in_memory_llm_clients_cache.flush_cache()
 
-    # Remove litellm from integration tracking so setup_once() can run again
-    _processed_integrations.discard("litellm")
-    _installed_integrations.discard("litellm")
-
     yield
 
     # Clean up after test as well
@@ -67,10 +61,6 @@ def clear_litellm_cache():
         and litellm.in_memory_llm_clients_cache
     ):
         litellm.in_memory_llm_clients_cache.flush_cache()
-
-    # Remove again for next test
-    _processed_integrations.discard("litellm")
-    _installed_integrations.discard("litellm")
 
 
 # Mock response objects
