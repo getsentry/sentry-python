@@ -109,6 +109,7 @@ TEST_SUITE_CONFIG = {
     "dramatiq": {
         "package": "dramatiq",
         "num_versions": 2,
+        "include": "!=2.0.0",
     },
     "falcon": {
         "package": "falcon",
@@ -249,6 +250,12 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
         },
     },
+    "fastmcp": {
+        "package": "fastmcp",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
     "openai-base": {
         "package": "openai",
         "integration_name": "openai",
@@ -279,6 +286,7 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
         },
         "python": ">=3.10",
+        "include": "!=0.6.0,!=0.6.1",
     },
     "openfeature": {
         "package": "openfeature-sdk",

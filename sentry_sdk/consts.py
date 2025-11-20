@@ -1447,4 +1447,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.44.0"
+VERSION = "2.45.0"
