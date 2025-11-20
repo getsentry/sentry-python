@@ -109,7 +109,6 @@ TEST_SUITE_CONFIG = {
     "dramatiq": {
         "package": "dramatiq",
         "num_versions": 2,
-        "include": "!=2.0.0",
     },
     "falcon": {
         "package": "falcon",
