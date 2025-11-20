@@ -953,3 +953,230 @@ def test_google_genai_message_truncation(
     assert (
         event["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 2
     )
+
+
+# Sample embed content API response JSON
+EXAMPLE_EMBED_RESPONSE_JSON = {
+    "embeddings": [
+        {
+            "values": [0.1, 0.2, 0.3, 0.4, 0.5],  # Simplified embedding vector
+            "statistics": {
+                "tokenCount": 10,
+                "truncated": False,
+            },
+        },
+        {
+            "values": [0.2, 0.3, 0.4, 0.5, 0.6],
+            "statistics": {
+                "tokenCount": 15,
+                "truncated": False,
+            },
+        },
+    ],
+    "metadata": {
+        "billableCharacterCount": 42,
+    },
+}
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_embed_content(
+    sentry_init, capture_events, send_default_pii, include_prompts, mock_genai_client
+):
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    # Mock the HTTP response at the _api_client.request() level
+    mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
+
+    with mock.patch.object(
+        mock_genai_client._api_client,
+        "request",
+        return_value=mock_http_response,
+    ):
+        with start_transaction(name="google_genai_embeddings"):
+            mock_genai_client.models.embed_content(
+                model="text-embedding-004",
+                contents=[
+                    "What is your name?",
+                    "What is your favorite color?",
+                ],
+            )
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "google_genai_embeddings"
+
+    # Should have 1 span for embeddings
+    assert len(event["spans"]) == 1
+    (embed_span,) = event["spans"]
+
+    # Check embeddings span
+    assert embed_span["op"] == OP.GEN_AI_EMBEDDINGS
+    assert embed_span["description"] == "embeddings text-embedding-004"
+    assert embed_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert embed_span["data"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert embed_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+
+    # Check input texts if PII is allowed
+    if send_default_pii and include_prompts:
+        input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+        assert input_texts == [
+            "What is your name?",
+            "What is your favorite color?",
+        ]
+    else:
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["data"]
+
+    # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
+    assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+
+
+def test_embed_content_string_input(sentry_init, capture_events, mock_genai_client):
+    """Test embed_content with a single string instead of list."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    # Mock response with single embedding
+    single_embed_response = {
+        "embeddings": [
+            {
+                "values": [0.1, 0.2, 0.3],
+                "statistics": {
+                    "tokenCount": 5,
+                    "truncated": False,
+                },
+            },
+        ],
+        "metadata": {
+            "billableCharacterCount": 10,
+        },
+    }
+    mock_http_response = create_mock_http_response(single_embed_response)
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai_embeddings"):
+            mock_genai_client.models.embed_content(
+                model="text-embedding-004",
+                contents="Single text input",
+            )
+
+    (event,) = events
+    (embed_span,) = event["spans"]
+
+    # Check that single string is handled correctly
+    input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+    assert input_texts == ["Single text input"]
+    # Should use token_count from statistics (5), not billable_character_count (10)
+    assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+
+
+def test_embed_content_error_handling(sentry_init, capture_events, mock_genai_client):
+    """Test error handling in embed_content."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    # Mock an error at the HTTP level
+    with mock.patch.object(
+        mock_genai_client._api_client,
+        "request",
+        side_effect=Exception("Embedding API Error"),
+    ):
+        with start_transaction(name="google_genai_embeddings"):
+            with pytest.raises(Exception, match="Embedding API Error"):
+                mock_genai_client.models.embed_content(
+                    model="text-embedding-004",
+                    contents=["This will fail"],
+                )
+
+    # Should have both transaction and error events
+    assert len(events) == 2
+    error_event, _ = events
+
+    assert error_event["level"] == "error"
+    assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert error_event["exception"]["values"][0]["value"] == "Embedding API Error"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "google_genai"
+
+
+def test_embed_content_without_metadata(sentry_init, capture_events, mock_genai_client):
+    """Test embed_content response without metadata (MLDev API)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    # Response without metadata (typical for MLDev, not Vertex AI)
+    mldev_response = {
+        "embeddings": [
+            {
+                "values": [0.1, 0.2, 0.3],
+            },
+        ],
+    }
+    mock_http_response = create_mock_http_response(mldev_response)
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai_embeddings"):
+            mock_genai_client.models.embed_content(
+                model="text-embedding-004",
+                contents=["Test without metadata"],
+            )
+
+    (event,) = events
+    (embed_span,) = event["spans"]
+
+    # But no usage tokens since there's no metadata
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["data"]
+
+
+def test_embed_content_span_origin(sentry_init, capture_events, mock_genai_client):
+    """Test that embed_content spans have correct origin."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai_embeddings"):
+            mock_genai_client.models.embed_content(
+                model="text-embedding-004",
+                contents=["Test origin"],
+            )
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    for span in event["spans"]:
+        assert span["origin"] == "auto.ai.google_genai"
