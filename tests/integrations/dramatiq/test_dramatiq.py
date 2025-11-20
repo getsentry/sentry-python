@@ -257,8 +257,11 @@ def test_that_multiple_errors_are_captured(broker, worker, capture_events, fail_
         return x / y
 
     dummy_actor.send(1, 0)
-    with pytest.raises(ZeroDivisionError):
-        broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     dummy_actor.send(1, None)
