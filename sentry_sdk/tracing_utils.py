@@ -115,7 +115,7 @@ def has_span_streaming_enabled(options):
     if options is None:
         return False
 
-    return options.get("_experiments").get("trace_lifecycle") == "stream"
+    return (options.get("_experiments") or {}).get("trace_lifecycle") == "stream"
 
 
 @contextlib.contextmanager
