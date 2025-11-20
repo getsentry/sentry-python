@@ -36,7 +36,13 @@ def worker(broker):
     worker.stop()
 
 
-def test_that_a_single_error_is_captured(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "fail_fast",
+    [
+        (False, True),
+    ],
+)
+def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fast):
     events = capture_events()
 
     @dramatiq.actor(max_retries=0)
@@ -45,7 +51,11 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events):
 
     dummy_actor.send(1, 2)
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     (event,) = events
@@ -54,15 +64,19 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events):
 
 
 @pytest.mark.parametrize(
-    "broker,expected_span_status",
+    "broker,expected_span_status,fail_fast",
     [
-        (1.0, SPANSTATUS.INTERNAL_ERROR),
-        (1.0, SPANSTATUS.OK),
+        (1.0, SPANSTATUS.INTERNAL_ERROR, False),
+        (1.0, SPANSTATUS.OK, False),
+        (1.0, SPANSTATUS.INTERNAL_ERROR, True),
+        (1.0, SPANSTATUS.OK, True),
     ],
-    ids=["error", "success"],
+    ids=["error", "success", "error_fail_fast", "success_fail_fast"],
     indirect=["broker"],
 )
-def test_task_transaction(broker, worker, capture_events, expected_span_status):
+def test_task_transaction(
+    broker, worker, capture_events, expected_span_status, fail_fast
+):
     events = capture_events()
     task_fails = expected_span_status == SPANSTATUS.INTERNAL_ERROR
 
@@ -71,7 +85,13 @@ def test_task_transaction(broker, worker, capture_events, expected_span_status):
         return x / y
 
     dummy_actor.send(1, int(not task_fails))
-    broker.join(dummy_actor.queue_name)
+
+    if expected_span_status == SPANSTATUS.INTERNAL_ERROR and fail_fast:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+
     worker.join()
 
     if task_fails:
@@ -106,7 +126,15 @@ def test_dramatiq_propagate_trace(broker, worker, capture_events):
     assert events[0]["contexts"]["trace"]["trace_id"] == outer_transaction.trace_id
 
 
-def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "fail_fast",
+    [
+        (False, True),
+    ],
+)
+def test_that_dramatiq_message_id_is_set_as_extra(
+    broker, worker, capture_events, fail_fast
+):
     events = capture_events()
 
     @dramatiq.actor(max_retries=0)
@@ -115,7 +143,11 @@ def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events
         return x / y
 
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     event_message, event_error = events
@@ -129,7 +161,13 @@ def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events
     assert all(uuid.UUID(msg_id) and isinstance(msg_id, str) for msg_id in msg_ids)
 
 
-def test_that_local_variables_are_captured(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "fail_fast",
+    [
+        (False, True),
+    ],
+)
+def test_that_local_variables_are_captured(broker, worker, capture_events, fail_fast):
     events = capture_events()
 
     @dramatiq.actor(max_retries=0)
@@ -139,7 +177,11 @@ def test_that_local_variables_are_captured(broker, worker, capture_events):
 
     dummy_actor.send(1, 2)
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     (event,) = events
@@ -168,7 +210,13 @@ def test_that_messages_are_captured(broker, worker, capture_events):
     assert event["transaction"] == "dummy_actor"
 
 
-def test_that_sub_actor_errors_are_captured(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "fail_fast",
+    [
+        (False, True),
+    ],
+)
+def test_that_sub_actor_errors_are_captured(broker, worker, capture_events, fail_fast):
     events = capture_events()
 
     @dramatiq.actor(max_retries=0)
@@ -181,7 +229,11 @@ def test_that_sub_actor_errors_are_captured(broker, worker, capture_events):
 
     dummy_actor.send(1, 2)
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     (event,) = events
@@ -191,7 +243,13 @@ def test_that_sub_actor_errors_are_captured(broker, worker, capture_events):
     assert exception["type"] == "ZeroDivisionError"
 
 
-def test_that_multiple_errors_are_captured(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "fail_fast",
+    [
+        (False, True),
+    ],
+)
+def test_that_multiple_errors_are_captured(broker, worker, capture_events, fail_fast):
     events = capture_events()
 
     @dramatiq.actor(max_retries=0)
@@ -199,11 +257,16 @@ def test_that_multiple_errors_are_captured(broker, worker, capture_events):
         return x / y
 
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ZeroDivisionError):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     dummy_actor.send(1, None)
-    broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     event1, event2 = events
@@ -217,7 +280,15 @@ def test_that_multiple_errors_are_captured(broker, worker, capture_events):
     assert exception["type"] == "TypeError"
 
 
-def test_that_message_data_is_added_as_request(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "fail_fast",
+    [
+        (False, True),
+    ],
+)
+def test_that_message_data_is_added_as_request(
+    broker, worker, capture_events, fail_fast
+):
     events = capture_events()
 
     @dramatiq.actor(max_retries=0)
@@ -231,7 +302,11 @@ def test_that_message_data_is_added_as_request(broker, worker, capture_events):
         ),
         max_retries=0,
     )
-    broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     (event,) = events
@@ -247,7 +322,15 @@ def test_that_message_data_is_added_as_request(broker, worker, capture_events):
     assert isinstance(request_data["message_timestamp"], int)
 
 
-def test_that_expected_exceptions_are_not_captured(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "fail_fast",
+    [
+        (False, True),
+    ],
+)
+def test_that_expected_exceptions_are_not_captured(
+    broker, worker, capture_events, fail_fast
+):
     events = capture_events()
 
     class ExpectedException(Exception):
@@ -258,13 +341,25 @@ def test_that_expected_exceptions_are_not_captured(broker, worker, capture_event
         raise ExpectedException
 
     dummy_actor.send()
-    broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(ExpectedException):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     assert events == []
 
 
-def test_that_retry_exceptions_are_not_captured(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "fail_fast",
+    [
+        (False, True),
+    ],
+)
+def test_that_retry_exceptions_are_not_captured(
+    broker, worker, capture_events, fail_fast
+):
     events = capture_events()
 
     @dramatiq.actor(max_retries=2)
@@ -272,7 +367,11 @@ def test_that_retry_exceptions_are_not_captured(broker, worker, capture_events):
         raise dramatiq.errors.Retry("Retrying", delay=100)
 
     dummy_actor.send()
-    broker.join(dummy_actor.queue_name)
+    if fail_fast:
+        with pytest.raises(dramatiq.errors.Retry):
+            broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
+    else:
+        broker.join(dummy_actor.queue_name, fail_fast=fail_fast)
     worker.join()
 
     assert events == []
