@@ -65,44 +65,44 @@ except ImportError:
 
 # Conditional imports for embeddings providers
 try:
-    from langchain_openai import OpenAIEmbeddings
+    from langchain_openai import OpenAIEmbeddings  # type: ignore[import-not-found]
 except ImportError:
-    OpenAIEmbeddings = None  # type: ignore[assignment, misc]
+    OpenAIEmbeddings = None
 
 try:
-    from langchain_openai import AzureOpenAIEmbeddings
+    from langchain_openai import AzureOpenAIEmbeddings  # type: ignore[import-not-found]
 except ImportError:
-    AzureOpenAIEmbeddings = None  # type: ignore[assignment, misc]
+    AzureOpenAIEmbeddings = None
 
 try:
-    from langchain_google_vertexai import VertexAIEmbeddings
+    from langchain_google_vertexai import VertexAIEmbeddings  # type: ignore[import-not-found]
 except ImportError:
-    VertexAIEmbeddings = None  # type: ignore[assignment, misc]
+    VertexAIEmbeddings = None
 
 try:
-    from langchain_aws import BedrockEmbeddings
+    from langchain_aws import BedrockEmbeddings  # type: ignore[import-not-found]
 except ImportError:
-    BedrockEmbeddings = None  # type: ignore[assignment, misc]
+    BedrockEmbeddings = None
 
 try:
-    from langchain_cohere import CohereEmbeddings
+    from langchain_cohere import CohereEmbeddings  # type: ignore[import-not-found]
 except ImportError:
-    CohereEmbeddings = None  # type: ignore[assignment, misc]
+    CohereEmbeddings = None
 
 try:
-    from langchain_mistralai import MistralAIEmbeddings
+    from langchain_mistralai import MistralAIEmbeddings  # type: ignore[import-not-found]
 except ImportError:
-    MistralAIEmbeddings = None  # type: ignore[assignment, misc]
+    MistralAIEmbeddings = None
 
 try:
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_huggingface import HuggingFaceEmbeddings  # type: ignore[import-not-found]
 except ImportError:
-    HuggingFaceEmbeddings = None  # type: ignore[assignment, misc]
+    HuggingFaceEmbeddings = None
 
 try:
-    from langchain_ollama import OllamaEmbeddings
+    from langchain_ollama import OllamaEmbeddings  # type: ignore[import-not-found]
 except ImportError:
-    OllamaEmbeddings = None  # type: ignore[assignment, misc]
+    OllamaEmbeddings = None
 
 
 DATA_FIELDS = {
