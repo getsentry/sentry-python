@@ -39,7 +39,8 @@ def worker(broker):
 @pytest.mark.parametrize(
     "fail_fast",
     [
-        (False, True),
+        False,
+        True,
     ],
 )
 def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fast):
@@ -129,7 +130,8 @@ def test_dramatiq_propagate_trace(broker, worker, capture_events):
 @pytest.mark.parametrize(
     "fail_fast",
     [
-        (False, True),
+        False,
+        True,
     ],
 )
 def test_that_dramatiq_message_id_is_set_as_extra(
@@ -164,7 +166,8 @@ def test_that_dramatiq_message_id_is_set_as_extra(
 @pytest.mark.parametrize(
     "fail_fast",
     [
-        (False, True),
+        False,
+        True,
     ],
 )
 def test_that_local_variables_are_captured(broker, worker, capture_events, fail_fast):
@@ -213,7 +216,8 @@ def test_that_messages_are_captured(broker, worker, capture_events):
 @pytest.mark.parametrize(
     "fail_fast",
     [
-        (False, True),
+        False,
+        True,
     ],
 )
 def test_that_sub_actor_errors_are_captured(broker, worker, capture_events, fail_fast):
@@ -246,7 +250,8 @@ def test_that_sub_actor_errors_are_captured(broker, worker, capture_events, fail
 @pytest.mark.parametrize(
     "fail_fast",
     [
-        (False, True),
+        False,
+        True,
     ],
 )
 def test_that_multiple_errors_are_captured(broker, worker, capture_events, fail_fast):
@@ -286,7 +291,8 @@ def test_that_multiple_errors_are_captured(broker, worker, capture_events, fail_
 @pytest.mark.parametrize(
     "fail_fast",
     [
-        (False, True),
+        False,
+        True,
     ],
 )
 def test_that_message_data_is_added_as_request(
@@ -328,7 +334,8 @@ def test_that_message_data_is_added_as_request(
 @pytest.mark.parametrize(
     "fail_fast",
     [
-        (False, True),
+        False,
+        True,
     ],
 )
 def test_that_expected_exceptions_are_not_captured(
@@ -357,7 +364,8 @@ def test_that_expected_exceptions_are_not_captured(
 @pytest.mark.parametrize(
     "fail_fast",
     [
-        (False, True),
+        False,
+        True,
     ],
 )
 def test_that_retry_exceptions_are_not_captured(
