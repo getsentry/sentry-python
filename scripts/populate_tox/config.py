@@ -286,6 +286,7 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
         },
         "python": ">=3.10",
+        "include": "!=0.6.0,!=0.6.1",
     },
     "openfeature": {
         "package": "openfeature-sdk",
