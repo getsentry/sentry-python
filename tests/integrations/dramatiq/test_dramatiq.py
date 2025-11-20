@@ -45,7 +45,8 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events):
 
     dummy_actor.send(1, 2)
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ZeroDivisionError):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     (event,) = events
@@ -71,7 +72,13 @@ def test_task_transaction(broker, worker, capture_events, expected_span_status):
         return x / y
 
     dummy_actor.send(1, int(not task_fails))
-    broker.join(dummy_actor.queue_name)
+
+    if expected_span_status == SPANSTATUS.INTERNAL_ERROR:
+        with pytest.raises(ZeroDivisionError):
+            broker.join(dummy_actor.queue_name)
+    else:
+        broker.join(dummy_actor.queue_name)
+
     worker.join()
 
     if task_fails:
@@ -115,7 +122,8 @@ def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events
         return x / y
 
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ZeroDivisionError):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     event_message, event_error = events
@@ -139,7 +147,8 @@ def test_that_local_variables_are_captured(broker, worker, capture_events):
 
     dummy_actor.send(1, 2)
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ZeroDivisionError):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     (event,) = events
@@ -181,7 +190,8 @@ def test_that_sub_actor_errors_are_captured(broker, worker, capture_events):
 
     dummy_actor.send(1, 2)
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ZeroDivisionError):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     (event,) = events
@@ -199,11 +209,13 @@ def test_that_multiple_errors_are_captured(broker, worker, capture_events):
         return x / y
 
     dummy_actor.send(1, 0)
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ZeroDivisionError):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     dummy_actor.send(1, None)
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ZeroDivisionError):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     event1, event2 = events
@@ -231,7 +243,8 @@ def test_that_message_data_is_added_as_request(broker, worker, capture_events):
         ),
         max_retries=0,
     )
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ZeroDivisionError):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     (event,) = events
@@ -258,7 +271,8 @@ def test_that_expected_exceptions_are_not_captured(broker, worker, capture_event
         raise ExpectedException
 
     dummy_actor.send()
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(ExpectedException):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     assert events == []
@@ -272,7 +286,8 @@ def test_that_retry_exceptions_are_not_captured(broker, worker, capture_events):
         raise dramatiq.errors.Retry("Retrying", delay=100)
 
     dummy_actor.send()
-    broker.join(dummy_actor.queue_name)
+    with pytest.raises(dramatiq.errors.Retry):
+        broker.join(dummy_actor.queue_name)
     worker.join()
 
     assert events == []
