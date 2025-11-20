@@ -80,6 +80,7 @@ class EventScrubber:
             self.denylist += pii_denylist
 
         self.denylist = [x.lower() for x in self.denylist]
+        self._denylist_set = set(self.denylist)
         self.recursive = recursive
 
     def scrub_list(self, lst):
@@ -111,7 +112,7 @@ class EventScrubber:
         for k, v in d.items():
             # The cast is needed because mypy is not smart enough to figure out that k must be a
             # string after the isinstance check.
-            if isinstance(k, str) and k.lower() in self.denylist:
+            if isinstance(k, str) and k.lower() in self._denylist_set:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
             elif self.recursive:
                 self.scrub_dict(v)  # no-op unless v is a dict
