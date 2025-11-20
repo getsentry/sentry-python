@@ -70,7 +70,7 @@ except ImportError:
     OpenAIEmbeddings = None
 
 try:
-    from langchain_openai import AzureOpenAIEmbeddings  # type: ignore[import-not-found]
+    from langchain_openai import AzureOpenAIEmbeddings
 except ImportError:
     AzureOpenAIEmbeddings = None
 
