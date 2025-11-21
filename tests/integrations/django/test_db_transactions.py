@@ -221,7 +221,7 @@ def test_db_no_autocommit_rollback_execute(sentry_init, client, capture_events):
     assert len(insert_spans) == 1
     insert_span = insert_spans[0]
 
-    # Verify query and commit statements are siblings
+    # Verify query and rollback statements are siblings
     assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
 
 
@@ -304,7 +304,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
         span for span in event["spans"] if span["description"].startswith("INSERT INTO")
     ]
 
-    # Verify queries and commit statements are siblings
+    # Verify queries and rollback statements are siblings
     for insert_span in insert_spans:
         assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
 
@@ -503,7 +503,7 @@ def test_db_atomic_rollback_execute(sentry_init, client, capture_events):
     assert len(insert_spans) == 1
     insert_span = insert_spans[0]
 
-    # Verify query and commit statements are siblings
+    # Verify query and rollback statements are siblings
     assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
 
 
@@ -584,6 +584,6 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
         span for span in event["spans"] if span["description"].startswith("INSERT INTO")
     ]
 
-    # Verify queries and commit statements are siblings
+    # Verify queries and rollback statements are siblings
     for insert_span in insert_spans:
         assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
