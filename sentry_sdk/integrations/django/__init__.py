@@ -5,7 +5,7 @@ import weakref
 from importlib import import_module
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, DBOPERATION
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
@@ -633,6 +633,7 @@ def install_sql_hook():
         real_execute = CursorWrapper.execute
         real_executemany = CursorWrapper.executemany
         real_connect = BaseDatabaseWrapper.connect
+        real_commit = BaseDatabaseWrapper._commit
     except AttributeError:
         # This won't work on Django versions < 1.6
         return
@@ -690,17 +691,32 @@ def install_sql_hook():
             _set_db_data(span, self)
             return real_connect(self)
 
+    @ensure_integration_enabled(DjangoIntegration, real_commit)
+    def _commit(self):
+        # type: (BaseDatabaseWrapper) -> None
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            name=DBOPERATION.COMMIT,
+            origin=DjangoIntegration.origin_db,
+        ) as span:
+            _set_db_data(span, self, DBOPERATION.COMMIT)
+            return real_commit(self)
+
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
     BaseDatabaseWrapper.connect = connect
+    BaseDatabaseWrapper._commit = _commit
     ignore_logger("django.db.backends")
 
 
-def _set_db_data(span, cursor_or_db):
-    # type: (Span, Any) -> None
+def _set_db_data(span, cursor_or_db, db_operation=None):
+    # type: (Span, Any, Optional[str]) -> None
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
+
+    if db_operation is not None:
+        span.set_data(SPANDATA.DB_OPERATION, db_operation)
 
     # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
     # actually has a `connection` and the `connection` has a `get_dsn_parameters`

@@ -114,6 +114,10 @@ class INSTRUMENTER:
     OTEL = "otel"
 
 
+class DBOPERATION:
+    COMMIT = "COMMIT"
+
+
 class SPANDATA:
     """
     Additional information describing the type of the span.
