@@ -255,9 +255,11 @@ def postgres_insert_orm_no_autocommit(request, *args, **kwargs):
             username="user1",
         )
         transaction.commit(using="postgres")
-    finally:
+    except Exception:
         transaction.set_autocommit(True, using="postgres")
+        raise
 
+    transaction.set_autocommit(True, using="postgres")
     return HttpResponse("ok {}".format(user))
 
 
