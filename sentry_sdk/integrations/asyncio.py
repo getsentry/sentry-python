@@ -15,10 +15,12 @@ except ImportError:
 from typing import cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Callable, TypeVar
     from collections.abc import Coroutine
 
     from sentry_sdk._types import ExcInfo
+
+    F = TypeVar("T", bound=Callable[..., Any])
 
 
 def get_name(coro):
@@ -31,11 +33,11 @@ def get_name(coro):
 
 
 def _wrap_coroutine(wrapped):
-    # type: (Coroutine[Any, Any, Any]) -> Coroutine[Any, Any, Any]
+    # type: (Coroutine[Any, Any, Any]) -> Callable[[T], T]
     # Only __name__ and __qualname__ are copied from function to coroutine in CPython
     return functools.partial(
         functools.update_wrapper,
-        wrapped=wrapped,
+        wrapped=wrapped,  # type: ignore
         assigned=("__name__", "__qualname__"),
         updated=(),
     )
