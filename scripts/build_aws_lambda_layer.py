@@ -22,6 +22,7 @@ class LayerBuilder:
     ):
         # type: (...) -> None
         self.base_dir = base_dir
+        printf("base_dir set")
         self.python_site_packages = os.path.join(self.base_dir, PYTHON_SITE_PACKAGES)
         self.out_zip_filename = (
             f"sentry-python-serverless-{SDK_VERSION}.zip"
