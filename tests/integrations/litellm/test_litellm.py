@@ -1,5 +1,6 @@
 import json
 import pytest
+import time
 from unittest import mock
 from datetime import datetime
 
@@ -17,6 +18,7 @@ try:
 except ImportError:
     pytest.skip("litellm not installed", allow_module_level=True)
 
+import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.litellm import (
@@ -29,6 +31,36 @@ from sentry_sdk.utils import package_version
 
 
 LITELLM_VERSION = package_version("litellm")
+
+
+@pytest.fixture
+def clear_litellm_cache():
+    """
+    Clear litellm's client cache and reset integration state to ensure test isolation.
+
+    The LiteLLM integration uses setup_once() which only runs once per Python process.
+    This fixture ensures the integration is properly re-initialized for each test.
+    """
+
+    # Stop all existing mocks
+    mock.patch.stopall()
+
+    # Clear client cache
+    if (
+        hasattr(litellm, "in_memory_llm_clients_cache")
+        and litellm.in_memory_llm_clients_cache
+    ):
+        litellm.in_memory_llm_clients_cache.flush_cache()
+
+    yield
+
+    # Clean up after test as well
+    mock.patch.stopall()
+    if (
+        hasattr(litellm, "in_memory_llm_clients_cache")
+        and litellm.in_memory_llm_clients_cache
+    ):
+        litellm.in_memory_llm_clients_cache.flush_cache()
 
 
 # Mock response objects
@@ -86,6 +118,21 @@ class MockEmbeddingResponse:
             prompt_tokens=5, completion_tokens=0, total_tokens=5
         )
         self.object = "list"
+
+    def model_dump(self):
+        return {
+            "model": self.model,
+            "data": [
+                {"embedding": d.embedding, "index": d.index, "object": d.object}
+                for d in self.data
+            ],
+            "usage": {
+                "prompt_tokens": self.usage.prompt_tokens,
+                "completion_tokens": self.usage.completion_tokens,
+                "total_tokens": self.usage.total_tokens,
+            },
+            "object": self.object,
+        }
 
 
 @pytest.mark.parametrize(
@@ -201,7 +248,13 @@ def test_streaming_chat_completion(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-def test_embeddings_create(sentry_init, capture_events):
+def test_embeddings_create(sentry_init, capture_events, clear_litellm_cache):
+    """
+    Test that litellm.embedding() calls are properly instrumented.
+
+    This test calls the actual litellm.embedding() function (not just callbacks)
+    to ensure proper integration testing.
+    """
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -209,36 +262,131 @@ def test_embeddings_create(sentry_init, capture_events):
     )
     events = capture_events()
 
-    messages = [{"role": "user", "content": "Some text to test embeddings"}]
     mock_response = MockEmbeddingResponse()
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "text-embedding-ada-002",
-            "input": "Hello!",
-            "messages": messages,
-            "call_type": "embedding",
-        }
+    # Mock within the test to ensure proper ordering with cache clearing
+    with mock.patch(
+        "litellm.openai_chat_completions.make_sync_openai_embedding_request"
+    ) as mock_http:
+        # The function returns (headers, response)
+        mock_http.return_value = ({}, mock_response)
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
+        with start_transaction(name="litellm test"):
+            response = litellm.embedding(
+                model="text-embedding-ada-002",
+                input="Hello, world!",
+                api_key="test-key",  # Provide a fake API key to avoid authentication errors
+            )
+            # Allow time for callbacks to complete (they may run in separate threads)
+            time.sleep(0.1)
 
-    assert len(events) == 1
-    (event,) = events
+        # Response is processed by litellm, so just check it exists
+        assert response is not None
+        assert len(events) == 1
+        (event,) = events
 
-    assert event["type"] == "transaction"
-    assert len(event["spans"]) == 1
-    (span,) = event["spans"]
+        assert event["type"] == "transaction"
+        assert len(event["spans"]) == 1
+        (span,) = event["spans"]
 
-    assert span["op"] == OP.GEN_AI_EMBEDDINGS
-    assert span["description"] == "embeddings text-embedding-ada-002"
-    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+        assert span["op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["description"] == "embeddings text-embedding-ada-002"
+        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-ada-002"
+        # Check that embeddings input is captured (it's JSON serialized)
+        embeddings_input = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        assert json.loads(embeddings_input) == ["Hello, world!"]
+
+
+def test_embeddings_create_with_list_input(
+    sentry_init, capture_events, clear_litellm_cache
+):
+    """Test embedding with list input."""
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_response = MockEmbeddingResponse()
+
+    # Mock within the test to ensure proper ordering with cache clearing
+    with mock.patch(
+        "litellm.openai_chat_completions.make_sync_openai_embedding_request"
+    ) as mock_http:
+        # The function returns (headers, response)
+        mock_http.return_value = ({}, mock_response)
+
+        with start_transaction(name="litellm test"):
+            response = litellm.embedding(
+                model="text-embedding-ada-002",
+                input=["First text", "Second text", "Third text"],
+                api_key="test-key",  # Provide a fake API key to avoid authentication errors
+            )
+            # Allow time for callbacks to complete (they may run in separate threads)
+            time.sleep(0.1)
+
+        # Response is processed by litellm, so just check it exists
+        assert response is not None
+        assert len(events) == 1
+        (event,) = events
+
+        assert event["type"] == "transaction"
+        assert len(event["spans"]) == 1
+        (span,) = event["spans"]
+
+        assert span["op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        # Check that list of embeddings input is captured (it's JSON serialized)
+        embeddings_input = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        assert json.loads(embeddings_input) == [
+            "First text",
+            "Second text",
+            "Third text",
+        ]
+
+
+def test_embeddings_no_pii(sentry_init, capture_events, clear_litellm_cache):
+    """Test that PII is not captured when disabled."""
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,  # PII disabled
+    )
+    events = capture_events()
+
+    mock_response = MockEmbeddingResponse()
+
+    # Mock within the test to ensure proper ordering with cache clearing
+    with mock.patch(
+        "litellm.openai_chat_completions.make_sync_openai_embedding_request"
+    ) as mock_http:
+        # The function returns (headers, response)
+        mock_http.return_value = ({}, mock_response)
+
+        with start_transaction(name="litellm test"):
+            response = litellm.embedding(
+                model="text-embedding-ada-002",
+                input="Hello, world!",
+                api_key="test-key",  # Provide a fake API key to avoid authentication errors
+            )
+            # Allow time for callbacks to complete (they may run in separate threads)
+            time.sleep(0.1)
+
+        # Response is processed by litellm, so just check it exists
+        assert response is not None
+        assert len(events) == 1
+        (event,) = events
+
+        assert event["type"] == "transaction"
+        assert len(event["spans"]) == 1
+        (span,) = event["spans"]
+
+        assert span["op"] == OP.GEN_AI_EMBEDDINGS
+        # Check that embeddings input is NOT captured when PII is disabled
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
 
 def test_exception_handling(sentry_init, capture_events):

@@ -501,9 +501,9 @@ def test_embeddings_create(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
@@ -549,9 +549,9 @@ async def test_embeddings_create_async(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30

@@ -154,7 +154,7 @@ def test_sentry_logs_warning(
     assert "code.line.number" in attrs
     assert attrs["logger.name"] == "tests.integrations.loguru.test_loguru"
     assert attrs["sentry.environment"] == "production"
-    assert attrs["sentry.origin"] == "auto.logger.loguru"
+    assert attrs["sentry.origin"] == "auto.log.loguru"
     assert logs[0]["severity_number"] == 13
     assert logs[0]["severity_text"] == "warn"
 
@@ -465,7 +465,7 @@ def test_logger_with_all_attributes(
     # Assert on the remaining non-dynamic attributes.
     assert attributes == {
         "logger.name": "tests.integrations.loguru.test_loguru",
-        "sentry.origin": "auto.logger.loguru",
+        "sentry.origin": "auto.log.loguru",
         "sentry.environment": "production",
         "sentry.sdk.version": VERSION,
         "sentry.severity_number": 13,

@@ -294,9 +294,6 @@ async def test_handoff_span(sentry_init, capture_events, mock_usage):
                         name="transfer_to_secondary_agent",
                         type="function_call",
                         arguments="{}",
-                        function=MagicMock(
-                            name="transfer_to_secondary_agent", arguments="{}"
-                        ),
                     )
                 ],
                 usage=mock_usage,
@@ -377,9 +374,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                 name="simple_test_tool",
                 type="function_call",
                 arguments='{"message": "hello"}',
-                function=MagicMock(
-                    name="simple_test_tool", arguments='{"message": "hello"}'
-                ),
             )
 
             # First response with tool call
@@ -507,11 +501,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-    assert re.sub(
-        r"SerializationIterator\(.*\)",
-        "NOT_CHECKED",
-        ai_client_span1["data"]["gen_ai.response.tool_calls"],
-    ) == safe_serialize(
+    assert ai_client_span1["data"]["gen_ai.response.tool_calls"] == safe_serialize(
         [
             {
                 "arguments": '{"message": "hello"}',
@@ -520,7 +510,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                 "type": "function_call",
                 "id": "call_123",
                 "status": None,
-                "function": "NOT_CHECKED",
             }
         ]
     )
@@ -559,11 +548,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         == available_tools
     )
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
-    assert re.sub(
-        r"SerializationIterator\(.*\)",
-        "NOT_CHECKED",
-        ai_client_span2["data"]["gen_ai.request.messages"],
-    ) == safe_serialize(
+    assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
         [
             {
                 "role": "system",
@@ -586,7 +571,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                         "name": "simple_test_tool",
                         "type": "function_call",
                         "id": "call_123",
-                        "function": "NOT_CHECKED",
                     }
                 ],
             },
@@ -1165,9 +1149,6 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
                 name="failing_tool",
                 type="function_call",
                 arguments='{"message": "test"}',
-                function=MagicMock(
-                    name="failing_tool", arguments='{"message": "test"}'
-                ),
             )
 
             # First response with tool call
