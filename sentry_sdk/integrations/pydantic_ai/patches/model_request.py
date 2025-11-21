@@ -1,7 +1,12 @@
 from functools import wraps
 from typing import TYPE_CHECKING
 
-from pydantic_ai import models  # type: ignore
+from sentry_sdk.integrations import DidNotEnable
+
+try:
+    from pydantic_ai import models  # type: ignore
+except ImportError:
+    raise DidNotEnable("pydantic-ai not installed")
 
 from ..spans import ai_client_span, update_ai_client_span
 

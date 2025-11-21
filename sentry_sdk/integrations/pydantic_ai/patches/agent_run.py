@@ -1,12 +1,17 @@
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import invoke_agent_span, update_invoke_agent_span
 from ..utils import _capture_exception, pop_agent, push_agent
 
 from typing import TYPE_CHECKING
-from pydantic_ai.agent import Agent  # type: ignore
+
+try:
+    from pydantic_ai.agent import Agent  # type: ignore
+except ImportError:
+    raise DidNotEnable("pydantic-ai not installed")
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
