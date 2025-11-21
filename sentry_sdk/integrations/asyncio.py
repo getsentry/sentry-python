@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import ExcInfo
 
-    F = TypeVar("T", bound=Callable[..., Any])
+    T = TypeVar("T", bound=Callable[..., Any])
 
 
 def get_name(coro):
