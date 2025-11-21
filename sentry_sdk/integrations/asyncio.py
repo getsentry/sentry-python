@@ -31,7 +31,7 @@ def get_name(coro):
 
 
 def _wrap_coroutine(wrapped):
-    # type: Coroutine[Any, Any, Any] -> Coroutine[Any, Any, Any]
+    # type: (Coroutine[Any, Any, Any]) -> Coroutine[Any, Any, Any]
     # Only __name__ and __qualname__ are copied from function to coroutine in CPython
     return functools.partial(
         functools.update_wrapper,
