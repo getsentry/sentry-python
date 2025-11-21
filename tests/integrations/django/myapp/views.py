@@ -291,6 +291,20 @@ def postgres_insert_orm_atomic_rollback(request, *args, **kwargs):
 
 
 @csrf_exempt
+def postgres_insert_orm_atomic_exception(request, *args, **kwargs):
+    try:
+        with transaction.atomic(using="postgres"):
+            user = User.objects.db_manager("postgres").create_user(
+                username="user1",
+            )
+            transaction.set_rollback(True, using="postgres")
+            1 / 0
+    except ZeroDivisionError:
+        pass
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
 def permission_denied_exc(*args, **kwargs):
     raise PermissionDenied("bye")
 

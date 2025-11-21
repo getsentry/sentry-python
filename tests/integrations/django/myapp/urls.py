@@ -82,6 +82,11 @@ urlpatterns = [
         name="postgres_insert_orm_atomic_rollback",
     ),
     path(
+        "postgres-insert-atomic-exception",
+        views.postgres_insert_orm_atomic_exception,
+        name="postgres_insert_orm_atomic_exception",
+    ),
+    path(
         "postgres-select-slow-from-supplement",
         helper_views.postgres_select_orm,
         name="postgres_select_slow_from_supplement",

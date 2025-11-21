@@ -587,3 +587,147 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     # Verify queries and rollback statements are siblings
     for insert_span in insert_spans:
         assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_atomic_execute_exception(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    client.get(reverse("postgres_insert_orm_atomic_exception"))
+
+    (event,) = events
+
+    # Ensure operation is rolled back
+    assert not User.objects.using("postgres").exists()
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    rollback_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+    ]
+    assert len(rollback_spans) == 1
+    rollback_span = rollback_spans[0]
+    assert rollback_span["origin"] == "auto.db.django"
+
+    # Verify other database attributes
+    assert rollback_span["data"].get(SPANDATA.DB_SYSTEM) == "postgresql"
+    conn_params = connections["postgres"].get_connection_params()
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) is not None
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
+        "database"
+    ) or conn_params.get("dbname")
+    assert rollback_span["data"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
+        "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
+    )
+    assert rollback_span["data"].get(SPANDATA.SERVER_PORT) == os.environ.get(
+        "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
+    )
+
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+    assert len(insert_spans) == 1
+    insert_span = insert_spans[0]
+
+    # Verify query and rollback statements are siblings
+    assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_atomic_executemany_exception(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        from django.db import connection, transaction
+
+        try:
+            with transaction.atomic():
+                cursor = connection.cursor()
+
+                query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
+                query_list = (
+                    (
+                        "user1",
+                        "John",
+                        "Doe",
+                        "user1@example.com",
+                        datetime(1970, 1, 1),
+                    ),
+                    (
+                        "user2",
+                        "Max",
+                        "Mustermann",
+                        "user2@example.com",
+                        datetime(1970, 1, 1),
+                    ),
+                )
+                cursor.executemany(query, query_list)
+                1 / 0
+        except ZeroDivisionError:
+            pass
+
+    (event,) = events
+
+    # Ensure operation is rolled back
+    assert not User.objects.exists()
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    rollback_spans = [
+        span
+        for span in event["spans"]
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+    ]
+    assert len(rollback_spans) == 1
+    rollback_span = rollback_spans[0]
+    assert rollback_span["origin"] == "auto.db.django"
+
+    # Verify other database attributes
+    assert rollback_span["data"].get(SPANDATA.DB_SYSTEM) == "sqlite"
+    conn_params = connection.get_connection_params()
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) is not None
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
+        "database"
+    ) or conn_params.get("dbname")
+
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+
+    # Verify queries and rollback statements are siblings
+    for insert_span in insert_spans:
+        assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
