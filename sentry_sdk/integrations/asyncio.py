@@ -30,6 +30,17 @@ def get_name(coro):
     )
 
 
+def _wrap_coroutine(wrapped):
+    # type: Coroutine[Any, Any, Any] -> Coroutine[Any, Any, Any]
+    # Only __name__ and __qualname__ are copied from function to coroutine in CPython
+    return functools.partial(
+        functools.update_wrapper,
+        wrapped=wrapped,
+        assigned=("__name__", "__qualname__"),
+        updated=(),
+    )
+
+
 def patch_asyncio():
     # type: () -> None
     orig_task_factory = None
@@ -40,7 +51,7 @@ def patch_asyncio():
         def _sentry_task_factory(loop, coro, **kwargs):
             # type: (asyncio.AbstractEventLoop, Coroutine[Any, Any, Any], Any) -> asyncio.Future[Any]
 
-            @functools.wraps(coro)
+            @_wrap_coroutine(coro)
             async def _task_with_sentry_span_creation():
                 # type: () -> Any
                 result = None
