@@ -264,11 +264,13 @@ def postgres_insert_orm_no_autocommit(request, *args, **kwargs):
 @csrf_exempt
 def postgres_insert_orm_no_autocommit_rollback(request, *args, **kwargs):
     transaction.set_autocommit(False, using="postgres")
-    user = User.objects.db_manager("postgres").create_user(
-        username="user1",
-    )
-    transaction.rollback(using="postgres")
-    transaction.set_autocommit(True, using="postgres")
+    try:
+        user = User.objects.db_manager("postgres").create_user(
+            username="user1",
+        )
+        transaction.rollback(using="postgres")
+    finally:
+        transaction.set_autocommit(True, using="postgres")
 
     return HttpResponse("ok {}".format(user))
 
