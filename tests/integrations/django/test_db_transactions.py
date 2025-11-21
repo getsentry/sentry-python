@@ -397,23 +397,23 @@ def test_db_atomic_executemany(sentry_init, client, capture_events):
 )
 VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 
-        query_list = (
-            (
-                "user1",
-                "John",
-                "Doe",
-                "user1@example.com",
-                datetime(1970, 1, 1),
-            ),
-            (
-                "user2",
-                "Max",
-                "Mustermann",
-                "user2@example.com",
-                datetime(1970, 1, 1),
-            ),
-        )
-        cursor.executemany(query, query_list)
+            query_list = (
+                (
+                    "user1",
+                    "John",
+                    "Doe",
+                    "user1@example.com",
+                    datetime(1970, 1, 1),
+                ),
+                (
+                    "user2",
+                    "Max",
+                    "Mustermann",
+                    "user2@example.com",
+                    datetime(1970, 1, 1),
+                ),
+            )
+            cursor.executemany(query, query_list)
 
     (event,) = events
 
