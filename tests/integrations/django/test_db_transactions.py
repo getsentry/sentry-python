@@ -192,28 +192,37 @@ def test_db_no_autocommit_rollback_execute(sentry_init, client, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.django"
 
-    commit_spans = [
+    rollback_spans = [
         span
         for span in event["spans"]
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
     ]
-    assert len(commit_spans) == 1
-    commit_span = commit_spans[0]
-    assert commit_span["origin"] == "auto.db.django"
+    assert len(rollback_spans) == 1
+    rollback_span = rollback_spans[0]
+    assert rollback_span["origin"] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["data"].get(SPANDATA.DB_SYSTEM) == "postgresql"
+    assert rollback_span["data"].get(SPANDATA.DB_SYSTEM) == "postgresql"
     conn_params = connections["postgres"].get_connection_params()
-    assert commit_span["data"].get(SPANDATA.DB_NAME) is not None
-    assert commit_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) is not None
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
         "database"
     ) or conn_params.get("dbname")
-    assert commit_span["data"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
+    assert rollback_span["data"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
         "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
     )
-    assert commit_span["data"].get(SPANDATA.SERVER_PORT) == os.environ.get(
+    assert rollback_span["data"].get(SPANDATA.SERVER_PORT) == os.environ.get(
         "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
     )
+
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+    assert len(insert_spans) == 1
+    insert_span = insert_spans[0]
+
+    # Verify query and commit statements are siblings
+    assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
 
 
 @pytest.mark.forked
@@ -274,22 +283,30 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.db.django"
 
-    commit_spans = [
+    rollback_spans = [
         span
         for span in event["spans"]
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
     ]
-    assert len(commit_spans) == 1
-    commit_span = commit_spans[0]
-    assert commit_span["origin"] == "auto.db.django"
+    assert len(rollback_spans) == 1
+    rollback_span = rollback_spans[0]
+    assert rollback_span["origin"] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["data"].get(SPANDATA.DB_SYSTEM) == "sqlite"
+    assert rollback_span["data"].get(SPANDATA.DB_SYSTEM) == "sqlite"
     conn_params = connection.get_connection_params()
-    assert commit_span["data"].get(SPANDATA.DB_NAME) is not None
-    assert commit_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) is not None
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
         "database"
     ) or conn_params.get("dbname")
+
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+
+    # Verify queries and commit statements are siblings
+    for insert_span in insert_spans:
+        assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
 
 
 @pytest.mark.forked
@@ -457,28 +474,37 @@ def test_db_atomic_rollback_execute(sentry_init, client, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.django"
 
-    commit_spans = [
+    rollback_spans = [
         span
         for span in event["spans"]
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
     ]
-    assert len(commit_spans) == 1
-    commit_span = commit_spans[0]
-    assert commit_span["origin"] == "auto.db.django"
+    assert len(rollback_spans) == 1
+    rollback_span = rollback_spans[0]
+    assert rollback_span["origin"] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["data"].get(SPANDATA.DB_SYSTEM) == "postgresql"
+    assert rollback_span["data"].get(SPANDATA.DB_SYSTEM) == "postgresql"
     conn_params = connections["postgres"].get_connection_params()
-    assert commit_span["data"].get(SPANDATA.DB_NAME) is not None
-    assert commit_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) is not None
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
         "database"
     ) or conn_params.get("dbname")
-    assert commit_span["data"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
+    assert rollback_span["data"].get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
         "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
     )
-    assert commit_span["data"].get(SPANDATA.SERVER_PORT) == os.environ.get(
+    assert rollback_span["data"].get(SPANDATA.SERVER_PORT) == os.environ.get(
         "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
     )
+
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+    assert len(insert_spans) == 1
+    insert_span = insert_spans[0]
+
+    # Verify query and commit statements are siblings
+    assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
 
 
 @pytest.mark.forked
@@ -537,19 +563,27 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 
     assert event["contexts"]["trace"]["origin"] == "manual"
 
-    commit_spans = [
+    rollback_spans = [
         span
         for span in event["spans"]
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
     ]
-    assert len(commit_spans) == 1
-    commit_span = commit_spans[0]
-    assert commit_span["origin"] == "auto.db.django"
+    assert len(rollback_spans) == 1
+    rollback_span = rollback_spans[0]
+    assert rollback_span["origin"] == "auto.db.django"
 
     # Verify other database attributes
-    assert commit_span["data"].get(SPANDATA.DB_SYSTEM) == "sqlite"
+    assert rollback_span["data"].get(SPANDATA.DB_SYSTEM) == "sqlite"
     conn_params = connection.get_connection_params()
-    assert commit_span["data"].get(SPANDATA.DB_NAME) is not None
-    assert commit_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) is not None
+    assert rollback_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
         "database"
     ) or conn_params.get("dbname")
+
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+
+    # Verify queries and commit statements are siblings
+    for insert_span in insert_spans:
+        assert rollback_span["parent_span_id"] == insert_span["parent_span_id"]
