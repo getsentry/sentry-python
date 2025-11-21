@@ -73,6 +73,15 @@ def test_db_no_autocommit_execute(sentry_init, client, capture_events):
         "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
     )
 
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+    assert len(insert_spans) == 1
+    insert_span = insert_spans[0]
+
+    # Verify query and commit statements are siblings
+    assert commit_span["parent_span_id"] == insert_span["parent_span_id"]
+
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
@@ -148,6 +157,14 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     assert commit_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
         "database"
     ) or conn_params.get("dbname")
+
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+
+    # Verify queries and commit statements are siblings
+    for insert_span in insert_spans:
+        assert commit_span["parent_span_id"] == insert_span["parent_span_id"]
 
 
 @pytest.mark.forked
@@ -323,6 +340,15 @@ def test_db_atomic_execute(sentry_init, client, capture_events):
         "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
     )
 
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+    assert len(insert_spans) == 1
+    insert_span = insert_spans[0]
+
+    # Verify query and commit statements are siblings
+    assert commit_span["parent_span_id"] == insert_span["parent_span_id"]
+
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
@@ -395,6 +421,14 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     assert commit_span["data"].get(SPANDATA.DB_NAME) == conn_params.get(
         "database"
     ) or conn_params.get("dbname")
+
+    insert_spans = [
+        span for span in event["spans"] if span["description"].startswith("INSERT INTO")
+    ]
+
+    # Verify queries and commit statements are siblings
+    for insert_span in insert_spans:
+        assert commit_span["parent_span_id"] == insert_span["parent_span_id"]
 
 
 @pytest.mark.forked
