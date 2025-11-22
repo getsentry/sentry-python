@@ -2076,3 +2076,20 @@ def get_before_send_metric(options):
     return options.get("before_send_metric") or options["_experiments"].get(
         "before_send_metric"
     )
+
+
+def format_attribute_value(value):
+    # type: (Any) -> dict[str, bool | str | int | float]
+    if isinstance(value, bool):
+        return {"value": value, "type": "boolean"}
+
+    if isinstance(value, int):
+        return {"value": value, "type": "integer"}
+
+    if isinstance(value, float):
+        return {"value": value, "type": "double"}
+
+    if isinstance(value, str):
+        return {"value": value, "type": "string"}
+
+    return {"value": safe_repr(value), "type": "string"}
