@@ -693,7 +693,6 @@ def install_sql_hook():
             _set_db_data(span, self)
             return real_connect(self)
 
-    @ensure_integration_enabled(DjangoIntegration, real_commit)
     def _commit(self):
         # type: (BaseDatabaseWrapper) -> None
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
