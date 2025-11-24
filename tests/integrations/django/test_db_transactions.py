@@ -167,7 +167,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 
     commit_spans = [
         span
-        for span in itertools.chain(postgres_spans["spans"], postgres_spans["spans"])
+        for span in itertools.chain(postgres_spans["spans"], sqlite_spans["spans"])
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
     ]
     assert len(commit_spans) == 0
