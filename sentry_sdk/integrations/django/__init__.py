@@ -703,10 +703,10 @@ def install_sql_hook():
 
         with sentry_sdk.start_span(
             op=OP.DB,
-            name=SPANNAME.COMMIT,
+            name=SPANNAME.DB_COMMIT,
             origin=DjangoIntegration.origin_db,
         ) as span:
-            _set_db_data(span, self, SPANNAME.COMMIT)
+            _set_db_data(span, self, SPANNAME.DB_COMMIT)
             return real_commit(self)
 
     @ensure_integration_enabled(DjangoIntegration, real_rollback)
@@ -714,15 +714,15 @@ def install_sql_hook():
         # type: (BaseDatabaseWrapper) -> None
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
 
-        if integration is None or not integration.database_transaction_spans:
+        if integration is None or not integration.db_transaction_spans:
             return real_rollback(self)
 
         with sentry_sdk.start_span(
             op=OP.DB,
-            name=SPANNAME.ROLLBACK,
+            name=SPANNAME.DB_ROLLBACK,
             origin=DjangoIntegration.origin_db,
         ) as span:
-            _set_db_data(span, self, SPANNAME.ROLLBACK)
+            _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
             return real_rollback(self)
 
     CursorWrapper.execute = execute
