@@ -1,4 +1,5 @@
 import sys
+import functools
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -14,10 +15,12 @@ except ImportError:
 from typing import cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Callable, TypeVar
     from collections.abc import Coroutine
 
     from sentry_sdk._types import ExcInfo
+
+    T = TypeVar("T", bound=Callable[..., Any])
 
 
 def get_name(coro):
@@ -26,6 +29,17 @@ def get_name(coro):
         getattr(coro, "__qualname__", None)
         or getattr(coro, "__name__", None)
         or "coroutine without __name__"
+    )
+
+
+def _wrap_coroutine(wrapped):
+    # type: (Coroutine[Any, Any, Any]) -> Callable[[T], T]
+    # Only __name__ and __qualname__ are copied from function to coroutine in CPython
+    return functools.partial(
+        functools.update_wrapper,
+        wrapped=wrapped,  # type: ignore
+        assigned=("__name__", "__qualname__"),
+        updated=(),
     )
 
 
@@ -39,6 +53,7 @@ def patch_asyncio():
         def _sentry_task_factory(loop, coro, **kwargs):
             # type: (asyncio.AbstractEventLoop, Coroutine[Any, Any, Any], Any) -> asyncio.Future[Any]
 
+            @_wrap_coroutine(coro)
             async def _task_with_sentry_span_creation():
                 # type: () -> Any
                 result = None
