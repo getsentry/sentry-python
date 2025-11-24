@@ -1,5 +1,6 @@
 import os
 import pytest
+import itertools
 from datetime import datetime
 
 from django.db import connections
@@ -27,9 +28,156 @@ def client():
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_db_no_autocommit_execute(sentry_init, client, capture_events):
+def test_db_transaction_spans_disabled_no_autocommit(
+    sentry_init, client, capture_events
+):
     sentry_init(
         integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    client.get(reverse("postgres_insert_orm_no_autocommit"))
+
+    with start_transaction(name="test_transaction"):
+        from django.db import connection, transaction
+
+        cursor = connection.cursor()
+
+        query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
+        query_list = (
+            (
+                "user1",
+                "John",
+                "Doe",
+                "user1@example.com",
+                datetime(1970, 1, 1),
+            ),
+            (
+                "user2",
+                "Max",
+                "Mustermann",
+                "user2@example.com",
+                datetime(1970, 1, 1),
+            ),
+        )
+
+        transaction.set_autocommit(False)
+        cursor.executemany(query, query_list)
+        transaction.commit()
+        transaction.set_autocommit(True)
+
+    (postgres_spans, sqlite_spans) = events
+
+    # Ensure operation is persisted
+    assert User.objects.using("postgres").exists()
+
+    assert postgres_spans["contexts"]["trace"]["origin"] == "auto.http.django"
+    assert sqlite_spans["contexts"]["trace"]["origin"] == "manual"
+
+    commit_spans = [
+        span
+        for span in itertools.chain(postgres_spans["spans"], sqlite_spans["spans"])
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+    ]
+    assert len(commit_spans) == 0
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_transaction_spans_disabled_atomic(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    client.get(reverse("postgres_insert_orm_atomic"))
+
+    with start_transaction(name="test_transaction"):
+        from django.db import connection, transaction
+
+        with transaction.atomic():
+            cursor = connection.cursor()
+
+            query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
+            query_list = (
+                (
+                    "user1",
+                    "John",
+                    "Doe",
+                    "user1@example.com",
+                    datetime(1970, 1, 1),
+                ),
+                (
+                    "user2",
+                    "Max",
+                    "Mustermann",
+                    "user2@example.com",
+                    datetime(1970, 1, 1),
+                ),
+            )
+            cursor.executemany(query, query_list)
+
+    (postgres_spans, sqlite_spans) = events
+
+    # Ensure operation is persisted
+    assert User.objects.using("postgres").exists()
+
+    assert postgres_spans["contexts"]["trace"]["origin"] == "auto.http.django"
+    assert sqlite_spans["contexts"]["trace"]["origin"] == "manual"
+
+    commit_spans = [
+        span
+        for span in itertools.chain(postgres_spans["spans"], postgres_spans["spans"])
+        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+    ]
+    assert len(commit_spans) == 0
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_no_autocommit_execute(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration(database_transaction_spans=True)],
         traces_sample_rate=1.0,
     )
 
@@ -87,7 +235,7 @@ def test_db_no_autocommit_execute(sentry_init, client, capture_events):
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_no_autocommit_executemany(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[DjangoIntegration(database_transaction_spans=True)],
         traces_sample_rate=1.0,
     )
 
@@ -313,7 +461,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_atomic_execute(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[DjangoIntegration(database_transaction_spans=True)],
         traces_sample_rate=1.0,
     )
 
@@ -371,7 +519,7 @@ def test_db_atomic_execute(sentry_init, client, capture_events):
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_atomic_executemany(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[DjangoIntegration(database_transaction_spans=True)],
         send_default_pii=True,
         traces_sample_rate=1.0,
     )
