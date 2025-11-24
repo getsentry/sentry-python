@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.46.0
+
+### Various fixes & improvements
+
+- feat: Preserve metadata on wrapped coroutines (#5105) by @alexander-alderman-webb
+- build(deps): bump actions/checkout from 5.0.0 to 6.0.0 (#5136) by @dependabot
+- build(deps): bump actions/create-github-app-token from 2.1.4 to 2.2.0 (#5137) by @dependabot
+- build(deps): bump supercharge/redis-github-action from 1.8.0 to 1.8.1 (#5138) by @dependabot
+- fix(pydantic-ai): Make imports defensive to avoid `ModuleNotFoundError` (#5135) by @alexander-alderman-webb
+- Fix openai-agents import (#5132) by @sentrivana
+- fix(integrations): enhance input handling for embeddings in LiteLLM integration (#5127) by @constantinius
+- test(openai-agents): Remove `MagicMock` from mocked `ModelResponse` (#5126) by @alexander-alderman-webb
+- test(dramatiq): Expect exceptions when re-raised (#5125) by @alexander-alderman-webb
+- feat: add instrumentation to embedding functions for various backends (#5120) by @constantinius
+- fix(integrations): improve embeddings support for openai (#5121) by @constantinius
+- ci: Update tox (#5122) by @sentrivana
+
 ## 2.45.0
 
 ### Various fixes & improvements
