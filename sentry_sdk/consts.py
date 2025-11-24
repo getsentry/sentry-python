@@ -114,9 +114,9 @@ class INSTRUMENTER:
     OTEL = "otel"
 
 
-class DBOPERATION:
-    COMMIT = "COMMIT"
-    ROLLBACK = "ROLLBACK"
+class SPANNAME:
+    DB_COMMIT = "COMMIT"
+    DB_ROLLBACK = "ROLLBACK"
 
 
 class SPANDATA:

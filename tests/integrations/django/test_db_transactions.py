@@ -273,7 +273,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_no_autocommit_execute(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration(database_transaction_spans=True)],
+        integrations=[DjangoIntegration(db_transaction_spans=True)],
         traces_sample_rate=1.0,
     )
 
@@ -331,7 +331,7 @@ def test_db_no_autocommit_execute(sentry_init, client, capture_events):
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_no_autocommit_executemany(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration(database_transaction_spans=True)],
+        integrations=[DjangoIntegration(db_transaction_spans=True)],
         traces_sample_rate=1.0,
     )
 
@@ -557,7 +557,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_atomic_execute(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration(database_transaction_spans=True)],
+        integrations=[DjangoIntegration(db_transaction_spans=True)],
         traces_sample_rate=1.0,
     )
 
@@ -615,7 +615,7 @@ def test_db_atomic_execute(sentry_init, client, capture_events):
 @pytest_mark_django_db_decorator(transaction=True)
 def test_db_atomic_executemany(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration(database_transaction_spans=True)],
+        integrations=[DjangoIntegration(db_transaction_spans=True)],
         send_default_pii=True,
         traces_sample_rate=1.0,
     )
