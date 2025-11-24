@@ -114,8 +114,8 @@ class INSTRUMENTER:
     OTEL = "otel"
 
 
-class DBOPERATION:
-    COMMIT = "COMMIT"
+class SPANNAME:
+    DB_COMMIT = "COMMIT"
 
 
 class SPANDATA:

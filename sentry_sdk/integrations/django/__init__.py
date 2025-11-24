@@ -5,7 +5,7 @@ import weakref
 from importlib import import_module
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, DBOPERATION
+from sentry_sdk.consts import OP, SPANDATA, SPANNAME
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
@@ -702,10 +702,10 @@ def install_sql_hook():
 
         with sentry_sdk.start_span(
             op=OP.DB,
-            name=DBOPERATION.COMMIT,
+            name=SPANNAME.COMMIT,
             origin=DjangoIntegration.origin_db,
         ) as span:
-            _set_db_data(span, self, DBOPERATION.COMMIT)
+            _set_db_data(span, self, SPANNAME.COMMIT)
             return real_commit(self)
 
     CursorWrapper.execute = execute
