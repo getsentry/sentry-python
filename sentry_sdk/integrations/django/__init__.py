@@ -132,7 +132,7 @@ class DjangoIntegration(Integration):
         middleware_spans=True,  # type: bool
         signals_spans=True,  # type: bool
         cache_spans=False,  # type: bool
-        database_transaction_spans=False,  # type: bool
+        db_transaction_spans=False,  # type: bool
         signals_denylist=None,  # type: Optional[list[signals.Signal]]
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
@@ -149,7 +149,7 @@ class DjangoIntegration(Integration):
         self.signals_denylist = signals_denylist or []
 
         self.cache_spans = cache_spans
-        self.database_transaction_spans = database_transaction_spans
+        self.db_transaction_spans = db_transaction_spans
 
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
@@ -697,7 +697,7 @@ def install_sql_hook():
         # type: (BaseDatabaseWrapper) -> None
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
 
-        if integration is None or not integration.database_transaction_spans:
+        if integration is None or not integration.db_transaction_spans:
             return real_commit(self)
 
         with sentry_sdk.start_span(
