@@ -274,6 +274,7 @@ def postgres_insert_orm_no_autocommit_rollback(request, *args, **kwargs):
         transaction.rollback(using="postgres")
     except Exception:
         transaction.set_autocommit(True, using="postgres")
+        transaction.rollback()
         raise
 
     transaction.set_autocommit(True, using="postgres")
