@@ -709,7 +709,6 @@ def install_sql_hook():
             _set_db_data(span, self, SPANNAME.DB_COMMIT)
             return real_commit(self)
 
-    @ensure_integration_enabled(DjangoIntegration, real_rollback)
     def _rollback(self):
         # type: (BaseDatabaseWrapper) -> None
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
