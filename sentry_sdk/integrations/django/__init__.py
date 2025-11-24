@@ -698,7 +698,7 @@ def install_sql_hook():
         # type: (BaseDatabaseWrapper) -> None
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
 
-        if not integration.database_transaction_spans:
+        if integration is None or not integration.database_transaction_spans:
             return real_commit(self)
 
         with sentry_sdk.start_span(
