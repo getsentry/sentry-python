@@ -146,6 +146,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
             sqlite_commit["spans"],
         )
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+        or span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
     ]
     assert len(commit_spans) == 0
 
@@ -263,6 +264,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
             sqlite_commit["spans"],
         )
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+        or span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
     ]
     assert len(commit_spans) == 0
 
