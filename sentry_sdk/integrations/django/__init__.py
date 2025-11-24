@@ -713,6 +713,11 @@ def install_sql_hook():
     @ensure_integration_enabled(DjangoIntegration, real_rollback)
     def _rollback(self):
         # type: (BaseDatabaseWrapper) -> None
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+
+        if integration is None or not integration.database_transaction_spans:
+            return real_rollback(self)
+
         with sentry_sdk.start_span(
             op=OP.DB,
             name=DBOPERATION.ROLLBACK,

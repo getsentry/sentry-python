@@ -44,7 +44,48 @@ def test_db_transaction_spans_disabled_no_autocommit(
 
     events = capture_events()
 
+    client.get(reverse("postgres_insert_orm_no_autocommit_rollback"))
     client.get(reverse("postgres_insert_orm_no_autocommit"))
+
+    with start_transaction(name="test_transaction"):
+        from django.db import connection, transaction
+
+        cursor = connection.cursor()
+
+        query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
+        query_list = (
+            (
+                "user1",
+                "John",
+                "Doe",
+                "user1@example.com",
+                datetime(1970, 1, 1),
+            ),
+            (
+                "user2",
+                "Max",
+                "Mustermann",
+                "user2@example.com",
+                datetime(1970, 1, 1),
+            ),
+        )
+
+        transaction.set_autocommit(False)
+        cursor.executemany(query, query_list)
+        transaction.rollback()
+        transaction.set_autocommit(True)
 
     with start_transaction(name="test_transaction"):
         from django.db import connection, transaction
@@ -86,17 +127,24 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
         transaction.commit()
         transaction.set_autocommit(True)
 
-    (postgres_spans, sqlite_spans) = events
+    (postgres_rollback, postgres_commit, sqlite_rollback, sqlite_commit) = events
 
     # Ensure operation is persisted
     assert User.objects.using("postgres").exists()
 
-    assert postgres_spans["contexts"]["trace"]["origin"] == "auto.http.django"
-    assert sqlite_spans["contexts"]["trace"]["origin"] == "manual"
+    assert postgres_rollback["contexts"]["trace"]["origin"] == "auto.http.django"
+    assert postgres_commit["contexts"]["trace"]["origin"] == "auto.http.django"
+    assert sqlite_rollback["contexts"]["trace"]["origin"] == "manual"
+    assert sqlite_commit["contexts"]["trace"]["origin"] == "manual"
 
     commit_spans = [
         span
-        for span in itertools.chain(postgres_spans["spans"], sqlite_spans["spans"])
+        for span in itertools.chain(
+            postgres_rollback["spans"],
+            postgres_commit["spans"],
+            sqlite_rollback["spans"],
+            sqlite_commit["spans"],
+        )
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
     ]
     assert len(commit_spans) == 0
@@ -118,6 +166,7 @@ def test_db_transaction_spans_disabled_atomic(sentry_init, client, capture_event
 
     events = capture_events()
 
+    client.get(reverse("postgres_insert_orm_atomic_rollback"))
     client.get(reverse("postgres_insert_orm_atomic"))
 
     with start_transaction(name="test_transaction"):
@@ -156,18 +205,63 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
                 ),
             )
             cursor.executemany(query, query_list)
+            transaction.set_rollback(True)
 
-    (postgres_spans, sqlite_spans) = events
+    with start_transaction(name="test_transaction"):
+        from django.db import connection, transaction
+
+        with transaction.atomic():
+            cursor = connection.cursor()
+
+            query = """INSERT INTO auth_user (
+    password,
+    is_superuser,
+    username,
+    first_name,
+    last_name,
+    email,
+    is_staff,
+    is_active,
+    date_joined
+)
+VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
+
+            query_list = (
+                (
+                    "user1",
+                    "John",
+                    "Doe",
+                    "user1@example.com",
+                    datetime(1970, 1, 1),
+                ),
+                (
+                    "user2",
+                    "Max",
+                    "Mustermann",
+                    "user2@example.com",
+                    datetime(1970, 1, 1),
+                ),
+            )
+            cursor.executemany(query, query_list)
+
+    (postgres_rollback, postgres_commit, sqlite_rollback, sqlite_commit) = events
 
     # Ensure operation is persisted
     assert User.objects.using("postgres").exists()
 
-    assert postgres_spans["contexts"]["trace"]["origin"] == "auto.http.django"
-    assert sqlite_spans["contexts"]["trace"]["origin"] == "manual"
+    assert postgres_rollback["contexts"]["trace"]["origin"] == "auto.http.django"
+    assert postgres_commit["contexts"]["trace"]["origin"] == "auto.http.django"
+    assert sqlite_rollback["contexts"]["trace"]["origin"] == "manual"
+    assert sqlite_commit["contexts"]["trace"]["origin"] == "manual"
 
     commit_spans = [
         span
-        for span in itertools.chain(postgres_spans["spans"], postgres_spans["spans"])
+        for span in itertools.chain(
+            postgres_rollback["spans"],
+            postgres_commit["spans"],
+            sqlite_rollback["spans"],
+            sqlite_commit["spans"],
+        )
         if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
     ]
     assert len(commit_spans) == 0
