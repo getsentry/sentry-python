@@ -471,12 +471,23 @@ class BaseHttpTransport(Transport):
         if content_encoding:
             headers["Content-Encoding"] = content_encoding
 
-        self._send_request(
-            body.getvalue(),
-            headers=headers,
-            endpoint_type=EndpointType.ENVELOPE,
-            envelope=envelope,
-        )
+        print("ENVELOPE")
+        print(envelope.headers)
+        for i, item in enumerate(envelope.items):
+            print("Item", i, item.type)
+            print(item.headers)
+            print(item.payload.json)
+            print()
+
+        print("-----------------------------------")
+        print()
+
+        # self._send_request(
+        #    body.getvalue(),
+        #    headers=headers,
+        #    endpoint_type=EndpointType.ENVELOPE,
+        #    envelope=envelope,
+        # )
         return None
 
     def _serialize_envelope(self, envelope):

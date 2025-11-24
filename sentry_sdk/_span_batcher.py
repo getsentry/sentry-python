@@ -112,6 +112,7 @@ class SpanBatcher:
                 self.get_size() >= self.MAX_SPANS_BEFORE_FLUSH
             ):  # TODO[span-first] should this be per bucket?
                 self._flush_event.set()
+            print(self._span_buffer)
 
     def kill(self):
         # type: (...) -> None
@@ -132,19 +133,19 @@ class SpanBatcher:
         res = {
             "trace_id": span.trace_id,
             "span_id": span.span_id,
-            "name": span.name,
+            "name": span.description,  # TODO[span-first]
             "status": SPANSTATUS.OK
             if span.status in (SPANSTATUS.OK, SPANSTATUS.UNSET)
             else SPANSTATUS.ERROR,
             "is_segment": span.containing_transaction == span,
-            "start_timestamp": span.start_timestamp,
-            "end_timestamp": span.timestamp,
+            "start_timestamp": span.start_timestamp.timestamp(),  # TODO[span-first]
+            "end_timestamp": span.timestamp.timestamp(),
         }
 
         if span.parent_span_id:
             res["parent_span_id"] = span.parent_span_id
 
-        if span["attributes"]:
+        if span.attributes:
             res["attributes"] = {
                 k: format_attribute_value(v) for (k, v) in span["attributes"].items()
             }
@@ -157,7 +158,7 @@ class SpanBatcher:
             if len(self._span_buffer) == 0:
                 return None
 
-            for trace_id, spans in self._span_buffer:
+            for trace_id, spans in self._span_buffer.items():
                 envelope = Envelope(
                     headers={
                         "sent_at": format_timestamp(datetime.now(timezone.utc)),
