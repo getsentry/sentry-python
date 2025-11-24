@@ -14,7 +14,7 @@ except ImportError:
 from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA, DBOPERATION
+from sentry_sdk.consts import SPANDATA, SPANNAME
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
@@ -145,8 +145,8 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
             sqlite_rollback["spans"],
             sqlite_commit["spans"],
         )
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
-        or span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
+        or span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.ROLLBACK
     ]
     assert len(commit_spans) == 0
 
@@ -263,8 +263,8 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
             sqlite_rollback["spans"],
             sqlite_commit["spans"],
         )
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
-        or span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
+        or span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.ROLLBACK
     ]
     assert len(commit_spans) == 0
 
@@ -297,7 +297,7 @@ def test_db_no_autocommit_execute(sentry_init, client, capture_events):
     commit_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
@@ -388,7 +388,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     commit_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
@@ -439,7 +439,7 @@ def test_db_no_autocommit_rollback_execute(sentry_init, client, capture_events):
     rollback_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.ROLLBACK
     ]
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
@@ -530,7 +530,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     rollback_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.ROLLBACK
     ]
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
@@ -581,7 +581,7 @@ def test_db_atomic_execute(sentry_init, client, capture_events):
     commit_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
@@ -669,7 +669,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     commit_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
@@ -721,7 +721,7 @@ def test_db_atomic_rollback_execute(sentry_init, client, capture_events):
     rollback_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.ROLLBACK
     ]
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
@@ -810,7 +810,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     rollback_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.ROLLBACK
     ]
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
@@ -862,7 +862,7 @@ def test_db_atomic_execute_exception(sentry_init, client, capture_events):
     rollback_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.ROLLBACK
     ]
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
@@ -954,7 +954,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     rollback_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == DBOPERATION.ROLLBACK
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.ROLLBACK
     ]
     assert len(rollback_spans) == 1
     rollback_span = rollback_spans[0]
