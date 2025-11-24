@@ -329,7 +329,10 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
-        "python": ">=3.9",
+        "python": {
+            ">0.0,<2.52.0": ">=3.9",
+            ">=2.52.0": ">=3.10",
+        },
         "num_versions": 2,
     },
     "redis": {
