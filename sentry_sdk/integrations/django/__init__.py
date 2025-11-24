@@ -702,10 +702,10 @@ def install_sql_hook():
 
         with sentry_sdk.start_span(
             op=OP.DB,
-            name=SPANNAME.COMMIT,
+            name=SPANNAME.DB_COMMIT,
             origin=DjangoIntegration.origin_db,
         ) as span:
-            _set_db_data(span, self, SPANNAME.COMMIT)
+            _set_db_data(span, self, SPANNAME.DB_COMMIT)
             return real_commit(self)
 
     CursorWrapper.execute = execute

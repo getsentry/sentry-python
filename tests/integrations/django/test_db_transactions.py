@@ -97,7 +97,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     commit_spans = [
         span
         for span in itertools.chain(postgres_spans["spans"], sqlite_spans["spans"])
-        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.DB_COMMIT
     ]
     assert len(commit_spans) == 0
 
@@ -168,7 +168,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     commit_spans = [
         span
         for span in itertools.chain(postgres_spans["spans"], sqlite_spans["spans"])
-        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.DB_COMMIT
     ]
     assert len(commit_spans) == 0
 
@@ -201,7 +201,7 @@ def test_db_no_autocommit_execute(sentry_init, client, capture_events):
     commit_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.DB_COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
@@ -292,7 +292,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     commit_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.DB_COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
@@ -343,7 +343,7 @@ def test_db_atomic_execute(sentry_init, client, capture_events):
     commit_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.DB_COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
@@ -431,7 +431,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
     commit_spans = [
         span
         for span in event["spans"]
-        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.COMMIT
+        if span["data"].get(SPANDATA.DB_OPERATION) == SPANNAME.DB_COMMIT
     ]
     assert len(commit_spans) == 1
     commit_span = commit_spans[0]
