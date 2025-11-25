@@ -362,9 +362,8 @@ class Span:
         self._attributes = attributes | self._attributes
 
         self._attributes["sentry.segment.id"] = self.containing_transaction.span_id
-        if hasattr(self.containing_transaction, "name"):
-            # TODO[span-first]: fix this properly
-            self._attributes["sentry.segment.name"] = self.containing_transaction.name
+        # TODO[span-first]: This might need to be updated if the segment name is updated
+        self._attributes["sentry.segment.name"] = self.containing_transaction.name
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -882,9 +881,10 @@ class Transaction(Span):
         **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None
+        self.name = name
+
         super().__init__(**kwargs)
 
-        self.name = name
         self.source = source
         self.sample_rate = None  # type: Optional[float]
         self.parent_sampled = parent_sampled

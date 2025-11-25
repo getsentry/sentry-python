@@ -1790,9 +1790,8 @@ def get_default_attributes():
     if thread_name is not None:
         attributes["thread.name"] = thread_name
 
-    # The user, if present, is always set on the isolation scope.
-    # TODO[ivana]: gate behing PII?
     if should_send_default_pii():
+        # The user, if present, is always set on the isolation scope.
         isolation_scope = sentry_sdk.get_isolation_scope()
         if isolation_scope._user is not None:
             for attribute, user_attribute in (
