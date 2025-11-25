@@ -478,9 +478,10 @@ class BaseHttpTransport(Transport):
             print("Headers")
             print(item.headers)
             print("Attributes")
-            for i in item.payload.json["items"]:
-                for attribute, value in i["attributes"].items():
-                    print(attribute, value)
+            if item.payload.json.get("items"):
+                for i in item.payload.json["items"]:
+                    for attribute, value in i["attributes"].items():
+                        print(attribute, value)
             print("Payload")
             print(item.payload.json)
             print()

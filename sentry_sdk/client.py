@@ -947,10 +947,15 @@ class _Client(BaseClient):
         attributes = get_default_attributes()
         span._attributes = attributes | span._attributes
 
-        span._attributes["sentry.segment.id"] = span.containing_transaction.span_id
-        span._attributes["sentry.segment.name"] = span.containing_transaction.name
+        segment = span.containing_transaction
+        span._attributes["sentry.segment.id"] = segment.span_id
+        span._attributes["sentry.segment.name"] = segment.name
 
-        self._span_batcher.add(span)
+        if self._span_batcher:
+            logger.debug(
+                f"[Tracing] Adding span {span.span_id} of segment {segment.span_id} to batcher"
+            )
+            self._span_batcher.add(span)
 
     def _capture_log(self, log):
         # type: (Optional[Log]) -> None

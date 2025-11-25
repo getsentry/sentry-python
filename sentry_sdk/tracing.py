@@ -742,7 +742,6 @@ class Span:
                 has_span_streaming_enabled(client.options)
                 and self.containing_transaction.sampled
             ):
-                logger.debug(f"[Tracing] Adding span {self.span_id} to buffer")
                 client._capture_span(self)
 
         return None
@@ -1113,7 +1112,6 @@ class Transaction(Span):
 
         if self._mode == "stream":
             if self.containing_transaction.sampled:
-                logger.debug(f"[Tracing] Adding span {self.span_id} to batcher")
                 client._capture_span(self)
             return
 

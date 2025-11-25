@@ -162,30 +162,35 @@ class SpanBatcher:
                 return None
 
             for trace_id, spans in self._span_buffer.items():
-                envelope = Envelope(
-                    headers={
-                        "sent_at": format_timestamp(datetime.now(timezone.utc)),
-                    }
-                    # TODO[span-first] more headers
-                )
+                if spans:
+                    trace_context = spans[0].get_trace_context()
+                    dsc = trace_context.get("dynamic_sampling_context")
+                    # XXX[span-first]: empty dsc?
 
-                envelope.add_item(
-                    Item(
-                        type="span",
-                        content_type="application/vnd.sentry.items.span.v2+json",
+                    envelope = Envelope(
                         headers={
-                            "item_count": len(spans),
-                        },
-                        payload=PayloadRef(
-                            json={
-                                "items": [
-                                    self._span_to_transport_format(span)
-                                    for span in spans
-                                ]
-                            }
-                        ),
+                            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+                            "trace": dsc,
+                        }
                     )
-                )
+
+                    envelope.add_item(
+                        Item(
+                            type="span",
+                            content_type="application/vnd.sentry.items.span.v2+json",
+                            headers={
+                                "item_count": len(spans),
+                            },
+                            payload=PayloadRef(
+                                json={
+                                    "items": [
+                                        self._span_to_transport_format(span)
+                                        for span in spans
+                                    ]
+                                }
+                            ),
+                        )
+                    )
 
             self._span_buffer.clear()
 
