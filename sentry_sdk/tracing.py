@@ -666,7 +666,7 @@ class Span:
         # type: (int) -> None
         self.set_tag(
             "http.status_code", str(http_status)
-        )  # we keep this for backwards compatibility
+        )  # TODO-neel remove in major, we keep this for backwards compatibility
         self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
         self.set_status(get_span_status_from_http_code(http_status))
 
@@ -729,6 +729,8 @@ class Span:
         }  # type: Dict[str, Any]
 
         if self.status:
+            rv["status"] = self.status
+            # TODO-neel remove redundant tag in major
             self._tags["status"] = self.status
 
         if len(self._measurements) > 0:

@@ -40,9 +40,11 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
         span1, span2 = event["spans"]
         parent_span = event
+        assert span1["status"] == "internal_error"
         assert span1["tags"]["status"] == "internal_error"
         assert span1["op"] == "foo"
         assert span1["description"] == "foodesc"
+        assert "status" not in span2
         assert "status" not in span2.get("tags", {})
         assert span2["op"] == "bar"
         assert span2["description"] == "bardesc"
@@ -332,6 +334,7 @@ def test_non_error_exceptions(
     event = events[0]
 
     span = event["spans"][0]
+    assert "status" not in span
     assert "status" not in span.get("tags", {})
     assert "status" not in event["tags"]
     assert event["contexts"]["trace"]["status"] == "ok"
@@ -357,6 +360,7 @@ def test_good_sysexit_doesnt_fail_transaction(
     event = events[0]
 
     span = event["spans"][0]
+    assert "status" not in span
     assert "status" not in span.get("tags", {})
     assert "status" not in event["tags"]
     assert event["contexts"]["trace"]["status"] == "ok"

@@ -722,6 +722,7 @@ def test_span_status_error(sentry_init, capture_events):
 
     (error, transaction) = events
     assert error["level"] == "error"
+    assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
@@ -745,6 +746,7 @@ async def test_span_status_error_async(sentry_init, capture_events):
 
     (error, transaction) = events
     assert error["level"] == "error"
+    assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
