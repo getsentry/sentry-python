@@ -4,6 +4,7 @@ import sys
 import time
 from typing import List, Any, Mapping, Union
 import pytest
+from unittest import mock
 
 import sentry_sdk
 import sentry_sdk.logger
@@ -450,7 +451,7 @@ def test_logs_with_literal_braces(
 
 @minimum_python_37
 def test_batcher_drops_logs(sentry_init, monkeypatch):
-    sentry_init(enable_logs=True)
+    sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
     client = sentry_sdk.get_client()
 
     def no_op_flush():
@@ -469,5 +470,52 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
         sentry_sdk.logger.info("This is a 'info' log...")
 
     assert len(lost_event_calls) == 5
+
+    expected_dropped_item = {
+        "body": "This is a 'info' log...",
+        "level": "info",
+        "timestamp": mock.ANY,
+        "trace_id": mock.ANY,
+        "attributes": {
+            "sentry.environment": {
+                "type": "string",
+                "value": "production",
+            },
+            "sentry.release": {
+                "type": "string",
+                "value": "1.0.0",
+            },
+            "sentry.sdk.name": {
+                "type": "string",
+                "value": mock.ANY,
+            },
+            "sentry.sdk.version": {
+                "type": "string",
+                "value": VERSION,
+            },
+            "sentry.severity_number": {
+                "type": "integer",
+                "value": 9,
+            },
+            "sentry.severity_text": {
+                "type": "string",
+                "value": "info",
+            },
+            "sentry.trace.parent_span_id": {
+                "type": "string",
+                "value": mock.ANY,
+            },
+            "server.address": {
+                "type": "string",
+                "value": "test-server",
+            },
+        },
+    }
+
     for lost_event_call in lost_event_calls:
-        assert lost_event_call == ("queue_overflow", "log_item", None, 1)
+        assert lost_event_call == (
+            "queue_overflow",
+            "log_item",
+            expected_dropped_item,
+            1,
+        )

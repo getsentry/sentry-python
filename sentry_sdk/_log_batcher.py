@@ -86,6 +86,7 @@ class LogBatcher:
                 self._record_lost_func(
                     reason="queue_overflow",
                     data_category="log_item",
+                    item=LogBatcher._log_to_transport_format(log),
                     quantity=1,
                 )
                 return None
