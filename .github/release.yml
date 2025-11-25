@@ -1,0 +1,19 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+    authors:
+      - dependabot
+  categories:
+    - title: New Features ✨
+      labels:
+        - "Changelog: Feature"
+    - title: Bug Fixes 🐛
+      labels:
+        - "Changelog: Bugfix"
+    - title: Documentation 📚
+      labels:
+        - "Changelog: Docs"
+    - title: Internal Changes 🔧
+      labels:
+        - "Changelog: Internal"
