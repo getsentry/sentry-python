@@ -360,7 +360,7 @@ class _Client(BaseClient):
         def _record_lost_event(
             reason,  # type: str
             data_category,  # type: EventDataCategory
-            item,  # type: Item
+            item=None,  # type: Optional[Item]
             quantity=1,  # type: int
         ):
             # type: (...) -> None
