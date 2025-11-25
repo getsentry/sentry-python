@@ -116,6 +116,7 @@ class INSTRUMENTER:
 
 class SPANNAME:
     DB_COMMIT = "COMMIT"
+    DB_ROLLBACK = "ROLLBACK"
 
 
 class SPANDATA:

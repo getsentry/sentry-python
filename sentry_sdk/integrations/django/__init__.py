@@ -636,6 +636,7 @@ def install_sql_hook():
         real_executemany = CursorWrapper.executemany
         real_connect = BaseDatabaseWrapper.connect
         real_commit = BaseDatabaseWrapper._commit
+        real_rollback = BaseDatabaseWrapper._rollback
     except AttributeError:
         # This won't work on Django versions < 1.6
         return
@@ -708,10 +709,26 @@ def install_sql_hook():
             _set_db_data(span, self, SPANNAME.DB_COMMIT)
             return real_commit(self)
 
+    def _rollback(self):
+        # type: (BaseDatabaseWrapper) -> None
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+
+        if integration is None or not integration.db_transaction_spans:
+            return real_rollback(self)
+
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            name=SPANNAME.DB_ROLLBACK,
+            origin=DjangoIntegration.origin_db,
+        ) as span:
+            _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
+            return real_rollback(self)
+
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
     BaseDatabaseWrapper.connect = connect
     BaseDatabaseWrapper._commit = _commit
+    BaseDatabaseWrapper._rollback = _rollback
     ignore_logger("django.db.backends")
 
 

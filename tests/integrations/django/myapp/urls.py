@@ -67,9 +67,24 @@ urlpatterns = [
         name="postgres_insert_orm_no_autocommit",
     ),
     path(
+        "postgres-insert-no-autocommit-rollback",
+        views.postgres_insert_orm_no_autocommit_rollback,
+        name="postgres_insert_orm_no_autocommit_rollback",
+    ),
+    path(
         "postgres-insert-atomic",
         views.postgres_insert_orm_atomic,
         name="postgres_insert_orm_atomic",
+    ),
+    path(
+        "postgres-insert-atomic-rollback",
+        views.postgres_insert_orm_atomic_rollback,
+        name="postgres_insert_orm_atomic_rollback",
+    ),
+    path(
+        "postgres-insert-atomic-exception",
+        views.postgres_insert_orm_atomic_exception,
+        name="postgres_insert_orm_atomic_exception",
     ),
     path(
         "postgres-select-slow-from-supplement",
