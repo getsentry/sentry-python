@@ -1,3 +1,4 @@
+import inspect 
 import json
 from collections import deque
 from typing import TYPE_CHECKING
@@ -38,6 +39,11 @@ def _normalize_data(data, unpack=True):
     # type: (Any, bool) -> Any
     # convert pydantic data (e.g. OpenAI v1+) to json compatible format
     if hasattr(data, "model_dump"):
+        # Check if it's a class (type) rather than an instance
+        # Model classes can be passed as arguments (e.g., for schema definitions)
+        if inspect.isclass(data):
+            return f"<ClassType: {data.__name__}>"
+
         try:
             return _normalize_data(data.model_dump(), unpack=unpack)
         except Exception as e:
