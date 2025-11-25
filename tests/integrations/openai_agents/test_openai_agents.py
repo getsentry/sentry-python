@@ -724,8 +724,8 @@ async def test_span_status_error(sentry_init, capture_events, test_agent):
 
     (error, transaction) = events
     assert error["level"] == "error"
-    assert transaction["spans"][0]["tags"]["status"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "error"
+    assert transaction["spans"][0]["tags"]["status"] == "internal_error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -827,7 +827,7 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_events, test_agent)
     )
 
     # Verify no error status since error was None
-    assert mcp_tool_span.get("tags", {}).get("status") != "error"
+    assert mcp_tool_span.get("tags", {}).get("status") != "internal_error"
 
 
 @pytest.mark.asyncio
@@ -927,7 +927,7 @@ async def test_mcp_tool_execution_with_error(sentry_init, capture_events, test_a
     assert mcp_tool_span["data"]["gen_ai.tool.output"] is None
 
     # Verify error status was set
-    assert mcp_tool_span["tags"]["status"] == "error"
+    assert mcp_tool_span["tags"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -1218,4 +1218,4 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
 
     # Verify error status was set (this is the key test for our patch)
     # The span should be marked as error because the tool execution failed
-    assert execute_tool_span["tags"]["status"] == "error"
+    assert execute_tool_span["tags"]["status"] == "internal_error"
