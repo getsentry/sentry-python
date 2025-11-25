@@ -937,6 +937,14 @@ class _Client(BaseClient):
 
         return return_value
 
+    def _capture_span(self, span):
+        # type: (Span) -> None
+        # Used for span streaming (trace_lifecycle == "stream").
+        if not has_span_streaming_enabled(self.options):
+            return
+
+        self._span_batcher.add(span)
+
     def _capture_log(self, log):
         # type: (Optional[Log]) -> None
         # TODO[ivana]: Use get_default_attributes here

@@ -361,10 +361,6 @@ class Span:
         attributes = get_default_attributes()
         self._attributes = attributes | self._attributes
 
-        self._attributes["sentry.segment.id"] = self.containing_transaction.span_id
-        # TODO[span-first]: This might need to be updated if the segment name is updated
-        self._attributes["sentry.segment.name"] = self.containing_transaction.name
-
     # TODO this should really live on the Transaction class rather than the Span
     # class
     def init_span_recorder(self, maxlen):
@@ -753,7 +749,7 @@ class Span:
                 and self.containing_transaction.sampled
             ):
                 logger.debug(f"[Tracing] Adding span {self.span_id} to buffer")
-                client._span_batcher.add(self)
+                client._capture_span(self)
 
         return None
 
@@ -1121,9 +1117,10 @@ class Transaction(Span):
 
             return None
 
-        if self._mode == "stream" and self.containing_transaction.sampled:
-            logger.debug(f"[Tracing] Adding span {self.span_id} to buffer")
-            client._span_batcher.add(self)
+        if self._mode == "stream":
+            if self.containing_transaction.sampled:
+                logger.debug(f"[Tracing] Adding span {self.span_id} to batcher")
+                client._capture_span(self)
             return
 
         finished_spans = [
@@ -1167,7 +1164,6 @@ class Transaction(Span):
             self._profile = None
 
         event["measurements"] = self._measurements
-
         return scope.capture_event(event)
 
     def set_measurement(self, name, value, unit=""):

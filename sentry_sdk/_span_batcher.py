@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 
 
 class SpanBatcher:
-    # TODO[span-first]: Adjust limits. However, there's still a restriction of
-    # at most 1000 spans per envelope.
+    # TODO[span-first]: Adjust limits. Protocol dictates at most 1000 spans
+    # in an envelope.
     MAX_SPANS_BEFORE_FLUSH = 1_000
     MAX_SPANS_BEFORE_DROP = 2_000
     FLUSH_WAIT_TIME = 5.0
@@ -107,9 +107,7 @@ class SpanBatcher:
                 return None
 
             self._span_buffer[span.trace_id].append(span)
-            if (
-                self.get_size() >= self.MAX_SPANS_BEFORE_FLUSH
-            ):  # TODO[span-first] should this be per bucket?
+            if self.get_size() >= self.MAX_SPANS_BEFORE_FLUSH:
                 self._flush_event.set()
 
     def kill(self):
@@ -130,10 +128,12 @@ class SpanBatcher:
         # type: (Span) -> SpanV2
         from sentry_sdk.utils import attribute_value_to_transport_format, safe_repr
 
+        is_segment = isinstance(span, Transaction)
+
         res = {
             "trace_id": span.trace_id,
             "span_id": span.span_id,
-            "name": span.description,  # TODO[span-first]
+            "name": span.name if is_segment else span.description,
             "status": SPANSTATUS.OK
             if span.status in (SPANSTATUS.OK, SPANSTATUS.UNSET)
             else SPANSTATUS.ERROR,
@@ -150,6 +150,11 @@ class SpanBatcher:
                 k: attribute_value_to_transport_format(v)
                 for (k, v) in span._attributes.items()
             }
+
+        # We set these as late as possible to increase the odds of the span
+        # getting a good segment name
+        res["attributes"]["sentry.segment.id"] = span.containing_transaction.span_id
+        res["attributes"]["sentry.segment.name"] = span.containing_transaction.name
 
         return res
 
