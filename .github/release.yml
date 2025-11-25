@@ -8,12 +8,19 @@ changelog:
     - title: New Features ✨
       labels:
         - "Changelog: Feature"
+        - Feature
+        - Improvement
+        - New Integration
     - title: Bug Fixes 🐛
       labels:
         - "Changelog: Bugfix"
+        - Bug
     - title: Documentation 📚
       labels:
         - "Changelog: Docs"
+        - Docs
+        - "Component: Docs"
     - title: Internal Changes 🔧
       labels:
         - "Changelog: Internal"
+        - Quality Improvement
