@@ -151,11 +151,6 @@ class SpanBatcher:
                 for (k, v) in span._attributes.items()
             }
 
-        # We set these as late as possible to increase the odds of the span
-        # getting a good segment name
-        res["attributes"]["sentry.segment.id"] = span.containing_transaction.span_id
-        res["attributes"]["sentry.segment.name"] = span.containing_transaction.name
-
         return res
 
     def _flush(self):

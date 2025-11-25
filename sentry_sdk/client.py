@@ -28,6 +28,7 @@ from sentry_sdk.utils import (
     logger,
     get_before_send_log,
     get_before_send_metric,
+    get_default_attributes,
     has_logs_enabled,
     has_metrics_enabled,
 )
@@ -942,6 +943,12 @@ class _Client(BaseClient):
         # Used for span streaming (trace_lifecycle == "stream").
         if not has_span_streaming_enabled(self.options):
             return
+
+        attributes = get_default_attributes()
+        span._attributes = attributes | span._attributes
+
+        span._attributes["sentry.segment.id"] = span.containing_transaction.span_id
+        span._attributes["sentry.segment.name"] = span.containing_transaction.name
 
         self._span_batcher.add(span)
 

@@ -14,7 +14,6 @@ from sentry_sdk.utils import (
     nanosecond_time,
     should_be_treated_as_error,
     serialize_attribute,
-    get_default_attributes,
 )
 
 from typing import TYPE_CHECKING
@@ -355,11 +354,6 @@ class Span:
 
         self.update_active_thread()
         self.set_profiler_id(get_profiler_id())
-        self._set_initial_attributes()
-
-    def _set_initial_attributes(self):
-        attributes = get_default_attributes()
-        self._attributes = attributes | self._attributes
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
