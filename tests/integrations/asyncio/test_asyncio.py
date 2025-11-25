@@ -67,7 +67,16 @@ async def test_create_task(
 
     with sentry_sdk.start_transaction(name="test_transaction_for_create_task"):
         with sentry_sdk.start_span(op="root", name="not so important"):
-            tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
+            foo_task = asyncio.create_task(foo())
+            bar_task = asyncio.create_task(bar())
+
+            if hasattr(foo_task.get_coro(), "__name__"):
+                assert foo_task.get_coro().__name__ == "foo"
+            if hasattr(bar_task.get_coro(), "__name__"):
+                assert bar_task.get_coro().__name__ == "bar"
+
+            tasks = [foo_task, bar_task]
+
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     sentry_sdk.flush()

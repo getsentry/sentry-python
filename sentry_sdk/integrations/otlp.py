@@ -33,7 +33,7 @@ def otel_propagation_context():
     return (trace.format_trace_id(ctx.trace_id), trace.format_span_id(ctx.span_id))
 
 
-def setup_otlp_exporter(dsn=None):
+def setup_otlp_traces_exporter(dsn=None):
     # type: (Optional[str]) -> None
     tracer_provider = trace.get_tracer_provider()
 
@@ -58,9 +58,9 @@ def setup_otlp_exporter(dsn=None):
 class OTLPIntegration(Integration):
     identifier = "otlp"
 
-    def __init__(self, setup_otlp_exporter=True, setup_propagator=True):
+    def __init__(self, setup_otlp_traces_exporter=True, setup_propagator=True):
         # type: (bool, bool) -> None
-        self.setup_otlp_exporter = setup_otlp_exporter
+        self.setup_otlp_traces_exporter = setup_otlp_traces_exporter
         self.setup_propagator = setup_propagator
 
     @staticmethod
@@ -71,10 +71,10 @@ class OTLPIntegration(Integration):
 
     def setup_once_with_options(self, options=None):
         # type: (Optional[Dict[str, Any]]) -> None
-        if self.setup_otlp_exporter:
+        if self.setup_otlp_traces_exporter:
             logger.debug("[OTLP] Setting up OTLP exporter")
             dsn = options.get("dsn") if options else None  # type: Optional[str]
-            setup_otlp_exporter(dsn)
+            setup_otlp_traces_exporter(dsn)
 
         if self.setup_propagator:
             logger.debug("[OTLP] Setting up propagator for distributed tracing")

@@ -200,7 +200,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "tiktoken", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -213,7 +213,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -245,6 +245,12 @@ TEST_SUITE_CONFIG = {
     },
     "mcp": {
         "package": "mcp",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
+    "fastmcp": {
+        "package": "fastmcp",
         "deps": {
             "*": ["pytest-asyncio"],
         },
@@ -323,7 +329,10 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
-        "python": ">=3.9",
+        "python": {
+            ">0.0,<2.52.0": ">=3.9",
+            ">=2.52.0": ">=3.10",
+        },
         "num_versions": 2,
     },
     "redis": {

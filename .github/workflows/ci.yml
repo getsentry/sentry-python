@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         with:
           python-version: 3.14
@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         with:
           python-version: 3.12
@@ -70,7 +70,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         with:
           python-version: 3.12

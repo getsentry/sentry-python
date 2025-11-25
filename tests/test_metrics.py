@@ -7,6 +7,7 @@ import sentry_sdk
 from sentry_sdk import get_client
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.types import Metric
+from sentry_sdk.consts import SPANDATA, VERSION
 
 
 def envelopes_to_metrics(envelopes):
@@ -93,7 +94,7 @@ def test_metrics_experimental_option(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_attributes(sentry_init, capture_envelopes):
-    sentry_init(release="1.0.0", environment="test")
+    sentry_init(release="1.0.0", environment="test", server_name="test-server")
     envelopes = capture_envelopes()
 
     sentry_sdk.metrics.count(
@@ -109,6 +110,10 @@ def test_metrics_with_attributes(sentry_init, capture_envelopes):
     assert metrics[0]["attributes"]["status"] == "success"
     assert metrics[0]["attributes"]["sentry.release"] == "1.0.0"
     assert metrics[0]["attributes"]["sentry.environment"] == "test"
+
+    assert metrics[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
+    assert metrics[0]["attributes"]["sentry.sdk.name"].startswith("sentry.python")
+    assert metrics[0]["attributes"]["sentry.sdk.version"] == VERSION
 
 
 def test_metrics_with_user(sentry_init, capture_envelopes):

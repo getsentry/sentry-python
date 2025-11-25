@@ -77,15 +77,40 @@ def _input_callback(kwargs):
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
-    # Record messages if allowed
-    messages = kwargs.get("messages", [])
-    if messages and should_send_default_pii() and integration.include_prompts:
-        scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(messages, span, scope)
-        if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+    # Record input/messages if allowed
+    if should_send_default_pii() and integration.include_prompts:
+        if operation == "embeddings":
+            # For embeddings, look for the 'input' parameter
+            embedding_input = kwargs.get("input")
+            if embedding_input:
+                scope = sentry_sdk.get_current_scope()
+                # Normalize to list format
+                input_list = (
+                    embedding_input
+                    if isinstance(embedding_input, list)
+                    else [embedding_input]
+                )
+                messages_data = truncate_and_annotate_messages(input_list, span, scope)
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                        messages_data,
+                        unpack=False,
+                    )
+        else:
+            # For chat, look for the 'messages' parameter
+            messages = kwargs.get("messages", [])
+            if messages:
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(messages, span, scope)
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
 
     # Record other parameters
     params = {

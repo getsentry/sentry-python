@@ -38,7 +38,7 @@ jobs:
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         if: ${{ matrix.python-version != '3.6' }}
         with:
@@ -86,6 +86,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-mcp"
+      - name: Test fastmcp
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-fastmcp"
       - name: Test openai-base
         run: |
           set -x # print commands that are executed

@@ -97,7 +97,7 @@ def test_does_not_setup_exporter_when_disabled(sentry_init):
 
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
-        integrations=[OTLPIntegration(setup_otlp_exporter=False)],
+        integrations=[OTLPIntegration(setup_otlp_traces_exporter=False)],
     )
 
     tracer_provider = get_tracer_provider()
