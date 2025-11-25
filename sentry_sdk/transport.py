@@ -475,7 +475,13 @@ class BaseHttpTransport(Transport):
         print(envelope.headers)
         for i, item in enumerate(envelope.items):
             print("Item", i, item.type)
+            print("Headers")
             print(item.headers)
+            print("Attributes")
+            for i in item.payload.json["items"]:
+                for attribute, value in i["attributes"].items():
+                    print(attribute, value)
+            print("Payload")
             print(item.payload.json)
             print()
 

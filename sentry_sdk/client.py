@@ -12,6 +12,7 @@ import sentry_sdk
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk._span_batcher import SpanBatcher
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     ContextVar,
@@ -938,6 +939,7 @@ class _Client(BaseClient):
 
     def _capture_log(self, log):
         # type: (Optional[Log]) -> None
+        # TODO[ivana]: Use get_default_attributes here
         if not has_logs_enabled(self.options) or log is None:
             return
 
@@ -1006,6 +1008,7 @@ class _Client(BaseClient):
 
     def _capture_metric(self, metric):
         # type: (Optional[Metric]) -> None
+        # TODO[ivana]: Use get_default_attributes here
         if not has_metrics_enabled(self.options) or metric is None:
             return
 

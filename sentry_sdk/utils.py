@@ -30,6 +30,7 @@ from sentry_sdk.consts import (
     DEFAULT_ADD_FULL_STACK,
     DEFAULT_MAX_STACK_FRAMES,
     DEFAULT_MAX_VALUE_LENGTH,
+    SPANDATA,
     EndpointType,
 )
 from sentry_sdk._types import Annotated, AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
@@ -1726,6 +1727,85 @@ def is_sentry_url(client, url):
     )
 
 
+def serialize_attribute(value):
+    # type: (Any) -> AttributeValue
+    # check for allowed primitives
+    if isinstance(value, (int, str, float, bool)):
+        return value
+
+    # lists are allowed too, as long as they don't mix types
+    if isinstance(value, (list, tuple)):
+        for type_ in (int, str, float, bool):
+            if all(isinstance(item, type_) for item in value):
+                return list(value)
+
+    return safe_repr(value)
+
+
+def attribute_value_to_transport_format(value):
+    # type: (Any) -> dict[str, bool | str | int | float]
+    if isinstance(value, bool):
+        return {"value": value, "type": "boolean"}
+
+    if isinstance(value, int):
+        return {"value": value, "type": "integer"}
+
+    if isinstance(value, float):
+        return {"value": value, "type": "double"}
+
+    if isinstance(value, str):
+        return {"value": value, "type": "string"}
+
+    return {"value": safe_repr(value), "type": "string"}
+
+
+def get_default_attributes():
+    # type: () -> Attributes
+    # TODO[ivana]: standardize attr names into an enum/take from sentry convs
+    from sentry_sdk.client import SDK_INFO
+    from sentry_sdk.scope import should_send_default_pii
+
+    attributes = {}
+
+    attributes["sentry.sdk.name"] = SDK_INFO["name"]
+    attributes["sentry.sdk.version"] = SDK_INFO["version"]
+
+    options = sentry_sdk.get_client().options
+
+    server_name = options.get("server_name")
+    if server_name is not None:
+        attributes[SPANDATA.SERVER_ADDRESS] = server_name
+
+    environment = options.get("environment")
+    if environment is not None:
+        attributes["sentry.environment"] = environment
+
+    release = options.get("release")
+    if release is not None:
+        attributes["sentry.release"] = release
+
+    thread_id, thread_name = get_current_thread_meta()
+    if thread_id is not None:
+        attributes["thread.id"] = thread_id
+    if thread_name is not None:
+        attributes["thread.name"] = thread_name
+
+    # The user, if present, is always set on the isolation scope.
+    # TODO[ivana]: gate behing PII?
+    if should_send_default_pii():
+        isolation_scope = sentry_sdk.get_isolation_scope()
+        if isolation_scope._user is not None:
+            for attribute, user_attribute in (
+                ("user.id", "id"),
+                ("user.name", "username"),
+                ("user.email", "email"),
+            ):
+                if attribute in isolation_scope._user:
+                    attributes[attribute] = isolation_scope._user[user_attribute]
+
+    return attributes
+
+
 def _generate_installed_modules():
     # type: () -> Iterator[Tuple[str, str]]
     try:
@@ -2076,20 +2156,3 @@ def get_before_send_metric(options):
     return options.get("before_send_metric") or options["_experiments"].get(
         "before_send_metric"
     )
-
-
-def format_attribute_value(value):
-    # type: (Any) -> dict[str, bool | str | int | float]
-    if isinstance(value, bool):
-        return {"value": value, "type": "boolean"}
-
-    if isinstance(value, int):
-        return {"value": value, "type": "integer"}
-
-    if isinstance(value, float):
-        return {"value": value, "type": "double"}
-
-    if isinstance(value, str):
-        return {"value": value, "type": "string"}
-
-    return {"value": safe_repr(value), "type": "string"}

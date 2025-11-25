@@ -223,14 +223,16 @@ if TYPE_CHECKING:
     # TODO: Make a proper type definition for this (PRs welcome!)
     Hint = Dict[str, Any]
 
-    # TODO: Consolidate attribute types. E.g. metrics use the same attr structure.
-    # I'm keeping span attrs separate for now so that the span first stuff is
-    # isolated until it's not experimental.
-    SpanAttributeValue = TypedDict(
-        "SpanAttributeValue",
+    AttributeValue = (
+        str | bool | float | int | list[str] | list[bool] | list[float] | list[int]
+    )
+    Attributes = dict[str, AttributeValue]
+
+    SerializedAttributeValue = TypedDict(
+        "SerializedAttributeValue",
         {
             "type": Literal["string", "boolean", "double", "integer"],
-            "value": str | bool | float | int,
+            "value": AttributeValue,
         },
     )
 
@@ -240,21 +242,13 @@ if TYPE_CHECKING:
             "severity_text": str,
             "severity_number": int,
             "body": str,
-            "attributes": dict[str, str | bool | float | int],
+            "attributes": Attributes,
             "time_unix_nano": int,
             "trace_id": Optional[str],
         },
     )
 
     MetricType = Literal["counter", "gauge", "distribution"]
-
-    MetricAttributeValue = TypedDict(
-        "MetricAttributeValue",
-        {
-            "value": Union[str, bool, float, int],
-            "type": Literal["string", "boolean", "double", "integer"],
-        },
-    )
 
     Metric = TypedDict(
         "Metric",
@@ -266,7 +260,7 @@ if TYPE_CHECKING:
             "type": MetricType,
             "value": float,
             "unit": Optional[str],
-            "attributes": dict[str, str | bool | float | int],
+            "attributes": Attributes,
         },
     )
 
@@ -285,7 +279,7 @@ if TYPE_CHECKING:
             "is_segment": bool,
             "start_timestamp": float,
             "end_timestamp": float,
-            "attributes": Optional[dict[str, SpanAttributeValue]],
+            "attributes": Attributes,
         },
     )
 

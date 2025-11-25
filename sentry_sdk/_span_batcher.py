@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from typing import Optional, List, Callable, TYPE_CHECKING, Any
 
 from sentry_sdk.consts import SPANSTATUS
-from sentry_sdk.utils import format_attribute_value, format_timestamp, safe_repr
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.tracing import Transaction
 
@@ -112,7 +111,6 @@ class SpanBatcher:
                 self.get_size() >= self.MAX_SPANS_BEFORE_FLUSH
             ):  # TODO[span-first] should this be per bucket?
                 self._flush_event.set()
-            print(self._span_buffer)
 
     def kill(self):
         # type: (...) -> None
@@ -130,6 +128,8 @@ class SpanBatcher:
     @staticmethod
     def _span_to_transport_format(span):
         # type: (Span) -> SpanV2
+        from sentry_sdk.utils import attribute_value_to_transport_format, safe_repr
+
         res = {
             "trace_id": span.trace_id,
             "span_id": span.span_id,
@@ -145,15 +145,18 @@ class SpanBatcher:
         if span.parent_span_id:
             res["parent_span_id"] = span.parent_span_id
 
-        if span.attributes:
+        if span._attributes:
             res["attributes"] = {
-                k: format_attribute_value(v) for (k, v) in span["attributes"].items()
+                k: attribute_value_to_transport_format(v)
+                for (k, v) in span._attributes.items()
             }
 
         return res
 
     def _flush(self):
         # type: (...) -> Optional[Envelope]
+        from sentry_sdk.utils import format_timestamp
+
         with self._lock:
             if len(self._span_buffer) == 0:
                 return None

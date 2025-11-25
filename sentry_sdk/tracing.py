@@ -13,6 +13,8 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
     should_be_treated_as_error,
+    serialize_attribute,
+    get_default_attributes,
 )
 
 from typing import TYPE_CHECKING
@@ -44,6 +46,8 @@ if TYPE_CHECKING:
         MeasurementUnit,
         SamplingContext,
         MeasurementValue,
+        Attributes,
+        AttributeValue,
     )
 
     class SpanKwargs(TypedDict, total=False):
@@ -282,7 +286,7 @@ class Span:
         "_flags",
         "_flags_capacity",
         "_mode",
-        "attributes",
+        "_attributes",
     )
 
     def __init__(
@@ -321,8 +325,7 @@ class Span:
         self._containing_transaction = containing_transaction
         self._flags = {}  # type: Dict[str, bool]
         self._flags_capacity = 10
-        self.attributes = attributes or {}
-        # TODO[span-first]: fill attributes
+        self._attributes = attributes or {}  # type: Attributes
 
         if hub is not None:
             warnings.warn(
@@ -352,6 +355,16 @@ class Span:
 
         self.update_active_thread()
         self.set_profiler_id(get_profiler_id())
+        self._set_initial_attributes()
+
+    def _set_initial_attributes(self):
+        attributes = get_default_attributes()
+        self._attributes = attributes | self._attributes
+
+        self._attributes["sentry.segment.id"] = self.containing_transaction.span_id
+        if hasattr(self.containing_transaction, "name"):
+            # TODO[span-first]: fix this properly
+            self._attributes["sentry.segment.name"] = self.containing_transaction.name
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -630,6 +643,21 @@ class Span:
     def update_data(self, data):
         # type: (Dict[str, Any]) -> None
         self._data.update(data)
+
+    def get_attributes(self):
+        # type: () -> Attributes
+        return self._attributes
+
+    def set_attribute(self, attribute, value):
+        # type: (str, AttributeValue) -> None
+        self._attributes[attribute] = serialize_attribute(value)
+
+    def remove_attribute(self, attribute):
+        # type: (str) -> None
+        try:
+            del self._attributes[attribute]
+        except KeyError:
+            pass
 
     def set_flag(self, flag, result):
         # type: (str, bool) -> None
