@@ -933,14 +933,14 @@ def get_current_span(scope=None):
 def set_span_errored(span=None):
     # type: (Optional[Span]) -> None
     """
-    Set the status of the current or given span to ERROR.
-    Also sets the status of the transaction (root span) to ERROR.
+    Set the status of the current or given span to INTERNAL_ERROR.
+    Also sets the status of the transaction (root span) to INTERNAL_ERROR.
     """
     span = span or get_current_span()
     if span is not None:
-        span.set_status(SPANSTATUS.ERROR)
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
         if span.containing_transaction is not None:
-            span.containing_transaction.set_status(SPANSTATUS.ERROR)
+            span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
 
 
 def _generate_sample_rand(
