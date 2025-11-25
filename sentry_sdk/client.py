@@ -62,7 +62,15 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric, EventDataCategory
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        SDKInfo,
+        Log,
+        Metric,
+        EventDataCategory,
+        Item,
+    )
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
@@ -360,6 +368,7 @@ class _Client(BaseClient):
         def _record_lost_event(
             reason,  # type: str
             data_category,  # type: EventDataCategory
+            item,  # type: Item
             quantity=1,  # type: int
         ):
             # type: (...) -> None
@@ -367,6 +376,7 @@ class _Client(BaseClient):
                 self.transport.record_lost_event(
                     reason=reason,
                     data_category=data_category,
+                    item=item,
                     quantity=quantity,
                 )
 
