@@ -792,7 +792,7 @@ def test_chat_completion_api_error(
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
     assert span["origin"] == "auto.ai.huggingface_hub"
-    assert span.get("tags", {}).get("status") == "error"
+    assert span.get("tags", {}).get("status") == "internal_error"
 
     assert (
         error["contexts"]["trace"]["trace_id"]
@@ -835,9 +835,9 @@ def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors)
             assert sp["op"] == "http.client"
 
     assert span is not None
-    assert span["tags"]["status"] == "error"
+    assert span["tags"]["status"] == "internal_error"
 
-    assert transaction["contexts"]["trace"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)

@@ -381,7 +381,7 @@ def _wrap_message_create(f):
             return _execute_sync(f, *args, **kwargs)
         finally:
             span = sentry_sdk.get_current_span()
-            if span is not None and span.status == SPANSTATUS.ERROR:
+            if span is not None and span.status == SPANSTATUS.INTERNAL_ERROR:
                 with capture_internal_exceptions():
                     span.__exit__(None, None, None)
 
@@ -420,7 +420,7 @@ def _wrap_message_create_async(f):
             return await _execute_async(f, *args, **kwargs)
         finally:
             span = sentry_sdk.get_current_span()
-            if span is not None and span.status == SPANSTATUS.ERROR:
+            if span is not None and span.status == SPANSTATUS.INTERNAL_ERROR:
                 with capture_internal_exceptions():
                     span.__exit__(None, None, None)
 
