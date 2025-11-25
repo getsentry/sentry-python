@@ -2,6 +2,7 @@ import asyncio
 import json
 import threading
 
+from django.db import transaction
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -243,6 +244,73 @@ def postgres_select(request, *args, **kwargs):
 @csrf_exempt
 def postgres_select_orm(request, *args, **kwargs):
     user = User.objects.using("postgres").all().first()
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
+def postgres_insert_orm_no_autocommit(request, *args, **kwargs):
+    transaction.set_autocommit(False, using="postgres")
+    try:
+        user = User.objects.db_manager("postgres").create_user(
+            username="user1",
+        )
+        transaction.commit(using="postgres")
+    except Exception:
+        transaction.rollback(using="postgres")
+        transaction.set_autocommit(True, using="postgres")
+        raise
+
+    transaction.set_autocommit(True, using="postgres")
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
+def postgres_insert_orm_no_autocommit_rollback(request, *args, **kwargs):
+    transaction.set_autocommit(False, using="postgres")
+    try:
+        user = User.objects.db_manager("postgres").create_user(
+            username="user1",
+        )
+        transaction.rollback(using="postgres")
+    except Exception:
+        transaction.rollback(using="postgres")
+        transaction.set_autocommit(True, using="postgres")
+        raise
+
+    transaction.set_autocommit(True, using="postgres")
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
+def postgres_insert_orm_atomic(request, *args, **kwargs):
+    with transaction.atomic(using="postgres"):
+        user = User.objects.db_manager("postgres").create_user(
+            username="user1",
+        )
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
+def postgres_insert_orm_atomic_rollback(request, *args, **kwargs):
+    with transaction.atomic(using="postgres"):
+        user = User.objects.db_manager("postgres").create_user(
+            username="user1",
+        )
+        transaction.set_rollback(True, using="postgres")
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
+def postgres_insert_orm_atomic_exception(request, *args, **kwargs):
+    try:
+        with transaction.atomic(using="postgres"):
+            user = User.objects.db_manager("postgres").create_user(
+                username="user1",
+            )
+            transaction.set_rollback(True, using="postgres")
+            1 / 0
+    except ZeroDivisionError:
+        pass
     return HttpResponse("ok {}".format(user))
 
 

@@ -1,7 +1,6 @@
 from functools import wraps
 
-from pydantic_ai._tool_manager import ToolManager  # type: ignore
-
+from sentry_sdk.integrations import DidNotEnable
 import sentry_sdk
 
 from ..spans import execute_tool_span, update_execute_tool_span
@@ -21,6 +20,11 @@ try:
     HAS_MCP = True
 except ImportError:
     HAS_MCP = False
+
+try:
+    from pydantic_ai._tool_manager import ToolManager  # type: ignore
+except ImportError:
+    raise DidNotEnable("pydantic-ai not installed")
 
 
 def _patch_tool_execution():

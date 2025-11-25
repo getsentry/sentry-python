@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.46.0
+
+### Various fixes & improvements
+
+- Preserve metadata on wrapped coroutines (#5105) by @alexander-alderman-webb
+- Make imports defensive to avoid `ModuleNotFoundError` in Pydantic AI integration (#5135) by @alexander-alderman-webb
+- Fix OpenAI agents integration mistakenly enabling itself (#5132) by @sentrivana
+- Add instrumentation to embedding functions for various backends (#5120) by @constantinius
+- Improve embeddings support for OpenAI (#5121) by @constantinius
+- Enhance input handling for embeddings in LiteLLM integration (#5127) by @constantinius
+- Expect exceptions when re-raised (#5125) by @alexander-alderman-webb
+- Remove `MagicMock` from mocked `ModelResponse` (#5126) by @alexander-alderman-webb
+
 ## 2.45.0
 
 ### Various fixes & improvements

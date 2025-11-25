@@ -116,6 +116,11 @@ class INSTRUMENTER:
     OTEL = "otel"
 
 
+class SPANNAME:
+    DB_COMMIT = "COMMIT"
+    DB_ROLLBACK = "ROLLBACK"
+
+
 class SPANDATA:
     """
     Additional information describing the type of the span.
@@ -1450,4 +1455,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.45.0"
+VERSION = "2.46.0"
