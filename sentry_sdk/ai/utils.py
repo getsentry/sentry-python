@@ -1,4 +1,4 @@
-import inspect 
+import inspect
 import json
 from collections import deque
 from typing import TYPE_CHECKING
