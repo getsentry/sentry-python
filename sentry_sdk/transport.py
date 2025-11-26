@@ -266,6 +266,11 @@ class BaseHttpTransport(Transport):
                 )
                 self.record_lost_event(reason, "span", quantity=span_count)
 
+            elif data_category == "log_item" and item:
+                # Also record size of lost logs in bytes
+                bytes_size = len(item.get_bytes())
+                self.record_lost_event(reason, "log_byte", quantity=bytes_size)
+
             elif data_category == "attachment":
                 # quantity of 0 is actually 1 as we do not want to count
                 # empty attachments as actually empty.
