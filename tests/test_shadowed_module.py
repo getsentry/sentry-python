@@ -15,7 +15,7 @@ def unrecognized_dependencies(tree):
     Finds unrecognized imports in the AST for a Python module. In an empty
     environment the set of non-standard library modules is returned.
     """
-    unrecognized_dependency = set()
+    unrecognized_dependencies = set()
     package_name = lambda name: name.split(".")[0]
 
     for node in ast.walk(tree):
@@ -25,7 +25,7 @@ def unrecognized_dependencies(tree):
 
                 try:
                     if not importlib.util.find_spec(root):
-                        unrecognized_dependency.add(root)
+                        unrecognized_dependencies.add(root)
                 except ValueError:
                     continue
 
@@ -38,11 +38,11 @@ def unrecognized_dependencies(tree):
 
             try:
                 if not importlib.util.find_spec(root):
-                    unrecognized_dependency.add(root)
+                    unrecognized_dependencies.add(root)
             except ValueError:
                 continue
 
-    return unrecognized_dependency
+    return unrecognized_dependencies
 
 
 def test_shadowed_module(sentry_init):
