@@ -112,7 +112,7 @@ def _wrap_generate_content_stream(f):
                         yield chunk
                 except Exception as exc:
                     _capture_exception(exc)
-                    chat_span.set_status(SPANSTATUS.ERROR)
+                    chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
                     raise
                 finally:
                     # Accumulate all chunks and set final response data on spans
@@ -186,7 +186,7 @@ def _wrap_async_generate_content_stream(f):
                         yield chunk
                 except Exception as exc:
                     _capture_exception(exc)
-                    chat_span.set_status(SPANSTATUS.ERROR)
+                    chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
                     raise
                 finally:
                     # Accumulate all chunks and set final response data on spans
@@ -249,7 +249,7 @@ def _wrap_generate_content(f):
                     response = f(self, *args, **kwargs)
                 except Exception as exc:
                     _capture_exception(exc)
-                    chat_span.set_status(SPANSTATUS.ERROR)
+                    chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
                     raise
 
                 set_span_data_for_response(chat_span, integration, response)
@@ -295,7 +295,7 @@ def _wrap_async_generate_content(f):
                     response = await f(self, *args, **kwargs)
                 except Exception as exc:
                     _capture_exception(exc)
-                    chat_span.set_status(SPANSTATUS.ERROR)
+                    chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
                     raise
 
                 set_span_data_for_response(chat_span, integration, response)

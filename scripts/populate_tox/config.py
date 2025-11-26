@@ -109,7 +109,6 @@ TEST_SUITE_CONFIG = {
     "dramatiq": {
         "package": "dramatiq",
         "num_versions": 2,
-        "include": "!=2.0.0",
     },
     "falcon": {
         "package": "falcon",
@@ -201,7 +200,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "tiktoken", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -214,7 +213,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -286,7 +285,6 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
         },
         "python": ">=3.10",
-        "include": "!=0.6.0,!=0.6.1",
     },
     "openfeature": {
         "package": "openfeature-sdk",
@@ -331,7 +329,10 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
-        "python": ">=3.9",
+        "python": {
+            ">0.0,<2.52.0": ">=3.9",
+            ">=2.52.0": ">=3.10",
+        },
         "num_versions": 2,
     },
     "redis": {

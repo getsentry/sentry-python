@@ -294,9 +294,6 @@ async def test_handoff_span(sentry_init, capture_events, mock_usage):
                         name="transfer_to_secondary_agent",
                         type="function_call",
                         arguments="{}",
-                        function=MagicMock(
-                            name="transfer_to_secondary_agent", arguments="{}"
-                        ),
                     )
                 ],
                 usage=mock_usage,
@@ -377,9 +374,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                 name="simple_test_tool",
                 type="function_call",
                 arguments='{"message": "hello"}',
-                function=MagicMock(
-                    name="simple_test_tool", arguments='{"message": "hello"}'
-                ),
             )
 
             # First response with tool call
@@ -507,11 +501,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-    assert re.sub(
-        r"SerializationIterator\(.*\)",
-        "NOT_CHECKED",
-        ai_client_span1["data"]["gen_ai.response.tool_calls"],
-    ) == safe_serialize(
+    assert ai_client_span1["data"]["gen_ai.response.tool_calls"] == safe_serialize(
         [
             {
                 "arguments": '{"message": "hello"}',
@@ -520,7 +510,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                 "type": "function_call",
                 "id": "call_123",
                 "status": None,
-                "function": "NOT_CHECKED",
             }
         ]
     )
@@ -559,11 +548,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         == available_tools
     )
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
-    assert re.sub(
-        r"SerializationIterator\(.*\)",
-        "NOT_CHECKED",
-        ai_client_span2["data"]["gen_ai.request.messages"],
-    ) == safe_serialize(
+    assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
         [
             {
                 "role": "system",
@@ -586,7 +571,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
                         "name": "simple_test_tool",
                         "type": "function_call",
                         "id": "call_123",
-                        "function": "NOT_CHECKED",
                     }
                 ],
             },
@@ -661,6 +645,7 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
     assert ai_client_span["description"] == "chat gpt-4"
     assert ai_client_span["origin"] == "auto.ai.openai_agents"
+    assert ai_client_span["status"] == "internal_error"
     assert ai_client_span["tags"]["status"] == "internal_error"
 
 
@@ -701,6 +686,7 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
     ai_client_span = [s for s in spans if s["op"] == "gen_ai.chat"][0]
 
     assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["status"] == "internal_error"
     assert ai_client_span["tags"]["status"] == "internal_error"
 
     assert "gen_ai.request.messages" in ai_client_span["data"]
@@ -740,8 +726,9 @@ async def test_span_status_error(sentry_init, capture_events, test_agent):
 
     (error, transaction) = events
     assert error["level"] == "error"
-    assert transaction["spans"][0]["tags"]["status"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "error"
+    assert transaction["spans"][0]["status"] == "internal_error"
+    assert transaction["spans"][0]["tags"]["status"] == "internal_error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -843,7 +830,8 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_events, test_agent)
     )
 
     # Verify no error status since error was None
-    assert mcp_tool_span.get("tags", {}).get("status") != "error"
+    assert mcp_tool_span.get("status") != "internal_error"
+    assert mcp_tool_span.get("tags", {}).get("status") != "internal_error"
 
 
 @pytest.mark.asyncio
@@ -943,7 +931,8 @@ async def test_mcp_tool_execution_with_error(sentry_init, capture_events, test_a
     assert mcp_tool_span["data"]["gen_ai.tool.output"] is None
 
     # Verify error status was set
-    assert mcp_tool_span["tags"]["status"] == "error"
+    assert mcp_tool_span["status"] == "internal_error"
+    assert mcp_tool_span["tags"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -1165,9 +1154,6 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
                 name="failing_tool",
                 type="function_call",
                 arguments='{"message": "test"}',
-                function=MagicMock(
-                    name="failing_tool", arguments='{"message": "test"}'
-                ),
             )
 
             # First response with tool call
@@ -1237,4 +1223,5 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
 
     # Verify error status was set (this is the key test for our patch)
     # The span should be marked as error because the tool execution failed
-    assert execute_tool_span["tags"]["status"] == "error"
+    assert execute_tool_span["status"] == "internal_error"
+    assert execute_tool_span["tags"]["status"] == "internal_error"
