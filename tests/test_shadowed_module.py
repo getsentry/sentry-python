@@ -10,7 +10,7 @@ from sentry_sdk import integrations
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, Integration
 
 
-def unrecognized_dependencies(tree):
+def find_unrecognized_dependencies(tree):
     """
     Finds unrecognized imports in the AST for a Python module. In an empty
     environment the set of non-standard library modules is returned.
@@ -45,7 +45,7 @@ def unrecognized_dependencies(tree):
     return unrecognized_dependencies
 
 
-def test_shadowed_module(sentry_init):
+def test_shadowed_modules_when_importing_integrations(sentry_init):
     """
     Check that importing integrations for third-party module raises an
     DidNotEnable exception when the associated module is shadowed by an empty
@@ -77,7 +77,7 @@ def test_shadowed_module(sentry_init):
             spec = importlib.util.find_spec(module_path)
             source = pathlib.Path(spec.origin).read_text(encoding="utf-8")
             tree = ast.parse(source, filename=spec.origin)
-            integration_dependencies = unrecognized_dependencies(tree)
+            integration_dependencies = find_unrecognized_dependencies(tree)
             for dependency in integration_dependencies:
                 sys.modules[dependency] = types.ModuleType(dependency)
             with pytest.raises(integrations.DidNotEnable):
