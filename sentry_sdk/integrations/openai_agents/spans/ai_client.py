@@ -40,3 +40,7 @@ def update_ai_client_span(span, agent, get_response_kwargs, result):
     _set_usage_data(span, result.usage)
     _set_output_data(span, result)
     _create_mcp_execute_tool_spans(span, result)
+
+    # Set response model if captured from raw response
+    if hasattr(result, "_sentry_response_model") and result._sentry_response_model:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, result._sentry_response_model)
