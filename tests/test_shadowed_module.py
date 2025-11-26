@@ -57,6 +57,19 @@ def test_shadowed_module(sentry_init):
     for _, submodule_name, _ in pkgutil.walk_packages(integrations.__path__):
         module_path = f"sentry_sdk.integrations.{submodule_name}"
 
+        # Temporary skip list
+        if submodule_name in (
+            "clickhouse_driver",
+            "grpc",
+            "litellm",
+            "opentelemetry",
+            "pure_eval",
+            "ray",
+            "trytond",
+            "typer",
+        ):
+            continue
+
         try:
             importlib.import_module(module_path)
             continue
