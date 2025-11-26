@@ -331,7 +331,7 @@ def _wrap_embed_content(f):
                 response = f(self, *args, **kwargs)
             except Exception as exc:
                 _capture_exception(exc)
-                span.set_status(SPANSTATUS.ERROR)
+                span.set_status(SPANSTATUS.INTERNAL_ERROR)
                 raise
 
             set_span_data_for_embed_response(span, integration, response)
@@ -366,7 +366,7 @@ def _wrap_async_embed_content(f):
                 response = await f(self, *args, **kwargs)
             except Exception as exc:
                 _capture_exception(exc)
-                span.set_status(SPANSTATUS.ERROR)
+                span.set_status(SPANSTATUS.INTERNAL_ERROR)
                 raise
 
             set_span_data_for_embed_response(span, integration, response)
