@@ -444,26 +444,23 @@ class PropagationContext:
     @classmethod
     def from_incoming_data(cls, incoming_data):
         # type: (Dict[str, Any]) -> Optional[PropagationContext]
-        propagation_context = None
-
         normalized_data = normalize_incoming_data(incoming_data)
+
+        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
+        sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
+        if sentrytrace_data is None:
+            return None
+
+        propagation_context = PropagationContext()
+        propagation_context.update(sentrytrace_data)
+
         baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
         if baggage_header:
-            propagation_context = PropagationContext()
             propagation_context.dynamic_sampling_context = Baggage.from_incoming_header(
                 baggage_header
             ).dynamic_sampling_context()
 
-        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
-        if sentry_trace_header:
-            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
-            if sentrytrace_data is not None:
-                if propagation_context is None:
-                    propagation_context = PropagationContext()
-                propagation_context.update(sentrytrace_data)
-
-        if propagation_context is not None:
-            propagation_context._fill_sample_rand()
+        propagation_context._fill_sample_rand()
 
         return propagation_context
 
