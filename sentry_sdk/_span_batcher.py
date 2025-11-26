@@ -128,7 +128,7 @@ class SpanBatcher:
         # type: (Span) -> SpanV2
         from sentry_sdk.utils import attribute_value_to_transport_format, safe_repr
 
-        is_segment = isinstance(span, Transaction)
+        is_segment = span.containing_transaction == span
 
         res = {
             "trace_id": span.trace_id,
@@ -137,7 +137,7 @@ class SpanBatcher:
             "status": SPANSTATUS.OK
             if span.status in (SPANSTATUS.OK, SPANSTATUS.UNSET)
             else SPANSTATUS.ERROR,
-            "is_segment": span.containing_transaction == span,
+            "is_segment": is_segment,
             "start_timestamp": span.start_timestamp.timestamp(),  # TODO[span-first]
             "end_timestamp": span.timestamp.timestamp(),
         }
