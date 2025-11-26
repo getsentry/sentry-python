@@ -13,7 +13,7 @@ from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, Integration
 def unrecognized_dependencies(tree):
     """
     Finds unrecognized imports in the AST for a Python module. In an empty
-    environment, the set of non-standard library modules are returned.
+    environment the set of non-standard library modules is returned.
     """
     unrecognized_dependency = set()
     package_name = lambda name: name.split(".")[0]
