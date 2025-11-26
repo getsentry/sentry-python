@@ -10,6 +10,37 @@ from sentry_sdk import integrations
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, Integration
 
 
+def pytest_generate_tests(metafunc):
+    """
+    All submodules of sentry_sdk.integrations are picked up, so modules
+    without a subclass of sentry_sdk.integrations.Integration are also tested
+    for poorly gated imports.
+
+    This approach was chosen to keep the implementation simple.
+    """
+    if "integration_submodule_name" in metafunc.fixturenames:
+        submodule_names = {
+            submodule_name
+            for _, submodule_name, _ in pkgutil.walk_packages(integrations.__path__)
+        }
+
+        metafunc.parametrize(
+            "integration_submodule_name",
+            # Temporarily skip some integrations
+            submodule_names
+            - {
+                "clickhouse_driver",
+                "grpc",
+                "litellm",
+                "opentelemetry",
+                "pure_eval",
+                "ray",
+                "trytond",
+                "typer",
+            },
+        )
+
+
 def find_unrecognized_dependencies(tree):
     """
     Finds unrecognized imports in the AST for a Python module. In an empty
@@ -48,7 +79,10 @@ def find_unrecognized_dependencies(tree):
 @pytest.mark.skipif(
     sys.version_info < (3, 7), reason="asyncpg imports __future__.annotations"
 )
-def test_shadowed_modules_when_importing_integrations(sentry_init):
+@pytest.mark.forked  # Importing modules can cause side-effects
+def test_shadowed_modules_when_importing_integrations(
+    sentry_init, integration_submodule_name
+):
     """
     Check that importing integrations for third-party module raises an
     DidNotEnable exception when the associated module is shadowed by an empty
@@ -57,31 +91,16 @@ def test_shadowed_modules_when_importing_integrations(sentry_init):
     An integration is determined to be for a third-party module if it cannot
     be imported in the environment in which the tests run.
     """
-    for _, submodule_name, _ in pkgutil.walk_packages(integrations.__path__):
-        module_path = f"sentry_sdk.integrations.{submodule_name}"
-
-        # Temporary skip list
-        if submodule_name in (
-            "clickhouse_driver",
-            "grpc",
-            "litellm",
-            "opentelemetry",
-            "pure_eval",
-            "ray",
-            "trytond",
-            "typer",
-        ):
-            continue
-
-        try:
+    module_path = f"sentry_sdk.integrations.{integration_submodule_name}"
+    try:
+        importlib.import_module(module_path)
+        return
+    except integrations.DidNotEnable:
+        spec = importlib.util.find_spec(module_path)
+        source = pathlib.Path(spec.origin).read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=spec.origin)
+        integration_dependencies = find_unrecognized_dependencies(tree)
+        for dependency in integration_dependencies:
+            sys.modules[dependency] = types.ModuleType(dependency)
+        with pytest.raises(integrations.DidNotEnable):
             importlib.import_module(module_path)
-            continue
-        except integrations.DidNotEnable:
-            spec = importlib.util.find_spec(module_path)
-            source = pathlib.Path(spec.origin).read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=spec.origin)
-            integration_dependencies = find_unrecognized_dependencies(tree)
-            for dependency in integration_dependencies:
-                sys.modules[dependency] = types.ModuleType(dependency)
-            with pytest.raises(integrations.DidNotEnable):
-                importlib.import_module(module_path)
