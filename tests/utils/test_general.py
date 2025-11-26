@@ -2,6 +2,7 @@ import sys
 import os
 
 import pytest
+from sentry_sdk.ai.utils import _normalize_data
 
 
 from sentry_sdk.utils import (
@@ -621,3 +622,29 @@ def test_failed_base64_conversion(input):
 )
 def test_strip_string(input, max_length, result):
     assert strip_string(input, max_length) == result
+
+
+def test_normalize_data_with_pydantic_class():
+    """Test that _normalize_data handles Pydantic model classes"""
+
+    class TestClass:
+        name: str = None
+
+        def __init__(self, name: str):
+            self.name = name
+
+        def model_dump(self):
+            return {"name": self.name}
+
+    # Test with class (should NOT call model_dump())
+    result = _normalize_data(TestClass)
+    assert result == "<ClassType: TestClass>"
+
+    # Test with instance (should call model_dump())
+    instance = TestClass(name="test")
+    result = _normalize_data(instance)
+    assert result == {"name": "test"}
+
+    # Test with dict containing class
+    result = _normalize_data({"schema": TestClass, "count": 5})
+    assert result == {"schema": "<ClassType: TestClass>", "count": 5}

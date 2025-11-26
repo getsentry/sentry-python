@@ -440,8 +440,9 @@ def test_span_status_error(sentry_init, capture_events):
 
     (error, transaction) = events
     assert error["level"] == "error"
-    assert transaction["spans"][0]["tags"]["status"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "error"
+    assert transaction["spans"][0]["status"] == "internal_error"
+    assert transaction["spans"][0]["tags"]["status"] == "internal_error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
