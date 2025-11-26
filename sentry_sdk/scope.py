@@ -530,9 +530,7 @@ class Scope:
 
         baggage = self.get_baggage()
         if baggage is not None:
-            self._propagation_context.dynamic_sampling_context = (
-                baggage.dynamic_sampling_context()
-            )
+            self._propagation_context.baggage = baggage
 
         return self._propagation_context.dynamic_sampling_context
 
@@ -573,13 +571,7 @@ class Scope:
 
         # If this scope has a propagation context, return baggage from there
         if self._propagation_context is not None:
-            dynamic_sampling_context = (
-                self._propagation_context.dynamic_sampling_context
-            )
-            if dynamic_sampling_context is None:
-                return Baggage.from_options(self)
-            else:
-                return Baggage(dynamic_sampling_context)
+            return self._propagation_context.baggage or Baggage.from_options(self)
 
         # Fall back to isolation scope's baggage. It always has one
         return self.get_isolation_scope().get_baggage()
@@ -1099,9 +1091,9 @@ class Scope:
         if transaction.sample_rate is not None:
             propagation_context = self.get_active_propagation_context()
             if propagation_context:
-                dsc = propagation_context.dynamic_sampling_context
-                if dsc is not None:
-                    dsc["sample_rate"] = str(transaction.sample_rate)
+                baggage = propagation_context.baggage
+                if baggage is not None:
+                    baggage.sentry_items["sample_rate"] = str(transaction.sample_rate)
             if transaction._baggage:
                 transaction._baggage.sentry_items["sample_rate"] = str(
                     transaction.sample_rate
