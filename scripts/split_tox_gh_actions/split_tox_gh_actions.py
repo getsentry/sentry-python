@@ -69,21 +69,27 @@ GROUPS = {
     "Common": [
         "common",
     ],
+    "MCP": [
+        "mcp",
+        "fastmcp",
+    ],
+    "Agents": [
+        "openai_agents",
+        "pydantic_ai",
+    ],
+    "AI Workflow": [
+        "langchain-base",
+        "langchain-notiktoken",
+        "langgraph",
+    ],
     "AI": [
         "anthropic",
         "cohere",
         "google_genai",
         "huggingface_hub",
-        "langchain-base",
-        "langchain-notiktoken",
-        "langgraph",
         "litellm",
-        "mcp",
-        "fastmcp",
         "openai-base",
         "openai-notiktoken",
-        "openai_agents",
-        "pydantic_ai",
     ],
     "Cloud": [
         "aws_lambda",

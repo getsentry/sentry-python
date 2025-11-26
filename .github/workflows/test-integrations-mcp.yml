@@ -2,7 +2,7 @@
 # python scripts/split_tox_gh_actions/split_tox_gh_actions.py
 # The template responsible for it is in
 # scripts/split_tox_gh_actions/templates/base.jinja
-name: Test AI
+name: Test MCP
 on:
   push:
     branches:
@@ -22,14 +22,14 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-ai:
-    name: AI
+  test-mcp:
+    name: MCP
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.9","3.10","3.11","3.12","3.13","3.14","3.14t"]
+        python-version: ["3.10","3.12","3.13","3.14","3.14t"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -50,34 +50,14 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test anthropic
+      - name: Test mcp
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-anthropic"
-      - name: Test cohere
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-mcp"
+      - name: Test fastmcp
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere"
-      - name: Test google_genai
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-google_genai"
-      - name: Test huggingface_hub
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub"
-      - name: Test litellm
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-litellm"
-      - name: Test openai-base
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-base"
-      - name: Test openai-notiktoken
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-notiktoken"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-fastmcp"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -106,13 +86,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All AI tests passed
-    needs: test-ai
+    name: All MCP tests passed
+    needs: test-mcp
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-ai.result != 'success'
+        if: needs.test-mcp.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
