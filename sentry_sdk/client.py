@@ -67,7 +67,7 @@ if TYPE_CHECKING:
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
-    from sentry_sdk.transport import Transport
+    from sentry_sdk.transport import Transport, Item
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher
 
@@ -360,6 +360,7 @@ class _Client(BaseClient):
         def _record_lost_event(
             reason,  # type: str
             data_category,  # type: EventDataCategory
+            item=None,  # type: Optional[Item]
             quantity=1,  # type: int
         ):
             # type: (...) -> None
@@ -367,6 +368,7 @@ class _Client(BaseClient):
                 self.transport.record_lost_event(
                     reason=reason,
                     data_category=data_category,
+                    item=item,
                     quantity=quantity,
                 )
 

@@ -201,4 +201,4 @@ def _create_mcp_execute_tool_spans(span, result):
                         SPANDATA.GEN_AI_TOOL_OUTPUT, output.output
                     )
                 if output.error:
-                    execute_tool_span.set_status(SPANSTATUS.ERROR)
+                    execute_tool_span.set_status(SPANSTATUS.INTERNAL_ERROR)
