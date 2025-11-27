@@ -31,7 +31,8 @@ def _patch_agent_run():
         """Start an agent invocation span"""
         # Store the agent on the context wrapper so we can access it later
         context_wrapper._sentry_current_agent = agent
-        invoke_agent_span(context_wrapper, agent, kwargs)
+        span = invoke_agent_span(context_wrapper, agent, kwargs)
+        context_wrapper._sentry_agent_span = span
 
     def _end_invoke_agent_span(context_wrapper, agent, output=None):
         # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
