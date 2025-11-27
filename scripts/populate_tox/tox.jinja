@@ -161,8 +161,8 @@ setenv =
     spark-v{3.0.3,3.5.6}: JAVA_HOME=/usr/lib/jvm/temurin-11-jdk-amd64
 
     # Avoid polluting test suite with imports
-    common: PYTEST_ADDOPTS="--ignore tests/test_shadowed_module.py"
-    gevent: PYTEST_ADDOPTS="--ignore tests/test_shadowed_module.py"
+    common: PYTEST_ADDOPTS="--ignore=tests/test_shadowed_module.py"
+    gevent: PYTEST_ADDOPTS="--ignore=tests/test_shadowed_module.py"
 
     # TESTPATH definitions for test suites not managed by toxgen
     common: TESTPATH=tests
