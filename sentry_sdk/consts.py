@@ -1427,6 +1427,13 @@ class ClientConstructor:
             If `trace_ignore_status_codes` is not provided, requests with any status code
             may be traced.
 
+        :param strict_trace_continuation: If set to `True`, the SDK will only continue a trace if the `org_id` of the incoming trace found in the
+           `baggage` header matches the `org_id` of the current Sentry client.
+
+            The client's organization ID is extracted from the DSN or can be set with the `org_id` option.
+            If the organization IDs do not match, the SDK will start a new trace instead of continuing the incoming one.
+            This is useful to prevent traces of unknown third-party services from being continued in your application.
+
         :param org_id: An optional organization ID. The SDK will try to extract if from the DSN in most cases
             but you can provide it explicitly for self-hosted and Relay setups. This value is used for
             trace propagation and for features like `strict_trace_continuation`.
