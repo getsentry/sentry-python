@@ -755,3 +755,183 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
     assert "small message 4" in str(parsed_messages[0])
     assert "small message 5" in str(parsed_messages[1])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
+
+
+def test_pregel_invoke_with_model_and_usage(sentry_init, capture_events):
+    """Test that model and usage information are captured during graph execution."""
+    sentry_init(
+        integrations=[LanggraphIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    class MockMessageWithMetadata(MockMessage):
+        def __init__(self, content, response_metadata=None):
+            super().__init__(content, type="ai")
+            self.response_metadata = response_metadata or {}
+
+    class MockPregelWithModel:
+        def __init__(self, model_name):
+            self.name = "test_graph_with_model"
+            self.config = {"model": model_name}
+
+        def invoke(self, state, config=None):
+            return {
+                "messages": [
+                    MockMessageWithMetadata(
+                        "Response from model",
+                        response_metadata={"model": "gpt-4"},
+                    )
+                ],
+                "usage_metadata": {
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "total_tokens": 150,
+                },
+            }
+
+    test_state = {"messages": [MockMessage("Hello, model test")]}
+    pregel = MockPregelWithModel("gpt-4")
+
+    def original_invoke(self, *args, **kwargs):
+        return self.invoke(*args, **kwargs)
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        wrapped_invoke(pregel, test_state)
+
+    tx = events[0]
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_span = invoke_spans[0]
+
+    assert SPANDATA.GEN_AI_REQUEST_MODEL in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-4"
+
+    assert SPANDATA.GEN_AI_RESPONSE_MODEL in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
+
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+
+    assert SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+
+    assert SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+
+
+def test_pregel_ainvoke_with_model_and_usage(sentry_init, capture_events):
+    """Test that model and usage information are captured during async graph execution."""
+    sentry_init(
+        integrations=[LanggraphIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    class MockMessageWithMetadata(MockMessage):
+        def __init__(self, content, response_metadata=None):
+            super().__init__(content, type="ai")
+            self.response_metadata = response_metadata or {}
+
+    class MockPregelWithModel:
+        def __init__(self, model_name):
+            self.name = "async_graph_with_model"
+            self.config = {"model": model_name}
+
+        async def ainvoke(self, state, config=None):
+            return {
+                "messages": [
+                    MockMessageWithMetadata(
+                        "Async response from model",
+                        response_metadata={"model": "claude-3"},
+                    )
+                ],
+                "usage_metadata": {
+                    "input_tokens": 200,
+                    "output_tokens": 75,
+                    "total_tokens": 275,
+                },
+            }
+
+    test_state = {"messages": [MockMessage("Hello, async model test")]}
+    pregel = MockPregelWithModel("claude-3")
+
+    async def original_ainvoke(self, *args, **kwargs):
+        return await self.ainvoke(*args, **kwargs)
+
+    async def run_test():
+        with start_transaction():
+            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+            await wrapped_ainvoke(pregel, test_state)
+
+    asyncio.run(run_test())
+
+    tx = events[0]
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_span = invoke_spans[0]
+
+    assert SPANDATA.GEN_AI_REQUEST_MODEL in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "claude-3"
+
+    assert SPANDATA.GEN_AI_RESPONSE_MODEL in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "claude-3"
+
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+
+    assert SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 75
+
+    assert SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 275
+
+
+def test_pregel_invoke_with_config_model(sentry_init, capture_events):
+    """Test that model information is extracted from config parameter."""
+    sentry_init(
+        integrations=[LanggraphIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    class MockPregelNoModel:
+        def __init__(self):
+            self.name = "test_graph_config_model"
+
+        def invoke(self, state, config=None):
+            return {
+                "messages": [MockMessage("Response")],
+            }
+
+    test_state = {"messages": [MockMessage("Hello")]}
+    pregel = MockPregelNoModel()
+    config = {"model": "gpt-3.5-turbo"}
+
+    def original_invoke(self, *args, **kwargs):
+        return self.invoke(*args, **kwargs)
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        wrapped_invoke(pregel, test_state, config=config)
+
+    tx = events[0]
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_span = invoke_spans[0]
+
+    assert SPANDATA.GEN_AI_REQUEST_MODEL in invoke_span["data"]
+    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
