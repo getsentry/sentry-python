@@ -44,7 +44,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                     return await handler(request, context)
 
                 # What if the headers are empty?
-                transaction = Transaction.continue_from_headers(
+                transaction = sentry_sdk.continue_trace(
                     dict(context.invocation_metadata()),
                     op=OP.GRPC_SERVER,
                     name=name,
