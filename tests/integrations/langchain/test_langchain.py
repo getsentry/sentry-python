@@ -1745,32 +1745,18 @@ def test_langchain_response_model_extraction(
             invocation_params={"model": "gpt-3.5-turbo"},
         )
 
-        response_metadata = {}
-        if response_metadata_model is not None:
-            response_metadata["model_name"] = response_metadata_model
-
-        generation_info = {}
-        if generation_info_model is not None:
-            generation_info["model_name"] = generation_info_model
-
-        llm_output = {}
-        if llm_output_model is not None:
-            llm_output["model_name"] = llm_output_model
+        response_metadata = {"model_name": response_metadata_model}
+        generation_info = {"model_name": generation_info_model}
+        llm_output = {"model_name": llm_output_model}
 
         message = AIMessageChunk(
-            content="Test response",
-            response_metadata=response_metadata,
+            content="Test response", response_metadata=response_metadata
         )
 
-        generation = Mock()
-        generation.text = "Test response"
-        generation.message = message
-        generation.generation_info = generation_info
-
-        response = Mock()
-        response.generations = [[generation]]
-        response.llm_output = llm_output
-
+        generation = Mock(
+            text="Test response", message=message, generation_info=generation_info
+        )
+        response = Mock(generations=[[generation]], llm_output=llm_output)
         callback.on_llm_end(response=response, run_id=run_id)
 
     assert len(events) > 0
