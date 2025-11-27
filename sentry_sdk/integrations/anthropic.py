@@ -41,7 +41,7 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncIterator, Iterator
+    from typing import Any, AsyncIterator, Iterator, List, Optional, Union
     from sentry_sdk.tracing import Span
 
 
@@ -134,7 +134,7 @@ def _set_input_data(span, kwargs, integration):
     ):
         normalized_messages = []
         if system_prompt:
-            system_prompt_content = None
+            system_prompt_content = None  # type: Optional[Union[str, List[dict[str, Any]]]]
             if isinstance(system_prompt, str):
                 system_prompt_content = system_prompt
             elif isinstance(system_prompt, Iterable):
@@ -166,7 +166,7 @@ def _set_input_data(span, kwargs, integration):
                         normalized_messages.append(
                             {
                                 "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
-                                "content": {
+                                "content": {  # type: ignore[dict-item]
                                     "tool_use_id": item.get("tool_use_id"),
                                     "output": item.get("content"),
                                 },
