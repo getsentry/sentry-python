@@ -134,6 +134,7 @@ def _set_input_data(span, kwargs, integration):
     ):
         normalized_messages = []
         if system_prompt:
+            system_prompt_content = None
             if isinstance(system_prompt, str):
                 system_prompt_content = system_prompt
             elif isinstance(system_prompt, Iterable):
