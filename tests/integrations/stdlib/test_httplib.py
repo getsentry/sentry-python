@@ -8,9 +8,8 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message, start_transaction, continue_trace
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
-from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 from tests.conftest import ApproxDict, create_mock_http_server
@@ -187,6 +186,7 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
     sentry_init(traces_sample_rate=1.0)
 
     headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
         "baggage": (
             "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
@@ -194,7 +194,7 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
         ),
     }
 
-    transaction = Transaction.continue_from_headers(headers)
+    transaction = continue_trace(headers)
 
     with start_transaction(
         transaction=transaction,
@@ -239,7 +239,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
 
     sentry_init(traces_sample_rate=0.5, release="foo")
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
-        transaction = Transaction.continue_from_headers({})
+        transaction = continue_trace({})
 
     with start_transaction(transaction=transaction, name="Head SDK tx") as transaction:
         HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
@@ -351,7 +351,7 @@ def test_option_trace_propagation_targets(
         )
     }
 
-    transaction = Transaction.continue_from_headers(headers)
+    transaction = continue_trace(headers)
 
     with start_transaction(
         transaction=transaction,

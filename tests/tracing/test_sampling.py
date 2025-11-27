@@ -5,8 +5,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk import start_span, start_transaction, capture_exception
-from sentry_sdk.tracing import Transaction
+from sentry_sdk import start_span, start_transaction, capture_exception, continue_trace
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import logger
 
@@ -196,8 +195,9 @@ def test_passes_parent_sampling_decision_in_sampling_context(
         )
     )
 
-    transaction = Transaction.continue_from_headers(
-        headers={"sentry-trace": sentry_trace_header}, name="dogpark"
+    transaction = sentry_sdk.continue_trace(
+        {"sentry-trace": sentry_trace_header},
+        name="dogpark",
     )
 
     def mock_set_initial_sampling_decision(_, sampling_context):
