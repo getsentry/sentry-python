@@ -664,8 +664,8 @@ class Baggage:
         if options.get("release"):
             sentry_items["release"] = options["release"]
 
-        if options.get("dsn"):
-            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
+        if client.parsed_dsn:
+            sentry_items["public_key"] = client.parsed_dsn.public_key
 
         if options.get("traces_sample_rate"):
             sentry_items["sample_rate"] = str(options["traces_sample_rate"])
@@ -696,8 +696,8 @@ class Baggage:
         if options.get("release"):
             sentry_items["release"] = options["release"]
 
-        if options.get("dsn"):
-            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
+        if client.parsed_dsn:
+            sentry_items["public_key"] = client.parsed_dsn.public_key
 
         if (
             transaction.name
