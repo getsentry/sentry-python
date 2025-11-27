@@ -1689,39 +1689,16 @@ def test_langchain_embeddings_with_list_and_string_inputs(sentry_init, capture_e
 
 
 @pytest.mark.parametrize(
-    "response_metadata_model,generation_info_model,llm_output_model,expected_model",
+    "response_metadata_model,expected_model",
     [
-        ("model-from-metadata", None, None, "model-from-metadata"),
-        (None, "model-from-generation-info", None, "model-from-generation-info"),
-        (None, None, "model-from-llm-output", "model-from-llm-output"),
-        (
-            "model-from-metadata",
-            "model-from-generation-info",
-            None,
-            "model-from-metadata",
-        ),
-        ("model-from-metadata", None, "model-from-llm-output", "model-from-metadata"),
-        (
-            None,
-            "model-from-generation-info",
-            "model-from-llm-output",
-            "model-from-generation-info",
-        ),
-        (
-            "model-from-metadata",
-            "model-from-generation-info",
-            "model-from-llm-output",
-            "model-from-metadata",
-        ),
-        (None, None, None, None),
+        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
+        (None, None),
     ],
 )
 def test_langchain_response_model_extraction(
     sentry_init,
     capture_events,
     response_metadata_model,
-    generation_info_model,
-    llm_output_model,
     expected_model,
 ):
     sentry_init(
@@ -1746,17 +1723,12 @@ def test_langchain_response_model_extraction(
         )
 
         response_metadata = {"model_name": response_metadata_model}
-        generation_info = {"model_name": generation_info_model}
-        llm_output = {"model_name": llm_output_model}
-
         message = AIMessageChunk(
             content="Test response", response_metadata=response_metadata
         )
 
-        generation = Mock(
-            text="Test response", message=message, generation_info=generation_info
-        )
-        response = Mock(generations=[[generation]], llm_output=llm_output)
+        generation = Mock(text="Test response", message=message)
+        response = Mock(generations=[[generation]])
         callback.on_llm_end(response=response, run_id=run_id)
 
     assert len(events) > 0
