@@ -13,7 +13,19 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-import sentry_sdk.client
+from sentry_sdk.transport import Transport
+from sentry_sdk.envelope import Envelope
+
+
+class TransportWithOptions(Transport):
+    """conftest.TestTransport does not pass in the options so we need this here"""
+
+    def __init__(self, options=None):
+        Transport.__init__(self, options)
+
+    def capture_envelope(self, _: Envelope) -> None:
+        """No-op capture_envelope for tests"""
+        pass
 
 
 def test_dsc_head_of_trace(sentry_init, capture_envelopes):
@@ -22,10 +34,11 @@ def test_dsc_head_of_trace(sentry_init, capture_envelopes):
     and sends a transaction event to Sentry.
     """
     sentry_init(
-        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=1.0,
+        transport=TransportWithOptions,
     )
     envelopes = capture_envelopes()
 
@@ -44,6 +57,10 @@ def test_dsc_head_of_trace(sentry_init, capture_envelopes):
     assert "public_key" in envelope_trace_header
     assert type(envelope_trace_header["public_key"]) == str
     assert envelope_trace_header["public_key"] == "mysecret"
+
+    assert "org_id" in envelope_trace_header
+    assert type(envelope_trace_header["org_id"]) == str
+    assert envelope_trace_header["org_id"] == "1234"
 
     assert "sample_rate" in envelope_trace_header
     assert type(envelope_trace_header["sample_rate"]) == str
@@ -66,16 +83,46 @@ def test_dsc_head_of_trace(sentry_init, capture_envelopes):
     assert envelope_trace_header["transaction"] == "foo"
 
 
+def test_dsc_head_of_trace_uses_custom_org_id(sentry_init, capture_envelopes):
+    """
+    Our service is the head of the trace (it starts a new trace)
+    and sends a transaction event to Sentry.
+    """
+    sentry_init(
+        dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
+        org_id="9999",
+        release="myapp@0.0.1",
+        environment="canary",
+        traces_sample_rate=1.0,
+        transport=TransportWithOptions,
+    )
+    envelopes = capture_envelopes()
+
+    # We start a new transaction
+    with sentry_sdk.start_transaction(name="foo"):
+        pass
+
+    assert len(envelopes) == 1
+
+    transaction_envelope = envelopes[0]
+    envelope_trace_header = transaction_envelope.headers["trace"]
+
+    assert "org_id" in envelope_trace_header
+    assert type(envelope_trace_header["org_id"]) == str
+    assert envelope_trace_header["org_id"] == "9999"
+
+
 def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
     """
     Another service calls our service and passes tracing information to us.
     Our service is continuing the trace and sends a transaction event to Sentry.
     """
     sentry_init(
-        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=1.0,
+        transport=TransportWithOptions,
     )
     envelopes = capture_envelopes()
 
@@ -149,10 +196,11 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         return 0.25
 
     sentry_init(
-        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
         traces_sampler=my_traces_sampler,
+        transport=TransportWithOptions,
     )
     envelopes = capture_envelopes()
 
@@ -219,9 +267,10 @@ def test_dsc_issue(sentry_init, capture_envelopes):
     Our service is a standalone service that does not have tracing enabled. Just uses Sentry for error reporting.
     """
     sentry_init(
-        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
+        transport=TransportWithOptions,
     )
     envelopes = capture_envelopes()
 
@@ -244,6 +293,10 @@ def test_dsc_issue(sentry_init, capture_envelopes):
     assert type(envelope_trace_header["public_key"]) == str
     assert envelope_trace_header["public_key"] == "mysecret"
 
+    assert "org_id" in envelope_trace_header
+    assert type(envelope_trace_header["org_id"]) == str
+    assert envelope_trace_header["org_id"] == "1234"
+
     assert "sample_rate" not in envelope_trace_header
 
     assert "sampled" not in envelope_trace_header
@@ -265,10 +318,11 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     Envelopes containing errors also have the same DSC than the transaction envelopes.
     """
     sentry_init(
-        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=1.0,
+        transport=TransportWithOptions,
     )
     envelopes = capture_envelopes()
 
@@ -293,6 +347,10 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     assert "public_key" in envelope_trace_header
     assert type(envelope_trace_header["public_key"]) == str
     assert envelope_trace_header["public_key"] == "mysecret"
+
+    assert "org_id" in envelope_trace_header
+    assert type(envelope_trace_header["org_id"]) == str
+    assert envelope_trace_header["org_id"] == "1234"
 
     assert "sample_rate" in envelope_trace_header
     assert envelope_trace_header["sample_rate"] == "1.0"
@@ -332,10 +390,11 @@ def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
     (This test would be service B in this scenario)
     """
     sentry_init(
-        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        dsn="https://mysecret@o1234.ingest.sentry.io/12312012",
         release="myapp@0.0.1",
         environment="canary",
         traces_sample_rate=traces_sample_rate,
+        transport=TransportWithOptions,
     )
     envelopes = capture_envelopes()
 

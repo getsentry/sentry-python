@@ -294,8 +294,10 @@ class BadDsn(ValueError):
 class Dsn:
     """Represents a DSN."""
 
-    def __init__(self, value):
-        # type: (Union[Dsn, str]) -> None
+    ORG_ID_REGEX = re.compile(r"^o(\d+)\.")
+
+    def __init__(self, value, org_id=None):
+        # type: (Union[Dsn, str], Optional[str]) -> None
         if isinstance(value, Dsn):
             self.__dict__ = dict(value.__dict__)
             return
@@ -309,6 +311,12 @@ class Dsn:
             raise BadDsn("Missing hostname")
 
         self.host = parts.hostname
+
+        if org_id is not None:
+            self.org_id = org_id  # type: Optional[str]
+        else:
+            org_id_match = Dsn.ORG_ID_REGEX.match(self.host)
+            self.org_id = org_id_match.group(1) if org_id_match else None
 
         if parts.port is None:
             self.port = self.scheme == "https" and 443 or 80  # type: int
