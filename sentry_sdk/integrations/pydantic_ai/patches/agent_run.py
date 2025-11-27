@@ -71,13 +71,9 @@ class _StreamingContextManagerWrapper:
             # Exit the original context manager first
             await self.original_ctx_manager.__aexit__(exc_type, exc_val, exc_tb)
 
-            # Update span with output if successful
-            if exc_type is None and self._result and hasattr(self._result, "output"):
-                output = (
-                    self._result.output if hasattr(self._result, "output") else None
-                )
-                if self._span is not None:
-                    update_invoke_agent_span(self._span, output)
+            # Update span with result if successful
+            if exc_type is None and self._result and self._span is not None:
+                update_invoke_agent_span(self._span, self._result)
         finally:
             # Pop agent from contextvar stack
             pop_agent()
@@ -123,9 +119,8 @@ def _create_run_wrapper(original_func, is_streaming=False):
                 try:
                     result = await original_func(self, *args, **kwargs)
 
-                    # Update span with output
-                    output = result.output if hasattr(result, "output") else None
-                    update_invoke_agent_span(span, output)
+                    # Update span with result
+                    update_invoke_agent_span(span, result)
 
                     return result
                 except Exception as exc:

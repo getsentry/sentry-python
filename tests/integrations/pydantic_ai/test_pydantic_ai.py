@@ -76,6 +76,51 @@ async def test_agent_run_async(sentry_init, capture_events, test_agent):
     assert "gen_ai.usage.output_tokens" in chat_span["data"]
 
 
+@pytest.mark.asyncio
+async def test_agent_run_async_usage_data(sentry_init, capture_events, test_agent):
+    """
+    Test that the invoke_agent span includes token usage and model data.
+    """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    result = await test_agent.run("Test input")
+
+    assert result is not None
+    assert result.output is not None
+
+    (transaction,) = events
+
+    # Verify transaction (the transaction IS the invoke_agent span)
+    assert transaction["transaction"] == "invoke_agent test_agent"
+
+    # The invoke_agent span should have token usage data
+    trace_data = transaction["contexts"]["trace"].get("data", {})
+    assert "gen_ai.usage.input_tokens" in trace_data, (
+        "Missing input_tokens on invoke_agent span"
+    )
+    assert "gen_ai.usage.output_tokens" in trace_data, (
+        "Missing output_tokens on invoke_agent span"
+    )
+    assert "gen_ai.usage.total_tokens" in trace_data, (
+        "Missing total_tokens on invoke_agent span"
+    )
+    assert "gen_ai.response.model" in trace_data, (
+        "Missing response.model on invoke_agent span"
+    )
+
+    # Verify the values are reasonable
+    assert trace_data["gen_ai.usage.input_tokens"] > 0
+    assert trace_data["gen_ai.usage.output_tokens"] > 0
+    assert trace_data["gen_ai.usage.total_tokens"] > 0
+    assert trace_data["gen_ai.response.model"] == "test"  # Test model name
+
+
 def test_agent_run_sync(sentry_init, capture_events, test_agent):
     """
     Test that the integration creates spans for sync agent runs.

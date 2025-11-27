@@ -13,6 +13,7 @@ from ..utils import (
     get_current_agent,
     get_is_streaming,
 )
+from .utils import _set_usage_data
 
 from typing import TYPE_CHECKING
 
@@ -37,22 +38,6 @@ except ImportError:
     UserPromptPart = None
     TextPart = None
     ThinkingPart = None
-
-
-def _set_usage_data(span, usage):
-    # type: (sentry_sdk.tracing.Span, RequestUsage) -> None
-    """Set token usage data on a span."""
-    if usage is None:
-        return
-
-    if hasattr(usage, "input_tokens") and usage.input_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
-
-    if hasattr(usage, "output_tokens") and usage.output_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
-
-    if hasattr(usage, "total_tokens") and usage.total_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
 
 
 def _set_input_messages(span, messages):
