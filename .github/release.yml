@@ -15,6 +15,9 @@ changelog:
       labels:
         - "Changelog: Bugfix"
         - Bug
+    - title: Deprecations 🏗️
+      labels:
+        - "Changelog: Deprecation"
     - title: Documentation 📚
       labels:
         - "Changelog: Docs"
