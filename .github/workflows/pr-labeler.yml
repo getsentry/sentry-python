@@ -38,12 +38,12 @@ jobs:
             // Determine which label to apply
             let newLabel = null;
 
-            if (title.startsWith('feat')) {
+            if (title.includes('deprecate')) {
+              newLabel = 'Changelog: Deprecation';
+            } else if (title.startsWith('feat')) {
               newLabel = 'Changelog: Feature';
             } else if (title.startsWith('fix') || title.startsWith('bugfix')) {
               newLabel = 'Changelog: Bugfix';
-            } else if (title.includes('deprecate')) {
-              newLabel = 'Changelog: Deprecation';
             } else if (title.startsWith('docs')) {
               newLabel = 'Changelog: Docs';
             } else if (title.startsWith('ref') || title.startsWith('test')) {
