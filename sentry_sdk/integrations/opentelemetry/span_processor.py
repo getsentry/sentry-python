@@ -113,14 +113,6 @@ class SentrySpanProcessor(SpanProcessor):
         # type: (OTelSpan, Optional[context_api.Context]) -> None
         client = get_client()
 
-        if not client.dsn:
-            return
-
-        try:
-            _ = Dsn(client.dsn)
-        except Exception:
-            return
-
         if client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
