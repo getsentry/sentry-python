@@ -42,10 +42,12 @@ if TYPE_CHECKING:
     from typing import Sequence
     from typing import Tuple
     from typing import AbstractSet
+    from typing import Pattern
     from typing_extensions import Literal
     from typing_extensions import TypedDict
 
     from sentry_sdk._types import (
+        Attributes,
         BreadcrumbProcessor,
         ContinuousProfilerMode,
         Event,
@@ -83,6 +85,12 @@ if TYPE_CHECKING:
             "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[TraceLifecycleMode],
+            "ignore_spans": Optional[
+                list[
+                    Union[str, Pattern],
+                    dict[Union[Literal["name", "attributes"], Union[str, Attributes]],],
+                ]
+            ],
         },
         total=False,
     )

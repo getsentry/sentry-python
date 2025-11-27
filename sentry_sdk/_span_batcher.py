@@ -135,8 +135,8 @@ class SpanBatcher:
             "span_id": span.span_id,
             "name": span.name if is_segment else span.description,
             "status": SPANSTATUS.OK
-            if span.status in (SPANSTATUS.OK, SPANSTATUS.UNSET)
-            else SPANSTATUS.ERROR,
+            if span.status == SPANSTATUS.OK
+            else SPANSTATUS.INTERNAL_ERROR,
             "is_segment": is_segment,
             "start_timestamp": span.start_timestamp.timestamp(),  # TODO[span-first]
             "end_timestamp": span.timestamp.timestamp(),
