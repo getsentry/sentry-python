@@ -1206,6 +1206,32 @@ class Scope:
             **optional_kwargs,
         )
 
+    def start_new_trace(
+        self, op=None, name=None, source=None, origin="manual"
+    ):
+        # type: (Optional[str], Optional[str], Optional[str], str) -> Transaction
+        """
+        Forces creation of a new trace in the propagation context and returns a transaction.
+        """
+        self.set_new_propagation_context()
+
+        # generate_propagation_context ensures that the propagation_context is not None.
+        propagation_context = typing.cast(PropagationContext, self._propagation_context)
+
+        optional_kwargs = {}
+        if name:
+            optional_kwargs["name"] = name
+        if source:
+            optional_kwargs["source"] = source
+
+        return Transaction(
+            op=op,
+            origin=origin,
+            trace_id=propagation_context.trace_id,
+            same_process_as_parent=False,
+            **optional_kwargs,
+        )
+
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
         """

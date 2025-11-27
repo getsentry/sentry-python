@@ -58,6 +58,7 @@ __all__ = [
     "capture_message",
     "configure_scope",
     "continue_trace",
+    "start_new_trace",
     "flush",
     "get_baggage",
     "get_client",
@@ -453,6 +454,18 @@ def continue_trace(
     """
     return get_isolation_scope().continue_trace(
         environ_or_headers, op, name, source, origin
+    )
+
+
+def start_new_trace(
+    op=None, name=None, source=None, origin="manual"
+):
+    # type: (Optional[str], Optional[str], Optional[str], str) -> Transaction
+    """
+    Forces creation of a new trace in the propagation context and returns a transaction.
+    """
+    return get_isolation_scope().start_new_trace(
+        op, name, source, origin
     )
 
 
