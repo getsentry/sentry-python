@@ -442,19 +442,14 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
     if kwargs.get("stream", False):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-    config = kwargs.get("config")
-
-    if config is None:
-        return
-
-    config = cast(GenerateContentConfig, config)
+    config = kwargs.get("config")  # type: Optional[GenerateContentConfig]
 
     # Set input messages/prompts if PII is allowed
     if should_send_default_pii() and integration.include_prompts:
         messages = []
 
         # Add system instruction if present
-        if hasattr(config, "system_instruction"):
+        if config and hasattr(config, "system_instruction"):
             system_instruction = config.system_instruction
             if system_instruction:
                 system_text = extract_contents_text(system_instruction)
