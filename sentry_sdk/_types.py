@@ -317,6 +317,7 @@ if TYPE_CHECKING:
         "monitor",
         "span",
         "log_item",
+        "log_byte",
         "trace_metric",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
