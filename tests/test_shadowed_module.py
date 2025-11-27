@@ -99,7 +99,11 @@ def test_shadowed_modules_when_importing_integrations(
         source = pathlib.Path(spec.origin).read_text(encoding="utf-8")
         tree = ast.parse(source, filename=spec.origin)
         integration_dependencies = find_unrecognized_dependencies(tree)
+
         for dependency in integration_dependencies:
             sys.modules[dependency] = types.ModuleType(dependency)
         with pytest.raises(integrations.DidNotEnable):
             importlib.import_module(module_path)
+
+        for dependency in integration_dependencies:
+            del sys.modules[dependency]
