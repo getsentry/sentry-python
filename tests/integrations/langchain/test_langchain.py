@@ -1686,3 +1686,185 @@ def test_langchain_embeddings_with_list_and_string_inputs(sentry_init, capture_e
             assert "List item" in input_data or "Single string query" in input_data, (
                 f"Expected input text in serialized data: {input_data}"
             )
+
+
+@pytest.mark.parametrize(
+    "response_metadata_model,generation_info_model,llm_output_model,expected_model",
+    [
+        ("model-from-metadata", None, None, "model-from-metadata"),
+        (None, "model-from-generation-info", None, "model-from-generation-info"),
+        (None, None, "model-from-llm-output", "model-from-llm-output"),
+        (
+            "model-from-metadata",
+            "model-from-generation-info",
+            None,
+            "model-from-metadata",
+        ),
+        ("model-from-metadata", None, "model-from-llm-output", "model-from-metadata"),
+        (
+            None,
+            "model-from-generation-info",
+            "model-from-llm-output",
+            "model-from-generation-info",
+        ),
+        (
+            "model-from-metadata",
+            "model-from-generation-info",
+            "model-from-llm-output",
+            "model-from-metadata",
+        ),
+        (None, None, None, None),
+    ],
+)
+def test_langchain_response_model_extraction(
+    sentry_init,
+    capture_events,
+    response_metadata_model,
+    generation_info_model,
+    llm_output_model,
+    expected_model,
+):
+    from langchain_core.outputs import LLMResult
+    from langchain_core.messages import AIMessageChunk
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "test-response-model-uuid"
+    serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
+    prompts = ["Test prompt"]
+
+    with start_transaction():
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            invocation_params={"model": "gpt-3.5-turbo"},
+        )
+
+        response_metadata = {}
+        if response_metadata_model is not None:
+            response_metadata["model_name"] = response_metadata_model
+
+        generation_info = {}
+        if generation_info_model is not None:
+            generation_info["model_name"] = generation_info_model
+
+        llm_output = {}
+        if llm_output_model is not None:
+            llm_output["model_name"] = llm_output_model
+
+        message = AIMessageChunk(
+            content="Test response",
+            response_metadata=response_metadata,
+        )
+
+        generation = Mock()
+        generation.text = "Test response"
+        generation.message = message
+        generation.generation_info = generation_info
+
+        response = Mock()
+        response.generations = [[generation]]
+        response.llm_output = llm_output
+
+        callback.on_llm_end(response=response, run_id=run_id)
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+
+    if expected_model is not None:
+        assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["data"]
+        assert llm_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == expected_model
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_MODEL not in llm_span.get("data", {})
+
+
+@pytest.mark.parametrize(
+    "missing_attribute",
+    [
+        "message",
+        "response_metadata",
+        "generation_info",
+        "llm_output",
+    ],
+)
+def test_langchain_response_model_extraction_missing_attributes(
+    sentry_init,
+    capture_events,
+    missing_attribute,
+):
+    from langchain_core.messages import AIMessageChunk
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "test-missing-attr-uuid"
+    serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
+    prompts = ["Test prompt"]
+
+    with start_transaction():
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            invocation_params={"model": "gpt-3.5-turbo"},
+        )
+
+        generation = Mock()
+        generation.text = "Test response"
+
+        if missing_attribute != "message":
+            message_mock = Mock()
+            message_mock.response_metadata.get.return_value = None
+            if missing_attribute == "response_metadata":
+                delattr(message_mock, "response_metadata")
+            generation.message = message_mock
+
+        if missing_attribute != "generation_info":
+            generation_info_mock = Mock()
+            generation_info_mock.get.return_value = None
+            generation.generation_info = generation_info_mock
+
+        response = Mock()
+        response.generations = [[generation]]
+
+        if missing_attribute != "llm_output":
+            llm_output_mock = Mock()
+            llm_output_mock.get.return_value = None
+            response.llm_output = llm_output_mock
+
+        callback.on_llm_end(response=response, run_id=run_id)
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+
+    assert SPANDATA.GEN_AI_RESPONSE_MODEL not in llm_span.get("data", {})
