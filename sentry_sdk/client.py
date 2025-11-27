@@ -382,6 +382,9 @@ class _Client(BaseClient):
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
 
+            if self.options["org_id"] and self.transport and self.transport.parsed_dsn:
+                self.transport.parsed_dsn.org_id = self.options["org_id"]
+
             self.monitor = None
             if self.transport:
                 if self.options["enable_backpressure_handling"]:
