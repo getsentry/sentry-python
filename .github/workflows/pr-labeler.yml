@@ -1,4 +1,4 @@
-name: Changelog Labeler
+name: Label PR for Changelog
 
 on:
   pull_request:
@@ -27,7 +27,7 @@ jobs:
 
             // Check if a Changelog label already exists
             const hasChangelogLabel = currentLabels.some(label =>
-              label.name.startsWith('Changelog') || label.name === 'skip-changelog'
+              label.name.startsWith('Changelog:') || label.name === 'skip-changelog'
             );
 
             if (hasChangelogLabel) {
@@ -46,7 +46,7 @@ jobs:
               newLabel = 'Changelog: Deprecation';
             } else if (title.startsWith('docs')) {
               newLabel = 'Changelog: Docs';
-            } else if (title.startswith('ref') || title.startsWith('test')) {
+            } else if (title.startsWith('ref') || title.startsWith('test')) {
               newLabel = 'Changelog: Internal';
             } else if (title.startsWith('ci') || title.startsWith('build')) {
               newLabel = 'skip-changelog';
