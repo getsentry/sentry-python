@@ -1,3 +1,7 @@
+# This action adds changelog labels to PRs that are then used by the release
+# notes generator in Craft. The configuration for which labels map to what
+# changelog categories can be found in .github/release.yml.
+
 name: Label PR for Changelog
 
 on:
