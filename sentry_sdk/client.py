@@ -360,6 +360,8 @@ class _Client(BaseClient):
 
         def _capture_envelope(envelope):
             # type: (Envelope) -> None
+            if self.spotlight is not None:
+                self.spotlight.capture_envelope(envelope)
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
@@ -386,6 +388,69 @@ class _Client(BaseClient):
             if self.transport:
                 if self.options["enable_backpressure_handling"]:
                     self.monitor = Monitor(self.transport)
+
+            # Setup Spotlight before creating batchers so _capture_envelope can use it
+            spotlight_config = self.options.get("spotlight")
+            spotlight_env_value = os.environ.get("SENTRY_SPOTLIGHT")
+
+            # Parse env var to determine if it's a boolean or URL
+            spotlight_from_env = None  # type: Optional[bool]
+            spotlight_env_url = None  # type: Optional[str]
+            if spotlight_env_value:
+                parsed = env_to_bool(spotlight_env_value, strict=True)
+                if parsed is None:
+                    # It's a URL string
+                    spotlight_from_env = True
+                    spotlight_env_url = spotlight_env_value
+                else:
+                    spotlight_from_env = parsed
+
+            # Apply precedence rules per spec
+            if spotlight_config is False:
+                # Config explicitly disables spotlight - warn if env var was set
+                if spotlight_from_env:
+                    logger.warning(
+                        "Spotlight is disabled via spotlight=False config option, "
+                        "ignoring SENTRY_SPOTLIGHT environment variable."
+                    )
+                self.options["spotlight"] = False
+            elif spotlight_config is True:
+                # Config enables spotlight with boolean true
+                # If env var has URL, use env var URL per spec
+                if spotlight_env_url:
+                    self.options["spotlight"] = spotlight_env_url
+                else:
+                    self.options["spotlight"] = True
+            elif isinstance(spotlight_config, str):
+                # Config has URL string - use config URL, warn if env var differs
+                if spotlight_env_value and spotlight_env_value != spotlight_config:
+                    logger.warning(
+                        "Spotlight URL from config (%s) takes precedence over "
+                        "SENTRY_SPOTLIGHT environment variable (%s).",
+                        spotlight_config,
+                        spotlight_env_value,
+                    )
+                # self.options["spotlight"] already has the config URL
+            elif spotlight_config is None:
+                # No config - use env var
+                if spotlight_env_url:
+                    self.options["spotlight"] = spotlight_env_url
+                elif spotlight_from_env:
+                    self.options["spotlight"] = True
+                # else: stays None (disabled)
+
+            if self.options.get("spotlight"):
+                # This is intentionally here to prevent setting up spotlight
+                # stuff we don't need unless spotlight is explicitly enabled
+                from sentry_sdk.spotlight import setup_spotlight
+
+                self.spotlight = setup_spotlight(self.options)
+                if not self.options["dsn"]:
+                    sample_all = lambda *_args, **_kwargs: 1.0
+                    self.options["send_default_pii"] = True
+                    self.options["error_sampler"] = sample_all
+                    self.options["traces_sampler"] = sample_all
+                    self.options["profiles_sampler"] = sample_all
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
@@ -436,29 +501,6 @@ class _Client(BaseClient):
                 disabled_integrations=self.options["disabled_integrations"],
                 options=self.options,
             )
-
-            spotlight_config = self.options.get("spotlight")
-            if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
-                spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
-                spotlight_config = env_to_bool(spotlight_env_value, strict=True)
-                self.options["spotlight"] = (
-                    spotlight_config
-                    if spotlight_config is not None
-                    else spotlight_env_value
-                )
-
-            if self.options.get("spotlight"):
-                # This is intentionally here to prevent setting up spotlight
-                # stuff we don't need unless spotlight is explicitly enabled
-                from sentry_sdk.spotlight import setup_spotlight
-
-                self.spotlight = setup_spotlight(self.options)
-                if not self.options["dsn"]:
-                    sample_all = lambda *_args, **_kwargs: 1.0
-                    self.options["send_default_pii"] = True
-                    self.options["error_sampler"] = sample_all
-                    self.options["traces_sampler"] = sample_all
-                    self.options["profiles_sampler"] = sample_all
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name
