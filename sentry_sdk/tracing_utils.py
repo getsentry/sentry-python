@@ -666,6 +666,8 @@ class Baggage:
 
         if client.parsed_dsn:
             sentry_items["public_key"] = client.parsed_dsn.public_key
+            if client.parsed_dsn.org_id:
+                sentry_items["org_id"] = client.parsed_dsn.org_id
 
         if options.get("traces_sample_rate"):
             sentry_items["sample_rate"] = str(options["traces_sample_rate"])
@@ -698,6 +700,8 @@ class Baggage:
 
         if client.parsed_dsn:
             sentry_items["public_key"] = client.parsed_dsn.public_key
+            if client.parsed_dsn.org_id:
+                sentry_items["org_id"] = client.parsed_dsn.org_id
 
         if (
             transaction.name
