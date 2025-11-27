@@ -79,7 +79,6 @@ def find_unrecognized_dependencies(tree):
 @pytest.mark.skipif(
     sys.version_info < (3, 7), reason="asyncpg imports __future__.annotations"
 )
-@pytest.mark.forked  # Importing modules can cause side-effects
 def test_shadowed_modules_when_importing_integrations(
     sentry_init, integration_submodule_name
 ):

@@ -26,6 +26,9 @@ envlist =
     # === Integration Deactivation ===
     {py3.9,py3.10,py3.11,py3.12,py3.13,py3.14}-integration_deactivation
 
+    # === Shadowed Module ===
+    {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13,py3.14,py3.14t}-shadowed_module
+
     # === Integrations ===
 
     # Asgi
@@ -157,10 +160,15 @@ setenv =
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
     spark-v{3.0.3,3.5.6}: JAVA_HOME=/usr/lib/jvm/temurin-11-jdk-amd64
 
+    # Avoid polluting test suite with imports
+    common: PYTEST_ADDOPTS="--ignore tests/test_shadowed_module.py"
+    gevent: PYTEST_ADDOPTS="--ignore tests/test_shadowed_module.py"
+
     # TESTPATH definitions for test suites not managed by toxgen
     common: TESTPATH=tests
     gevent: TESTPATH=tests
     integration_deactivation: TESTPATH=tests/test_ai_integration_deactivation.py
+    shadowed_module: TESTPATH=tests/test_shadowed_module.py
     asgi: TESTPATH=tests/integrations/asgi
     aws_lambda: TESTPATH=tests/integrations/aws_lambda
     cloud_resource_context: TESTPATH=tests/integrations/cloud_resource_context
