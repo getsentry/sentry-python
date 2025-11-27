@@ -1,3 +1,8 @@
+# This configuration is used by Craft to categorize changelog entries based on
+# PR labels. To avoid some manual work, there is a PR labeling GitHub action in
+# .github/workflows/pr-labeler.yml that adds a changelog label to PRs based on
+# the title.
+
 changelog:
   exclude:
     labels:
@@ -15,6 +20,9 @@ changelog:
       labels:
         - "Changelog: Bugfix"
         - Bug
+    - title: Deprecations 🏗️
+      labels:
+        - "Changelog: Deprecation"
     - title: Documentation 📚
       labels:
         - "Changelog: Docs"

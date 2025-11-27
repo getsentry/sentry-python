@@ -38,7 +38,7 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 if name:
                     metadata = dict(context.invocation_metadata())
 
-                    transaction = Transaction.continue_from_headers(
+                    transaction = sentry_sdk.continue_trace(
                         metadata,
                         op=OP.GRPC_SERVER,
                         name=name,
