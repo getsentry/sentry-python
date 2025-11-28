@@ -653,11 +653,7 @@ def get_errno(exc_value):
 
 def get_error_message(exc_value):
     # type: (Optional[BaseException]) -> str
-    message = safe_str(
-        getattr(exc_value, "message", "")
-        or getattr(exc_value, "detail", "")
-        or safe_str(exc_value)
-    )  # type: str
+    message = safe_str(exc_value)
 
     # __notes__ should be a list of strings when notes are added
     # via add_note, but can be anything else if __notes__ is set
