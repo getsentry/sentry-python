@@ -2,12 +2,6 @@ import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
 
-# up top to prevent circular import due to integration import
-# This is more or less an arbitrary large-ish value for now, so that we allow
-# pretty long strings (like LLM prompts), but still have *some* upper limit
-# until we verify that removing the trimming completely is safe.
-DEFAULT_MAX_VALUE_LENGTH = 100_000
-
 DEFAULT_MAX_STACK_FRAMES = 100
 DEFAULT_ADD_FULL_STACK = False
 
@@ -996,7 +990,7 @@ class ClientConstructor:
         ],  # type: Optional[Sequence[str]]
         functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
-        max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
+        max_value_length=None,  # type: Optional[int]
         enable_backpressure_handling=True,  # type: bool
         error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
         enable_db_query_source=True,  # type: bool

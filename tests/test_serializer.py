@@ -2,7 +2,6 @@ import re
 
 import pytest
 
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH, MAX_DATABAG_DEPTH, serialize
 
 try:
@@ -166,12 +165,12 @@ def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):
     assert result == data
 
 
-def test_max_value_length_default(body_normalizer):
-    data = {"key": "a" * (DEFAULT_MAX_VALUE_LENGTH * 10)}
+def test_no_value_truncation_by_default(body_normalizer):
+    data = {"key": "a" * (10240)}
 
     result = body_normalizer(data)
 
-    assert len(result["key"]) == DEFAULT_MAX_VALUE_LENGTH  # fallback max length
+    assert len(result["key"]) == 10240  # fallback max length
 
 
 def test_max_value_length(body_normalizer):
