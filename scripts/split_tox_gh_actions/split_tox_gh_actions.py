@@ -163,6 +163,7 @@ GROUPS = {
         "trytond",
         "typer",
         "integration_deactivation",
+        "shadowed_module",
     ],
 }
 

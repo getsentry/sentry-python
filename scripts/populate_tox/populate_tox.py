@@ -65,6 +65,7 @@ IGNORE = {
     "cloud_resource_context",
     "common",
     "integration_deactivation",
+    "shadowed_module",
     "gcp",
     "gevent",
     "opentelemetry",
