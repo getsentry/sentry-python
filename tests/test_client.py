@@ -1181,7 +1181,8 @@ def test_debug_option(
         (None, "t", DEFAULT_SPOTLIGHT_URL),
         (None, "1", DEFAULT_SPOTLIGHT_URL),
         (True, None, DEFAULT_SPOTLIGHT_URL),
-        (True, "http://localhost:8080/slurp", DEFAULT_SPOTLIGHT_URL),
+        # Per spec: spotlight=True + env URL -> use env URL
+        (True, "http://localhost:8080/slurp", "http://localhost:8080/slurp"),
         ("http://localhost:8080/slurp", "f", "http://localhost:8080/slurp"),
         (None, "http://localhost:8080/slurp", "http://localhost:8080/slurp"),
     ],

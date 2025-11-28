@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import time
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -34,14 +35,39 @@ DJANGO_SPOTLIGHT_MIDDLEWARE_PATH = "sentry_sdk.spotlight.SpotlightMiddleware"
 
 
 class SpotlightClient:
+    """
+    A client for sending envelopes to Sentry Spotlight.
+
+    Implements exponential backoff retry logic per the SDK spec:
+    - Logs error at least once when server is unreachable
+    - Does not log for every failed envelope
+    - Uses exponential backoff to avoid hammering an unavailable server
+    - Never blocks normal Sentry operation
+    """
+
+    # Exponential backoff settings
+    INITIAL_RETRY_DELAY = 1.0  # Start with 1 second
+    MAX_RETRY_DELAY = 60.0  # Max 60 seconds
+
     def __init__(self, url):
         # type: (str) -> None
         self.url = url
         self.http = urllib3.PoolManager()
-        self.fails = 0
+        self._error_logged = False
+        self._retry_delay = self.INITIAL_RETRY_DELAY
+        self._last_error_time = 0.0  # type: float
 
     def capture_envelope(self, envelope):
         # type: (Envelope) -> None
+
+        # Check if we're in backoff period - skip sending to avoid blocking
+        current_time = time.time()
+        if self._last_error_time > 0:
+            time_since_error = current_time - self._last_error_time
+            if time_since_error < self._retry_delay:
+                # Still in backoff period, skip this envelope
+                return
+
         body = io.BytesIO()
         envelope.serialize_into(body)
         try:
@@ -54,18 +80,27 @@ class SpotlightClient:
                 },
             )
             req.close()
-            self.fails = 0
+            # Success - reset backoff state
+            self._error_logged = False
+            self._retry_delay = self.INITIAL_RETRY_DELAY
+            self._last_error_time = 0.0
         except Exception as e:
-            if self.fails < 2:
-                sentry_logger.warning(str(e))
-                self.fails += 1
-            elif self.fails == 2:
-                self.fails += 1
+            current_time = time.time()
+            self._last_error_time = current_time
+
+            # Log error only once per backoff cycle
+            if not self._error_logged:
                 sentry_logger.warning(
-                    "Looks like Spotlight is not running, will keep trying to send events but will not log errors."
+                    "Failed to send envelope to Spotlight at %s: %s. "
+                    "Will retry after %.1f seconds.",
+                    self.url,
+                    e,
+                    self._retry_delay,
                 )
-            # omitting self.fails += 1 in the `else:` case intentionally
-            # to avoid overflowing the variable if Spotlight never becomes reachable
+                self._error_logged = True
+
+            # Increase backoff delay exponentially
+            self._retry_delay = min(self._retry_delay * 2, self.MAX_RETRY_DELAY)
 
 
 try:
