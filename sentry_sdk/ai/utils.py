@@ -1,5 +1,6 @@
 import inspect
 import json
+from copy import deepcopy
 from collections import deque
 from typing import TYPE_CHECKING
 from sys import getsizeof
@@ -13,6 +14,8 @@ import sentry_sdk
 from sentry_sdk.utils import logger
 
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
+# Maximum characters when only a single message is left after bytes truncation
+MAX_SINGLE_MESSAGE_CONTENT_CHARS = 10_000
 
 
 class GEN_AI_ALLOWED_MESSAGE_ROLES:
@@ -107,6 +110,23 @@ def get_start_span_function():
     return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
 
 
+def _truncate_single_message_content_if_present(message, max_chars):
+    # type: (Dict[str, Any], int) -> Dict[str, Any]
+    """
+    Truncate a message's content to at most `max_chars` characters and append an
+    ellipsis if truncation occurs.
+    """
+    if not isinstance(message, dict) or "content" not in message:
+        return message
+    content = message["content"]
+
+    if not isinstance(content, str) or len(content) <= max_chars:
+        return message
+
+    message["content"] = content[:max_chars] + "..."
+    return message
+
+
 def _find_truncation_index(messages, max_bytes):
     # type: (List[Dict[str, Any]], int) -> int
     """
@@ -124,8 +144,22 @@ def _find_truncation_index(messages, max_bytes):
     return 0
 
 
-def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
-    # type: (List[Dict[str, Any]], int) -> Tuple[List[Dict[str, Any]], int]
+def truncate_messages_by_size(
+    messages,
+    max_bytes=MAX_GEN_AI_MESSAGE_BYTES,
+    max_single_message_chars=MAX_SINGLE_MESSAGE_CONTENT_CHARS,
+):
+    # type: (List[Dict[str, Any]], int, int) -> Tuple[List[Dict[str, Any]], int]
+    """
+    Returns a truncated messages list, consisting of
+    - the last message, with its content truncated to `max_single_message_chars` characters,
+      if the last message's size exceeds `max_bytes` bytes; otherwise,
+    - the maximum number of messages, starting from the end of the `messages` list, whose total
+      serialized size does not exceed `max_bytes` bytes.
+
+    In the single message case, the serialized message size may exceed `max_bytes`, because
+    truncation is based only on character count in that case.
+    """
     serialized_json = json.dumps(messages, separators=(",", ":"))
     current_size = len(serialized_json.encode("utf-8"))
 
@@ -133,7 +167,18 @@ def truncate_messages_by_size(messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES):
         return messages, 0
 
     truncation_index = _find_truncation_index(messages, max_bytes)
-    return messages[truncation_index:], truncation_index
+    if truncation_index < len(messages):
+        truncated_messages = messages[truncation_index:]
+    else:
+        truncation_index = len(messages) - 1
+        truncated_messages = messages[-1:]
+
+    if len(truncated_messages) == 1:
+        truncated_messages[0] = _truncate_single_message_content_if_present(
+            deepcopy(truncated_messages[0]), max_chars=max_single_message_chars
+        )
+
+    return truncated_messages, truncation_index
 
 
 def truncate_and_annotate_messages(
