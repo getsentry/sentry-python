@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
     should_be_treated_as_error,
+    serialize_attribute,
 )
 
 from typing import TYPE_CHECKING
@@ -44,6 +45,8 @@ if TYPE_CHECKING:
         MeasurementUnit,
         SamplingContext,
         MeasurementValue,
+        Attributes,
+        AttributeValue,
     )
 
     class SpanKwargs(TypedDict, total=False):
@@ -281,6 +284,8 @@ class Span:
         "name",
         "_flags",
         "_flags_capacity",
+        "_mode",
+        "_attributes",
     )
 
     def __init__(
@@ -299,6 +304,7 @@ class Span:
         scope=None,  # type: Optional[sentry_sdk.Scope]
         origin="manual",  # type: str
         name=None,  # type: Optional[str]
+        attributes=None,  # type: Optional[dict]
     ):
         # type: (...) -> None
         self._trace_id = trace_id
@@ -318,6 +324,7 @@ class Span:
         self._containing_transaction = containing_transaction
         self._flags = {}  # type: Dict[str, bool]
         self._flags_capacity = 10
+        self._attributes = attributes or {}  # type: Attributes
 
         if hub is not None:
             warnings.warn(
@@ -614,6 +621,21 @@ class Span:
         # type: (Dict[str, Any]) -> None
         self._data.update(data)
 
+    def get_attributes(self):
+        # type: () -> Attributes
+        return self._attributes
+
+    def set_attribute(self, attribute, value):
+        # type: (str, AttributeValue) -> None
+        self._attributes[attribute] = serialize_attribute(value)
+
+    def remove_attribute(self, attribute):
+        # type: (str) -> None
+        try:
+            del self._attributes[attribute]
+        except KeyError:
+            pass
+
     def set_flag(self, flag, result):
         # type: (str, bool) -> None
         if len(self._flags) < self._flags_capacity:
@@ -663,22 +685,7 @@ class Span:
         # type: () -> bool
         return self.status == "ok"
 
-    def finish(self, scope=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -> Optional[str]
-        """
-        Sets the end timestamp of the span.
-
-        Additionally it also creates a breadcrumb from the span,
-        if the span represents a database or HTTP request.
-
-        :param scope: The scope to use for this transaction.
-            If not provided, the current scope will be used.
-        :param end_timestamp: Optional timestamp that should
-            be used as timestamp instead of the current time.
-
-        :return: Always ``None``. The type is ``Optional[str]`` to match
-            the return value of :py:meth:`sentry_sdk.tracing.Transaction.finish`.
-        """
+    def _finish(self, scope=None, end_timestamp=None):
         if self.timestamp is not None:
             # This span is already finished, ignore.
             return None
@@ -698,6 +705,32 @@ class Span:
 
         scope = scope or sentry_sdk.get_current_scope()
         maybe_create_breadcrumbs_from_span(scope, self)
+
+    def finish(self, scope=None, end_timestamp=None):
+        # type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -> Optional[str]
+        """
+        Sets the end timestamp of the span.
+
+        Additionally it also creates a breadcrumb from the span,
+        if the span represents a database or HTTP request.
+
+        :param scope: The scope to use for this transaction.
+            If not provided, the current scope will be used.
+        :param end_timestamp: Optional timestamp that should
+            be used as timestamp instead of the current time.
+
+        :return: Always ``None``. The type is ``Optional[str]`` to match
+            the return value of :py:meth:`sentry_sdk.tracing.Transaction.finish`.
+        """
+        self._finish(scope, end_timestamp)
+
+        client = sentry_sdk.get_client()
+        if client.is_active():
+            if (
+                has_span_streaming_enabled(client.options)
+                and self.containing_transaction.sampled
+            ):
+                client._capture_span(self)
 
         return None
 
@@ -827,9 +860,10 @@ class Transaction(Span):
         **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None
+        self.name = name
+
         super().__init__(**kwargs)
 
-        self.name = name
         self.source = source
         self.sample_rate = None  # type: Optional[float]
         self.parent_sampled = parent_sampled
@@ -846,6 +880,12 @@ class Transaction(Span):
             self._sample_rand = baggage_sample_rand
         else:
             self._sample_rand = _generate_sample_rand(self.trace_id)
+
+        self._mode = "static"
+        client = sentry_sdk.get_client()
+        if client.is_active():
+            if has_span_streaming_enabled(client.options):
+                self._mode = "stream"
 
     def __repr__(self):
         # type: () -> str
@@ -872,9 +912,11 @@ class Transaction(Span):
         with sentry_sdk.start_transaction, and therefore the transaction will
         be discarded.
         """
-
-        # We must explicitly check self.sampled is False since self.sampled can be None
-        return self._span_recorder is not None or self.sampled is False
+        if self._mode == "static":
+            # We must explicitly check self.sampled is False since self.sampled can be None
+            return self._span_recorder is not None or self.sampled is False
+        else:
+            return True
 
     def __enter__(self):
         # type: () -> Transaction
@@ -962,7 +1004,8 @@ class Transaction(Span):
     ):
         # type: (...) -> Optional[str]
         """Finishes the transaction and sends it to Sentry.
-        All finished spans in the transaction will also be sent to Sentry.
+        If we're in non-streaming mode, all finished spans in the transaction
+        will also be sent to Sentry at this point.
 
         :param scope: The Scope to use for this transaction.
             If not provided, the current Scope will be used.
@@ -990,7 +1033,7 @@ class Transaction(Span):
             # We have no active client and therefore nowhere to send this transaction.
             return None
 
-        if self._span_recorder is None:
+        if self._mode == "static" and self._span_recorder is None:
             # Explicit check against False needed because self.sampled might be None
             if self.sampled is False:
                 logger.debug("Discarding transaction because sampled = False")
@@ -1020,11 +1063,12 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        super().finish(scope, end_timestamp)
+        super()._finish(scope, end_timestamp)
 
         status_code = self._data.get(SPANDATA.HTTP_STATUS_CODE)
         if (
-            status_code is not None
+            self._mode == "static"
+            and status_code is not None
             and status_code in client.options["trace_ignore_status_codes"]
         ):
             logger.debug(
@@ -1055,6 +1099,11 @@ class Transaction(Span):
                 logger.warning("Discarding transaction without sampling decision.")
 
             return None
+
+        if self._mode == "stream":
+            if self.containing_transaction.sampled:
+                client._capture_span(self)
+            return
 
         finished_spans = [
             span.to_json()
@@ -1097,7 +1146,6 @@ class Transaction(Span):
             self._profile = None
 
         event["measurements"] = self._measurements
-
         return scope.capture_event(event)
 
     def set_measurement(self, name, value, unit=""):
@@ -1472,5 +1520,6 @@ from sentry_sdk.tracing_utils import (
     extract_sentrytrace_data,
     _generate_sample_rand,
     has_tracing_enabled,
+    has_span_streaming_enabled,
     maybe_create_breadcrumbs_from_span,
 )
