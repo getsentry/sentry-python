@@ -28,7 +28,7 @@ except ImportError:
 
 class _SingleTurnException(Exception):
     def __init__(self, original):
-        # type: Exception -> None
+        # type: (Exception) -> None
         self.original = original
 
 
