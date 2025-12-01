@@ -1686,3 +1686,64 @@ def test_langchain_embeddings_with_list_and_string_inputs(sentry_init, capture_e
             assert "List item" in input_data or "Single string query" in input_data, (
                 f"Expected input text in serialized data: {input_data}"
             )
+
+
+@pytest.mark.parametrize(
+    "response_metadata_model,expected_model",
+    [
+        ("gpt-3.5-turbo", "gpt-3.5-turbo"),
+        (None, None),
+    ],
+)
+def test_langchain_response_model_extraction(
+    sentry_init,
+    capture_events,
+    response_metadata_model,
+    expected_model,
+):
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "test-response-model-uuid"
+    serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
+    prompts = ["Test prompt"]
+
+    with start_transaction():
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            invocation_params={"model": "gpt-3.5-turbo"},
+        )
+
+        response_metadata = {"model_name": response_metadata_model}
+        message = AIMessageChunk(
+            content="Test response", response_metadata=response_metadata
+        )
+
+        generation = Mock(text="Test response", message=message)
+        response = Mock(generations=[[generation]])
+        callback.on_llm_end(response=response, run_id=run_id)
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+
+    if expected_model is not None:
+        assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["data"]
+        assert llm_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == expected_model
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_MODEL not in llm_span.get("data", {})

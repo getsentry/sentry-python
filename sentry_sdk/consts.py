@@ -1033,6 +1033,7 @@ class ClientConstructor:
         trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
         enable_metrics=True,  # type: bool
         before_send_metric=None,  # type: Optional[Callable[[Metric, Hint], Optional[Metric]]]
+        org_id=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1435,6 +1436,10 @@ class ClientConstructor:
 
             If `trace_ignore_status_codes` is not provided, requests with any status code
             may be traced.
+
+        :param org_id: An optional organization ID. The SDK will try to extract if from the DSN in most cases
+            but you can provide it explicitly for self-hosted and Relay setups. This value is used for
+            trace propagation and for features like `strict_trace_continuation`.
 
         :param _experiments:
         """
