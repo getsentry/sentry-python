@@ -1,9 +1,15 @@
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable
 
-from ..spans import agent_workflow_span
-from ..utils import _capture_exception
+from ..spans import agent_workflow_span, end_invoke_agent_span
+from ..utils import _capture_exception, _record_exception_on_span
+
+try:
+    from agents.exceptions import AgentsException
+except ImportError:
+    raise DidNotEnable("OpenAI Agents not installed")
 
 from typing import TYPE_CHECKING
 
@@ -28,18 +34,26 @@ def _create_run_wrapper(original_func):
         with sentry_sdk.isolation_scope():
             agent = args[0]
             with agent_workflow_span(agent):
-                run_result = await original_func(*args, **kwargs)
+                try:
+                    run_result = await original_func(*args, **kwargs)
+                except AgentsException as exc:
+                    context_wrapper = getattr(exc.run_data, "context_wrapper", None)
+                    if context_wrapper is not None:
+                        invoke_agent_span = getattr(
+                            context_wrapper, "_sentry_agent_span", None
+                        )
 
-                invoke_agent_span = getattr(
-                    run_result.context_wrapper, "_sentry_agent_span", None
-                )
+                        if (
+                            invoke_agent_span is not None
+                            and invoke_agent_span.timestamp is None
+                        ):
+                            _record_exception_on_span(invoke_agent_span, exc)
+                            end_invoke_agent_span(context_wrapper, agent)
 
-                if (
-                    invoke_agent_span is not None
-                    and invoke_agent_span.timestamp is None
-                ):
-                    invoke_agent_span.__exit__(None, None, None)
+                    _capture_exception(exc)
+                    raise exc from None
 
+                end_invoke_agent_span(run_result.context_wrapper, agent)
                 return run_result
 
     return wrapper
