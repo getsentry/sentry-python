@@ -37,6 +37,8 @@ def _create_run_wrapper(original_func):
                 try:
                     run_result = await original_func(*args, **kwargs)
                 except AgentsException as exc:
+                    _capture_exception(exc)
+
                     context_wrapper = getattr(exc.run_data, "context_wrapper", None)
                     if context_wrapper is not None:
                         invoke_agent_span = getattr(
@@ -50,7 +52,6 @@ def _create_run_wrapper(original_func):
                             _record_exception_on_span(invoke_agent_span, exc)
                             end_invoke_agent_span(context_wrapper, agent)
 
-                    _capture_exception(exc)
                     raise exc from None
 
                 end_invoke_agent_span(run_result.context_wrapper, agent)

@@ -91,11 +91,12 @@ def _patch_agent_run():
         try:
             result = await original_run_single_turn(*args, **kwargs)
         except Exception as exc:
+            _capture_exception(exc)
+
             if span is not None and span.timestamp is None:
                 _record_exception_on_span(span, exc)
                 end_invoke_agent_span(context_wrapper, agent)
 
-            _capture_exception(exc)
             raise exc from None
 
         return result
