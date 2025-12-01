@@ -421,14 +421,12 @@ async def test_max_turns_before_handoff_span(sentry_init, capture_events, mock_u
             events = capture_events()
 
             with pytest.raises(MaxTurnsExceeded):
-                result = await agents.Runner.run(
+                await agents.Runner.run(
                     primary_agent,
                     "Please hand off to secondary agent",
                     run_config=test_run_config,
                     max_turns=1,
                 )
-
-                assert result is not None
 
     (error, transaction) = events
     spans = transaction["spans"]
