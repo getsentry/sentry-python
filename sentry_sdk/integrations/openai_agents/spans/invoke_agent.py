@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import agents
-    from typing import Any
+    from typing import Any, Optional
 
 
 def invoke_agent_span(context, agent, kwargs):
