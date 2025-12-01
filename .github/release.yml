@@ -36,4 +36,4 @@ changelog:
         - "Changelog: Internal"
         - Quality Improvement
       commit_log_patterns:
-        - "^(build|ref|chore|ci|tests)(\(\w+\))?:"
+        - "^(build|ref|chore|ci|tests|test)(\(\w+\))?:"
