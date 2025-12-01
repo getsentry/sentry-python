@@ -71,7 +71,7 @@ def _patch_agent_run():
         context_wrapper = kwargs.get("context_wrapper")
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
 
-        span = getattr(context_wrapper, "_sentry_current_agent", None)
+        span = getattr(context_wrapper, "_sentry_agent_span", None)
         # Start agent span when agent starts (but only once per agent)
         if should_run_agent_start_hooks and agent and context_wrapper:
             # End any existing span for a different agent
