@@ -2,7 +2,12 @@ from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.tracing_utils import set_span_errored
-from ..spans import invoke_agent_span, update_invoke_agent_span, handoff_span
+from ..spans import (
+    invoke_agent_span,
+    update_invoke_agent_span,
+    end_invoke_agent_span,
+    handoff_span,
+)
 from ..utils import _capture_exception, _record_exception_on_span
 
 from typing import TYPE_CHECKING
@@ -78,7 +83,7 @@ def _patch_agent_run():
             if _has_active_agent_span(context_wrapper):
                 current_agent = _get_current_agent(context_wrapper)
                 if current_agent and current_agent != agent:
-                    _end_invoke_agent_span(context_wrapper, current_agent)
+                    end_invoke_agent_span(context_wrapper, current_agent)
 
             span = _start_invoke_agent_span(context_wrapper, agent, kwargs)
 
@@ -88,7 +93,7 @@ def _patch_agent_run():
         except Exception as exc:
             if span is not None and span.timestamp is None:
                 _record_exception_on_span(span, exc)
-                _end_invoke_agent_span(context_wrapper, agent)
+                end_invoke_agent_span(context_wrapper, agent)
 
             _capture_exception(exc)
             raise exc from None
