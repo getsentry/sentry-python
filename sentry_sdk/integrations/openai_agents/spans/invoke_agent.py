@@ -84,3 +84,4 @@ def update_invoke_agent_span(context, agent, output):
             )
 
         span.__exit__(None, None, None)
+        delattr(context, "_sentry_agent_span")
