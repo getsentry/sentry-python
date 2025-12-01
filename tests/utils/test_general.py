@@ -120,6 +120,18 @@ def test_parse_dsn_paths(given, expected_envelope):
 
 
 @pytest.mark.parametrize(
+    "given,expected",
+    [
+        ("https://foobar@sentry.io/123", None),
+        ("https://foobar@o1234.ingest.sentry.io/123", "1234"),
+    ],
+)
+def test_parse_dsn_org_id(given, expected):
+    dsn = Dsn(given)
+    assert dsn.org_id == expected
+
+
+@pytest.mark.parametrize(
     "dsn",
     [
         "https://foobar@sentry.io"

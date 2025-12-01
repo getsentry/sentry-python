@@ -70,7 +70,7 @@ class Transport(ABC):
         # type: (Self, Optional[Dict[str, Any]]) -> None
         self.options = options
         if options and options["dsn"] is not None and options["dsn"]:
-            self.parsed_dsn = Dsn(options["dsn"])
+            self.parsed_dsn = Dsn(options["dsn"], options.get("org_id"))
         else:
             self.parsed_dsn = None
 

@@ -235,7 +235,13 @@ TEST_SUITE_CONFIG = {
     "litestar": {
         "package": "litestar",
         "deps": {
-            "*": ["pytest-asyncio", "python-multipart", "requests", "cryptography"],
+            "*": [
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "cryptography",
+                "sniffio",
+            ],
             "<2.7": ["httpx<0.28"],
         },
     },

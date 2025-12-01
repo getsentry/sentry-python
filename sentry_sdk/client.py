@@ -70,6 +70,7 @@ if TYPE_CHECKING:
     from sentry_sdk.transport import Transport, Item
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher
+    from sentry_sdk.utils import Dsn
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
@@ -199,6 +200,11 @@ class BaseClient:
     @property
     def dsn(self):
         # type: () -> Optional[str]
+        return None
+
+    @property
+    def parsed_dsn(self):
+        # type: () -> Optional[Dsn]
         return None
 
     def should_send_default_pii(self):
@@ -511,6 +517,12 @@ class _Client(BaseClient):
         # type: () -> Optional[str]
         """Returns the configured DSN as string."""
         return self.options["dsn"]
+
+    @property
+    def parsed_dsn(self):
+        # type: () -> Optional[Dsn]
+        """Returns the configured parsed DSN object."""
+        return self.transport.parsed_dsn if self.transport else None
 
     def _prepare_event(
         self,

@@ -1,9 +1,11 @@
+from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
+    GEN_AI_ALLOWED_MESSAGE_ROLES,
     set_data_normalized,
     normalize_message_roles,
     truncate_and_annotate_messages,
@@ -39,7 +41,7 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncIterator, Iterator
+    from typing import Any, AsyncIterator, Iterator, List, Optional, Union
     from sentry_sdk.tracing import Span
 
 
@@ -122,6 +124,7 @@ def _set_input_data(span, kwargs, integration):
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
+    system_prompt = kwargs.get("system")
     messages = kwargs.get("messages")
     if (
         messages is not None
@@ -130,9 +133,31 @@ def _set_input_data(span, kwargs, integration):
         and integration.include_prompts
     ):
         normalized_messages = []
+        if system_prompt:
+            system_prompt_content = None  # type: Optional[Union[str, List[dict[str, Any]]]]
+            if isinstance(system_prompt, str):
+                system_prompt_content = system_prompt
+            elif isinstance(system_prompt, Iterable):
+                system_prompt_content = []
+                for item in system_prompt:
+                    if (
+                        isinstance(item, dict)
+                        and item.get("type") == "text"
+                        and item.get("text")
+                    ):
+                        system_prompt_content.append(item.copy())
+
+            if system_prompt_content:
+                normalized_messages.append(
+                    {
+                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM,
+                        "content": system_prompt_content,
+                    }
+                )
+
         for message in messages:
             if (
-                message.get("role") == "user"
+                message.get("role") == GEN_AI_ALLOWED_MESSAGE_ROLES.USER
                 and "content" in message
                 and isinstance(message["content"], (list, tuple))
             ):
@@ -140,8 +165,8 @@ def _set_input_data(span, kwargs, integration):
                     if item.get("type") == "tool_result":
                         normalized_messages.append(
                             {
-                                "role": "tool",
-                                "content": {
+                                "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
+                                "content": {  # type: ignore[dict-item]
                                     "tool_use_id": item.get("tool_use_id"),
                                     "output": item.get("content"),
                                 },
