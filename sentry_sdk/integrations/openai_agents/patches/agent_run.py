@@ -88,8 +88,7 @@ def _patch_agent_run():
         except Exception as exc:
             if span is not None and span.timestamp is None:
                 _record_exception_on_span(span, exc)
-                span.__exit__(None, None, None)
-                delattr(context_wrapper, "_sentry_agent_span")
+                _end_invoke_agent_span(context_wrapper, agent)
 
             _capture_exception(exc)
             raise exc from None
