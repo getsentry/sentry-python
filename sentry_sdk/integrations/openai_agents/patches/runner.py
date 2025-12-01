@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import agent_workflow_span, end_invoke_agent_span
-from ..utils import _capture_exception, _record_exception_on_span
+from ..utils import _capture_exception, _record_exception_on_span, _SingleTurnException
 
 try:
     from agents.exceptions import AgentsException
@@ -52,6 +52,15 @@ def _create_run_wrapper(original_func):
                             _record_exception_on_span(invoke_agent_span, exc)
                             end_invoke_agent_span(context_wrapper, agent)
 
+                    raise exc from None
+                except _SingleTurnException as exc:
+                    # Handled in _run_single_turn() patch.
+                    raise exc.original from None
+                except Exception as exc:
+                    # Invoke agent span is not finished in this case.
+                    # This is much less likely to occur than other cases because
+                    # AgentRunner.run() is "just" a while loop around _run_single_turn.
+                    _capture_exception(exc)
                     raise exc from None
 
                 end_invoke_agent_span(run_result.context_wrapper, agent)

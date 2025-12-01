@@ -8,7 +8,7 @@ from ..spans import (
     end_invoke_agent_span,
     handoff_span,
 )
-from ..utils import _capture_exception, _record_exception_on_span
+from ..utils import _capture_exception, _record_exception_on_span, _SingleTurnException
 
 from typing import TYPE_CHECKING
 
@@ -103,7 +103,7 @@ def _patch_agent_run():
                 _record_exception_on_span(span, exc)
                 end_invoke_agent_span(context_wrapper, agent)
 
-            raise exc from None
+            raise _SingleTurnException(exc)
 
         return result
 
