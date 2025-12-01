@@ -14,8 +14,10 @@ from sentry_sdk.utils import event_from_exception, safe_serialize
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional
     from agents import Usage
+
+    from sentry_sdk.tracing import Span
 
 try:
     import agents
