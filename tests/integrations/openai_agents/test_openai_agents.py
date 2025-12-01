@@ -3,10 +3,13 @@ import re
 import pytest
 from unittest.mock import MagicMock, patch
 import os
+import json
 
+import sentry_sdk
+from sentry_sdk import start_span
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
-from sentry_sdk.integrations.asyncio import AsyncioIntegration
-from sentry_sdk.integrations.openai_agents.utils import safe_serialize
+from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.utils import parse_version
 
 import agents
@@ -1387,3 +1390,46 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
     # The span should be marked as error because the tool execution failed
     assert execute_tool_span["status"] == "internal_error"
     assert execute_tool_span["tags"]["status"] == "internal_error"
+
+
+def test_openai_agents_message_truncation(sentry_init, capture_events):
+    """Test that large messages are truncated properly in OpenAI Agents integration."""
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    test_messages = [
+        {"role": "system", "content": "small message 1"},
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": "small message 4"},
+        {"role": "assistant", "content": "small message 5"},
+    ]
+
+    get_response_kwargs = {"input": test_messages}
+
+    with start_span(op="gen_ai.chat") as span:
+        scope = sentry_sdk.get_current_scope()
+        _set_input_data(span, get_response_kwargs)
+        if hasattr(scope, "_gen_ai_original_message_count"):
+            truncated_count = scope._gen_ai_original_message_count.get(span.span_id)
+            assert truncated_count == 5, (
+                f"Expected 5 original messages, got {truncated_count}"
+            )
+
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data
+        messages_data = span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages_data, str)
+
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 2
+        assert "small message 4" in str(parsed_messages[0])
+        assert "small message 5" in str(parsed_messages[1])

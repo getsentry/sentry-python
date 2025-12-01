@@ -221,6 +221,19 @@ class TestTransport(Transport):
         pass
 
 
+class TestTransportWithOptions(Transport):
+    """TestTransport above does not pass in the options and for some tests we need them"""
+
+    __test__ = False
+
+    def __init__(self, options=None):
+        Transport.__init__(self, options)
+
+    def capture_envelope(self, _: Envelope) -> None:
+        """No-op capture_envelope for tests"""
+        pass
+
+
 @pytest.fixture
 def capture_events(monkeypatch):
     def inner():
