@@ -14,7 +14,7 @@ from sentry_sdk.utils import event_from_exception, safe_serialize
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
     from agents import Usage
 
     from sentry_sdk.tracing import Span
@@ -39,18 +39,17 @@ def _capture_exception(exc):
 
 
 def _record_exception_on_span(span, error):
-    # type: (Optional[Span], Exception) -> Any
-    if span is not None:
-        set_span_errored(span)
-        span.set_data("span.status", "error")
+    # type: (Span, Exception) -> Any
+    set_span_errored(span)
+    span.set_data("span.status", "error")
 
-        # Optionally capture the error details if we have them
-        if hasattr(error, "__class__"):
-            span.set_data("error.type", error.__class__.__name__)
-        if hasattr(error, "__str__"):
-            error_message = str(error)
-            if error_message:
-                span.set_data("error.message", error_message)
+    # Optionally capture the error details if we have them
+    if hasattr(error, "__class__"):
+        span.set_data("error.type", error.__class__.__name__)
+    if hasattr(error, "__str__"):
+        error_message = str(error)
+        if error_message:
+            span.set_data("error.message", error_message)
 
 
 def _set_agent_data(span, agent):
