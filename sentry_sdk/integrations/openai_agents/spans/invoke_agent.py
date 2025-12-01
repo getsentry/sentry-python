@@ -75,7 +75,7 @@ def invoke_agent_span(context, agent, kwargs):
 
 def update_invoke_agent_span(context, agent, output):
     # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
-    span = sentry_sdk.get_current_span()
+    span = getattr(context, "_sentry_agent_span", None)
 
     if span:
         if should_send_default_pii():
@@ -84,3 +84,4 @@ def update_invoke_agent_span(context, agent, output):
             )
 
         span.__exit__(None, None, None)
+        delattr(context, "_sentry_agent_span")
