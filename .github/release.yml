@@ -11,29 +11,29 @@ changelog:
         - Feature
         - Improvement
         - New Integration
-      commit_log_patterns:
+      commit_patterns:
         - "^feat(\([a-zA-Z0-9_-]+\))?:"
     - title: Bug Fixes 🐛
       labels:
         - "Changelog: Bugfix"
         - Bug
-      commit_log_patterns:
+      commit_patterns:
         - "^(fix|bugfix)(\([a-zA-Z0-9_-]+\))?:"
     - title: Deprecations 🏗️
       labels:
         - "Changelog: Deprecation"
-      commit_log_patterns:
+      commit_patterns:
         - "deprecat"  # deprecation, deprecated
     - title: Documentation 📚
       labels:
         - "Changelog: Docs"
         - Docs
         - "Component: Docs"
-      commit_log_patterns:
+      commit_patterns:
         - "^docs(\([a-zA-Z0-9_-]+\))?:"
     - title: Internal Changes 🔧
       labels:
         - "Changelog: Internal"
         - Quality Improvement
-      commit_log_patterns:
+      commit_patterns:
         - "^(build|ref|chore|ci|tests|test)(\([a-zA-Z0-9_-]+\))?:"
