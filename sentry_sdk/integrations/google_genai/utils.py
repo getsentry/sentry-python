@@ -491,7 +491,7 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
                 span.set_data(span_key, value)
 
     # Set tools if available
-    if hasattr(config, "tools"):
+    if config is not None and hasattr(config, "tools"):
         tools = config.tools
         if tools:
             formatted_tools = _format_tools_for_span(tools)
