@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 try:
     import agents
+    from agents.exceptions import AgentsException
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
@@ -90,6 +91,11 @@ def _patch_agent_run():
         # Call original method with all the correct parameters
         try:
             result = await original_run_single_turn(*args, **kwargs)
+        except AgentsException:
+            # AgentsException is caught on AgentRunner.run().
+            # Exceptions are captured and agent invocation spans are explicitly finished
+            # as long as only AgentRunner.run() invokes AgentRunner._run_single_turn().
+            raise
         except Exception as exc:
             _capture_exception(exc)
 

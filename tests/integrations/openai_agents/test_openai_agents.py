@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import os
 
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.openai_agents.utils import safe_serialize
 from sentry_sdk.utils import parse_version
 
@@ -21,6 +22,7 @@ from agents.items import (
     ResponseOutputText,
     ResponseFunctionToolCall,
 )
+from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
 
 from openai.types.responses.response_usage import (
@@ -350,6 +352,97 @@ async def test_handoff_span(sentry_init, capture_events, mock_usage):
 
 
 @pytest.mark.asyncio
+async def test_max_turns_before_handoff_span(sentry_init, capture_events, mock_usage):
+    """
+    Example raising agents.exceptions.AgentsException after the agent invocation span is complete.
+    """
+    # Create two simple agents with a handoff relationship
+    secondary_agent = agents.Agent(
+        name="secondary_agent",
+        instructions="You are a secondary agent.",
+        model="gpt-4o-mini",
+    )
+
+    primary_agent = agents.Agent(
+        name="primary_agent",
+        instructions="You are a primary agent that hands off to secondary agent.",
+        model="gpt-4o-mini",
+        handoffs=[secondary_agent],
+    )
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Mock two responses:
+            # 1. Primary agent calls handoff tool
+            # 2. Secondary agent provides final response
+            handoff_response = ModelResponse(
+                output=[
+                    ResponseFunctionToolCall(
+                        id="call_handoff_123",
+                        call_id="call_handoff_123",
+                        name="transfer_to_secondary_agent",
+                        type="function_call",
+                        arguments="{}",
+                    )
+                ],
+                usage=mock_usage,
+                response_id="resp_handoff_123",
+            )
+
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="I'm the specialist and I can help with that!",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=mock_usage,
+                response_id="resp_final_123",
+            )
+
+            mock_get_response.side_effect = [handoff_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            with pytest.raises(MaxTurnsExceeded):
+                result = await agents.Runner.run(
+                    primary_agent,
+                    "Please hand off to secondary agent",
+                    run_config=test_run_config,
+                    max_turns=1,
+                )
+
+                assert result is not None
+
+    (error, transaction) = events
+    spans = transaction["spans"]
+    handoff_span = spans[2]
+
+    # Verify handoff span was created
+    assert handoff_span is not None
+    assert (
+        handoff_span["description"] == "handoff from primary_agent to secondary_agent"
+    )
+    assert handoff_span["data"]["gen_ai.operation.name"] == "handoff"
+
+
+@pytest.mark.asyncio
 async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     """
     Test tool execution span creation.
@@ -599,6 +692,77 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span2["data"]["gen_ai.usage.output_tokens"] == 10
     assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
+
+
+@pytest.mark.asyncio
+async def test_model_behavior_error(sentry_init, capture_events, test_agent):
+    """
+    Example raising agents.exceptions.AgentsException before the agent invocation span is complete.
+    The mocked API response indicates that "wrong_tool" was called.
+    """
+
+    @agents.function_tool
+    def simple_test_tool(message: str) -> str:
+        """A simple tool"""
+        return f"Tool executed with: {message}"
+
+    # Create agent with the tool
+    agent_with_tool = test_agent.clone(tools=[simple_test_tool])
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a mock response that includes tool calls
+            tool_call = ResponseFunctionToolCall(
+                id="call_123",
+                call_id="call_123",
+                name="wrong_tool",
+                type="function_call",
+                arguments='{"message": "hello"}',
+            )
+
+            tool_response = ModelResponse(
+                output=[tool_call],
+                usage=Usage(
+                    requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+                ),
+                response_id="resp_tool_123",
+            )
+
+            mock_get_response.side_effect = [tool_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            with pytest.raises(ModelBehaviorError):
+                await agents.Runner.run(
+                    agent_with_tool,
+                    "Please use the simple test tool",
+                    run_config=test_run_config,
+                )
+
+    (error, transaction) = events
+    spans = transaction["spans"]
+    (
+        agent_span,
+        ai_client_span1,
+    ) = spans
+
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    assert agent_span["description"] == "invoke_agent test_agent"
+    assert agent_span["origin"] == "auto.ai.openai_agents"
+
+    # Error due to unrecognized tool in model response.
+    assert agent_span["status"] == "internal_error"
+    assert agent_span["tags"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
