@@ -12,13 +12,13 @@ changelog:
         - Improvement
         - New Integration
       commit_log_patterns:
-        - "^feat(\(\w+\))?:"
+        - "^feat(\([a-zA-Z0-9_-]+\))?:"
     - title: Bug Fixes 🐛
       labels:
         - "Changelog: Bugfix"
         - Bug
       commit_log_patterns:
-        - "^(fix|bugfix)(\(\w+\))?:"
+        - "^(fix|bugfix)(\([a-zA-Z0-9_-]+\))?:"
     - title: Deprecations 🏗️
       labels:
         - "Changelog: Deprecation"
@@ -30,10 +30,10 @@ changelog:
         - Docs
         - "Component: Docs"
       commit_log_patterns:
-        - "^docs(\(\w+\))?:"
+        - "^docs(\([a-zA-Z0-9_-]+\))?:"
     - title: Internal Changes 🔧
       labels:
         - "Changelog: Internal"
         - Quality Improvement
       commit_log_patterns:
-        - "^(build|ref|chore|ci|tests|test)(\(\w+\))?:"
+        - "^(build|ref|chore|ci|tests|test)(\([a-zA-Z0-9_-]+\))?:"
