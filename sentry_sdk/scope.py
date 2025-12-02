@@ -530,9 +530,7 @@ class Scope:
 
         baggage = self.get_baggage()
         if baggage is not None:
-            self._propagation_context.dynamic_sampling_context = (
-                baggage.dynamic_sampling_context()
-            )
+            self._propagation_context.baggage = baggage
 
         return self._propagation_context.dynamic_sampling_context
 
@@ -573,13 +571,7 @@ class Scope:
 
         # If this scope has a propagation context, return baggage from there
         if self._propagation_context is not None:
-            dynamic_sampling_context = (
-                self._propagation_context.dynamic_sampling_context
-            )
-            if dynamic_sampling_context is None:
-                return Baggage.from_options(self)
-            else:
-                return Baggage(dynamic_sampling_context)
+            return self._propagation_context.baggage or Baggage.from_options(self)
 
         # Fall back to isolation scope's baggage. It always has one
         return self.get_isolation_scope().get_baggage()
@@ -1099,9 +1091,9 @@ class Scope:
         if transaction.sample_rate is not None:
             propagation_context = self.get_active_propagation_context()
             if propagation_context:
-                dsc = propagation_context.dynamic_sampling_context
-                if dsc is not None:
-                    dsc["sample_rate"] = str(transaction.sample_rate)
+                baggage = propagation_context.baggage
+                if baggage is not None:
+                    baggage.sentry_items["sample_rate"] = str(transaction.sample_rate)
             if transaction._baggage:
                 transaction._baggage.sentry_items["sample_rate"] = str(
                     transaction.sample_rate
@@ -1194,27 +1186,25 @@ class Scope:
         """
         self.generate_propagation_context(environ_or_headers)
 
-        # When we generate the propagation context, the sample_rand value is set
-        # if missing or invalid (we use the original value if it's valid).
-        # We want the transaction to use the same sample_rand value. Due to duplicated
-        # propagation logic in the transaction, we pass it in to avoid recomputing it
-        # in the transaction.
-        # TYPE SAFETY: self.generate_propagation_context() ensures that self._propagation_context
-        # is not None.
-        sample_rand = typing.cast(
-            PropagationContext, self._propagation_context
-        )._sample_rand()
+        # generate_propagation_context ensures that the propagation_context is not None.
+        propagation_context = typing.cast(PropagationContext, self._propagation_context)
 
-        transaction = Transaction.continue_from_headers(
-            normalize_incoming_data(environ_or_headers),
-            _sample_rand=sample_rand,
+        optional_kwargs = {}
+        if name:
+            optional_kwargs["name"] = name
+        if source:
+            optional_kwargs["source"] = source
+
+        return Transaction(
             op=op,
             origin=origin,
-            name=name,
-            source=source,
+            baggage=propagation_context.baggage,
+            parent_sampled=propagation_context.parent_sampled,
+            trace_id=propagation_context.trace_id,
+            parent_span_id=propagation_context.parent_span_id,
+            same_process_as_parent=False,
+            **optional_kwargs,
         )
-
-        return transaction
 
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]

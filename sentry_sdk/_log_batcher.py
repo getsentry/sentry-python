@@ -83,9 +83,21 @@ class LogBatcher:
 
         with self._lock:
             if len(self._log_buffer) >= self.MAX_LOGS_BEFORE_DROP:
+                # Construct log envelope item without sending it to report lost bytes
+                log_item = Item(
+                    type="log",
+                    content_type="application/vnd.sentry.items.log+json",
+                    headers={
+                        "item_count": 1,
+                    },
+                    payload=PayloadRef(
+                        json={"items": [LogBatcher._log_to_transport_format(log)]}
+                    ),
+                )
                 self._record_lost_func(
                     reason="queue_overflow",
                     data_category="log_item",
+                    item=log_item,
                     quantity=1,
                 )
                 return None

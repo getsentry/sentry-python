@@ -26,6 +26,9 @@ from .utils import (
     set_span_data_for_response,
     _capture_exception,
     prepare_generate_content_args,
+    prepare_embed_content_args,
+    set_span_data_for_embed_request,
+    set_span_data_for_embed_response,
 )
 from .streaming import (
     set_span_data_for_streaming_response,
@@ -49,6 +52,7 @@ class GoogleGenAIIntegration(Integration):
         Models.generate_content_stream = _wrap_generate_content_stream(
             Models.generate_content_stream
         )
+        Models.embed_content = _wrap_embed_content(Models.embed_content)
 
         # Patch async methods
         AsyncModels.generate_content = _wrap_async_generate_content(
@@ -57,6 +61,7 @@ class GoogleGenAIIntegration(Integration):
         AsyncModels.generate_content_stream = _wrap_async_generate_content_stream(
             AsyncModels.generate_content_stream
         )
+        AsyncModels.embed_content = _wrap_async_embed_content(AsyncModels.embed_content)
 
 
 def _wrap_generate_content_stream(f):
@@ -299,3 +304,73 @@ def _wrap_async_generate_content(f):
                 return response
 
     return new_async_generate_content
+
+
+def _wrap_embed_content(f):
+    # type: (Callable[..., Any]) -> Callable[..., Any]
+    @wraps(f)
+    def new_embed_content(self, *args, **kwargs):
+        # type: (Any, Any, Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(GoogleGenAIIntegration)
+        if integration is None:
+            return f(self, *args, **kwargs)
+
+        model_name, contents = prepare_embed_content_args(args, kwargs)
+
+        with sentry_sdk.start_span(
+            op=OP.GEN_AI_EMBEDDINGS,
+            name=f"embeddings {model_name}",
+            origin=ORIGIN,
+        ) as span:
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+            span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
+            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            set_span_data_for_embed_request(span, integration, contents, kwargs)
+
+            try:
+                response = f(self, *args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                raise
+
+            set_span_data_for_embed_response(span, integration, response)
+
+            return response
+
+    return new_embed_content
+
+
+def _wrap_async_embed_content(f):
+    # type: (Callable[..., Any]) -> Callable[..., Any]
+    @wraps(f)
+    async def new_async_embed_content(self, *args, **kwargs):
+        # type: (Any, Any, Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(GoogleGenAIIntegration)
+        if integration is None:
+            return await f(self, *args, **kwargs)
+
+        model_name, contents = prepare_embed_content_args(args, kwargs)
+
+        with sentry_sdk.start_span(
+            op=OP.GEN_AI_EMBEDDINGS,
+            name=f"embeddings {model_name}",
+            origin=ORIGIN,
+        ) as span:
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+            span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
+            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            set_span_data_for_embed_request(span, integration, contents, kwargs)
+
+            try:
+                response = await f(self, *args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                raise
+
+            set_span_data_for_embed_response(span, integration, response)
+
+            return response
+
+    return new_async_embed_content

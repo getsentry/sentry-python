@@ -478,6 +478,8 @@ class Span:
     ):
         # type: (...) -> Transaction
         """
+        DEPRECATED: Use :py:meth:`sentry_sdk.continue_trace`.
+
         Create a Transaction with the given params, then add in data pulled from
         the ``sentry-trace`` and ``baggage`` headers from the environ (if any)
         before returning the Transaction.
@@ -489,11 +491,6 @@ class Span:
 
         :param environ: The ASGI/WSGI environ to pull information from.
         """
-        if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.continue_from_environ "
-                "instead of Span.continue_from_environ."
-            )
         return Transaction.continue_from_headers(EnvironHeaders(environ), **kwargs)
 
     @classmethod
@@ -506,6 +503,8 @@ class Span:
     ):
         # type: (...) -> Transaction
         """
+        DEPRECATED: Use :py:meth:`sentry_sdk.continue_trace`.
+
         Create a transaction with the given params (including any data pulled from
         the ``sentry-trace`` and ``baggage`` headers).
 
@@ -513,12 +512,7 @@ class Span:
         :param _sample_rand: If provided, we override the sample_rand value from the
             incoming headers with this value. (internal use only)
         """
-        # TODO move this to the Transaction class
-        if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.continue_from_headers "
-                "instead of Span.continue_from_headers."
-            )
+        logger.warning("Deprecated: use sentry_sdk.continue_trace instead.")
 
         # TODO-neel move away from this kwargs stuff, it's confusing and opaque
         # make more explicit
@@ -572,16 +566,11 @@ class Span:
     ):
         # type: (...) -> Optional[Transaction]
         """
-        DEPRECATED: Use :py:meth:`sentry_sdk.tracing.Span.continue_from_headers`.
+        DEPRECATED: Use :py:meth:`sentry_sdk.continue_trace`.
 
         Create a ``Transaction`` with the given params, then add in data pulled from
         the given ``sentry-trace`` header value before returning the ``Transaction``.
         """
-        logger.warning(
-            "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
-            "instead of from_traceparent(traceparent, **kwargs)"
-        )
-
         if not traceparent:
             return None
 
@@ -666,7 +655,7 @@ class Span:
         # type: (int) -> None
         self.set_tag(
             "http.status_code", str(http_status)
-        )  # we keep this for backwards compatibility
+        )  # TODO-neel remove in major, we keep this for backwards compatibility
         self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
         self.set_status(get_span_status_from_http_code(http_status))
 
@@ -729,6 +718,8 @@ class Span:
         }  # type: Dict[str, Any]
 
         if self.status:
+            rv["status"] = self.status
+            # TODO-neel remove redundant tag in major
             self._tags["status"] = self.status
 
         if len(self._measurements) > 0:

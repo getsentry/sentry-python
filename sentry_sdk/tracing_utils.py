@@ -15,7 +15,6 @@ from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     filename_for_module,
-    Dsn,
     logger,
     match_regex_list,
     qualname_from_function,
@@ -411,7 +410,7 @@ class PropagationContext:
         "_span_id",
         "parent_span_id",
         "parent_sampled",
-        "dynamic_sampling_context",
+        "baggage",
     )
 
     def __init__(
@@ -421,6 +420,7 @@ class PropagationContext:
         parent_span_id=None,  # type: Optional[str]
         parent_sampled=None,  # type: Optional[bool]
         dynamic_sampling_context=None,  # type: Optional[Dict[str, str]]
+        baggage=None,  # type: Optional[Baggage]
     ):
         # type: (...) -> None
         self._trace_id = trace_id
@@ -438,32 +438,39 @@ class PropagationContext:
         Important when the parent span originated in an upstream service,
         because we want to sample the whole trace, or nothing from the trace."""
 
-        self.dynamic_sampling_context = dynamic_sampling_context
-        """Data that is used for dynamic sampling decisions."""
+        self.baggage = baggage
+        """Parsed baggage header that is used for dynamic sampling decisions."""
+
+        """DEPRECATED this only exists for backwards compat of constructor."""
+        if baggage is None and dynamic_sampling_context is not None:
+            self.baggage = Baggage(dynamic_sampling_context)
 
     @classmethod
     def from_incoming_data(cls, incoming_data):
         # type: (Dict[str, Any]) -> Optional[PropagationContext]
-        propagation_context = None
-
         normalized_data = normalize_incoming_data(incoming_data)
-        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
-        if baggage_header:
-            propagation_context = PropagationContext()
-            propagation_context.dynamic_sampling_context = Baggage.from_incoming_header(
-                baggage_header
-            ).dynamic_sampling_context()
 
         sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
-        if sentry_trace_header:
-            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
-            if sentrytrace_data is not None:
-                if propagation_context is None:
-                    propagation_context = PropagationContext()
-                propagation_context.update(sentrytrace_data)
+        sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
 
-        if propagation_context is not None:
-            propagation_context._fill_sample_rand()
+        # nothing to propagate if no sentry-trace
+        if sentrytrace_data is None:
+            return None
+
+        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
+        baggage = (
+            Baggage.from_incoming_header(baggage_header) if baggage_header else None
+        )
+
+        if not _should_continue_trace(baggage):
+            return None
+
+        propagation_context = PropagationContext()
+        propagation_context.update(sentrytrace_data)
+        if baggage:
+            propagation_context.baggage = baggage
+
+        propagation_context._fill_sample_rand()
 
         return propagation_context
 
@@ -496,6 +503,11 @@ class PropagationContext:
         # type: (str) -> None
         self._span_id = value
 
+    @property
+    def dynamic_sampling_context(self):
+        # type: () -> Optional[Dict[str, Any]]
+        return self.baggage.dynamic_sampling_context() if self.baggage else None
+
     def update(self, other_dict):
         # type: (Dict[str, Any]) -> None
         """
@@ -509,20 +521,20 @@ class PropagationContext:
 
     def __repr__(self):
         # type: (...) -> str
-        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} dynamic_sampling_context={}>".format(
+        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} baggage={}>".format(
             self._trace_id,
             self._span_id,
             self.parent_span_id,
             self.parent_sampled,
-            self.dynamic_sampling_context,
+            self.baggage,
         )
 
     def _fill_sample_rand(self):
         # type: () -> None
         """
-        Ensure that there is a valid sample_rand value in the dynamic_sampling_context.
+        Ensure that there is a valid sample_rand value in the baggage.
 
-        If there is a valid sample_rand value in the dynamic_sampling_context, we keep it.
+        If there is a valid sample_rand value in the baggage, we keep it.
         Otherwise, we generate a sample_rand value according to the following:
 
           - If we have a parent_sampled value and a sample_rate in the DSC, we compute
@@ -535,23 +547,19 @@ class PropagationContext:
 
         The sample_rand is deterministically generated from the trace_id, if present.
 
-        This function does nothing if there is no dynamic_sampling_context.
+        This function does nothing if there is no baggage.
         """
-        if self.dynamic_sampling_context is None:
+        if self.baggage is None:
             return
 
-        sample_rand = try_convert(
-            float, self.dynamic_sampling_context.get("sample_rand")
-        )
+        sample_rand = try_convert(float, self.baggage.sentry_items.get("sample_rand"))
         if sample_rand is not None and 0 <= sample_rand < 1:
             # sample_rand is present and valid, so don't overwrite it
             return
 
         # Get the sample rate and compute the transformation that will map the random value
         # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
-        sample_rate = try_convert(
-            float, self.dynamic_sampling_context.get("sample_rate")
-        )
+        sample_rate = try_convert(float, self.baggage.sentry_items.get("sample_rate"))
         lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
 
         try:
@@ -567,15 +575,15 @@ class PropagationContext:
             )
             return
 
-        self.dynamic_sampling_context["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
+        self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
 
     def _sample_rand(self):
         # type: () -> Optional[str]
-        """Convenience method to get the sample_rand value from the dynamic_sampling_context."""
-        if self.dynamic_sampling_context is None:
+        """Convenience method to get the sample_rand value from the baggage."""
+        if self.baggage is None:
             return None
 
-        return self.dynamic_sampling_context.get("sample_rand")
+        return self.baggage.sentry_items.get("sample_rand")
 
 
 class Baggage:
@@ -663,8 +671,10 @@ class Baggage:
         if options.get("release"):
             sentry_items["release"] = options["release"]
 
-        if options.get("dsn"):
-            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
+        if client.parsed_dsn:
+            sentry_items["public_key"] = client.parsed_dsn.public_key
+            if client.parsed_dsn.org_id:
+                sentry_items["org_id"] = client.parsed_dsn.org_id
 
         if options.get("traces_sample_rate"):
             sentry_items["sample_rate"] = str(options["traces_sample_rate"])
@@ -695,8 +705,10 @@ class Baggage:
         if options.get("release"):
             sentry_items["release"] = options["release"]
 
-        if options.get("dsn"):
-            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
+        if client.parsed_dsn:
+            sentry_items["public_key"] = client.parsed_dsn.public_key
+            if client.parsed_dsn.org_id:
+                sentry_items["org_id"] = client.parsed_dsn.org_id
 
         if (
             transaction.name
@@ -1223,6 +1235,41 @@ def _set_output_attributes(span, template, send_pii, result):
     :param result: The result of the wrapped function.
     """
     span.update_data(_get_output_attributes(template, send_pii, result) or {})
+
+
+def _should_continue_trace(baggage):
+    # type: (Optional[Baggage]) -> bool
+    """
+    Check if we should continue the incoming trace according to the strict_trace_continuation spec.
+    https://develop.sentry.dev/sdk/telemetry/traces/#stricttracecontinuation
+    """
+
+    client = sentry_sdk.get_client()
+    parsed_dsn = client.parsed_dsn
+    client_org_id = parsed_dsn.org_id if parsed_dsn else None
+    baggage_org_id = baggage.sentry_items.get("org_id") if baggage else None
+
+    if (
+        client_org_id is not None
+        and baggage_org_id is not None
+        and client_org_id != baggage_org_id
+    ):
+        logger.debug(
+            f"Starting a new trace because org IDs don't match (incoming baggage org_id: {baggage_org_id}, SDK org_id: {client_org_id})"
+        )
+        return False
+
+    strict_trace_continuation = client.options.get("strict_trace_continuation", False)  # type: bool
+    if strict_trace_continuation:
+        if (baggage_org_id is not None and client_org_id is None) or (
+            baggage_org_id is None and client_org_id is not None
+        ):
+            logger.debug(
+                f"Starting a new trace because strict trace continuation is enabled and one org ID is missing (incoming baggage org_id: {baggage_org_id}, SDK org_id: {client_org_id})"
+            )
+            return False
+
+    return True
 
 
 # Circular imports

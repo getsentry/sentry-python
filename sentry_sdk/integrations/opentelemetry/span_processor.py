@@ -23,7 +23,6 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 )
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
-from sentry_sdk.utils import Dsn
 
 from urllib3.util import parse_url as urlparse
 
@@ -113,12 +112,7 @@ class SentrySpanProcessor(SpanProcessor):
         # type: (OTelSpan, Optional[context_api.Context]) -> None
         client = get_client()
 
-        if not client.dsn:
-            return
-
-        try:
-            _ = Dsn(client.dsn)
-        except Exception:
+        if not client.parsed_dsn:
             return
 
         if client.options["instrumenter"] != INSTRUMENTER.OTEL:
@@ -233,10 +227,8 @@ class SentrySpanProcessor(SpanProcessor):
             otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL)
         otel_span_url = cast("Optional[str]", otel_span_url)
 
-        dsn_url = None
-        client = get_client()
-        if client.dsn:
-            dsn_url = Dsn(client.dsn).netloc
+        parsed_dsn = get_client().parsed_dsn
+        dsn_url = parsed_dsn.netloc if parsed_dsn else None
 
         if otel_span_url and dsn_url and dsn_url in otel_span_url:
             return True
