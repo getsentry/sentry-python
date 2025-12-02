@@ -1,13 +1,14 @@
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.tracing_utils import set_span_errored
 from ..utils import _record_exception_on_span
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Callable, Optional
 
 
 def _patch_error_tracing():
