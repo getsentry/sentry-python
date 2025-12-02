@@ -42,7 +42,6 @@ def _create_get_model_wrapper(original_get_model):
             async def wrapped_fetch_response(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 response = await original_fetch_response(*args, **kwargs)
-                # Store model from raw response in context variable
                 if hasattr(response, "model"):
                     agent._sentry_raw_response_model = str(response.model)
                 return response
@@ -55,7 +54,6 @@ def _create_get_model_wrapper(original_get_model):
             with ai_client_span(agent, kwargs) as span:
                 result = await original_get_response(*args, **kwargs)
 
-                # Retrieve response model from context and attach to ModelResponse
                 response_model = getattr(agent, "_sentry_raw_response_model", None)
                 if response_model:
                     result._sentry_response_model = response_model
@@ -65,6 +63,8 @@ def _create_get_model_wrapper(original_get_model):
                         agent_span.set_data(
                             SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
                         )
+
+                    delattr(agent, "_sentry_raw_response_model")
 
                 update_ai_client_span(span, agent, kwargs, result)
 
