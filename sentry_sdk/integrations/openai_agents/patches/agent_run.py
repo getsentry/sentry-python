@@ -87,6 +87,7 @@ def _patch_agent_run():
                     end_invoke_agent_span(context_wrapper, current_agent)
 
             span = _start_invoke_agent_span(context_wrapper, agent, kwargs)
+            agent._sentry_agent_span = span
 
         # Call original method with all the correct parameters
         try:
