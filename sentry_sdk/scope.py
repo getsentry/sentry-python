@@ -510,11 +510,12 @@ class Scope:
         If there is `incoming_data` overwrite existing propagation context.
         If there is no `incoming_data` create new propagation context, but do NOT overwrite if already existing.
         """
-        if incoming_data:
-            propagation_context = PropagationContext.from_incoming_data(incoming_data)
-            if propagation_context is not None:
-                self._propagation_context = propagation_context
+        if incoming_data is not None:
+            self._propagation_context = PropagationContext.from_incoming_data(
+                incoming_data
+            )
 
+        # TODO-neel this below is a BIG code smell but requires a bunch of other refactoring
         if self._type != ScopeType.CURRENT:
             if self._propagation_context is None:
                 self.set_new_propagation_context()

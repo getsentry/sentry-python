@@ -419,3 +419,14 @@ def test_continue_trace_strict_trace_continuation(
         )
         assert transaction.parent_span_id != "1234567890abcdef"
         assert not transaction.parent_sampled
+
+
+def test_continue_trace_forces_new_traces_when_no_propagation(sentry_init):
+    """This is to make sure we don't have a long running trace because of TWP logic for the no propagation case."""
+
+    sentry_init(traces_sample_rate=1.0)
+
+    tx1 = continue_trace({}, name="tx1")
+    tx2 = continue_trace({}, name="tx2")
+
+    assert tx1.trace_id != tx2.trace_id
