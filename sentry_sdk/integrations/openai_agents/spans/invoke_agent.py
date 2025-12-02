@@ -9,7 +9,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
 
-from .._context_vars import _invoke_agent_response_model_context
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
 
@@ -88,12 +87,6 @@ def update_invoke_agent_span(context, agent, output):
         # Add aggregated usage data from context_wrapper
         if hasattr(context, "usage"):
             _set_usage_data(span, context.usage)
-
-        # Add response model if available (will be the last model used)
-        response_model = _invoke_agent_response_model_context.get(None)
-        if response_model:
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
-            _invoke_agent_response_model_context.set(None)  # Clear after use
 
         if should_send_default_pii():
             set_data_normalized(

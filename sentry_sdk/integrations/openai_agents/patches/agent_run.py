@@ -34,6 +34,8 @@ def _patch_agent_run():
         span = invoke_agent_span(context_wrapper, agent, kwargs)
         context_wrapper._sentry_agent_span = span
 
+        return span
+
     def _end_invoke_agent_span(context_wrapper, agent, output=None):
         # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
         """End the agent invocation span"""
@@ -73,7 +75,8 @@ def _patch_agent_run():
                 if current_agent and current_agent != agent:
                     _end_invoke_agent_span(context_wrapper, current_agent)
 
-            _start_invoke_agent_span(context_wrapper, agent, kwargs)
+            span = _start_invoke_agent_span(context_wrapper, agent, kwargs)
+            agent._sentry_agent_span = span
 
         # Call original method with all the correct parameters
         result = await original_run_single_turn(*args, **kwargs)
