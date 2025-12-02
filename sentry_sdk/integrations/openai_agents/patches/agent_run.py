@@ -1,14 +1,16 @@
+import sys
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.utils import reraise
 from ..spans import (
     invoke_agent_span,
     update_invoke_agent_span,
     end_invoke_agent_span,
     handoff_span,
 )
-from ..utils import _capture_exception, _record_exception_on_span, _SingleTurnException
+from ..utils import _capture_exception, _record_exception_on_span
 
 from typing import TYPE_CHECKING
 
@@ -97,7 +99,7 @@ def _patch_agent_run():
                 _record_exception_on_span(span, exc)
                 end_invoke_agent_span(context_wrapper, agent)
 
-            raise _SingleTurnException(exc)
+            reraise(*sys.exc_info())
 
         return result
 

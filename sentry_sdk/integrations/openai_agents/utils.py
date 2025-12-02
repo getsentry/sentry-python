@@ -27,12 +27,6 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-class _SingleTurnException(Exception):
-    def __init__(self, original):
-        # type: (Exception) -> None
-        self.original = original
-
-
 def _capture_exception(exc):
     # type: (Any) -> None
     set_span_errored()

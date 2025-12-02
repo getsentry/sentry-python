@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import agent_workflow_span, end_invoke_agent_span
-from ..utils import _capture_exception, _record_exception_on_span, _SingleTurnException
+from ..utils import _capture_exception, _record_exception_on_span
 
 try:
     from agents.exceptions import AgentsException
@@ -38,9 +38,6 @@ def _create_run_wrapper(original_func):
                 args = (agent, *args[1:])
                 try:
                     run_result = await original_func(*args, **kwargs)
-                except _SingleTurnException as exc:
-                    _capture_exception(exc.original)
-                    raise exc.original from None
                 except AgentsException as exc:
                     _capture_exception(exc)
 
