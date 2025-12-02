@@ -124,6 +124,7 @@ def _set_input_data(span, kwargs, integration):
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
     system_prompt = kwargs.get("system")
     messages = kwargs.get("messages")
     if (
