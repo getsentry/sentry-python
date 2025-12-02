@@ -56,8 +56,6 @@ def _create_get_model_wrapper(original_get_model):
 
                 response_model = getattr(agent, "_sentry_raw_response_model", None)
                 if response_model:
-                    result._sentry_response_model = response_model
-
                     agent_span = getattr(agent, "_sentry_agent_span", None)
                     if agent_span:
                         agent_span.set_data(
@@ -66,7 +64,7 @@ def _create_get_model_wrapper(original_get_model):
 
                     delattr(agent, "_sentry_raw_response_model")
 
-                update_ai_client_span(span, agent, kwargs, result)
+                update_ai_client_span(span, agent, kwargs, result, response_model)
 
             return result
 
