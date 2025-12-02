@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Optional
 
+    from sentry_sdk.tracing import Span
+
 try:
     import agents
 except ImportError:
@@ -27,12 +29,14 @@ def _patch_agent_run():
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
 
     def _start_invoke_agent_span(context_wrapper, agent, kwargs):
-        # type: (agents.RunContextWrapper, agents.Agent, dict[str, Any]) -> None
+        # type: (agents.RunContextWrapper, agents.Agent, dict[str, Any]) -> Span
         """Start an agent invocation span"""
         # Store the agent on the context wrapper so we can access it later
         context_wrapper._sentry_current_agent = agent
         span = invoke_agent_span(context_wrapper, agent, kwargs)
         context_wrapper._sentry_agent_span = span
+
+        return span
 
     def _end_invoke_agent_span(context_wrapper, agent, output=None):
         # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
@@ -73,7 +77,8 @@ def _patch_agent_run():
                 if current_agent and current_agent != agent:
                     _end_invoke_agent_span(context_wrapper, current_agent)
 
-            _start_invoke_agent_span(context_wrapper, agent, kwargs)
+            span = _start_invoke_agent_span(context_wrapper, agent, kwargs)
+            agent._sentry_agent_span = span
 
         # Call original method with all the correct parameters
         result = await original_run_single_turn(*args, **kwargs)

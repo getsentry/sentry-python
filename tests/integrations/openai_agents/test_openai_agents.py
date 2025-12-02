@@ -1231,6 +1231,571 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
     assert execute_tool_span["tags"]["status"] == "internal_error"
 
 
+@pytest.mark.asyncio
+async def test_invoke_agent_span_includes_usage_data(
+    sentry_init, capture_events, test_agent, mock_usage
+):
+    """
+    Test that invoke_agent spans include aggregated usage data from context_wrapper.
+    This verifies the new functionality added to track token usage in invoke_agent spans.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a response with usage data
+            response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_123",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="Response with usage",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=mock_usage,
+                response_id="resp_123",
+            )
+            mock_get_response.return_value = response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    # Verify invoke_agent span has usage data from context_wrapper
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
+
+    # The usage should match the mock_usage values (aggregated across all calls)
+    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 30
+    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens.reasoning"] == 5
+
+
+@pytest.mark.asyncio
+async def test_ai_client_span_includes_response_model(
+    sentry_init, capture_events, test_agent
+):
+    """
+    Test that ai_client spans (gen_ai.chat) include the response model from the actual API response.
+    This verifies the new functionality to capture the model used in the response.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        # Mock the _fetch_response method to return a response with a model field
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
+        ) as mock_fetch_response:
+            # Create a mock OpenAI Response object with a model field
+            mock_response = MagicMock()
+            mock_response.model = "gpt-4.1-2025-04-14"  # The actual response model
+            mock_response.id = "resp_123"
+            mock_response.output = [
+                ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="Hello from GPT-4.1",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ]
+            mock_response.usage = MagicMock()
+            mock_response.usage.input_tokens = 10
+            mock_response.usage.output_tokens = 20
+            mock_response.usage.total_tokens = 30
+            mock_response.usage.input_tokens_details = InputTokensDetails(
+                cached_tokens=0
+            )
+            mock_response.usage.output_tokens_details = OutputTokensDetails(
+                reasoning_tokens=5
+            )
+
+            mock_fetch_response.return_value = mock_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    _, ai_client_span = spans
+
+    # Verify ai_client span has response model
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert "gen_ai.response.model" in ai_client_span["data"]
+    assert ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+
+
+@pytest.mark.asyncio
+async def test_ai_client_span_response_model_with_chat_completions(
+    sentry_init, capture_events
+):
+    """
+    Test that response model is captured when using ChatCompletions API (not Responses API).
+    This ensures our implementation works with different OpenAI model types.
+    """
+    # Create agent that uses ChatCompletions model
+    agent = Agent(
+        name="chat_completions_agent",
+        instructions="Test agent using ChatCompletions",
+        model="gpt-4o-mini",
+    )
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        # Mock the get_response method directly since ChatCompletions may use Responses API anyway
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
+        ) as mock_fetch_response:
+            # Create a mock Response object with a model field
+            mock_response = MagicMock()
+            mock_response.model = "gpt-4o-mini-2024-07-18"  # Actual response model
+            mock_response.id = "resp_123"
+            mock_response.output = [
+                ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="Response from model",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ]
+            mock_response.usage = MagicMock()
+            mock_response.usage.input_tokens = 15
+            mock_response.usage.output_tokens = 25
+            mock_response.usage.total_tokens = 40
+            mock_response.usage.input_tokens_details = InputTokensDetails(
+                cached_tokens=0
+            )
+            mock_response.usage.output_tokens_details = OutputTokensDetails(
+                reasoning_tokens=0
+            )
+
+            mock_fetch_response.return_value = mock_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    _, ai_client_span = spans
+
+    # Verify response model from Response is captured
+    assert "gen_ai.response.model" in ai_client_span["data"]
+    assert ai_client_span["data"]["gen_ai.response.model"] == "gpt-4o-mini-2024-07-18"
+
+
+@pytest.mark.asyncio
+async def test_multiple_llm_calls_aggregate_usage(
+    sentry_init, capture_events, test_agent
+):
+    """
+    Test that invoke_agent spans show aggregated usage across multiple LLM calls
+    (e.g., when tools are used and multiple API calls are made).
+    """
+
+    @agents.function_tool
+    def calculator(a: int, b: int) -> int:
+        """Add two numbers"""
+        return a + b
+
+    agent_with_tool = test_agent.clone(tools=[calculator])
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # First call: agent decides to use tool (10 input, 5 output tokens)
+            tool_call_response = ModelResponse(
+                output=[
+                    ResponseFunctionToolCall(
+                        id="call_123",
+                        call_id="call_123",
+                        name="calculator",
+                        type="function_call",
+                        arguments='{"a": 5, "b": 3}',
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=10,
+                    output_tokens=5,
+                    total_tokens=15,
+                    input_tokens_details=InputTokensDetails(cached_tokens=0),
+                    output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
+                ),
+                response_id="resp_tool_call",
+            )
+
+            # Second call: agent uses tool result to respond (20 input, 15 output tokens)
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="The result is 8",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=20,
+                    output_tokens=15,
+                    total_tokens=35,
+                    input_tokens_details=InputTokensDetails(cached_tokens=5),
+                    output_tokens_details=OutputTokensDetails(reasoning_tokens=3),
+                ),
+                response_id="resp_final",
+            )
+
+            mock_get_response.side_effect = [tool_call_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent_with_tool,
+                "What is 5 + 3?",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span = spans[0]
+
+    # Verify invoke_agent span has aggregated usage from both API calls
+    # Total: 10 + 20 = 30 input tokens, 5 + 15 = 20 output tokens, 15 + 35 = 50 total
+    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 30
+    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
+    # Cached tokens should be aggregated: 0 + 5 = 5
+    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens.cached"] == 5
+    # Reasoning tokens should be aggregated: 0 + 3 = 3
+    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens.reasoning"] == 3
+
+
+@pytest.mark.asyncio
+async def test_response_model_not_set_when_unavailable(
+    sentry_init, capture_events, test_agent
+):
+    """
+    Test that response model is not set if the raw response doesn't have a model field.
+    This can happen with custom model implementations.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        # Mock without _fetch_response (simulating custom model without this method)
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_123",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="Response without model field",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=10,
+                    output_tokens=20,
+                    total_tokens=30,
+                ),
+                response_id="resp_123",
+            )
+            # Don't set _sentry_response_model attribute
+            mock_get_response.return_value = response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            # Remove the _fetch_response method to simulate custom model
+            with patch.object(
+                agents.models.openai_responses.OpenAIResponsesModel,
+                "_fetch_response",
+                None,
+            ):
+                result = await agents.Runner.run(
+                    test_agent, "Test input", run_config=test_run_config
+                )
+
+                assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    _, ai_client_span = spans
+
+    # When response model can't be captured, it shouldn't be in the span data
+    # (we only set it when we can accurately capture it)
+    assert "gen_ai.response.model" not in ai_client_span["data"]
+
+
+@pytest.mark.asyncio
+async def test_invoke_agent_span_includes_response_model(
+    sentry_init, capture_events, test_agent
+):
+    """
+    Test that invoke_agent spans include the response model.
+    When an agent makes multiple LLM calls, it should report the last model used.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
+        ) as mock_fetch_response:
+            # Create a mock OpenAI Response object with a model field
+            mock_response = MagicMock()
+            mock_response.model = "gpt-4.1-2025-04-14"  # The actual response model
+            mock_response.id = "resp_123"
+            mock_response.output = [
+                ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="Response from model",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ]
+            mock_response.usage = MagicMock()
+            mock_response.usage.input_tokens = 10
+            mock_response.usage.output_tokens = 20
+            mock_response.usage.total_tokens = 30
+            mock_response.usage.input_tokens_details = InputTokensDetails(
+                cached_tokens=0
+            )
+            mock_response.usage.output_tokens_details = OutputTokensDetails(
+                reasoning_tokens=5
+            )
+
+            mock_fetch_response.return_value = mock_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    # Verify invoke_agent span has response model
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert "gen_ai.response.model" in invoke_agent_span["data"]
+    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+
+    # Also verify ai_client span has it
+    assert "gen_ai.response.model" in ai_client_span["data"]
+    assert ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+
+
+@pytest.mark.asyncio
+async def test_invoke_agent_span_uses_last_response_model(
+    sentry_init, capture_events, test_agent
+):
+    """
+    Test that when an agent makes multiple LLM calls (e.g., with tools),
+    the invoke_agent span reports the last response model used.
+    """
+
+    @agents.function_tool
+    def calculator(a: int, b: int) -> int:
+        """Add two numbers"""
+        return a + b
+
+    agent_with_tool = test_agent.clone(tools=[calculator])
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
+        ) as mock_fetch_response:
+            # First call: gpt-4 model
+            first_response = MagicMock()
+            first_response.model = "gpt-4-0613"
+            first_response.id = "resp_1"
+            first_response.output = [
+                ResponseFunctionToolCall(
+                    id="call_123",
+                    call_id="call_123",
+                    name="calculator",
+                    type="function_call",
+                    arguments='{"a": 5, "b": 3}',
+                )
+            ]
+            first_response.usage = MagicMock()
+            first_response.usage.input_tokens = 10
+            first_response.usage.output_tokens = 5
+            first_response.usage.total_tokens = 15
+            first_response.usage.input_tokens_details = InputTokensDetails(
+                cached_tokens=0
+            )
+            first_response.usage.output_tokens_details = OutputTokensDetails(
+                reasoning_tokens=0
+            )
+
+            # Second call: different model (e.g., after tool execution)
+            second_response = MagicMock()
+            second_response.model = "gpt-4.1-2025-04-14"  # Different model
+            second_response.id = "resp_2"
+            second_response.output = [
+                ResponseOutputMessage(
+                    id="msg_final",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="The result is 8",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ]
+            second_response.usage = MagicMock()
+            second_response.usage.input_tokens = 20
+            second_response.usage.output_tokens = 15
+            second_response.usage.total_tokens = 35
+            second_response.usage.input_tokens_details = InputTokensDetails(
+                cached_tokens=5
+            )
+            second_response.usage.output_tokens_details = OutputTokensDetails(
+                reasoning_tokens=3
+            )
+
+            mock_fetch_response.side_effect = [first_response, second_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent_with_tool,
+                "What is 5 + 3?",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span = spans[0]
+    first_ai_client_span = spans[1]
+    second_ai_client_span = spans[3]  # After tool span
+
+    # Verify invoke_agent span uses the LAST response model
+    assert "gen_ai.response.model" in invoke_agent_span["data"]
+    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+
+    # Verify each ai_client span has its own response model
+    assert first_ai_client_span["data"]["gen_ai.response.model"] == "gpt-4-0613"
+    assert (
+        second_ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    )
+
+
 def test_openai_agents_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in OpenAI Agents integration."""
 
