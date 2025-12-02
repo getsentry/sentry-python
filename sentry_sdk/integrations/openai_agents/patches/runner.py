@@ -38,6 +38,9 @@ def _create_run_wrapper(original_func):
                 args = (agent, *args[1:])
                 try:
                     run_result = await original_func(*args, **kwargs)
+                except _SingleTurnException as exc:
+                    # Handled in _run_single_turn() patch.
+                    raise exc.original from None
                 except AgentsException as exc:
                     _capture_exception(exc)
 
@@ -55,9 +58,6 @@ def _create_run_wrapper(original_func):
                             end_invoke_agent_span(context_wrapper, agent)
 
                     raise exc from None
-                except _SingleTurnException as exc:
-                    # Handled in _run_single_turn() patch.
-                    raise exc.original from None
                 except Exception as exc:
                     # Invoke agent span is not finished in this case.
                     # This is much less likely to occur than other cases because
