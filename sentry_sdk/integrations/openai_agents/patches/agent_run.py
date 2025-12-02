@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 try:
     import agents
-    from agents.exceptions import AgentsException
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
@@ -47,15 +46,6 @@ def _patch_agent_run():
         context_wrapper._sentry_agent_span = span
 
         return span
-
-    def _end_invoke_agent_span(context_wrapper, agent, output=None):
-        # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
-        """End the agent invocation span"""
-        # Clear the stored agent
-        if hasattr(context_wrapper, "_sentry_current_agent"):
-            delattr(context_wrapper, "_sentry_current_agent")
-
-        update_invoke_agent_span(context_wrapper, agent, output)
 
     def _has_active_agent_span(context_wrapper):
         # type: (agents.RunContextWrapper) -> bool
@@ -129,7 +119,7 @@ def _patch_agent_run():
         finally:
             # End span for current agent after handoff processing is complete
             if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-                _end_invoke_agent_span(context_wrapper, agent)
+                end_invoke_agent_span(context_wrapper, agent)
 
         return result
 
@@ -152,7 +142,7 @@ def _patch_agent_run():
         finally:
             # End span for current agent after final output processing is complete
             if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-                _end_invoke_agent_span(context_wrapper, agent, final_output)
+                end_invoke_agent_span(context_wrapper, agent, final_output)
 
         return result
 
