@@ -26,7 +26,7 @@ def _create_run_wrapper(original_func):
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
         with sentry_sdk.isolation_scope():
-            agent = args[0]
+            agent = args[0].clone()
             with agent_workflow_span(agent):
                 result = None
                 try:
