@@ -447,7 +447,8 @@ class PropagationContext:
 
     @classmethod
     def from_incoming_data(cls, incoming_data):
-        # type: (Dict[str, Any]) -> Optional[PropagationContext]
+        # type: (Dict[str, Any]) -> PropagationContext
+        propagation_context = PropagationContext()
         normalized_data = normalize_incoming_data(incoming_data)
 
         sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
@@ -455,7 +456,7 @@ class PropagationContext:
 
         # nothing to propagate if no sentry-trace
         if sentrytrace_data is None:
-            return None
+            return propagation_context
 
         baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
         baggage = (
@@ -463,9 +464,8 @@ class PropagationContext:
         )
 
         if not _should_continue_trace(baggage):
-            return None
+            return propagation_context
 
-        propagation_context = PropagationContext()
         propagation_context.update(sentrytrace_data)
         if baggage:
             propagation_context.baggage = baggage
