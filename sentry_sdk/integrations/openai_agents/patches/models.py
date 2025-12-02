@@ -2,11 +2,8 @@ from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 
-from .._context_vars import (
-    _invoke_agent_response_model_context,
-    _response_model_context,
-)
 from ..spans import ai_client_span, update_ai_client_span
+from sentry_sdk.consts import SPANDATA
 
 from typing import TYPE_CHECKING
 
@@ -47,7 +44,7 @@ def _create_get_model_wrapper(original_get_model):
                 response = await original_fetch_response(*args, **kwargs)
                 # Store model from raw response in context variable
                 if hasattr(response, "model"):
-                    _response_model_context.set(str(response.model))
+                    agent._sentry_raw_response_model = str(response.model)
                 return response
 
             model._fetch_response = wrapped_fetch_response
@@ -59,13 +56,15 @@ def _create_get_model_wrapper(original_get_model):
                 result = await original_get_response(*args, **kwargs)
 
                 # Retrieve response model from context and attach to ModelResponse
-                response_model = _response_model_context.get(None)
+                response_model = getattr(agent, "_sentry_raw_response_model", None)
                 if response_model:
                     result._sentry_response_model = response_model
-                    _response_model_context.set(None)  # Clear context
 
-                    # Also store for invoke_agent span (will be the last one used)
-                    _invoke_agent_response_model_context.set(response_model)
+                    agent_span = getattr(agent, "_sentry_agent_span", None)
+                    if agent_span:
+                        agent_span.set_data(
+                            SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
+                        )
 
                 update_ai_client_span(span, agent, kwargs, result)
 
