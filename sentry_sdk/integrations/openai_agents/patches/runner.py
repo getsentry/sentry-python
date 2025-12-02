@@ -39,7 +39,7 @@ def _create_run_wrapper(original_func):
                 try:
                     run_result = await original_func(*args, **kwargs)
                 except _SingleTurnException as exc:
-                    # Handled in _run_single_turn() patch.
+                    _capture_exception(exc.original)
                     raise exc.original from None
                 except AgentsException as exc:
                     _capture_exception(exc)
