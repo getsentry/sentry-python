@@ -1,7 +1,14 @@
+import sys
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
-from ..spans import invoke_agent_span, update_invoke_agent_span, handoff_span
+from sentry_sdk.utils import reraise
+from ..spans import (
+    invoke_agent_span,
+    end_invoke_agent_span,
+    handoff_span,
+)
+from ..utils import _record_exception_on_span
 
 from typing import TYPE_CHECKING
 
@@ -38,15 +45,6 @@ def _patch_agent_run():
 
         return span
 
-    def _end_invoke_agent_span(context_wrapper, agent, output=None):
-        # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
-        """End the agent invocation span"""
-        # Clear the stored agent
-        if hasattr(context_wrapper, "_sentry_current_agent"):
-            delattr(context_wrapper, "_sentry_current_agent")
-
-        update_invoke_agent_span(context_wrapper, agent, output)
-
     def _has_active_agent_span(context_wrapper):
         # type: (agents.RunContextWrapper) -> bool
         """Check if there's an active agent span for this context"""
@@ -69,19 +67,27 @@ def _patch_agent_run():
         context_wrapper = kwargs.get("context_wrapper")
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
 
+        span = getattr(context_wrapper, "_sentry_agent_span", None)
         # Start agent span when agent starts (but only once per agent)
         if should_run_agent_start_hooks and agent and context_wrapper:
             # End any existing span for a different agent
             if _has_active_agent_span(context_wrapper):
                 current_agent = _get_current_agent(context_wrapper)
                 if current_agent and current_agent != agent:
-                    _end_invoke_agent_span(context_wrapper, current_agent)
+                    end_invoke_agent_span(context_wrapper, current_agent)
 
             span = _start_invoke_agent_span(context_wrapper, agent, kwargs)
             agent._sentry_agent_span = span
 
         # Call original method with all the correct parameters
-        result = await original_run_single_turn(*args, **kwargs)
+        try:
+            result = await original_run_single_turn(*args, **kwargs)
+        except Exception as exc:
+            if span is not None and span.timestamp is None:
+                _record_exception_on_span(span, exc)
+                end_invoke_agent_span(context_wrapper, agent)
+
+            reraise(*sys.exc_info())
 
         return result
 
@@ -111,7 +117,7 @@ def _patch_agent_run():
         finally:
             # End span for current agent after handoff processing is complete
             if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-                _end_invoke_agent_span(context_wrapper, agent)
+                end_invoke_agent_span(context_wrapper, agent)
 
         return result
 
@@ -134,7 +140,7 @@ def _patch_agent_run():
         finally:
             # End span for current agent after final output processing is complete
             if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-                _end_invoke_agent_span(context_wrapper, agent, final_output)
+                end_invoke_agent_span(context_wrapper, agent, final_output)
 
         return result
 

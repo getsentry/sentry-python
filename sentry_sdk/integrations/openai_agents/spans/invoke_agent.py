@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import agents
-    from typing import Any
+    from typing import Any, Optional
 
 
 def invoke_agent_span(context, agent, kwargs):
@@ -95,3 +95,13 @@ def update_invoke_agent_span(context, agent, output):
 
         span.__exit__(None, None, None)
         delattr(context, "_sentry_agent_span")
+
+
+def end_invoke_agent_span(context_wrapper, agent, output=None):
+    # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
+    """End the agent invocation span"""
+    # Clear the stored agent
+    if hasattr(context_wrapper, "_sentry_current_agent"):
+        delattr(context_wrapper, "_sentry_current_agent")
+
+    update_invoke_agent_span(context_wrapper, agent, output)
