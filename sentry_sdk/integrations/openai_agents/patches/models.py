@@ -32,7 +32,10 @@ def _create_get_model_wrapper(original_get_model):
         # type: (agents.Runner, agents.Agent, agents.RunConfig) -> agents.Model
 
         model = original_get_model(agent, run_config)
-        original_get_response = model.get_response
+
+        # check if we have already patched this model
+        if getattr(model, "_sentry_wrapped_get_model", False):
+            return model
 
         # Wrap _fetch_response if it exists (for OpenAI models) to capture raw response model
         if hasattr(model, "_fetch_response"):
@@ -47,6 +50,8 @@ def _create_get_model_wrapper(original_get_model):
                 return response
 
             model._fetch_response = wrapped_fetch_response
+
+        original_get_response = model.get_response
 
         @wraps(original_get_response)
         async def wrapped_get_response(*args, **kwargs):
@@ -69,6 +74,9 @@ def _create_get_model_wrapper(original_get_model):
             return result
 
         model.get_response = wrapped_get_response
+
+        # set marker that we have already patched this model
+        model._sentry_wrapped_get_model = True
 
         return model
 
