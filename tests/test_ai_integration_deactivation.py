@@ -2,6 +2,8 @@ import pytest
 
 from sentry_sdk import get_client
 from sentry_sdk.integrations import _INTEGRATION_DEACTIVATES
+from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 
 
 try:
@@ -36,6 +38,10 @@ def test_integration_deactivates_map_exists():
     assert "langchain" in _INTEGRATION_DEACTIVATES
     assert "openai" in _INTEGRATION_DEACTIVATES["langchain"]
     assert "anthropic" in _INTEGRATION_DEACTIVATES["langchain"]
+    assert "openai_agents" in _INTEGRATION_DEACTIVATES
+    assert "openai" in _INTEGRATION_DEACTIVATES["openai_agents"]
+    assert "pydantic_ai" in _INTEGRATION_DEACTIVATES
+    assert "openai" in _INTEGRATION_DEACTIVATES["pydantic_ai"]
 
 
 def test_langchain_auto_deactivates_openai_and_anthropic(
@@ -104,13 +110,17 @@ def test_user_can_override_with_both_explicit_integrations(
     assert AnthropicIntegration in integration_types
 
 
-def test_disabling_langchain_allows_openai_and_anthropic(
+def test_disabling_integrations_allows_openai_and_anthropic(
     sentry_init, reset_integrations
 ):
     sentry_init(
         default_integrations=False,
         auto_enabling_integrations=True,
-        disabled_integrations=[LangchainIntegration],
+        disabled_integrations=[
+            LangchainIntegration,
+            OpenAIAgentsIntegration,
+            PydanticAIIntegration,
+        ],
     )
 
     client = get_client()
