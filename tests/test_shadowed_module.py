@@ -92,6 +92,8 @@ def test_shadowed_modules_when_importing_integrations(
     """
     module_path = f"sentry_sdk.integrations.{integration_submodule_name}"
     try:
+        # If importing the integration succeeds in the current environment, assume
+        # that the integration has no non-standard imports.
         importlib.import_module(module_path)
         return
     except integrations.DidNotEnable:
@@ -100,8 +102,15 @@ def test_shadowed_modules_when_importing_integrations(
         tree = ast.parse(source, filename=spec.origin)
         integration_dependencies = find_unrecognized_dependencies(tree)
 
+        # For each non-standard import, create an empty shadow module to
+        # emulate an empty "agents.py" or analogous local module that
+        # shadows the package.
         for dependency in integration_dependencies:
             sys.modules[dependency] = types.ModuleType(dependency)
+
+        # Importing the integration must raise DidNotEnable, since the
+        # SDK catches the exception type when attempting to activate
+        # auto-enabling integrations.
         with pytest.raises(integrations.DidNotEnable):
             importlib.import_module(module_path)
 
