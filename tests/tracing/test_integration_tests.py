@@ -11,10 +11,11 @@ from sentry_sdk import (
     capture_message,
     start_span,
     start_transaction,
+    continue_trace,
 )
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport
-from sentry_sdk.tracing import Transaction
+from tests.conftest import TestTransportWithOptions
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
@@ -40,9 +41,11 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
         span1, span2 = event["spans"]
         parent_span = event
+        assert span1["status"] == "internal_error"
         assert span1["tags"]["status"] == "internal_error"
         assert span1["op"] == "foo"
         assert span1["description"] == "foodesc"
+        assert "status" not in span2
         assert "status" not in span2.get("tags", {})
         assert span2["op"] == "bar"
         assert span2["description"] == "bardesc"
@@ -55,9 +58,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 @pytest.mark.parametrize("parent_sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_continue_from_headers(
-    sentry_init, capture_envelopes, parent_sampled, sample_rate
-):
+def test_continue_trace(sentry_init, capture_envelopes, parent_sampled, sample_rate):
     """
     Ensure data is actually passed along via headers, and that they are read
     correctly.
@@ -77,11 +78,12 @@ def test_continue_from_headers(
                 "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
                 "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
                 "sentry-sample_rate=0.01337, sentry-user_id=Amelie, "
+                "sentry-sample_rand=0.250000, "
                 "other-vendor-value-2=foo;bar;"
             )
 
     # child transaction, to prove that we can read 'sentry-trace' header data correctly
-    child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
+    child_transaction = continue_trace(headers, name="WRONG")
     assert child_transaction is not None
     assert child_transaction.parent_sampled == parent_sampled
     assert child_transaction.trace_id == old_span.trace_id
@@ -96,6 +98,7 @@ def test_continue_from_headers(
         "public_key": "49d0f7386ad645858ae85020e393bef3",
         "trace_id": "771a43a4192642f0b136d5159a501700",
         "user_id": "Amelie",
+        "sample_rand": "0.250000",
         "sample_rate": "0.01337",
     }
 
@@ -141,6 +144,7 @@ def test_continue_from_headers(
             "public_key": "49d0f7386ad645858ae85020e393bef3",
             "trace_id": "771a43a4192642f0b136d5159a501700",
             "user_id": "Amelie",
+            "sample_rand": "0.250000",
             "sample_rate": expected_sample_rate,
         }
 
@@ -170,14 +174,10 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
 
     # make sure transaction is sampled for both cases
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
-        transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+        transaction = continue_trace({}, name="Head SDK tx")
 
-    # will create empty mutable baggage
     baggage = transaction._baggage
-    assert baggage
-    assert baggage.mutable
-    assert baggage.sentry_items == {}
-    assert baggage.third_party_items == ""
+    assert baggage is None
 
     with start_transaction(transaction):
         with start_span(op="foo", name="foodesc"):
@@ -289,7 +289,7 @@ def test_start_span_after_finish(sentry_init, capture_events):
 def test_trace_propagation_meta_head_sdk(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="foo")
 
-    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+    transaction = continue_trace({}, name="Head SDK tx")
     meta = None
     span = None
 
@@ -332,6 +332,7 @@ def test_non_error_exceptions(
     event = events[0]
 
     span = event["spans"][0]
+    assert "status" not in span
     assert "status" not in span.get("tags", {})
     assert "status" not in event["tags"]
     assert event["contexts"]["trace"]["status"] == "ok"
@@ -357,6 +358,75 @@ def test_good_sysexit_doesnt_fail_transaction(
     event = events[0]
 
     span = event["spans"][0]
+    assert "status" not in span
     assert "status" not in span.get("tags", {})
     assert "status" not in event["tags"]
     assert event["contexts"]["trace"]["status"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "strict_trace_continuation,baggage_org_id,dsn_org_id,should_continue_trace",
+    (
+        (True, "sentry-org_id=1234", "o1234", True),
+        (True, "sentry-org_id=1234", "o9999", False),
+        (True, "sentry-org_id=9999", "o1234", False),
+        (False, "sentry-org_id=1234", "o1234", True),
+        (False, "sentry-org_id=9999", "o1234", False),
+        (False, "sentry-org_id=1234", "o9999", False),
+        (False, "sentry-org_id=1234", "not_org_id", True),
+        (False, "", "o1234", True),
+    ),
+)
+def test_continue_trace_strict_trace_continuation(
+    sentry_init,
+    strict_trace_continuation,
+    baggage_org_id,
+    dsn_org_id,
+    should_continue_trace,
+):
+    sentry_init(
+        dsn=f"https://mysecret@{dsn_org_id}.ingest.sentry.io/12312012",
+        strict_trace_continuation=strict_trace_continuation,
+        traces_sample_rate=1.0,
+        transport=TestTransportWithOptions,
+    )
+
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+        "baggage": (
+            "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+            f"{baggage_org_id}, "
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+            "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+        ),
+    }
+
+    transaction = continue_trace(headers, name="strict trace")
+
+    if should_continue_trace:
+        assert (
+            transaction.trace_id
+            == "771a43a4192642f0b136d5159a501700"
+            == "771a43a4192642f0b136d5159a501700"
+        )
+        assert transaction.parent_span_id == "1234567890abcdef"
+        assert transaction.parent_sampled
+    else:
+        assert (
+            transaction.trace_id
+            != "771a43a4192642f0b136d5159a501700"
+            == "771a43a4192642f0b136d5159a501700"
+        )
+        assert transaction.parent_span_id != "1234567890abcdef"
+        assert not transaction.parent_sampled
+
+
+def test_continue_trace_forces_new_traces_when_no_propagation(sentry_init):
+    """This is to make sure we don't have a long running trace because of TWP logic for the no propagation case."""
+
+    sentry_init(traces_sample_rate=1.0)
+
+    tx1 = continue_trace({}, name="tx1")
+    tx2 = continue_trace({}, name="tx2")
+
+    assert tx1.trace_id != tx2.trace_id

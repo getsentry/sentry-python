@@ -300,6 +300,7 @@ def test_tool_handler_with_error(sentry_init, capture_events):
 
     # Error flag should be set for tools
     assert span["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
+    assert span["status"] == "internal_error"
     assert span["tags"]["status"] == "internal_error"
 
 

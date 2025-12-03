@@ -403,6 +403,7 @@ def test_pregel_invoke_error(sentry_init, capture_events):
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
+    assert invoke_span.get("status") == "internal_error"
     assert invoke_span.get("tags", {}).get("status") == "internal_error"
 
 
@@ -436,6 +437,7 @@ def test_pregel_ainvoke_error(sentry_init, capture_events):
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
+    assert invoke_span.get("status") == "internal_error"
     assert invoke_span.get("tags", {}).get("status") == "internal_error"
 
 

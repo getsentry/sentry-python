@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         ContentListUnion,
         Tool,
         Model,
+        EmbedContentResponse,
     )
 
 
@@ -441,19 +442,14 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
     if kwargs.get("stream", False):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-    config = kwargs.get("config")
-
-    if config is None:
-        return
-
-    config = cast(GenerateContentConfig, config)
+    config = kwargs.get("config")  # type: Optional[GenerateContentConfig]
 
     # Set input messages/prompts if PII is allowed
     if should_send_default_pii() and integration.include_prompts:
         messages = []
 
         # Add system instruction if present
-        if hasattr(config, "system_instruction"):
+        if config and hasattr(config, "system_instruction"):
             system_instruction = config.system_instruction
             if system_instruction:
                 system_text = extract_contents_text(system_instruction)
@@ -495,7 +491,7 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
                 span.set_data(span_key, value)
 
     # Set tools if available
-    if hasattr(config, "tools"):
+    if config is not None and hasattr(config, "tools"):
         tools = config.tools
         if tools:
             formatted_tools = _format_tools_for_span(tools)
@@ -574,3 +570,70 @@ def prepare_generate_content_args(args, kwargs):
         kwargs["config"] = wrapped_config
 
     return model, contents, model_name
+
+
+def prepare_embed_content_args(args, kwargs):
+    # type: (tuple[Any, ...], dict[str, Any]) -> tuple[str, Any]
+    """Extract and prepare common arguments for embed_content methods.
+
+    Returns:
+        tuple: (model_name, contents)
+    """
+    model = kwargs.get("model", "unknown")
+    contents = kwargs.get("contents")
+    model_name = get_model_name(model)
+
+    return model_name, contents
+
+
+def set_span_data_for_embed_request(span, integration, contents, kwargs):
+    # type: (Span, Any, Any, dict[str, Any]) -> None
+    """Set span data for embedding request."""
+    # Include input contents if PII is allowed
+    if should_send_default_pii() and integration.include_prompts:
+        if contents:
+            # For embeddings, contents is typically a list of strings/texts
+            input_texts = []
+
+            # Handle various content formats
+            if isinstance(contents, str):
+                input_texts = [contents]
+            elif isinstance(contents, list):
+                for item in contents:
+                    text = extract_contents_text(item)
+                    if text:
+                        input_texts.append(text)
+            else:
+                text = extract_contents_text(contents)
+                if text:
+                    input_texts = [text]
+
+            if input_texts:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                    input_texts,
+                    unpack=False,
+                )
+
+
+def set_span_data_for_embed_response(span, integration, response):
+    # type: (Span, Any, EmbedContentResponse) -> None
+    """Set span data for embedding response."""
+    if not response:
+        return
+
+    # Extract token counts from embeddings statistics (Vertex AI only)
+    # Each embedding has its own statistics with token_count
+    if hasattr(response, "embeddings") and response.embeddings:
+        total_tokens = 0
+
+        for embedding in response.embeddings:
+            if hasattr(embedding, "statistics") and embedding.statistics:
+                token_count = getattr(embedding.statistics, "token_count", None)
+                if token_count is not None:
+                    total_tokens += int(token_count)
+
+        # Set token count if we found any
+        if total_tokens > 0:
+            span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, total_tokens)

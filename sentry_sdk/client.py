@@ -67,9 +67,10 @@ if TYPE_CHECKING:
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
-    from sentry_sdk.transport import Transport
+    from sentry_sdk.transport import Transport, Item
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher
+    from sentry_sdk.utils import Dsn
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
@@ -199,6 +200,11 @@ class BaseClient:
     @property
     def dsn(self):
         # type: () -> Optional[str]
+        return None
+
+    @property
+    def parsed_dsn(self):
+        # type: () -> Optional[Dsn]
         return None
 
     def should_send_default_pii(self):
@@ -354,12 +360,15 @@ class _Client(BaseClient):
 
         def _capture_envelope(envelope):
             # type: (Envelope) -> None
+            if self.spotlight is not None:
+                self.spotlight.capture_envelope(envelope)
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
         def _record_lost_event(
             reason,  # type: str
             data_category,  # type: EventDataCategory
+            item=None,  # type: Optional[Item]
             quantity=1,  # type: int
         ):
             # type: (...) -> None
@@ -367,6 +376,7 @@ class _Client(BaseClient):
                 self.transport.record_lost_event(
                     reason=reason,
                     data_category=data_category,
+                    item=item,
                     quantity=quantity,
                 )
 
@@ -378,6 +388,18 @@ class _Client(BaseClient):
             if self.transport:
                 if self.options["enable_backpressure_handling"]:
                     self.monitor = Monitor(self.transport)
+
+            # Setup Spotlight before creating batchers so _capture_envelope can use it.
+            # setup_spotlight handles all config/env var resolution per the SDK spec.
+            from sentry_sdk.spotlight import setup_spotlight
+
+            self.spotlight = setup_spotlight(self.options)
+            if self.spotlight is not None and not self.options["dsn"]:
+                sample_all = lambda *_args, **_kwargs: 1.0
+                self.options["send_default_pii"] = True
+                self.options["error_sampler"] = sample_all
+                self.options["traces_sampler"] = sample_all
+                self.options["profiles_sampler"] = sample_all
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
@@ -428,29 +450,6 @@ class _Client(BaseClient):
                 disabled_integrations=self.options["disabled_integrations"],
                 options=self.options,
             )
-
-            spotlight_config = self.options.get("spotlight")
-            if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
-                spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
-                spotlight_config = env_to_bool(spotlight_env_value, strict=True)
-                self.options["spotlight"] = (
-                    spotlight_config
-                    if spotlight_config is not None
-                    else spotlight_env_value
-                )
-
-            if self.options.get("spotlight"):
-                # This is intentionally here to prevent setting up spotlight
-                # stuff we don't need unless spotlight is explicitly enabled
-                from sentry_sdk.spotlight import setup_spotlight
-
-                self.spotlight = setup_spotlight(self.options)
-                if not self.options["dsn"]:
-                    sample_all = lambda *_args, **_kwargs: 1.0
-                    self.options["send_default_pii"] = True
-                    self.options["error_sampler"] = sample_all
-                    self.options["traces_sampler"] = sample_all
-                    self.options["profiles_sampler"] = sample_all
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name
@@ -509,6 +508,12 @@ class _Client(BaseClient):
         # type: () -> Optional[str]
         """Returns the configured DSN as string."""
         return self.options["dsn"]
+
+    @property
+    def parsed_dsn(self):
+        # type: () -> Optional[Dsn]
+        """Returns the configured parsed DSN object."""
+        return self.transport.parsed_dsn if self.transport else None
 
     def _prepare_event(
         self,

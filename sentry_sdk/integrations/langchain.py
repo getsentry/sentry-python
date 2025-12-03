@@ -443,7 +443,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             if generation is not None:
                 try:
-                    response_model = generation.generation_info.get("model_name")
+                    response_model = generation.message.response_metadata.get(
+                        "model_name"
+                    )
                     if response_model is not None:
                         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
                 except AttributeError:

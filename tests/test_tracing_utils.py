@@ -1,8 +1,13 @@
+import pytest
 from dataclasses import asdict, dataclass
 from typing import Optional, List
 
-from sentry_sdk.tracing_utils import _should_be_included, Baggage
-import pytest
+from sentry_sdk.tracing_utils import (
+    _should_be_included,
+    _should_continue_trace,
+    Baggage,
+)
+from tests.conftest import TestTransportWithOptions
 
 
 def id_function(val):
@@ -146,3 +151,130 @@ def test_strip_sentry_baggage(header, expected):
 )
 def test_baggage_repr(baggage, expected_repr):
     assert repr(baggage) == expected_repr
+
+
+@pytest.mark.parametrize(
+    (
+        "baggage_header",
+        "dsn",
+        "explicit_org_id",
+        "strict_trace_continuation",
+        "should_continue_trace",
+    ),
+    (
+        # continue cases when strict_trace_continuation=False
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            "https://mysecret@o1234.ingest.sentry.io/12312012",
+            None,
+            False,
+            True,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700",
+            "https://mysecret@o1234.ingest.sentry.io/12312012",
+            None,
+            False,
+            True,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            None,
+            None,
+            False,
+            True,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            None,
+            "1234",
+            False,
+            True,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            "https://mysecret@not_org_id.ingest.sentry.io/12312012",
+            None,
+            False,
+            True,
+        ),
+        # start new cases when strict_trace_continuation=False
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            "https://mysecret@o9999.ingest.sentry.io/12312012",
+            None,
+            False,
+            False,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            "https://mysecret@o1234.ingest.sentry.io/12312012",
+            "9999",
+            False,
+            False,
+        ),
+        # continue cases when strict_trace_continuation=True
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            "https://mysecret@o1234.ingest.sentry.io/12312012",
+            None,
+            True,
+            True,
+        ),
+        ("sentry-trace_id=771a43a4192642f0b136d5159a501700", None, None, True, True),
+        # start new cases when strict_trace_continuation=True
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700",
+            "https://mysecret@o1234.ingest.sentry.io/12312012",
+            None,
+            True,
+            False,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            None,
+            None,
+            True,
+            False,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            "https://mysecret@not_org_id.ingest.sentry.io/12312012",
+            None,
+            True,
+            False,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            "https://mysecret@o9999.ingest.sentry.io/12312012",
+            None,
+            True,
+            False,
+        ),
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700, sentry-org_id=1234",
+            "https://mysecret@o1234.ingest.sentry.io/12312012",
+            "9999",
+            True,
+            False,
+        ),
+    ),
+)
+def test_should_continue_trace(
+    sentry_init,
+    baggage_header,
+    dsn,
+    explicit_org_id,
+    strict_trace_continuation,
+    should_continue_trace,
+):
+    sentry_init(
+        dsn=dsn,
+        org_id=explicit_org_id,
+        strict_trace_continuation=strict_trace_continuation,
+        traces_sample_rate=1.0,
+        transport=TestTransportWithOptions,
+    )
+
+    baggage = Baggage.from_incoming_header(baggage_header) if baggage_header else None
+    assert _should_continue_trace(baggage) == should_continue_trace

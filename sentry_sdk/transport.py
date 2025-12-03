@@ -70,7 +70,7 @@ class Transport(ABC):
         # type: (Self, Optional[Dict[str, Any]]) -> None
         self.options = options
         if options and options["dsn"] is not None and options["dsn"]:
-            self.parsed_dsn = Dsn(options["dsn"])
+            self.parsed_dsn = Dsn(options["dsn"], options.get("org_id"))
         else:
             self.parsed_dsn = None
 
@@ -265,6 +265,11 @@ class BaseHttpTransport(Transport):
                     len(cast(List[Dict[str, object]], event.get("spans") or [])) + 1
                 )
                 self.record_lost_event(reason, "span", quantity=span_count)
+
+            elif data_category == "log_item" and item:
+                # Also record size of lost logs in bytes
+                bytes_size = len(item.get_bytes())
+                self.record_lost_event(reason, "log_byte", quantity=bytes_size)
 
             elif data_category == "attachment":
                 # quantity of 0 is actually 1 as we do not want to count

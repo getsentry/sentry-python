@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agents import Agent
-    from typing import Any
+    from typing import Any, Optional
 
 
 def ai_client_span(agent, get_response_kwargs):
@@ -35,8 +35,14 @@ def ai_client_span(agent, get_response_kwargs):
     return span
 
 
-def update_ai_client_span(span, agent, get_response_kwargs, result):
-    # type: (sentry_sdk.tracing.Span, Agent, dict[str, Any], Any) -> None
+def update_ai_client_span(
+    span, agent, get_response_kwargs, result, response_model=None
+):
+    # type: (sentry_sdk.tracing.Span, Agent, dict[str, Any], Any, Optional[str]) -> None
     _set_usage_data(span, result.usage)
     _set_output_data(span, result)
     _create_mcp_execute_tool_spans(span, result)
+
+    # Set response model if captured from raw response
+    if response_model is not None:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
