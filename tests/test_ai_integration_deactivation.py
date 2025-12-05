@@ -2,8 +2,6 @@ import pytest
 
 from sentry_sdk import get_client
 from sentry_sdk.integrations import _INTEGRATION_DEACTIVATES
-from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
-from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 
 
 try:
@@ -28,8 +26,29 @@ except Exception:
     has_anthropic = False
 
 
+try:
+    from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+
+    has_openai_agents = True
+except Exception:
+    has_openai_agents = False
+
+try:
+    from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+
+    has_pydantic_ai = True
+except Exception:
+    has_pydantic_ai = False
+
+
 pytestmark = pytest.mark.skipif(
-    not (has_langchain and has_openai and has_anthropic),
+    not (
+        has_langchain
+        and has_openai
+        and has_anthropic
+        and has_openai_agents
+        and has_pydantic_ai
+    ),
     reason="Requires langchain, openai, and anthropic packages to be installed",
 )
 
