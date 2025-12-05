@@ -61,6 +61,7 @@ def test_integration_deactivates_map_exists():
     assert "openai" in _INTEGRATION_DEACTIVATES["openai_agents"]
     assert "pydantic_ai" in _INTEGRATION_DEACTIVATES
     assert "openai" in _INTEGRATION_DEACTIVATES["pydantic_ai"]
+    assert "anthropic" in _INTEGRATION_DEACTIVATES["pydantic_ai"]
 
 
 def test_langchain_auto_deactivates_openai_and_anthropic(
