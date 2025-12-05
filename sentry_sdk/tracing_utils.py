@@ -109,6 +109,14 @@ def has_tracing_enabled(options):
     )
 
 
+def has_span_streaming_enabled(options):
+    # type: (Optional[Dict[str, Any]]) -> bool
+    if options is None:
+        return False
+
+    return (options.get("_experiments") or {}).get("trace_lifecycle") == "stream"
+
+
 @contextlib.contextmanager
 def record_sql_queries(
     cursor,  # type: Any
