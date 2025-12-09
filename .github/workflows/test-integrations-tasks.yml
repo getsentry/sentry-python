@@ -45,7 +45,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: Start Redis
-        uses: supercharge/redis-github-action@v2
+        uses: supercharge/redis-github-action@2
       - name: Install Java
         uses: actions/setup-java@v5
         with:
