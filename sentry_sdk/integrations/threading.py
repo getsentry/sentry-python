@@ -31,8 +31,9 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(self, propagate_hub=None, propagate_scope=True):
-        # type: (Optional[bool], bool) -> None
+    def __init__(
+        self, propagate_hub: "Optional[bool]" = None, propagate_scope: bool = True
+    ) -> None:
         if propagate_hub is not None:
             logger.warning(
                 "Deprecated: propagate_hub is deprecated. This will be removed in the future."
@@ -48,8 +49,7 @@ class ThreadingIntegration(Integration):
             self.propagate_scope = propagate_hub
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         old_start = Thread.start
 
         try:
@@ -71,8 +71,7 @@ class ThreadingIntegration(Integration):
         )
 
         @wraps(old_start)
-        def sentry_start(self, *a, **kw):
-            # type: (Thread, *Any, **Any) -> Any
+        def sentry_start(self: "Thread", *a: "Any", **kw: "Any") -> "Any":
             integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
             if integration is None:
                 return old_start(self, *a, **kw)
@@ -118,13 +117,14 @@ class ThreadingIntegration(Integration):
         )
 
 
-def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
-    # type: (Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope], F) -> F
+def _wrap_run(
+    isolation_scope_to_use: "Optional[sentry_sdk.Scope]",
+    current_scope_to_use: "Optional[sentry_sdk.Scope]",
+    old_run_func: "F",
+) -> "F":
     @wraps(old_run_func)
-    def run(*a, **kw):
-        # type: (*Any, **Any) -> Any
-        def _run_old_run_func():
-            # type: () -> Any
+    def run(*a: Any, **kw: Any) -> Any:
+        def _run_old_run_func() -> Any:
             try:
                 self = current_thread()
                 return old_run_func(self, *a[1:], **kw)
@@ -141,15 +141,20 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
     return run  # type: ignore
 
 
-def _wrap_threadpool_executor_submit(func, is_async_emulated_with_threads):
-    # type: (Callable[..., Future[T]], bool) -> Callable[..., Future[T]]
+def _wrap_threadpool_executor_submit(
+    func: "Callable[..., Future[T]]", is_async_emulated_with_threads: bool
+) -> "Callable[..., Future[T]]":
     """
     Wrap submit call to propagate scopes on task submission.
     """
 
     @wraps(func)
-    def sentry_submit(self, fn, *args, **kwargs):
-        # type: (ThreadPoolExecutor, Callable[..., T], *Any, **Any) -> Future[T]
+    def sentry_submit(
+        self: "ThreadPoolExecutor",
+        fn: "Callable[..., T]",
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> "Future[T]":
         integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
         if integration is None:
             return func(self, fn, *args, **kwargs)
@@ -164,8 +169,7 @@ def _wrap_threadpool_executor_submit(func, is_async_emulated_with_threads):
             isolation_scope = None
             current_scope = None
 
-        def wrapped_fn(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
+        def wrapped_fn(*args: "Any", **kwargs: "Any") -> "Any":
             if isolation_scope is not None and current_scope is not None:
                 with use_isolation_scope(isolation_scope):
                     with use_scope(current_scope):
@@ -178,8 +182,7 @@ def _wrap_threadpool_executor_submit(func, is_async_emulated_with_threads):
     return sentry_submit
 
 
-def _capture_exception():
-    # type: () -> ExcInfo
+def _capture_exception() -> "ExcInfo":
     exc_info = sys.exc_info()
 
     client = sentry_sdk.get_client()

@@ -31,13 +31,12 @@ class Attachment:
 
     def __init__(
         self,
-        bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
-        filename=None,  # type: Optional[str]
-        path=None,  # type: Optional[str]
-        content_type=None,  # type: Optional[str]
-        add_to_transactions=False,  # type: bool
-    ):
-        # type: (...) -> None
+        bytes: "Union[None, bytes, Callable[[], bytes]]" = None,
+        filename: "Optional[str]" = None,
+        path: "Optional[str]" = None,
+        content_type: "Optional[str]" = None,
+        add_to_transactions: bool = False,
+    ) -> None:
         if bytes is None and path is None:
             raise TypeError("path or raw bytes required for attachment")
         if filename is None and path is not None:
@@ -52,10 +51,9 @@ class Attachment:
         self.content_type = content_type
         self.add_to_transactions = add_to_transactions
 
-    def to_envelope_item(self):
-        # type: () -> Item
+    def to_envelope_item(self) -> "Item":
         """Returns an envelope item for this attachment."""
-        payload = None  # type: Union[None, PayloadRef, bytes]
+        payload: "Union[None, PayloadRef, bytes]" = None
         if self.bytes is not None:
             if callable(self.bytes):
                 payload = self.bytes()
@@ -70,6 +68,5 @@ class Attachment:
             filename=self.filename,
         )
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return "<Attachment %r>" % (self.filename,)

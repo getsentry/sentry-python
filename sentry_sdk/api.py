@@ -43,8 +43,7 @@ if TYPE_CHECKING:
     F = TypeVar("F", bound=Callable[..., Any])
 else:
 
-    def overload(x):
-        # type: (T) -> T
+    def overload(x: "T") -> "T":
         return x
 
 
@@ -89,8 +88,7 @@ __all__ = [
 ]
 
 
-def scopemethod(f):
-    # type: (F) -> F
+def scopemethod(f: "F") -> "F":
     f.__doc__ = "%s\n\n%s" % (
         "Alias for :py:meth:`sentry_sdk.Scope.%s`" % f.__name__,
         inspect.getdoc(getattr(Scope, f.__name__)),
@@ -98,8 +96,7 @@ def scopemethod(f):
     return f
 
 
-def clientmethod(f):
-    # type: (F) -> F
+def clientmethod(f: "F") -> "F":
     f.__doc__ = "%s\n\n%s" % (
         "Alias for :py:meth:`sentry_sdk.Client.%s`" % f.__name__,
         inspect.getdoc(getattr(Client, f.__name__)),
@@ -108,13 +105,11 @@ def clientmethod(f):
 
 
 @scopemethod
-def get_client():
-    # type: () -> BaseClient
+def get_client() -> "BaseClient":
     return Scope.get_client()
 
 
-def is_initialized():
-    # type: () -> bool
+def is_initialized() -> bool:
     """
     .. versionadded:: 2.0.0
 
@@ -128,26 +123,22 @@ def is_initialized():
 
 
 @scopemethod
-def get_global_scope():
-    # type: () -> Scope
+def get_global_scope() -> "Scope":
     return Scope.get_global_scope()
 
 
 @scopemethod
-def get_isolation_scope():
-    # type: () -> Scope
+def get_isolation_scope() -> "Scope":
     return Scope.get_isolation_scope()
 
 
 @scopemethod
-def get_current_scope():
-    # type: () -> Scope
+def get_current_scope() -> "Scope":
     return Scope.get_current_scope()
 
 
 @scopemethod
-def last_event_id():
-    # type: () -> Optional[str]
+def last_event_id() -> "Optional[str]":
     """
     See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding
     this method's limitations.
@@ -157,23 +148,21 @@ def last_event_id():
 
 @scopemethod
 def capture_event(
-    event,  # type: Event
-    hint=None,  # type: Optional[Hint]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    event: "Event",
+    hint: "Optional[Hint]" = None,
+    scope: "Optional[Any]" = None,
+    **scope_kwargs: "Any",
+) -> "Optional[str]":
     return get_current_scope().capture_event(event, hint, scope=scope, **scope_kwargs)
 
 
 @scopemethod
 def capture_message(
-    message,  # type: str
-    level=None,  # type: Optional[LogLevelStr]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    message: str,
+    level: "Optional[LogLevelStr]" = None,
+    scope: "Optional[Any]" = None,
+    **scope_kwargs: "Any",
+) -> "Optional[str]":
     return get_current_scope().capture_message(
         message, level, scope=scope, **scope_kwargs
     )
@@ -181,23 +170,21 @@ def capture_message(
 
 @scopemethod
 def capture_exception(
-    error=None,  # type: Optional[Union[BaseException, ExcInfo]]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    error: "Optional[Union[BaseException, ExcInfo]]" = None,
+    scope: "Optional[Any]" = None,
+    **scope_kwargs: "Any",
+) -> "Optional[str]":
     return get_current_scope().capture_exception(error, scope=scope, **scope_kwargs)
 
 
 @scopemethod
 def add_attachment(
-    bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
-    filename=None,  # type: Optional[str]
-    path=None,  # type: Optional[str]
-    content_type=None,  # type: Optional[str]
-    add_to_transactions=False,  # type: bool
-):
-    # type: (...) -> None
+    bytes: "Union[None, bytes, Callable[[], bytes]]" = None,
+    filename: "Optional[str]" = None,
+    path: "Optional[str]" = None,
+    content_type: "Optional[str]" = None,
+    add_to_transactions: bool = False,
+) -> None:
     return get_isolation_scope().add_attachment(
         bytes, filename, path, content_type, add_to_transactions
     )
@@ -205,32 +192,28 @@ def add_attachment(
 
 @scopemethod
 def add_breadcrumb(
-    crumb=None,  # type: Optional[Breadcrumb]
-    hint=None,  # type: Optional[BreadcrumbHint]
-    **kwargs,  # type: Any
-):
-    # type: (...) -> None
+    crumb: "Optional[Breadcrumb]" = None,
+    hint: "Optional[BreadcrumbHint]" = None,
+    **kwargs: "Any",
+) -> None:
     return get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
 
 @overload
-def configure_scope():
-    # type: () -> ContextManager[Scope]
+def configure_scope() -> "ContextManager[Scope]":
     pass
 
 
 @overload
 def configure_scope(  # noqa: F811
-    callback,  # type: Callable[[Scope], None]
-):
-    # type: (...) -> None
+    callback: "Callable[[Scope], None]",
+) -> None:
     pass
 
 
 def configure_scope(  # noqa: F811
-    callback=None,  # type: Optional[Callable[[Scope], None]]
-):
-    # type: (...) -> Optional[ContextManager[Scope]]
+    callback: "Optional[Callable[[Scope], None]]" = None,
+) -> "Optional[ContextManager[Scope]]":
     """
     Reconfigures the scope.
 
@@ -256,31 +239,27 @@ def configure_scope(  # noqa: F811
         return None
 
     @contextmanager
-    def inner():
-        # type: () -> Generator[Scope, None, None]
+    def inner() -> "Generator[Scope, None, None]":
         yield scope
 
     return inner()
 
 
 @overload
-def push_scope():
-    # type: () -> ContextManager[Scope]
+def push_scope() -> "ContextManager[Scope]":
     pass
 
 
 @overload
 def push_scope(  # noqa: F811
-    callback,  # type: Callable[[Scope], None]
-):
-    # type: (...) -> None
+    callback: "Callable[[Scope], None]",
+) -> None:
     pass
 
 
 def push_scope(  # noqa: F811
-    callback=None,  # type: Optional[Callable[[Scope], None]]
-):
-    # type: (...) -> Optional[ContextManager[Scope]]
+    callback: "Optional[Callable[[Scope], None]]" = None,
+) -> "Optional[ContextManager[Scope]]":
     """
     Pushes a new layer on the scope stack.
 
@@ -309,66 +288,57 @@ def push_scope(  # noqa: F811
 
 
 @scopemethod
-def set_tag(key, value):
-    # type: (str, Any) -> None
+def set_tag(key: str, value: "Any") -> None:
     return get_isolation_scope().set_tag(key, value)
 
 
 @scopemethod
-def set_tags(tags):
-    # type: (Mapping[str, object]) -> None
+def set_tags(tags: "Mapping[str, object]") -> None:
     return get_isolation_scope().set_tags(tags)
 
 
 @scopemethod
-def set_context(key, value):
-    # type: (str, Dict[str, Any]) -> None
+def set_context(key: str, value: "Dict[str, Any]") -> None:
     return get_isolation_scope().set_context(key, value)
 
 
 @scopemethod
-def set_extra(key, value):
-    # type: (str, Any) -> None
+def set_extra(key: str, value: "Any") -> None:
     return get_isolation_scope().set_extra(key, value)
 
 
 @scopemethod
-def set_user(value):
-    # type: (Optional[Dict[str, Any]]) -> None
+def set_user(value: "Optional[Dict[str, Any]]") -> None:
     return get_isolation_scope().set_user(value)
 
 
 @scopemethod
-def set_level(value):
-    # type: (LogLevelStr) -> None
+def set_level(value: "LogLevelStr") -> None:
     return get_isolation_scope().set_level(value)
 
 
 @clientmethod
 def flush(
-    timeout=None,  # type: Optional[float]
-    callback=None,  # type: Optional[Callable[[int, float], None]]
-):
-    # type: (...) -> None
+    timeout: "Optional[float]" = None,
+    callback: "Optional[Callable[[int, float], None]]" = None,
+) -> None:
     return get_client().flush(timeout=timeout, callback=callback)
 
 
 @scopemethod
 def start_span(
-    **kwargs,  # type: Any
-):
-    # type: (...) -> Span
+    **kwargs: "Any",
+) -> "Span":
     return get_current_scope().start_span(**kwargs)
 
 
 @scopemethod
 def start_transaction(
-    transaction=None,  # type: Optional[Transaction]
-    instrumenter=INSTRUMENTER.SENTRY,  # type: str
-    custom_sampling_context=None,  # type: Optional[SamplingContext]
-    **kwargs,  # type: Unpack[TransactionKwargs]
-):
-    # type: (...) -> Union[Transaction, NoOpSpan]
+    transaction: "Optional[Transaction]" = None,
+    instrumenter: str = INSTRUMENTER.SENTRY,
+    custom_sampling_context: "Optional[SamplingContext]" = None,
+    **kwargs: "Unpack[TransactionKwargs]",
+) -> "Union[Transaction, NoOpSpan]":
     """
     Start and return a transaction on the current scope.
 
@@ -405,8 +375,7 @@ def start_transaction(
     )
 
 
-def set_measurement(name, value, unit=""):
-    # type: (str, float, MeasurementUnit) -> None
+def set_measurement(name: str, value: float, unit: "MeasurementUnit" = "") -> None:
     """
     .. deprecated:: 2.28.0
         This function is deprecated and will be removed in the next major release.
@@ -416,24 +385,21 @@ def set_measurement(name, value, unit=""):
         transaction.set_measurement(name, value, unit)
 
 
-def get_current_span(scope=None):
-    # type: (Optional[Scope]) -> Optional[Span]
+def get_current_span(scope: "Optional[Scope]" = None) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
     return tracing_utils.get_current_span(scope)
 
 
-def get_traceparent():
-    # type: () -> Optional[str]
+def get_traceparent() -> "Optional[str]":
     """
     Returns the traceparent either from the active span or from the scope.
     """
     return get_current_scope().get_traceparent()
 
 
-def get_baggage():
-    # type: () -> Optional[str]
+def get_baggage() -> "Optional[str]":
     """
     Returns Baggage either from the active span or from the scope.
     """
@@ -445,9 +411,12 @@ def get_baggage():
 
 
 def continue_trace(
-    environ_or_headers, op=None, name=None, source=None, origin="manual"
-):
-    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+    environ_or_headers: "Dict[str, Any]",
+    op: "Optional[str]" = None,
+    name: "Optional[str]" = None,
+    source: "Optional[str]" = None,
+    origin: str = "manual",
+) -> "Transaction":
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """
@@ -458,26 +427,27 @@ def continue_trace(
 
 @scopemethod
 def start_session(
-    session_mode="application",  # type: str
-):
-    # type: (...) -> None
+    session_mode: str = "application",
+) -> None:
     return get_isolation_scope().start_session(session_mode=session_mode)
 
 
 @scopemethod
-def end_session():
-    # type: () -> None
+def end_session() -> None:
     return get_isolation_scope().end_session()
 
 
 @scopemethod
-def set_transaction_name(name, source=None):
-    # type: (str, Optional[str]) -> None
+def set_transaction_name(name: str, source: "Optional[str]" = None) -> None:
     return get_current_scope().set_transaction_name(name, source)
 
 
-def update_current_span(op=None, name=None, attributes=None, data=None):
-    # type: (Optional[str], Optional[str], Optional[dict[str, Union[str, int, float, bool]]], Optional[dict[str, Any]]) -> None
+def update_current_span(
+    op: "Optional[str]" = None,
+    name: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Union[str, int, float, bool]]]" = None,
+    data: "Optional[dict[str, Any]]" = None,
+) -> None:
     """
     Update the current active span with the provided parameters.
 

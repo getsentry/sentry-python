@@ -27,8 +27,7 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc: "Any") -> None:
     set_span_errored()
 
     event, hint = event_from_exception(
@@ -39,8 +38,7 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _record_exception_on_span(span, error):
-    # type: (Span, Exception) -> Any
+def _record_exception_on_span(span: "Span", error: Exception) -> "Any":
     set_span_errored(span)
     span.set_data("span.status", "error")
 
@@ -53,8 +51,7 @@ def _record_exception_on_span(span, error):
             span.set_data("error.message", error_message)
 
 
-def _set_agent_data(span, agent):
-    # type: (sentry_sdk.tracing.Span, agents.Agent) -> None
+def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "agents.Agent") -> None:
     span.set_data(
         SPANDATA.GEN_AI_SYSTEM, "openai"
     )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
@@ -97,8 +94,7 @@ def _set_agent_data(span, agent):
         )
 
 
-def _set_usage_data(span, usage):
-    # type: (sentry_sdk.tracing.Span, Usage) -> None
+def _set_usage_data(span: "sentry_sdk.tracing.Span", usage: "Usage") -> None:
     span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
     span.set_data(
         SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
@@ -112,8 +108,9 @@ def _set_usage_data(span, usage):
     span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
 
 
-def _set_input_data(span, get_response_kwargs):
-    # type: (sentry_sdk.tracing.Span, dict[str, Any]) -> None
+def _set_input_data(
+    span: "sentry_sdk.tracing.Span", get_response_kwargs: "dict[str, Any]"
+) -> None:
     if not should_send_default_pii():
         return
     request_messages = []
@@ -169,15 +166,14 @@ def _set_input_data(span, get_response_kwargs):
         )
 
 
-def _set_output_data(span, result):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _set_output_data(span: "sentry_sdk.tracing.Span", result: "Any") -> None:
     if not should_send_default_pii():
         return
 
-    output_messages = {
+    output_messages: "dict[str, list[Any]]" = {
         "response": [],
         "tool": [],
-    }  # type: (dict[str, list[Any]])
+    }
 
     for output in result.output:
         if output.type == "function_call":
@@ -201,8 +197,9 @@ def _set_output_data(span, result):
         )
 
 
-def _create_mcp_execute_tool_spans(span, result):
-    # type: (sentry_sdk.tracing.Span, agents.Result) -> None
+def _create_mcp_execute_tool_spans(
+    span: "sentry_sdk.tracing.Span", result: "agents.Result"
+) -> None:
     for output in result.output:
         if output.__class__.__name__ == "McpCall":
             with sentry_sdk.start_span(

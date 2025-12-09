@@ -50,8 +50,9 @@ class UsageData(TypedDict):
     total_tokens: int
 
 
-def extract_usage_data(response):
-    # type: (Union[GenerateContentResponse, dict[str, Any]]) -> UsageData
+def extract_usage_data(
+    response: "Union[GenerateContentResponse, dict[str, Any]]",
+) -> "UsageData":
     """Extract usage data from response into a structured format.
 
     Args:
@@ -124,8 +125,7 @@ def extract_usage_data(response):
     return usage_data
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc: "Any") -> None:
     """Capture exception with Google GenAI mechanism."""
     event, hint = event_from_exception(
         exc,
@@ -135,8 +135,7 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def get_model_name(model):
-    # type: (Union[str, Model]) -> str
+def get_model_name(model: "Union[str, Model]") -> str:
     """Extract model name from model parameter."""
     if isinstance(model, str):
         return model
@@ -146,8 +145,7 @@ def get_model_name(model):
     return str(model)
 
 
-def extract_contents_text(contents):
-    # type: (ContentListUnion) -> Optional[str]
+def extract_contents_text(contents: "ContentListUnion") -> "Optional[str]":
     """Extract text from contents parameter which can have various formats."""
     if contents is None:
         return None
@@ -185,8 +183,9 @@ def extract_contents_text(contents):
     return None
 
 
-def _format_tools_for_span(tools):
-    # type: (Iterable[Tool | Callable[..., Any]]) -> Optional[List[dict[str, Any]]]
+def _format_tools_for_span(
+    tools: "Iterable[Tool | Callable[..., Any]]",
+) -> "Optional[List[dict[str, Any]]]":
     """Format tools parameter for span data."""
     formatted_tools = []
     for tool in tools:
@@ -226,8 +225,9 @@ def _format_tools_for_span(tools):
     return formatted_tools if formatted_tools else None
 
 
-def extract_tool_calls(response):
-    # type: (GenerateContentResponse) -> Optional[List[dict[str, Any]]]
+def extract_tool_calls(
+    response: "GenerateContentResponse",
+) -> "Optional[List[dict[str, Any]]]":
     """Extract tool/function calls from response candidates and automatic function calling history."""
 
     tool_calls = []
@@ -278,8 +278,9 @@ def extract_tool_calls(response):
     return tool_calls if tool_calls else None
 
 
-def _capture_tool_input(args, kwargs, tool):
-    # type: (tuple[Any, ...], dict[str, Any], Tool) -> dict[str, Any]
+def _capture_tool_input(
+    args: "tuple[Any, ...]", kwargs: "dict[str, Any]", tool: "Tool"
+) -> "dict[str, Any]":
     """Capture tool input from args and kwargs."""
     tool_input = kwargs.copy() if kwargs else {}
 
@@ -298,8 +299,7 @@ def _capture_tool_input(args, kwargs, tool):
     return tool_input
 
 
-def _create_tool_span(tool_name, tool_doc):
-    # type: (str, Optional[str]) -> Span
+def _create_tool_span(tool_name: str, tool_doc: "Optional[str]") -> "Span":
     """Create a span for tool execution."""
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_EXECUTE_TOOL,
@@ -313,8 +313,7 @@ def _create_tool_span(tool_name, tool_doc):
     return span
 
 
-def wrapped_tool(tool):
-    # type: (Tool | Callable[..., Any]) -> Tool | Callable[..., Any]
+def wrapped_tool(tool: "Tool | Callable[..., Any]") -> "Tool | Callable[..., Any]":
     """Wrap a tool to emit execute_tool spans when called."""
     if not callable(tool):
         # Not a callable function, return as-is (predefined tools)
@@ -326,8 +325,7 @@ def wrapped_tool(tool):
     if inspect.iscoroutinefunction(tool):
         # Async function
         @wraps(tool)
-        async def async_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+        async def async_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             with _create_tool_span(tool_name, tool_doc) as span:
                 # Capture tool input
                 tool_input = _capture_tool_input(args, kwargs, tool)
@@ -354,8 +352,7 @@ def wrapped_tool(tool):
     else:
         # Sync function
         @wraps(tool)
-        def sync_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+        def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             with _create_tool_span(tool_name, tool_doc) as span:
                 # Capture tool input
                 tool_input = _capture_tool_input(args, kwargs, tool)
@@ -381,8 +378,9 @@ def wrapped_tool(tool):
         return sync_wrapped
 
 
-def wrapped_config_with_tools(config):
-    # type: (GenerateContentConfig) -> GenerateContentConfig
+def wrapped_config_with_tools(
+    config: "GenerateContentConfig",
+) -> "GenerateContentConfig":
     """Wrap tools in config to emit execute_tool spans. Tools are sometimes passed directly as
     callable functions as a part of the config object."""
 
@@ -395,8 +393,9 @@ def wrapped_config_with_tools(config):
     return result
 
 
-def _extract_response_text(response):
-    # type: (GenerateContentResponse) -> Optional[List[str]]
+def _extract_response_text(
+    response: "GenerateContentResponse",
+) -> "Optional[List[str]]":
     """Extract text from response candidates."""
 
     if not response or not getattr(response, "candidates", []):
@@ -414,8 +413,9 @@ def _extract_response_text(response):
     return texts if texts else None
 
 
-def extract_finish_reasons(response):
-    # type: (GenerateContentResponse) -> Optional[List[str]]
+def extract_finish_reasons(
+    response: "GenerateContentResponse",
+) -> "Optional[List[str]]":
     """Extract finish reasons from response candidates."""
     if not response or not getattr(response, "candidates", []):
         return None
@@ -433,8 +433,13 @@ def extract_finish_reasons(response):
     return finish_reasons if finish_reasons else None
 
 
-def set_span_data_for_request(span, integration, model, contents, kwargs):
-    # type: (Span, Any, str, ContentListUnion, dict[str, Any]) -> None
+def set_span_data_for_request(
+    span: "Span",
+    integration: "Any",
+    model: str,
+    contents: "ContentListUnion",
+    kwargs: "dict[str, Any]",
+) -> None:
     """Set span data for the request."""
     span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
     span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
@@ -442,7 +447,7 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
     if kwargs.get("stream", False):
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-    config = kwargs.get("config")  # type: Optional[GenerateContentConfig]
+    config: "Optional[GenerateContentConfig]" = kwargs.get("config")
 
     # Set input messages/prompts if PII is allowed
     if should_send_default_pii() and integration.include_prompts:
@@ -504,8 +509,9 @@ def set_span_data_for_request(span, integration, model, contents, kwargs):
                 )
 
 
-def set_span_data_for_response(span, integration, response):
-    # type: (Span, Any, GenerateContentResponse) -> None
+def set_span_data_for_response(
+    span: "Span", integration: "Any", response: "GenerateContentResponse"
+) -> None:
     """Set span data for the response."""
     if not response:
         return
@@ -557,8 +563,9 @@ def set_span_data_for_response(span, integration, response):
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"])
 
 
-def prepare_generate_content_args(args, kwargs):
-    # type: (tuple[Any, ...], dict[str, Any]) -> tuple[Any, Any, str]
+def prepare_generate_content_args(
+    args: "tuple[Any, ...]", kwargs: "dict[str, Any]"
+) -> "tuple[Any, Any, str]":
     """Extract and prepare common arguments for generate_content methods."""
     model = args[0] if args else kwargs.get("model", "unknown")
     contents = args[1] if len(args) > 1 else kwargs.get("contents")
@@ -572,8 +579,9 @@ def prepare_generate_content_args(args, kwargs):
     return model, contents, model_name
 
 
-def prepare_embed_content_args(args, kwargs):
-    # type: (tuple[Any, ...], dict[str, Any]) -> tuple[str, Any]
+def prepare_embed_content_args(
+    args: "tuple[Any, ...]", kwargs: "dict[str, Any]"
+) -> "tuple[str, Any]":
     """Extract and prepare common arguments for embed_content methods.
 
     Returns:
@@ -586,8 +594,9 @@ def prepare_embed_content_args(args, kwargs):
     return model_name, contents
 
 
-def set_span_data_for_embed_request(span, integration, contents, kwargs):
-    # type: (Span, Any, Any, dict[str, Any]) -> None
+def set_span_data_for_embed_request(
+    span: "Span", integration: "Any", contents: "Any", kwargs: "dict[str, Any]"
+) -> None:
     """Set span data for embedding request."""
     # Include input contents if PII is allowed
     if should_send_default_pii() and integration.include_prompts:
@@ -617,8 +626,9 @@ def set_span_data_for_embed_request(span, integration, contents, kwargs):
                 )
 
 
-def set_span_data_for_embed_response(span, integration, response):
-    # type: (Span, Any, EmbedContentResponse) -> None
+def set_span_data_for_embed_response(
+    span: "Span", integration: "Any", response: "EmbedContentResponse"
+) -> None:
     """Set span data for embedding response."""
     if not response:
         return

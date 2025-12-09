@@ -1,65 +1,64 @@
 import warnings
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 from sentry_sdk import (
     get_client,
+    get_current_scope,
     get_global_scope,
     get_isolation_scope,
-    get_current_scope,
 )
 from sentry_sdk._compat import with_metaclass
+from sentry_sdk.client import Client
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import _ScopeManager
-from sentry_sdk.client import Client
 from sentry_sdk.tracing import (
     NoOpSpan,
     Span,
     Transaction,
 )
-
 from sentry_sdk.utils import (
-    logger,
     ContextVar,
+    logger,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import ContextManager
-    from typing import Dict
-    from typing import Generator
-    from typing import List
-    from typing import Optional
-    from typing import overload
-    from typing import Tuple
-    from typing import Type
-    from typing import TypeVar
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Generator,
+        List,
+        Optional,
+        Tuple,
+        Type,
+        TypeVar,
+        Union,
+        overload,
+    )
 
     from typing_extensions import Unpack
 
-    from sentry_sdk.scope import Scope
-    from sentry_sdk.client import BaseClient
-    from sentry_sdk.integrations import Integration
     from sentry_sdk._types import (
-        Event,
-        Hint,
         Breadcrumb,
         BreadcrumbHint,
+        Event,
         ExcInfo,
+        Hint,
         LogLevelStr,
         SamplingContext,
     )
+    from sentry_sdk.client import BaseClient
+    from sentry_sdk.integrations import Integration
+    from sentry_sdk.scope import Scope
     from sentry_sdk.tracing import TransactionKwargs
 
     T = TypeVar("T")
 
 else:
 
-    def overload(x):
-        # type: (T) -> T
+    def overload(x: "T") -> "T":
         return x
 
 
@@ -75,14 +74,12 @@ class SentryHubDeprecationWarning(DeprecationWarning):
         "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x"
     )
 
-    def __init__(self, *_):
-        # type: (*object) -> None
+    def __init__(self, *_: object) -> None:
         super().__init__(self._MESSAGE)
 
 
 @contextmanager
-def _suppress_hub_deprecation_warning():
-    # type: () -> Generator[None, None, None]
+def _suppress_hub_deprecation_warning() -> "Generator[None, None, None]":
     """Utility function to suppress deprecation warnings for the Hub."""
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=SentryHubDeprecationWarning)
@@ -94,8 +91,7 @@ _local = ContextVar("sentry_current_hub")
 
 class HubMeta(type):
     @property
-    def current(cls):
-        # type: () -> Hub
+    def current(cls) -> "Hub":
         """Returns the current instance of the hub."""
         warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
         rv = _local.get(None)
@@ -107,8 +103,7 @@ class HubMeta(type):
         return rv
 
     @property
-    def main(cls):
-        # type: () -> Hub
+    def main(cls) -> "Hub":
         """Returns the main instance of the hub."""
         warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
         return GLOBAL_HUB
@@ -126,21 +121,20 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     If the hub is used with a with statement it's temporarily activated.
     """
 
-    _stack = None  # type: List[Tuple[Optional[Client], Scope]]
-    _scope = None  # type: Optional[Scope]
+    _stack: "List[Tuple[Optional[Client], Scope]]" = None  # type: ignore[assignment]
+    _scope: "Optional[Scope]" = None
 
     # Mypy doesn't pick up on the metaclass.
 
     if TYPE_CHECKING:
-        current = None  # type: Hub
-        main = None  # type: Hub
+        current: "Hub" = None  # type: ignore[assignment]
+        main: "Optional[Hub]" = None
 
     def __init__(
         self,
-        client_or_hub=None,  # type: Optional[Union[Hub, Client]]
-        scope=None,  # type: Optional[Any]
-    ):
-        # type: (...) -> None
+        client_or_hub: "Optional[Union[Hub, Client]]" = None,
+        scope: "Optional[Any]" = None,
+    ) -> None:
         warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
 
         current_scope = None
@@ -165,16 +159,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             current_scope = get_current_scope()
 
         self._stack = [(client, scope)]  # type: ignore
-        self._last_event_id = None  # type: Optional[str]
-        self._old_hubs = []  # type: List[Hub]
+        self._last_event_id: "Optional[str]" = None
+        self._old_hubs: "List[Hub]" = []
 
-        self._old_current_scopes = []  # type: List[Scope]
-        self._old_isolation_scopes = []  # type: List[Scope]
-        self._current_scope = current_scope  # type: Scope
-        self._scope = scope  # type: Scope
+        self._old_current_scopes: "List[Scope]" = []
+        self._old_isolation_scopes: "List[Scope]" = []
+        self._current_scope: "Scope" = current_scope
+        self._scope: "Scope" = scope
 
-    def __enter__(self):
-        # type: () -> Hub
+    def __enter__(self) -> "Hub":
         self._old_hubs.append(Hub.current)
         _local.set(self)
 
@@ -190,11 +183,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def __exit__(
         self,
-        exc_type,  # type: Optional[type]
-        exc_value,  # type: Optional[BaseException]
-        tb,  # type: Optional[Any]
-    ):
-        # type: (...) -> None
+        exc_type: "Optional[type]",
+        exc_value: "Optional[BaseException]",
+        tb: "Optional[Any]",
+    ) -> None:
         old = self._old_hubs.pop()
         _local.set(old)
 
@@ -206,9 +198,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def run(
         self,
-        callback,  # type: Callable[[], T]
-    ):
-        # type: (...) -> T
+        callback: "Callable[[], T]",
+    ) -> "T":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -221,9 +212,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def get_integration(
         self,
-        name_or_class,  # type: Union[str, Type[Integration]]
-    ):
-        # type: (...) -> Any
+        name_or_class: "Union[str, Type[Integration]]",
+    ) -> "Any":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -239,8 +229,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return get_client().get_integration(name_or_class)
 
     @property
-    def client(self):
-        # type: () -> Optional[BaseClient]
+    def client(self) -> "Optional[BaseClient]":
         """
         .. deprecated:: 2.0.0
             This property is deprecated and will be removed in a future release.
@@ -256,8 +245,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return client
 
     @property
-    def scope(self):
-        # type: () -> Scope
+    def scope(self) -> "Scope":
         """
         .. deprecated:: 2.0.0
             This property is deprecated and will be removed in a future release.
@@ -265,8 +253,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         return get_isolation_scope()
 
-    def last_event_id(self):
-        # type: () -> Optional[str]
+    def last_event_id(self) -> "Optional[str]":
         """
         Returns the last event ID.
 
@@ -280,9 +267,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def bind_client(
         self,
-        new,  # type: Optional[BaseClient]
-    ):
-        # type: (...) -> None
+        new: "Optional[BaseClient]",
+    ) -> None:
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -292,8 +278,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         get_global_scope().set_client(new)
 
-    def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
-        # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
+    def capture_event(
+        self,
+        event: "Event",
+        hint: "Optional[Hint]" = None,
+        scope: "Optional[Scope]" = None,
+        **scope_kwargs: "Any",
+    ) -> "Optional[str]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -324,8 +315,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def capture_message(self, message, level=None, scope=None, **scope_kwargs):
-        # type: (str, Optional[LogLevelStr], Optional[Scope], Any) -> Optional[str]
+    def capture_message(
+        self,
+        message: str,
+        level: "Optional[LogLevelStr]" = None,
+        scope: "Optional[Scope]" = None,
+        **scope_kwargs: "Any",
+    ) -> "Optional[str]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -357,8 +353,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def capture_exception(self, error=None, scope=None, **scope_kwargs):
-        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
+    def capture_exception(
+        self,
+        error: "Optional[Union[BaseException, ExcInfo]]" = None,
+        scope: "Optional[Scope]" = None,
+        **scope_kwargs: "Any",
+    ) -> "Optional[str]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -388,8 +388,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
+    def add_breadcrumb(
+        self,
+        crumb: "Optional[Breadcrumb]" = None,
+        hint: "Optional[BreadcrumbHint]" = None,
+        **kwargs: "Any",
+    ) -> None:
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -404,8 +408,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
-    def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, Any) -> Span
+    def start_span(
+        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: "Any"
+    ) -> "Span":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -430,12 +435,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def start_transaction(
         self,
-        transaction=None,
-        instrumenter=INSTRUMENTER.SENTRY,
-        custom_sampling_context=None,
-        **kwargs,
-    ):
-        # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        transaction: "Optional[Transaction]" = None,
+        instrumenter: str = INSTRUMENTER.SENTRY,
+        custom_sampling_context: "Optional[SamplingContext]" = None,
+        **kwargs: "Unpack[TransactionKwargs]",
+    ) -> "Union[Transaction, NoOpSpan]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -475,8 +479,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             transaction, instrumenter, custom_sampling_context, **kwargs
         )
 
-    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+    def continue_trace(
+        self,
+        environ_or_headers: "Dict[str, Any]",
+        op: "Optional[str]" = None,
+        name: "Optional[str]" = None,
+        source: "Optional[str]" = None,
+    ) -> "Transaction":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -491,25 +500,22 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     @overload
     def push_scope(
         self,
-        callback=None,  # type: Optional[None]
-    ):
-        # type: (...) -> ContextManager[Scope]
+        callback: "Optional[None]" = None,
+    ) -> "ContextManager[Scope]":
         pass
 
     @overload
     def push_scope(  # noqa: F811
         self,
-        callback,  # type: Callable[[Scope], None]
-    ):
-        # type: (...) -> None
+        callback: "Callable[[Scope], None]",
+    ) -> None:
         pass
 
     def push_scope(  # noqa
         self,
-        callback=None,  # type: Optional[Callable[[Scope], None]]
-        continue_trace=True,  # type: bool
-    ):
-        # type: (...) -> Optional[ContextManager[Scope]]
+        callback: "Optional[Callable[[Scope], None]]" = None,
+        continue_trace: bool = True,
+    ) -> "Optional[ContextManager[Scope]]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -529,8 +535,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return _ScopeManager(self)
 
-    def pop_scope_unsafe(self):
-        # type: () -> Tuple[Optional[Client], Scope]
+    def pop_scope_unsafe(self) -> "Tuple[Optional[Client], Scope]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -546,25 +551,22 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     @overload
     def configure_scope(
         self,
-        callback=None,  # type: Optional[None]
-    ):
-        # type: (...) -> ContextManager[Scope]
+        callback: "Optional[None]" = None,
+    ) -> "ContextManager[Scope]":
         pass
 
     @overload
     def configure_scope(  # noqa: F811
         self,
-        callback,  # type: Callable[[Scope], None]
-    ):
-        # type: (...) -> None
+        callback: "Callable[[Scope], None]",
+    ) -> None:
         pass
 
     def configure_scope(  # noqa
         self,
-        callback=None,  # type: Optional[Callable[[Scope], None]]
-        continue_trace=True,  # type: bool
-    ):
-        # type: (...) -> Optional[ContextManager[Scope]]
+        callback: "Optional[Callable[[Scope], None]]" = None,
+        continue_trace: bool = True,
+    ) -> "Optional[ContextManager[Scope]]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -587,17 +589,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return None
 
         @contextmanager
-        def inner():
-            # type: () -> Generator[Scope, None, None]
+        def inner() -> "Generator[Scope, None, None]":
             yield scope
 
         return inner()
 
     def start_session(
         self,
-        session_mode="application",  # type: str
-    ):
-        # type: (...) -> None
+        session_mode: str = "application",
+    ) -> None:
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -609,8 +609,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             session_mode=session_mode,
         )
 
-    def end_session(self):
-        # type: (...) -> None
+    def end_session(self) -> None:
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -620,8 +619,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         get_isolation_scope().end_session()
 
-    def stop_auto_session_tracking(self):
-        # type: (...) -> None
+    def stop_auto_session_tracking(self) -> None:
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -634,8 +632,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         get_isolation_scope().stop_auto_session_tracking()
 
-    def resume_auto_session_tracking(self):
-        # type: (...) -> None
+    def resume_auto_session_tracking(self) -> None:
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -649,10 +646,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def flush(
         self,
-        timeout=None,  # type: Optional[float]
-        callback=None,  # type: Optional[Callable[[int, float], None]]
-    ):
-        # type: (...) -> None
+        timeout: "Optional[float]" = None,
+        callback: "Optional[Callable[[int, float], None]]" = None,
+    ) -> None:
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -662,8 +658,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         return get_client().flush(timeout=timeout, callback=callback)
 
-    def get_traceparent(self):
-        # type: () -> Optional[str]
+    def get_traceparent(self) -> "Optional[str]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -680,8 +675,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return traceparent
 
-    def get_baggage(self):
-        # type: () -> Optional[str]
+    def get_baggage(self) -> "Optional[str]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -701,8 +695,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return None
 
-    def iter_trace_propagation_headers(self, span=None):
-        # type: (Optional[Span]) -> Generator[Tuple[str, str], None, None]
+    def iter_trace_propagation_headers(
+        self, span: "Optional[Span]" = None
+    ) -> "Generator[Tuple[str, str], None, None]":
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -716,8 +711,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             span=span,
         )
 
-    def trace_propagation_meta(self, span=None):
-        # type: (Optional[Span]) -> str
+    def trace_propagation_meta(self, span: "Optional[Span]" = None) -> str:
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.

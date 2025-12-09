@@ -22,26 +22,24 @@ class _StreamingContextManagerWrapper:
 
     def __init__(
         self,
-        agent,
-        original_ctx_manager,
-        user_prompt,
-        model,
-        model_settings,
-        is_streaming=True,
-    ):
-        # type: (Any, Any, Any, Any, Any, bool) -> None
+        agent: "Any",
+        original_ctx_manager: "Any",
+        user_prompt: "Any",
+        model: "Any",
+        model_settings: "Any",
+        is_streaming: bool = True,
+    ) -> None:
         self.agent = agent
         self.original_ctx_manager = original_ctx_manager
         self.user_prompt = user_prompt
         self.model = model
         self.model_settings = model_settings
         self.is_streaming = is_streaming
-        self._isolation_scope = None  # type: Any
-        self._span = None  # type: Optional[sentry_sdk.tracing.Span]
-        self._result = None  # type: Any
+        self._isolation_scope: "Any" = None
+        self._span: "Optional[sentry_sdk.tracing.Span]" = None
+        self._result: "Any" = None
 
-    async def __aenter__(self):
-        # type: () -> Any
+    async def __aenter__(self) -> "Any":
         # Set up isolation scope and invoke_agent span
         self._isolation_scope = sentry_sdk.isolation_scope()
         self._isolation_scope.__enter__()
@@ -65,8 +63,7 @@ class _StreamingContextManagerWrapper:
         self._result = result
         return result
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        # type: (Any, Any, Any) -> None
+    async def __aexit__(self, exc_type: "Any", exc_val: "Any", exc_tb: "Any") -> None:
         try:
             # Exit the original context manager first
             await self.original_ctx_manager.__aexit__(exc_type, exc_val, exc_tb)
@@ -87,8 +84,9 @@ class _StreamingContextManagerWrapper:
                 self._isolation_scope.__exit__(exc_type, exc_val, exc_tb)
 
 
-def _create_run_wrapper(original_func, is_streaming=False):
-    # type: (Callable[..., Any], bool) -> Callable[..., Any]
+def _create_run_wrapper(
+    original_func: "Callable[..., Any]", is_streaming: bool = False
+) -> "Callable[..., Any]":
     """
     Wraps the Agent.run method to create an invoke_agent span.
 
@@ -98,8 +96,7 @@ def _create_run_wrapper(original_func, is_streaming=False):
     """
 
     @wraps(original_func)
-    async def wrapper(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    async def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
         with sentry_sdk.isolation_scope():
@@ -133,15 +130,15 @@ def _create_run_wrapper(original_func, is_streaming=False):
     return wrapper
 
 
-def _create_streaming_wrapper(original_func):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _create_streaming_wrapper(
+    original_func: "Callable[..., Any]",
+) -> "Callable[..., Any]":
     """
     Wraps run_stream method that returns an async context manager.
     """
 
     @wraps(original_func)
-    def wrapper(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         # Extract parameters for the span
         user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
         model = kwargs.get("model")
@@ -163,8 +160,9 @@ def _create_streaming_wrapper(original_func):
     return wrapper
 
 
-def _create_streaming_events_wrapper(original_func):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _create_streaming_events_wrapper(
+    original_func: "Callable[..., Any]",
+) -> "Callable[..., Any]":
     """
     Wraps run_stream_events method - no span needed as it delegates to run().
 
@@ -173,8 +171,7 @@ def _create_streaming_events_wrapper(original_func):
     """
 
     @wraps(original_func)
-    async def wrapper(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    async def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         # Just call the original generator - it will call run() which has the instrumentation
         try:
             async for event in original_func(self, *args, **kwargs):
@@ -186,8 +183,7 @@ def _create_streaming_events_wrapper(original_func):
     return wrapper
 
 
-def _patch_agent_run():
-    # type: () -> None
+def _patch_agent_run() -> None:
     """
     Patches the Agent run methods to create spans for agent execution.
 

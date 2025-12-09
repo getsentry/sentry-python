@@ -17,8 +17,13 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def invoke_agent_span(user_prompt, agent, model, model_settings, is_streaming=False):
-    # type: (Any, Any, Any, Any, bool) -> sentry_sdk.tracing.Span
+def invoke_agent_span(
+    user_prompt: "Any",
+    agent: "Any",
+    model: "Any",
+    model_settings: "Any",
+    is_streaming: bool = False,
+) -> "sentry_sdk.tracing.Span":
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
@@ -104,8 +109,7 @@ def invoke_agent_span(user_prompt, agent, model, model_settings, is_streaming=Fa
     return span
 
 
-def update_invoke_agent_span(span, result):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> None:
     """Update and close the invoke agent span."""
     if not span or not result:
         return

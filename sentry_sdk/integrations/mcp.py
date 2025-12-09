@@ -33,8 +33,7 @@ class MCPIntegration(Integration):
     identifier = "mcp"
     origin = "auto.ai.mcp"
 
-    def __init__(self, include_prompts=True):
-        # type: (bool) -> None
+    def __init__(self, include_prompts: bool = True) -> None:
         """
         Initialize the MCP integration.
 
@@ -45,16 +44,14 @@ class MCPIntegration(Integration):
         self.include_prompts = include_prompts
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         Patches MCP server classes to instrument handler execution.
         """
         _patch_lowlevel_server()
 
 
-def _get_request_context_data():
-    # type: () -> tuple[Optional[str], Optional[str], str]
+def _get_request_context_data() -> "tuple[Optional[str], Optional[str], str]":
     """
     Extract request ID, session ID, and MCP transport type from the request context.
 
@@ -64,9 +61,9 @@ def _get_request_context_data():
         - session_id: May be None if not available
         - mcp_transport: "http", "sse", "stdio"
     """
-    request_id = None  # type: Optional[str]
-    session_id = None  # type: Optional[str]
-    mcp_transport = "stdio"  # type: str
+    request_id: "Optional[str]" = None
+    session_id: "Optional[str]" = None
+    mcp_transport: str = "stdio"
 
     try:
         ctx = request_ctx.get()
@@ -96,8 +93,9 @@ def _get_request_context_data():
     return request_id, session_id, mcp_transport
 
 
-def _get_span_config(handler_type, item_name):
-    # type: (str, str) -> tuple[str, str, str, Optional[str]]
+def _get_span_config(
+    handler_type: str, item_name: str
+) -> "tuple[str, str, str, Optional[str]]":
     """
     Get span configuration based on handler type.
 
@@ -123,16 +121,15 @@ def _get_span_config(handler_type, item_name):
 
 
 def _set_span_input_data(
-    span,
-    handler_name,
-    span_data_key,
-    mcp_method_name,
-    arguments,
-    request_id,
-    session_id,
-    mcp_transport,
-):
-    # type: (Any, str, str, str, dict[str, Any], Optional[str], Optional[str], str) -> None
+    span: "Any",
+    handler_name: str,
+    span_data_key: str,
+    mcp_method_name: str,
+    arguments: "dict[str, Any]",
+    request_id: "Optional[str]",
+    session_id: "Optional[str]",
+    mcp_transport: str,
+) -> None:
     """Set input span data for MCP handlers."""
 
     # Set handler identifier
@@ -158,8 +155,7 @@ def _set_span_input_data(
         span.set_data(f"mcp.request.argument.{k}", safe_serialize(v))
 
 
-def _extract_tool_result_content(result):
-    # type: (Any) -> Any
+def _extract_tool_result_content(result: "Any") -> "Any":
     """
     Extract meaningful content from MCP tool result.
 
@@ -199,8 +195,9 @@ def _extract_tool_result_content(result):
     return result
 
 
-def _set_span_output_data(span, result, result_data_key, handler_type):
-    # type: (Any, Any, Optional[str], str) -> None
+def _set_span_output_data(
+    span: "Any", result: "Any", result_data_key: "Optional[str]", handler_type: str
+) -> None:
     """Set output span data for MCP handlers."""
     if result is None:
         return
@@ -224,7 +221,7 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
     elif handler_type == "prompt":
         # For prompts, count messages and set role/content only for single-message prompts
         try:
-            messages = None  # type: Optional[list[str]]
+            messages: "Optional[list[str]]" = None
             message_count = 0
 
             # Check if result has messages attribute (GetPromptResult)
@@ -282,8 +279,9 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
 # Handler data preparation and wrapping
 
 
-def _prepare_handler_data(handler_type, original_args):
-    # type: (str, tuple[Any, ...]) -> tuple[str, dict[str, Any], str, str, str, Optional[str]]
+def _prepare_handler_data(
+    handler_type: str, original_args: "tuple[Any, ...]"
+) -> "tuple[str, dict[str, Any], str, str, str, Optional[str]]":
     """
     Prepare common handler data for both async and sync wrappers.
 
@@ -319,8 +317,9 @@ def _prepare_handler_data(handler_type, original_args):
     )
 
 
-async def _async_handler_wrapper(handler_type, func, original_args):
-    # type: (str, Callable[..., Any], tuple[Any, ...]) -> Any
+async def _async_handler_wrapper(
+    handler_type: str, func: "Callable[..., Any]", original_args: "tuple[Any, ...]"
+) -> "Any":
     """
     Async wrapper for MCP handlers.
 
@@ -384,8 +383,9 @@ async def _async_handler_wrapper(handler_type, func, original_args):
         return result
 
 
-def _sync_handler_wrapper(handler_type, func, original_args):
-    # type: (str, Callable[..., Any], tuple[Any, ...]) -> Any
+def _sync_handler_wrapper(
+    handler_type: str, func: "Callable[..., Any]", original_args: "tuple[Any, ...]"
+) -> "Any":
     """
     Sync wrapper for MCP handlers.
 
@@ -449,8 +449,9 @@ def _sync_handler_wrapper(handler_type, func, original_args):
         return result
 
 
-def _create_instrumented_handler(handler_type, func):
-    # type: (str, Callable[..., Any]) -> Callable[..., Any]
+def _create_instrumented_handler(
+    handler_type: str, func: "Callable[..., Any]"
+) -> "Callable[..., Any]":
     """
     Create an instrumented version of a handler function (async or sync).
 
@@ -470,25 +471,25 @@ def _create_instrumented_handler(handler_type, func):
     if inspect.iscoroutinefunction(func):
 
         @wraps(func)
-        async def async_wrapper(*args):
-            # type: (*Any) -> Any
+        async def async_wrapper(*args: "Any") -> "Any":
             return await _async_handler_wrapper(handler_type, func, args)
 
         return async_wrapper
     else:
 
         @wraps(func)
-        def sync_wrapper(*args):
-            # type: (*Any) -> Any
+        def sync_wrapper(*args: "Any") -> "Any":
             return _sync_handler_wrapper(handler_type, func, args)
 
         return sync_wrapper
 
 
 def _create_instrumented_decorator(
-    original_decorator, handler_type, *decorator_args, **decorator_kwargs
-):
-    # type: (Callable[..., Any], str, *Any, **Any) -> Callable[..., Any]
+    original_decorator: "Callable[..., Any]",
+    handler_type: str,
+    *decorator_args: "Any",
+    **decorator_kwargs: "Any",
+) -> "Callable[..., Any]":
     """
     Create an instrumented version of an MCP decorator.
 
@@ -512,8 +513,7 @@ def _create_instrumented_decorator(
         A decorator function that instruments handlers before registering them
     """
 
-    def instrumented_decorator(func):
-        # type: (Callable[..., Any]) -> Callable[..., Any]
+    def instrumented_decorator(func: "Callable[..., Any]") -> "Callable[..., Any]":
         # First wrap the handler with instrumentation
         instrumented_func = _create_instrumented_handler(handler_type, func)
         # Then register it with the original MCP decorator
@@ -524,16 +524,16 @@ def _create_instrumented_decorator(
     return instrumented_decorator
 
 
-def _patch_lowlevel_server():
-    # type: () -> None
+def _patch_lowlevel_server() -> None:
     """
     Patches the mcp.server.lowlevel.Server class to instrument handler execution.
     """
     # Patch call_tool decorator
     original_call_tool = Server.call_tool
 
-    def patched_call_tool(self, **kwargs):
-        # type: (Server, **Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]
+    def patched_call_tool(
+        self: "Server", **kwargs: "Any"
+    ) -> "Callable[[Callable[..., Any]], Callable[..., Any]]":
         """Patched version of Server.call_tool that adds Sentry instrumentation."""
         return lambda func: _create_instrumented_decorator(
             original_call_tool, "tool", self, **kwargs
@@ -544,8 +544,9 @@ def _patch_lowlevel_server():
     # Patch get_prompt decorator
     original_get_prompt = Server.get_prompt
 
-    def patched_get_prompt(self):
-        # type: (Server) -> Callable[[Callable[..., Any]], Callable[..., Any]]
+    def patched_get_prompt(
+        self: "Server",
+    ) -> "Callable[[Callable[..., Any]], Callable[..., Any]]":
         """Patched version of Server.get_prompt that adds Sentry instrumentation."""
         return lambda func: _create_instrumented_decorator(
             original_get_prompt, "prompt", self
@@ -556,8 +557,9 @@ def _patch_lowlevel_server():
     # Patch read_resource decorator
     original_read_resource = Server.read_resource
 
-    def patched_read_resource(self):
-        # type: (Server) -> Callable[[Callable[..., Any]], Callable[..., Any]]
+    def patched_read_resource(
+        self: "Server",
+    ) -> "Callable[[Callable[..., Any]], Callable[..., Any]]":
         """Patched version of Server.read_resource that adds Sentry instrumentation."""
         return lambda func: _create_instrumented_decorator(
             original_read_resource, "resource", self

@@ -43,32 +43,26 @@ except ImportError:
     FALCON3 = False
 
 
-_FALCON_UNSET = None  # type: Optional[object]
+_FALCON_UNSET: "Optional[object]" = None
 if FALCON3:  # falcon.request._UNSET is only available in Falcon 3.0+
     with capture_internal_exceptions():
         from falcon.request import _UNSET as _FALCON_UNSET  # type: ignore[import-not-found, no-redef]
 
 
 class FalconRequestExtractor(RequestExtractor):
-    def env(self):
-        # type: () -> Dict[str, Any]
+    def env(self) -> "Dict[str, Any]":
         return self.request.env
 
-    def cookies(self):
-        # type: () -> Dict[str, Any]
+    def cookies(self) -> "Dict[str, Any]":
         return self.request.cookies
 
-    def form(self):
-        # type: () -> None
+    def form(self) -> None:
         return None  # No such concept in Falcon
 
-    def files(self):
-        # type: () -> None
+    def files(self) -> None:
         return None  # No such concept in Falcon
 
-    def raw_data(self):
-        # type: () -> Optional[str]
-
+    def raw_data(self) -> "Optional[str]":
         # As request data can only be read once we won't make this available
         # to Sentry. Just send back a dummy string in case there was a
         # content length.
@@ -79,8 +73,7 @@ class FalconRequestExtractor(RequestExtractor):
         else:
             return None
 
-    def json(self):
-        # type: () -> Optional[Dict[str, Any]]
+    def json(self) -> "Optional[Dict[str, Any]]":
         # fallback to cached_media = None if self.request._media is not available
         cached_media = None
         with capture_internal_exceptions():
@@ -101,8 +94,9 @@ class FalconRequestExtractor(RequestExtractor):
 class SentryFalconMiddleware:
     """Captures exceptions in Falcon requests and send to Sentry"""
 
-    def process_request(self, req, resp, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> None
+    def process_request(
+        self, req: "Any", resp: "Any", *args: "Any", **kwargs: "Any"
+    ) -> None:
         integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is None:
             return
@@ -121,8 +115,7 @@ class FalconIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="uri_template"):
-        # type: (str) -> None
+    def __init__(self, transaction_style: str = "uri_template") -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -131,9 +124,7 @@ class FalconIntegration(Integration):
         self.transaction_style = transaction_style
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         version = parse_version(FALCON_VERSION)
         _check_minimum_version(FalconIntegration, version)
 
@@ -142,12 +133,12 @@ class FalconIntegration(Integration):
         _patch_prepare_middleware()
 
 
-def _patch_wsgi_app():
-    # type: () -> None
+def _patch_wsgi_app() -> None:
     original_wsgi_app = falcon_app_class.__call__
 
-    def sentry_patched_wsgi_app(self, env, start_response):
-        # type: (falcon.API, Any, Any) -> Any
+    def sentry_patched_wsgi_app(
+        self: "falcon.API", env: "Any", start_response: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is None:
             return original_wsgi_app(self, env, start_response)
@@ -162,13 +153,11 @@ def _patch_wsgi_app():
     falcon_app_class.__call__ = sentry_patched_wsgi_app
 
 
-def _patch_handle_exception():
-    # type: () -> None
+def _patch_handle_exception() -> None:
     original_handle_exception = falcon_app_class._handle_exception
 
     @ensure_integration_enabled(FalconIntegration, original_handle_exception)
-    def sentry_patched_handle_exception(self, *args):
-        # type: (falcon.API, *Any) -> Any
+    def sentry_patched_handle_exception(self: "falcon.API", *args: "Any") -> "Any":
         # NOTE(jmagnusson): falcon 2.0 changed falcon.API._handle_exception
         # method signature from `(ex, req, resp, params)` to
         # `(req, resp, ex, params)`
@@ -200,14 +189,14 @@ def _patch_handle_exception():
     falcon_app_class._handle_exception = sentry_patched_handle_exception
 
 
-def _patch_prepare_middleware():
-    # type: () -> None
+def _patch_prepare_middleware() -> None:
     original_prepare_middleware = falcon_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
-        middleware=None, independent_middleware=False, asgi=False
-    ):
-        # type: (Any, Any, bool) -> Any
+        middleware: "Any" = None,
+        independent_middleware: "Any" = False,
+        asgi: bool = False,
+    ) -> "Any":
         if asgi:
             # We don't support ASGI Falcon apps, so we don't patch anything here
             return original_prepare_middleware(middleware, independent_middleware, asgi)
@@ -223,8 +212,7 @@ def _patch_prepare_middleware():
     falcon_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
 
-def _exception_leads_to_http_5xx(ex, response):
-    # type: (Exception, falcon.Response) -> bool
+def _exception_leads_to_http_5xx(ex: Exception, response: "falcon.Response") -> bool:
     is_server_error = isinstance(ex, falcon.HTTPError) and (ex.status or "").startswith(
         "5"
     )
@@ -242,13 +230,13 @@ def _exception_leads_to_http_5xx(ex, response):
     )
 
 
-def _has_http_5xx_status(response):
-    # type: (falcon.Response) -> bool
+def _has_http_5xx_status(response: "falcon.Response") -> bool:
     return response.status.startswith("5")
 
 
-def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Event, str, falcon.Request) -> None
+def _set_transaction_name_and_source(
+    event: "Event", transaction_style: str, request: "falcon.Request"
+) -> None:
     name_for_style = {
         "uri_template": request.uri_template,
         "path": request.path,
@@ -257,11 +245,10 @@ def _set_transaction_name_and_source(event, transaction_style, request):
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
 
-def _make_request_event_processor(req, integration):
-    # type: (falcon.Request, FalconIntegration) -> EventProcessor
-
-    def event_processor(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+def _make_request_event_processor(
+    req: "falcon.Request", integration: "FalconIntegration"
+) -> "EventProcessor":
+    def event_processor(event: Event, hint: dict[str, Any]) -> Event:
         _set_transaction_name_and_source(event, integration.transaction_style, req)
 
         with capture_internal_exceptions():

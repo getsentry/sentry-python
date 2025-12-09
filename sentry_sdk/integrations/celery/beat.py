@@ -42,8 +42,7 @@ except ImportError:
     RedBeatScheduler = None
 
 
-def _get_headers(task):
-    # type: (Task) -> dict[str, Any]
+def _get_headers(task: "Task") -> "dict[str, Any]":
     headers = task.request.get("headers") or {}
 
     # flatten nested headers
@@ -56,12 +55,13 @@ def _get_headers(task):
     return headers
 
 
-def _get_monitor_config(celery_schedule, app, monitor_name):
-    # type: (Any, Celery, str) -> MonitorConfig
-    monitor_config = {}  # type: MonitorConfig
-    schedule_type = None  # type: Optional[MonitorConfigScheduleType]
-    schedule_value = None  # type: Optional[Union[str, int]]
-    schedule_unit = None  # type: Optional[MonitorConfigScheduleUnit]
+def _get_monitor_config(
+    celery_schedule: "Any", app: "Celery", monitor_name: str
+) -> "MonitorConfig":
+    monitor_config: MonitorConfig = {}
+    schedule_type: "Optional[MonitorConfigScheduleType]" = None
+    schedule_value: "Optional[Union[str, int]]" = None
+    schedule_unit: "Optional[MonitorConfigScheduleUnit]" = None
 
     if isinstance(celery_schedule, crontab):
         schedule_type = "crontab"
@@ -113,8 +113,11 @@ def _get_monitor_config(celery_schedule, app, monitor_name):
     return monitor_config
 
 
-def _apply_crons_data_to_schedule_entry(scheduler, schedule_entry, integration):
-    # type: (Any, Any, sentry_sdk.integrations.celery.CeleryIntegration) -> None
+def _apply_crons_data_to_schedule_entry(
+    scheduler: "Any",
+    schedule_entry: "Any",
+    integration: "sentry_sdk.integrations.celery.CeleryIntegration",
+) -> None:
     """
     Add Sentry Crons information to the schedule_entry headers.
     """
@@ -158,8 +161,9 @@ def _apply_crons_data_to_schedule_entry(scheduler, schedule_entry, integration):
     schedule_entry.options["headers"] = headers
 
 
-def _wrap_beat_scheduler(original_function):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _wrap_beat_scheduler(
+    original_function: "Callable[..., Any]",
+) -> "Callable[..., Any]":
     """
     Makes sure that:
     - a new Sentry trace is started for each task started by Celery Beat and
@@ -178,8 +182,7 @@ def _wrap_beat_scheduler(original_function):
 
     from sentry_sdk.integrations.celery import CeleryIntegration
 
-    def sentry_patched_scheduler(*args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def sentry_patched_scheduler(*args: "Any", **kwargs: "Any") -> None:
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
         if integration is None:
             return original_function(*args, **kwargs)
@@ -197,29 +200,25 @@ def _wrap_beat_scheduler(original_function):
     return sentry_patched_scheduler
 
 
-def _patch_beat_apply_entry():
-    # type: () -> None
+def _patch_beat_apply_entry() -> None:
     Scheduler.apply_entry = _wrap_beat_scheduler(Scheduler.apply_entry)
 
 
-def _patch_redbeat_apply_async():
-    # type: () -> None
+def _patch_redbeat_apply_async() -> None:
     if RedBeatScheduler is None:
         return
 
     RedBeatScheduler.apply_async = _wrap_beat_scheduler(RedBeatScheduler.apply_async)
 
 
-def _setup_celery_beat_signals(monitor_beat_tasks):
-    # type: (bool) -> None
+def _setup_celery_beat_signals(monitor_beat_tasks: bool) -> None:
     if monitor_beat_tasks:
         task_success.connect(crons_task_success)
         task_failure.connect(crons_task_failure)
         task_retry.connect(crons_task_retry)
 
 
-def crons_task_success(sender, **kwargs):
-    # type: (Task, dict[Any, Any]) -> None
+def crons_task_success(sender: "Task", **kwargs: "dict[Any, Any]") -> None:
     logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
 
@@ -243,8 +242,7 @@ def crons_task_success(sender, **kwargs):
     )
 
 
-def crons_task_failure(sender, **kwargs):
-    # type: (Task, dict[Any, Any]) -> None
+def crons_task_failure(sender: "Task", **kwargs: "dict[Any, Any]") -> None:
     logger.debug("celery_task_failure %s", sender)
     headers = _get_headers(sender)
 
@@ -268,8 +266,7 @@ def crons_task_failure(sender, **kwargs):
     )
 
 
-def crons_task_retry(sender, **kwargs):
-    # type: (Task, dict[Any, Any]) -> None
+def crons_task_retry(sender: "Task", **kwargs: "dict[Any, Any]") -> None:
     logger.debug("celery_task_retry %s", sender)
     headers = _get_headers(sender)
 

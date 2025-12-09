@@ -12,8 +12,9 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def execute_tool_span(tool, *args, **kwargs):
-    # type: (agents.Tool, *Any, **Any) -> sentry_sdk.tracing.Span
+def execute_tool_span(
+    tool: "agents.Tool", *args: "Any", **kwargs: "Any"
+) -> "sentry_sdk.tracing.Span":
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_EXECUTE_TOOL,
         name=f"execute_tool {tool.name}",
@@ -35,8 +36,12 @@ def execute_tool_span(tool, *args, **kwargs):
     return span
 
 
-def update_execute_tool_span(span, agent, tool, result):
-    # type: (sentry_sdk.tracing.Span, agents.Agent, agents.Tool, Any) -> None
+def update_execute_tool_span(
+    span: "sentry_sdk.tracing.Span",
+    agent: "agents.Agent",
+    tool: "agents.Tool",
+    result: "Any",
+) -> None:
     _set_agent_data(span, agent)
 
     if isinstance(result, str) and result.startswith(

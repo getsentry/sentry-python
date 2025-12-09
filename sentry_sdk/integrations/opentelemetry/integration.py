@@ -31,8 +31,7 @@ class OpenTelemetryIntegration(Integration):
     identifier = "opentelemetry"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         logger.warning(
             "[OTel] Initializing highly experimental OpenTelemetry support. "
             "Use at your own risk."
@@ -44,15 +43,13 @@ class OpenTelemetryIntegration(Integration):
         logger.debug("[OTel] Finished setting up OpenTelemetry integration")
 
 
-def _setup_sentry_tracing():
-    # type: () -> None
+def _setup_sentry_tracing() -> None:
     provider = TracerProvider()
     provider.add_span_processor(SentrySpanProcessor())
     trace.set_tracer_provider(provider)
     set_global_textmap(SentryPropagator())
 
 
-def _setup_instrumentors():
-    # type: () -> None
+def _setup_instrumentors() -> None:
     for instrumentor, kwargs in CONFIGURABLE_INSTRUMENTATIONS.items():
         instrumentor().instrument(**kwargs)

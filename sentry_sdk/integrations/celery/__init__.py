@@ -63,11 +63,10 @@ class CeleryIntegration(Integration):
 
     def __init__(
         self,
-        propagate_traces=True,
-        monitor_beat_tasks=False,
-        exclude_beat_tasks=None,
-    ):
-        # type: (bool, bool, Optional[List[str]]) -> None
+        propagate_traces: bool = True,
+        monitor_beat_tasks: bool = False,
+        exclude_beat_tasks: "Optional[List[str]]" = None,
+    ) -> None:
         self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
@@ -77,8 +76,7 @@ class CeleryIntegration(Integration):
         _setup_celery_beat_signals(monitor_beat_tasks)
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         _check_minimum_version(CeleryIntegration, CELERY_VERSION)
 
         _patch_build_tracer()
@@ -98,16 +96,14 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.redirected")
 
 
-def _set_status(status):
-    # type: (str) -> None
+def _set_status(status: str) -> None:
     with capture_internal_exceptions():
         scope = sentry_sdk.get_current_scope()
         if scope.span is not None:
             scope.span.set_status(status)
 
 
-def _capture_exception(task, exc_info):
-    # type: (Any, ExcInfo) -> None
+def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
     client = sentry_sdk.get_client()
     if client.get_integration(CeleryIntegration) is None:
         return
@@ -131,11 +127,14 @@ def _capture_exception(task, exc_info):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _make_event_processor(task, uuid, args, kwargs, request=None):
-    # type: (Any, Any, Any, Any, Optional[Any]) -> EventProcessor
-    def event_processor(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
-
+def _make_event_processor(
+    task: "Any",
+    uuid: "Any",
+    args: "Any",
+    kwargs: "Any",
+    request: "Optional[Any]" = None,
+) -> "EventProcessor":
+    def event_processor(event: Event, hint: Hint) -> Optional[Event]:
         with capture_internal_exceptions():
             tags = event.setdefault("tags", {})
             tags["celery_task_id"] = uuid
@@ -160,8 +159,9 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     return event_processor
 
 
-def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
-    # type: (dict[str, Any], Optional[Span], bool) -> dict[str, Any]
+def _update_celery_task_headers(
+    original_headers: "dict[str, Any]", span: "Optional[Span]", monitor_beat_tasks: bool
+) -> "dict[str, Any]":
     """
     Updates the headers of the Celery task with the tracing information
     and eventually Sentry Crons monitoring information for beat tasks.
@@ -235,20 +235,16 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
 
 
 class NoOpMgr:
-    def __enter__(self):
-        # type: () -> None
+    def __enter__(self) -> None:
         return None
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        # type: (Any, Any, Any) -> None
+    def __exit__(self, exc_type: "Any", exc_value: "Any", traceback: "Any") -> None:
         return None
 
 
-def _wrap_task_run(f):
-    # type: (F) -> F
+def _wrap_task_run(f: "F") -> "F":
     @wraps(f)
-    def apply_async(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def apply_async(*args: Any, **kwargs: Any) -> Any:
         # Note: kwargs can contain headers=None, so no setdefault!
         # Unsure which backend though.
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
@@ -264,7 +260,7 @@ def _wrap_task_run(f):
             return f(*args, **kwargs)
 
         if isinstance(args[0], Task):
-            task_name = args[0].name  # type: str
+            task_name: str = args[0].name
         elif len(args) > 1 and isinstance(args[1], str):
             task_name = args[1]
         else:
@@ -272,7 +268,7 @@ def _wrap_task_run(f):
 
         task_started_from_beat = sentry_sdk.get_isolation_scope()._name == "celery-beat"
 
-        span_mgr = (
+        span_mgr: "Union[Span, NoOpMgr]" = (
             sentry_sdk.start_span(
                 op=OP.QUEUE_SUBMIT_CELERY,
                 name=task_name,
@@ -280,7 +276,7 @@ def _wrap_task_run(f):
             )
             if not task_started_from_beat
             else NoOpMgr()
-        )  # type: Union[Span, NoOpMgr]
+        )
 
         with span_mgr as span:
             kwargs["headers"] = _update_celery_task_headers(
@@ -291,9 +287,7 @@ def _wrap_task_run(f):
     return apply_async  # type: ignore
 
 
-def _wrap_tracer(task, f):
-    # type: (Any, F) -> F
-
+def _wrap_tracer(task: "Any", f: "F") -> "F":
     # Need to wrap tracer for pushing the scope before prerun is sent, and
     # popping it after postrun is sent.
     #
@@ -302,8 +296,7 @@ def _wrap_tracer(task, f):
     # crashes.
     @wraps(f)
     @ensure_integration_enabled(CeleryIntegration, f)
-    def _inner(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _inner(*args: Any, **kwargs: Any) -> Any:
         with isolation_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
@@ -345,8 +338,7 @@ def _wrap_tracer(task, f):
     return _inner  # type: ignore
 
 
-def _set_messaging_destination_name(task, span):
-    # type: (Any, Span) -> None
+def _set_messaging_destination_name(task: "Any", span: "Span") -> None:
     """Set "messaging.destination.name" tag for span"""
     with capture_internal_exceptions():
         delivery_info = task.request.delivery_info
@@ -358,9 +350,7 @@ def _set_messaging_destination_name(task, span):
                 span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
 
-def _wrap_task_call(task, f):
-    # type: (Any, F) -> F
-
+def _wrap_task_call(task: "Any", f: "F") -> "F":
     # Need to wrap task call because the exception is caught before we get to
     # see it. Also celery's reported stacktrace is untrustworthy.
 
@@ -370,8 +360,7 @@ def _wrap_task_call(task, f):
     # to add @functools.wraps(f) here.
     # https://github.com/getsentry/sentry-python/issues/421
     @ensure_integration_enabled(CeleryIntegration, f)
-    def _inner(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _inner(*args: Any, **kwargs: Any) -> Any:
         try:
             with sentry_sdk.start_span(
                 op=OP.QUEUE_PROCESS,
@@ -418,14 +407,14 @@ def _wrap_task_call(task, f):
     return _inner  # type: ignore
 
 
-def _patch_build_tracer():
-    # type: () -> None
+def _patch_build_tracer() -> None:
     import celery.app.trace as trace  # type: ignore
 
     original_build_tracer = trace.build_tracer
 
-    def sentry_build_tracer(name, task, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> Any
+    def sentry_build_tracer(
+        name: "Any", task: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         if not getattr(task, "_sentry_is_patched", False):
             # determine whether Celery will use __call__ or run and patch
             # accordingly
@@ -444,29 +433,24 @@ def _patch_build_tracer():
     trace.build_tracer = sentry_build_tracer
 
 
-def _patch_task_apply_async():
-    # type: () -> None
+def _patch_task_apply_async() -> None:
     Task.apply_async = _wrap_task_run(Task.apply_async)
 
 
-def _patch_celery_send_task():
-    # type: () -> None
+def _patch_celery_send_task() -> None:
     from celery import Celery
 
     Celery.send_task = _wrap_task_run(Celery.send_task)
 
 
-def _patch_worker_exit():
-    # type: () -> None
-
+def _patch_worker_exit() -> None:
     # Need to flush queue before worker shutdown because a crashing worker will
     # call os._exit
     from billiard.pool import Worker  # type: ignore
 
     original_workloop = Worker.workloop
 
-    def sentry_workloop(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def sentry_workloop(*args: "Any", **kwargs: "Any") -> "Any":
         try:
             return original_workloop(*args, **kwargs)
         finally:
@@ -480,13 +464,11 @@ def _patch_worker_exit():
     Worker.workloop = sentry_workloop
 
 
-def _patch_producer_publish():
-    # type: () -> None
+def _patch_producer_publish() -> None:
     original_publish = Producer.publish
 
     @ensure_integration_enabled(CeleryIntegration, original_publish)
-    def sentry_publish(self, *args, **kwargs):
-        # type: (Producer, *Any, **Any) -> Any
+    def sentry_publish(self: "Producer", *args: "Any", **kwargs: "Any") -> "Any":
         kwargs_headers = kwargs.get("headers", {})
         if not isinstance(kwargs_headers, Mapping):
             # Ensure kwargs_headers is a Mapping, so we can safely call get().

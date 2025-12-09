@@ -27,8 +27,7 @@ except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
 
-def _patch_tool_execution():
-    # type: () -> None
+def _patch_tool_execution() -> None:
     """
     Patch ToolManager._call_tool to create execute_tool spans.
 
@@ -44,9 +43,9 @@ def _patch_tool_execution():
     original_call_tool = ToolManager._call_tool
 
     @wraps(original_call_tool)
-    async def wrapped_call_tool(self, call, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> Any
-
+    async def wrapped_call_tool(
+        self: "Any", call: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         # Extract tool info before calling original
         name = call.tool_name
         tool = self.tools.get(name) if self.tools else None

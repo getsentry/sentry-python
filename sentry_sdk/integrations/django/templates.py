@@ -25,9 +25,9 @@ except ImportError:
     from django.template.loader import LoaderOrigin as Origin
 
 
-def get_template_frame_from_exception(exc_value):
-    # type: (Optional[BaseException]) -> Optional[Dict[str, Any]]
-
+def get_template_frame_from_exception(
+    exc_value: "Optional[BaseException]",
+) -> "Optional[Dict[str, Any]]":
     # As of Django 1.9 or so the new template debug thing showed up.
     if hasattr(exc_value, "template_debug"):
         return _get_template_frame_from_debug(exc_value.template_debug)  # type: ignore
@@ -48,8 +48,7 @@ def get_template_frame_from_exception(exc_value):
     return None
 
 
-def _get_template_name_description(template_name):
-    # type: (str) -> str
+def _get_template_name_description(template_name: str) -> str:
     if isinstance(template_name, (list, tuple)):
         if template_name:
             return "[{}, ...]".format(template_name[0])
@@ -57,8 +56,7 @@ def _get_template_name_description(template_name):
         return template_name
 
 
-def patch_templates():
-    # type: () -> None
+def patch_templates() -> None:
     from django.template.response import SimpleTemplateResponse
     from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -66,8 +64,7 @@ def patch_templates():
 
     @property  # type: ignore
     @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
-    def rendered_content(self):
-        # type: (SimpleTemplateResponse) -> str
+    def rendered_content(self: "SimpleTemplateResponse") -> str:
         with sentry_sdk.start_span(
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(self.template_name),
@@ -86,9 +83,13 @@ def patch_templates():
 
     @functools.wraps(real_render)
     @ensure_integration_enabled(DjangoIntegration, real_render)
-    def render(request, template_name, context=None, *args, **kwargs):
-        # type: (django.http.HttpRequest, str, Optional[Dict[str, Any]], *Any, **Any) -> django.http.HttpResponse
-
+    def render(
+        request: "django.http.HttpRequest",
+        template_name: str,
+        context: "Optional[Dict[str, Any]]" = None,
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> "django.http.HttpResponse":
         # Inject trace meta tags into template context
         context = context or {}
         if "sentry_trace_meta" not in context:
@@ -107,8 +108,7 @@ def patch_templates():
     django.shortcuts.render = render
 
 
-def _get_template_frame_from_debug(debug):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+def _get_template_frame_from_debug(debug: "Dict[str, Any]") -> "Dict[str, Any]":
     if debug is None:
         return None
 
@@ -139,8 +139,7 @@ def _get_template_frame_from_debug(debug):
     }
 
 
-def _linebreak_iter(template_source):
-    # type: (str) -> Iterator[int]
+def _linebreak_iter(template_source: str) -> "Iterator[int]":
     yield 0
     p = template_source.find("\n")
     while p >= 0:
@@ -148,8 +147,9 @@ def _linebreak_iter(template_source):
         p = template_source.find("\n", p + 1)
 
 
-def _get_template_frame_from_source(source):
-    # type: (Tuple[Origin, Tuple[int, int]]) -> Optional[Dict[str, Any]]
+def _get_template_frame_from_source(
+    source: "Tuple[Origin, Tuple[int, int]]",
+) -> "Optional[Dict[str, Any]]":
     if not source:
         return None
 

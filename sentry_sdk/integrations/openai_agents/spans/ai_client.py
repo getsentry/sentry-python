@@ -17,8 +17,9 @@ if TYPE_CHECKING:
     from typing import Any, Optional
 
 
-def ai_client_span(agent, get_response_kwargs):
-    # type: (Agent, dict[str, Any]) -> sentry_sdk.tracing.Span
+def ai_client_span(
+    agent: "Agent", get_response_kwargs: "dict[str, Any]"
+) -> "sentry_sdk.tracing.Span":
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
     model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
     span = sentry_sdk.start_span(
@@ -36,9 +37,12 @@ def ai_client_span(agent, get_response_kwargs):
 
 
 def update_ai_client_span(
-    span, agent, get_response_kwargs, result, response_model=None
-):
-    # type: (sentry_sdk.tracing.Span, Agent, dict[str, Any], Any, Optional[str]) -> None
+    span: "sentry_sdk.tracing.Span",
+    agent: "Agent",
+    get_response_kwargs: "dict[str, Any]",
+    result: "Any",
+    response_model: "Optional[str]" = None,
+) -> None:
     _set_usage_data(span, result.usage)
     _set_output_data(span, result)
     _create_mcp_execute_tool_spans(span, result)

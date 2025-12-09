@@ -55,37 +55,32 @@ MAX_DATABAG_BREADTH = 10
 CYCLE_MARKER = "<cyclic>"
 
 
-global_repr_processors = []  # type: List[ReprProcessor]
+global_repr_processors: "List[ReprProcessor]" = []
 
 
-def add_global_repr_processor(processor):
-    # type: (ReprProcessor) -> None
+def add_global_repr_processor(processor: "ReprProcessor") -> None:
     global_repr_processors.append(processor)
 
 
-sequence_types = [Sequence, Set]  # type: List[type]
+sequence_types: "List[type]" = [Sequence, Set]
 
 
-def add_repr_sequence_type(ty):
-    # type: (type) -> None
+def add_repr_sequence_type(ty: type) -> None:
     sequence_types.append(ty)
 
 
 class Memo:
     __slots__ = ("_ids", "_objs")
 
-    def __init__(self):
-        # type: () -> None
-        self._ids = {}  # type: Dict[int, Any]
-        self._objs = []  # type: List[Any]
+    def __init__(self) -> None:
+        self._ids: Dict[int, Any] = {}
+        self._objs: "List[Any]" = []
 
-    def memoize(self, obj):
-        # type: (Any) -> ContextManager[bool]
+    def memoize(self, obj: "Any") -> "ContextManager[bool]":
         self._objs.append(obj)
         return self
 
-    def __enter__(self):
-        # type: () -> bool
+    def __enter__(self) -> bool:
         obj = self._objs[-1]
         if id(obj) in self._ids:
             return True
@@ -95,16 +90,14 @@ class Memo:
 
     def __exit__(
         self,
-        ty,  # type: Optional[Type[BaseException]]
-        value,  # type: Optional[BaseException]
-        tb,  # type: Optional[TracebackType]
-    ):
-        # type: (...) -> None
+        ty: "Optional[Type[BaseException]]",
+        value: "Optional[BaseException]",
+        tb: "Optional[TracebackType]",
+    ) -> None:
         self._ids.pop(id(self._objs.pop()), None)
 
 
-def serialize(event, **kwargs):
-    # type: (Dict[str, Any], **Any) -> Dict[str, Any]
+def serialize(event: "Dict[str, Any]", **kwargs: "Any") -> "Dict[str, Any]":
     """
     A very smart serializer that takes a dict and emits a json-friendly dict.
     Currently used for serializing the final Event and also prematurely while fetching the stack
@@ -125,16 +118,15 @@ def serialize(event, **kwargs):
 
     """
     memo = Memo()
-    path = []  # type: List[Segment]
-    meta_stack = []  # type: List[Dict[str, Any]]
+    path: "List[Segment]" = []
+    meta_stack: "List[Dict[str, Any]]" = []
 
-    keep_request_bodies = kwargs.pop("max_request_body_size", None) == "always"  # type: bool
-    max_value_length = kwargs.pop("max_value_length", None)  # type: Optional[int]
+    keep_request_bodies: bool = kwargs.pop("max_request_body_size", None) == "always"
+    max_value_length: "Optional[int]" = kwargs.pop("max_value_length", None)
     is_vars = kwargs.pop("is_vars", False)
-    custom_repr = kwargs.pop("custom_repr", None)  # type: Callable[..., Optional[str]]
+    custom_repr: "Callable[..., Optional[str]]" = kwargs.pop("custom_repr", None)
 
-    def _safe_repr_wrapper(value):
-        # type: (Any) -> str
+    def _safe_repr_wrapper(value: "Any") -> str:
         try:
             repr_value = None
             if custom_repr is not None:
@@ -143,8 +135,7 @@ def serialize(event, **kwargs):
         except Exception:
             return safe_repr(value)
 
-    def _annotate(**meta):
-        # type: (**Any) -> None
+    def _annotate(**meta: "Any") -> None:
         while len(meta_stack) <= len(path):
             try:
                 segment = path[len(meta_stack) - 1]
@@ -156,8 +147,7 @@ def serialize(event, **kwargs):
 
         meta_stack[-1].setdefault("", {}).update(meta)
 
-    def _is_databag():
-        # type: () -> Optional[bool]
+    def _is_databag() -> "Optional[bool]":
         """
         A databag is any value that we need to trim.
         True for stuff like vars, request bodies, breadcrumbs and extra.
@@ -185,8 +175,7 @@ def serialize(event, **kwargs):
 
         return False
 
-    def _is_span_attribute():
-        # type: () -> Optional[bool]
+    def _is_span_attribute() -> "Optional[bool]":
         try:
             if path[0] == "spans" and path[2] == "data":
                 return True
@@ -195,8 +184,7 @@ def serialize(event, **kwargs):
 
         return False
 
-    def _is_request_body():
-        # type: () -> Optional[bool]
+    def _is_request_body() -> "Optional[bool]":
         try:
             if path[0] == "request" and path[1] == "data":
                 return True
@@ -206,15 +194,14 @@ def serialize(event, **kwargs):
         return False
 
     def _serialize_node(
-        obj,  # type: Any
-        is_databag=None,  # type: Optional[bool]
-        is_request_body=None,  # type: Optional[bool]
-        should_repr_strings=None,  # type: Optional[bool]
-        segment=None,  # type: Optional[Segment]
-        remaining_breadth=None,  # type: Optional[Union[int, float]]
-        remaining_depth=None,  # type: Optional[Union[int, float]]
-    ):
-        # type: (...) -> Any
+        obj: "Any",
+        is_databag: "Optional[bool]" = None,
+        is_request_body: "Optional[bool]" = None,
+        should_repr_strings: "Optional[bool]" = None,
+        segment: "Optional[Segment]" = None,
+        remaining_breadth: "Optional[Union[int, float]]" = None,
+        remaining_depth: "Optional[Union[int, float]]" = None,
+    ) -> "Any":
         if segment is not None:
             path.append(segment)
 
@@ -243,22 +230,20 @@ def serialize(event, **kwargs):
                 path.pop()
                 del meta_stack[len(path) + 1 :]
 
-    def _flatten_annotated(obj):
-        # type: (Any) -> Any
+    def _flatten_annotated(obj: "Any") -> "Any":
         if isinstance(obj, AnnotatedValue):
             _annotate(**obj.metadata)
             obj = obj.value
         return obj
 
     def _serialize_node_impl(
-        obj,
-        is_databag,
-        is_request_body,
-        should_repr_strings,
-        remaining_depth,
-        remaining_breadth,
-    ):
-        # type: (Any, Optional[bool], Optional[bool], Optional[bool], Optional[Union[float, int]], Optional[Union[float, int]]) -> Any
+        obj: "Any",
+        is_databag: "Optional[bool]",
+        is_request_body: "Optional[bool]",
+        should_repr_strings: "Optional[bool]",
+        remaining_depth: "Optional[Union[float, int]]",
+        remaining_breadth: "Optional[Union[float, int]]",
+    ) -> "Any":
         if isinstance(obj, AnnotatedValue):
             should_repr_strings = False
         if should_repr_strings is None:
@@ -323,7 +308,7 @@ def serialize(event, **kwargs):
             # might mutate our dictionary while we're still iterating over it.
             obj = dict(obj.items())
 
-            rv_dict = {}  # type: Dict[str, Any]
+            rv_dict: "Dict[str, Any]" = {}
             i = 0
 
             for k, v in obj.items():

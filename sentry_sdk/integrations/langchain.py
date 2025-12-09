@@ -1,26 +1,25 @@
 import contextvars
 import itertools
+import sys
 import warnings
 from collections import OrderedDict
 from functools import wraps
-import sys
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
+    get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
-    get_start_span_function,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import _get_value, set_span_errored
-from sentry_sdk.utils import logger, capture_internal_exceptions
-
-from typing import TYPE_CHECKING
+from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
     from typing import (
@@ -34,6 +33,7 @@ if TYPE_CHECKING:
         Union,
     )
     from uuid import UUID
+
     from sentry_sdk.tracing import Span
 
 
@@ -118,11 +118,12 @@ DATA_FIELDS = {
 
 
 # Contextvar to track agent names in a stack for re-entrant agent support
-_agent_stack = contextvars.ContextVar("langchain_agent_stack", default=None)  # type: contextvars.ContextVar[Optional[List[Optional[str]]]]
+_agent_stack: "contextvars.ContextVar[Optional[List[Optional[str]]]]" = (
+    contextvars.ContextVar("langchain_agent_stack", default=None)
+)
 
 
-def _push_agent(agent_name):
-    # type: (Optional[str]) -> None
+def _push_agent(agent_name: "Optional[str]") -> None:
     """Push an agent name onto the stack."""
     stack = _agent_stack.get()
     if stack is None:
@@ -134,8 +135,7 @@ def _push_agent(agent_name):
     _agent_stack.set(stack)
 
 
-def _pop_agent():
-    # type: () -> Optional[str]
+def _pop_agent() -> "Optional[str]":
     """Pop an agent name from the stack and return it."""
     stack = _agent_stack.get()
     if stack:
@@ -147,8 +147,7 @@ def _pop_agent():
     return None
 
 
-def _get_current_agent():
-    # type: () -> Optional[str]
+def _get_current_agent() -> "Optional[str]":
     """Get the current agent name (top of stack) without removing it."""
     stack = _agent_stack.get()
     if stack:
@@ -160,8 +159,11 @@ class LangchainIntegration(Integration):
     identifier = "langchain"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True, max_spans=None):
-        # type: (LangchainIntegration, bool, Optional[int]) -> None
+    def __init__(
+        self: "LangchainIntegration",
+        include_prompts: bool = True,
+        max_spans: "Optional[int]" = None,
+    ) -> None:
         self.include_prompts = include_prompts
         self.max_spans = max_spans
 
@@ -174,8 +176,7 @@ class LangchainIntegration(Integration):
             )
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         manager._configure = _wrap_configure(manager._configure)
 
         if AgentExecutor is not None:
@@ -194,34 +195,31 @@ class LangchainIntegration(Integration):
 
 
 class WatchedSpan:
-    span = None  # type: Span
-    children = []  # type: List[WatchedSpan]
-    is_pipeline = False  # type: bool
+    span: "Span" = None  # type: ignore[assignment]
+    children: "List[WatchedSpan]" = []
+    is_pipeline: bool = False
 
-    def __init__(self, span):
-        # type: (Span) -> None
+    def __init__(self, span: "Span") -> None:
         self.span = span
 
 
 class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     """Callback handler that creates Sentry spans."""
 
-    def __init__(self, max_span_map_size, include_prompts):
-        # type: (Optional[int], bool) -> None
-        self.span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
+    def __init__(
+        self, max_span_map_size: "Optional[int]", include_prompts: bool
+    ) -> None:
+        self.span_map: OrderedDict[UUID, WatchedSpan] = OrderedDict()
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
 
-    def gc_span_map(self):
-        # type: () -> None
-
+    def gc_span_map(self) -> None:
         if self.max_span_map_size is not None:
             while len(self.span_map) > self.max_span_map_size:
                 run_id, watched_span = self.span_map.popitem(last=False)
                 self._exit_span(watched_span, run_id)
 
-    def _handle_error(self, run_id, error):
-        # type: (UUID, Any) -> None
+    def _handle_error(self, run_id: "UUID", error: "Any") -> None:
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
                 return
@@ -235,17 +233,20 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span.__exit__(None, None, None)
             del self.span_map[run_id]
 
-    def _normalize_langchain_message(self, message):
-        # type: (BaseMessage) -> Any
+    def _normalize_langchain_message(self, message: "BaseMessage") -> "Any":
         parsed = {"role": message.type, "content": message.content}
         parsed.update(message.additional_kwargs)
         return parsed
 
-    def _create_span(self, run_id, parent_id, **kwargs):
-        # type: (SentryLangchainCallback, UUID, Optional[Any], Any) -> WatchedSpan
-        watched_span = None  # type: Optional[WatchedSpan]
+    def _create_span(
+        self: "SentryLangchainCallback",
+        run_id: "UUID",
+        parent_id: "Optional[Any]",
+        **kwargs: "Any",
+    ) -> "WatchedSpan":
+        watched_span: "Optional[WatchedSpan]" = None
         if parent_id:
-            parent_span = self.span_map.get(parent_id)  # type: Optional[WatchedSpan]
+            parent_span: "Optional[WatchedSpan]" = self.span_map.get(parent_id)
             if parent_span:
                 watched_span = WatchedSpan(parent_span.span.start_child(**kwargs))
                 parent_span.children.append(watched_span)
@@ -258,8 +259,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         self.gc_span_map()
         return watched_span
 
-    def _exit_span(self, span_data, run_id):
-        # type: (SentryLangchainCallback, WatchedSpan, UUID) -> None
+    def _exit_span(
+        self: "SentryLangchainCallback", span_data: "WatchedSpan", run_id: "UUID"
+    ) -> None:
         if span_data.is_pipeline:
             set_ai_pipeline_name(None)
 
@@ -267,17 +269,16 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         del self.span_map[run_id]
 
     def on_llm_start(
-        self,
-        serialized,
-        prompts,
+        self: "SentryLangchainCallback",
+        serialized: "Dict[str, Any]",
+        prompts: "List[str]",
         *,
-        run_id,
-        tags=None,
-        parent_run_id=None,
-        metadata=None,
-        **kwargs,
-    ):
-        # type: (SentryLangchainCallback, Dict[str, Any], List[str], UUID, Optional[List[str]], Optional[UUID], Optional[Dict[str, Any]], Any) -> Any
+        run_id: "UUID",
+        tags: "Optional[List[str]]" = None,
+        parent_run_id: "Optional[UUID]" = None,
+        metadata: "Optional[Dict[str, Any]]" = None,
+        **kwargs: "Any",
+    ) -> "Any":
         """Run when LLM starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -340,8 +341,14 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         unpack=False,
                     )
 
-    def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
+    def on_chat_model_start(
+        self: "SentryLangchainCallback",
+        serialized: "Dict[str, Any]",
+        messages: "List[List[BaseMessage]]",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
         """Run when Chat Model starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -406,8 +413,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         unpack=False,
                     )
 
-    def on_chat_model_end(self, response, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
+    def on_chat_model_end(
+        self: "SentryLangchainCallback",
+        response: "LLMResult",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
         """Run when Chat Model ends running."""
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
@@ -426,8 +438,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _record_token_usage(span, response)
             self._exit_span(span_data, run_id)
 
-    def on_llm_end(self, response, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
+    def on_llm_end(
+        self: "SentryLangchainCallback",
+        response: "LLMResult",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
         """Run when LLM ends running."""
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
@@ -483,18 +500,33 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _record_token_usage(span, response)
             self._exit_span(span_data, run_id)
 
-    def on_llm_error(self, error, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
+    def on_llm_error(
+        self: "SentryLangchainCallback",
+        error: "Union[Exception, KeyboardInterrupt]",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
         """Run when LLM errors."""
         self._handle_error(run_id, error)
 
-    def on_chat_model_error(self, error, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
+    def on_chat_model_error(
+        self: "SentryLangchainCallback",
+        error: "Union[Exception, KeyboardInterrupt]",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
         """Run when Chat Model errors."""
         self._handle_error(run_id, error)
 
-    def on_agent_finish(self, finish, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, AgentFinish, UUID, Any) -> Any
+    def on_agent_finish(
+        self: "SentryLangchainCallback",
+        finish: "AgentFinish",
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
                 return
@@ -509,8 +541,14 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             self._exit_span(span_data, run_id)
 
-    def on_tool_start(self, serialized, input_str, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, Dict[str, Any], str, UUID, Any) -> Any
+    def on_tool_start(
+        self: "SentryLangchainCallback",
+        serialized: "Dict[str, Any]",
+        input_str: str,
+        *,
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
         """Run when tool starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -545,8 +583,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     kwargs.get("inputs", [input_str]),
                 )
 
-    def on_tool_end(self, output, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, str, UUID, Any) -> Any
+    def on_tool_end(
+        self: "SentryLangchainCallback", output: str, *, run_id: "UUID", **kwargs: "Any"
+    ) -> "Any":
         """Run when tool ends running."""
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
@@ -560,14 +599,20 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             self._exit_span(span_data, run_id)
 
-    def on_tool_error(self, error, *args, run_id, **kwargs):
-        # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
+    def on_tool_error(
+        self,
+        error: "SentryLangchainCallback",
+        *args: "Union[Exception, KeyboardInterrupt]",
+        run_id: "UUID",
+        **kwargs: "Any",
+    ) -> "Any":
         """Run when tool errors."""
         self._handle_error(run_id, error)
 
 
-def _extract_tokens(token_usage):
-    # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
+def _extract_tokens(
+    token_usage: "Any",
+) -> "tuple[Optional[int], Optional[int], Optional[int]]":
     if not token_usage:
         return None, None, None
 
@@ -582,8 +627,9 @@ def _extract_tokens(token_usage):
     return input_tokens, output_tokens, total_tokens
 
 
-def _extract_tokens_from_generations(generations):
-    # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
+def _extract_tokens_from_generations(
+    generations: "Any",
+) -> "tuple[Optional[int], Optional[int], Optional[int]]":
     """Extract token usage from response.generations structure."""
     if not generations:
         return None, None, None
@@ -607,8 +653,7 @@ def _extract_tokens_from_generations(generations):
     )
 
 
-def _get_token_usage(obj):
-    # type: (Any) -> Optional[Dict[str, Any]]
+def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
     """
     Check multiple paths to extract token usage from different objects.
     """
@@ -636,8 +681,7 @@ def _get_token_usage(obj):
     return None
 
 
-def _record_token_usage(span, response):
-    # type: (Span, Any) -> None
+def _record_token_usage(span: "Span", response: "Any") -> None:
     token_usage = _get_token_usage(response)
     if token_usage:
         input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
@@ -656,8 +700,9 @@ def _record_token_usage(span, response):
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
-def _get_request_data(obj, args, kwargs):
-    # type: (Any, Any, Any) -> tuple[Optional[str], Optional[List[Any]]]
+def _get_request_data(
+    obj: "Any", args: "Any", kwargs: "Any"
+) -> "tuple[Optional[str], Optional[List[Any]]]":
     """
     Get the agent name and available tools for the agent.
     """
@@ -684,8 +729,7 @@ def _get_request_data(obj, args, kwargs):
     return (agent_name, tools)
 
 
-def _simplify_langchain_tools(tools):
-    # type: (Any) -> Optional[List[Any]]
+def _simplify_langchain_tools(tools: "Any") -> "Optional[List[Any]]":
     """Parse and simplify tools into a cleaner format."""
     if not tools:
         return None
@@ -750,8 +794,7 @@ def _simplify_langchain_tools(tools):
     return simplified_tools if simplified_tools else None
 
 
-def _set_tools_on_span(span, tools):
-    # type: (Span, Any) -> None
+def _set_tools_on_span(span: "Span", tools: "Any") -> None:
     """Set available tools data on a span if tools are provided."""
     if tools is not None:
         simplified_tools = _simplify_langchain_tools(tools)
@@ -764,19 +807,15 @@ def _set_tools_on_span(span, tools):
             )
 
 
-def _wrap_configure(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-
+def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
     def new_configure(
-        callback_manager_cls,  # type: type
-        inheritable_callbacks=None,  # type: Callbacks
-        local_callbacks=None,  # type: Callbacks
-        *args,  # type: Any
-        **kwargs,  # type: Any
-    ):
-        # type: (...) -> Any
-
+        callback_manager_cls: type,
+        inheritable_callbacks: Callbacks = None,
+        local_callbacks: Callbacks = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(
@@ -848,12 +887,9 @@ def _wrap_configure(f):
     return new_configure
 
 
-def _wrap_agent_executor_invoke(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-
+def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_invoke(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
+    def new_invoke(self: Any, *args: Any, **kwargs: Any) -> Any:
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -914,12 +950,9 @@ def _wrap_agent_executor_invoke(f):
     return new_invoke
 
 
-def _wrap_agent_executor_stream(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-
+def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_stream(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
+    def new_stream(self: Any, *args: Any, **kwargs: Any) -> Any:
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -968,9 +1001,8 @@ def _wrap_agent_executor_stream(f):
 
         old_iterator = result
 
-        def new_iterator():
-            # type: () -> Iterator[Any]
-            exc_info = (None, None, None)  # type: tuple[Any, Any, Any]
+        def new_iterator() -> "Iterator[Any]":
+            exc_info: tuple[Any, Any, Any] = (None, None, None)
             try:
                 for event in old_iterator:
                     yield event
@@ -995,9 +1027,8 @@ def _wrap_agent_executor_stream(f):
                 _pop_agent()
                 span.__exit__(*exc_info)
 
-        async def new_iterator_async():
-            # type: () -> AsyncIterator[Any]
-            exc_info = (None, None, None)  # type: tuple[Any, Any, Any]
+        async def new_iterator_async() -> "AsyncIterator[Any]":
+            exc_info: tuple[Any, Any, Any] = (None, None, None)
             try:
                 async for event in old_iterator:
                     yield event
@@ -1032,8 +1063,7 @@ def _wrap_agent_executor_stream(f):
     return new_stream
 
 
-def _patch_embeddings_provider(provider_class):
-    # type: (Any) -> None
+def _patch_embeddings_provider(provider_class: "Any") -> None:
     """Patch an embeddings provider class with monitoring wrappers."""
     if provider_class is None:
         return
@@ -1054,13 +1084,11 @@ def _patch_embeddings_provider(provider_class):
         )
 
 
-def _wrap_embedding_method(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
     """Wrap sync embedding methods (embed_documents and embed_query)."""
 
     @wraps(f)
-    def new_embedding_method(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
+    def new_embedding_method(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -1094,13 +1122,13 @@ def _wrap_embedding_method(f):
     return new_embedding_method
 
 
-def _wrap_async_embedding_method(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
     """Wrap async embedding methods (aembed_documents and aembed_query)."""
 
     @wraps(f)
-    async def new_async_embedding_method(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
+    async def new_async_embedding_method(
+        self: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return await f(self, *args, **kwargs)

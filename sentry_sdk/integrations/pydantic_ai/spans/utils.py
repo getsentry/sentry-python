@@ -10,8 +10,9 @@ if TYPE_CHECKING:
     from pydantic_ai.usage import RequestUsage, RunUsage  # type: ignore
 
 
-def _set_usage_data(span, usage):
-    # type: (sentry_sdk.tracing.Span, Union[RequestUsage, RunUsage]) -> None
+def _set_usage_data(
+    span: "sentry_sdk.tracing.Span", usage: "Union[RequestUsage, RunUsage]"
+) -> None:
     """Set token usage data on a span.
 
     This function works with both RequestUsage (single request) and

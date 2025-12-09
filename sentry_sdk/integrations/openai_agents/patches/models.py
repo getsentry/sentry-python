@@ -18,8 +18,9 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-def _create_get_model_wrapper(original_get_model):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _create_get_model_wrapper(
+    original_get_model: "Callable[..., Any]",
+) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner._get_model method to wrap the get_response method of the model to create a AI client span.
     """
@@ -29,9 +30,9 @@ def _create_get_model_wrapper(original_get_model):
         if hasattr(original_get_model, "__func__")
         else original_get_model
     )
-    def wrapped_get_model(cls, agent, run_config):
-        # type: (agents.Runner, agents.Agent, agents.RunConfig) -> agents.Model
-
+    def wrapped_get_model(
+        cls: "agents.Runner", agent: "agents.Agent", run_config: "agents.RunConfig"
+    ) -> "agents.Model":
         # copy the model to double patching its methods. We use copy on purpose here (instead of deepcopy)
         # because we only patch its direct methods, all underlying data can remain unchanged.
         model = copy.copy(original_get_model(agent, run_config))
@@ -41,8 +42,7 @@ def _create_get_model_wrapper(original_get_model):
             original_fetch_response = model._fetch_response
 
             @wraps(original_fetch_response)
-            async def wrapped_fetch_response(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
+            async def wrapped_fetch_response(*args: "Any", **kwargs: "Any") -> "Any":
                 response = await original_fetch_response(*args, **kwargs)
                 if hasattr(response, "model"):
                     agent._sentry_raw_response_model = str(response.model)
@@ -53,8 +53,7 @@ def _create_get_model_wrapper(original_get_model):
         original_get_response = model.get_response
 
         @wraps(original_get_response)
-        async def wrapped_get_response(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
+        async def wrapped_get_response(*args: "Any", **kwargs: "Any") -> "Any":
             with ai_client_span(agent, kwargs) as span:
                 result = await original_get_response(*args, **kwargs)
 

@@ -1,18 +1,18 @@
 import sys
 from functools import partial
+from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk._werkzeug import get_host, _get_headers
+from sentry_sdk._werkzeug import _get_headers, get_host
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
     nullcontext,
 )
+from sentry_sdk.scope import should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
-from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TransactionSource
 from sentry_sdk.utils import (
     ContextVar,
@@ -21,41 +21,36 @@ from sentry_sdk.utils import (
     reraise,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Callable
-    from typing import Dict
-    from typing import Iterator
-    from typing import Any
-    from typing import Tuple
-    from typing import Optional
-    from typing import TypeVar
-    from typing import Protocol
+    from typing import Any, Callable, Dict, Iterator, Optional, Protocol, Tuple, TypeVar
 
-    from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk.utils import ExcInfo
 
     WsgiResponseIter = TypeVar("WsgiResponseIter")
     WsgiResponseHeaders = TypeVar("WsgiResponseHeaders")
     WsgiExcInfo = TypeVar("WsgiExcInfo")
 
     class StartResponse(Protocol):
-        def __call__(self, status, response_headers, exc_info=None):  # type: ignore
-            # type: (str, WsgiResponseHeaders, Optional[WsgiExcInfo]) -> WsgiResponseIter
+        def __call__(
+            self,
+            status: str,
+            response_headers: "WsgiResponseHeaders",
+            exc_info: "Optional[WsgiExcInfo]" = None,
+        ) -> "WsgiResponseIter":  # type: ignore
             pass
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
 
-def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
-    # type: (str, str, str) -> str
+def wsgi_decoding_dance(s: str, charset: str = "utf-8", errors: str = "replace") -> str:
     return s.encode("latin1").decode(charset, errors)
 
 
-def get_request_url(environ, use_x_forwarded_for=False):
-    # type: (Dict[str, str], bool) -> str
+def get_request_url(
+    environ: "Dict[str, str]", use_x_forwarded_for: bool = False
+) -> str:
     """Return the absolute URL without query string for the given WSGI
     environment."""
     script_name = environ.get("SCRIPT_NAME", "").rstrip("/")
@@ -79,19 +74,19 @@ class SentryWsgiMiddleware:
 
     def __init__(
         self,
-        app,  # type: Callable[[Dict[str, str], Callable[..., Any]], Any]
-        use_x_forwarded_for=False,  # type: bool
-        span_origin="manual",  # type: str
-        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: Tuple[str, ...]
-    ):
-        # type: (...) -> None
+        app: "Callable[[Dict[str, str], Callable[..., Any]], Any]",
+        use_x_forwarded_for: bool = False,
+        span_origin: str = "manual",
+        http_methods_to_capture: "Tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    ) -> None:
         self.app = app
         self.use_x_forwarded_for = use_x_forwarded_for
         self.span_origin = span_origin
         self.http_methods_to_capture = http_methods_to_capture
 
-    def __call__(self, environ, start_response):
-        # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
+    def __call__(
+        self, environ: "Dict[str, str]", start_response: "Callable[..., Any]"
+    ) -> "_ScopedResponse":
         if _wsgi_middleware_applied.get(False):
             return self.app(environ, start_response)
 
@@ -143,14 +138,13 @@ class SentryWsgiMiddleware:
         return _ScopedResponse(scope, response)
 
 
-def _sentry_start_response(  # type: ignore
-    old_start_response,  # type: StartResponse
-    transaction,  # type: Optional[Transaction]
-    status,  # type: str
-    response_headers,  # type: WsgiResponseHeaders
-    exc_info=None,  # type: Optional[WsgiExcInfo]
-):
-    # type: (...) -> WsgiResponseIter
+def _sentry_start_response(
+    old_start_response: "StartResponse",
+    transaction: "Optional[Transaction]",
+    status: str,
+    response_headers: "WsgiResponseHeaders",
+    exc_info: "Optional[WsgiExcInfo]" = None,
+) -> "WsgiResponseIter":  # type: ignore[type-var]
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
         if transaction is not None:
@@ -165,8 +159,7 @@ def _sentry_start_response(  # type: ignore
         return old_start_response(status, response_headers, exc_info)
 
 
-def _get_environ(environ):
-    # type: (Dict[str, str]) -> Iterator[Tuple[str, str]]
+def _get_environ(environ: "Dict[str, str]") -> "Iterator[Tuple[str, str]]":
     """
     Returns our explicitly included environment variables we want to
     capture (server name, port and remote addr if pii is enabled).
@@ -182,8 +175,7 @@ def _get_environ(environ):
             yield key, environ[key]
 
 
-def get_client_ip(environ):
-    # type: (Dict[str, str]) -> Optional[Any]
+def get_client_ip(environ: "Dict[str, str]") -> "Optional[Any]":
     """
     Infer the user IP address from various headers. This cannot be used in
     security sensitive situations since the value may be forged from a client,
@@ -202,8 +194,7 @@ def get_client_ip(environ):
     return environ.get("REMOTE_ADDR")
 
 
-def _capture_exception():
-    # type: () -> ExcInfo
+def _capture_exception() -> "ExcInfo":
     """
     Captures the current exception and sends it to Sentry.
     Returns the ExcInfo tuple to it can be reraised afterwards.
@@ -237,13 +228,13 @@ class _ScopedResponse:
 
     __slots__ = ("_response", "_scope")
 
-    def __init__(self, scope, response):
-        # type: (sentry_sdk.scope.Scope, Iterator[bytes]) -> None
+    def __init__(
+        self, scope: "sentry_sdk.scope.Scope", response: "Iterator[bytes]"
+    ) -> None:
         self._scope = scope
         self._response = response
 
-    def __iter__(self):
-        # type: () -> Iterator[bytes]
+    def __iter__(self) -> "Iterator[bytes]":
         iterator = iter(self._response)
 
         while True:
@@ -257,8 +248,7 @@ class _ScopedResponse:
 
             yield chunk
 
-    def close(self):
-        # type: () -> None
+    def close(self) -> None:
         with use_isolation_scope(self._scope):
             try:
                 self._response.close()  # type: ignore
@@ -268,8 +258,9 @@ class _ScopedResponse:
                 reraise(*_capture_exception())
 
 
-def _make_wsgi_event_processor(environ, use_x_forwarded_for):
-    # type: (Dict[str, str], bool) -> EventProcessor
+def _make_wsgi_event_processor(
+    environ: "Dict[str, str]", use_x_forwarded_for: bool
+) -> "EventProcessor":
     # It's a bit unfortunate that we have to extract and parse the request data
     # from the environ so eagerly, but there are a few good reasons for this.
     #
@@ -289,8 +280,7 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
     env = dict(_get_environ(environ))
     headers = _filter_headers(dict(_get_headers(environ)))
 
-    def event_processor(event, hint):
-        # type: (Event, Dict[str, Any]) -> Event
+    def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
         with capture_internal_exceptions():
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})

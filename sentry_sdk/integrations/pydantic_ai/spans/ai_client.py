@@ -40,8 +40,7 @@ except ImportError:
     ThinkingPart = None
 
 
-def _set_input_messages(span, messages):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     """Set input messages data on a span."""
     if not _should_send_prompts():
         return
@@ -81,7 +80,7 @@ def _set_input_messages(span, messages):
                     elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
                         role = "tool"
 
-                    content = []  # type: List[Dict[str, Any] | str]
+                    content: "List[Dict[str, Any] | str]" = []
                     tool_calls = None
                     tool_call_id = None
 
@@ -115,7 +114,7 @@ def _set_input_messages(span, messages):
 
                     # Add message if we have content or tool calls
                     if content or tool_calls:
-                        message = {"role": role}  # type: Dict[str, Any]
+                        message: "Dict[str, Any]" = {"role": role}
                         if content:
                             message["content"] = content
                         if tool_calls:
@@ -133,8 +132,7 @@ def _set_input_messages(span, messages):
         pass
 
 
-def _set_output_data(span, response):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _set_output_data(span: "sentry_sdk.tracing.Span", response: "Any") -> None:
     """Set output data on a span."""
     if not _should_send_prompts():
         return
@@ -175,8 +173,9 @@ def _set_output_data(span, response):
         pass
 
 
-def ai_client_span(messages, agent, model, model_settings):
-    # type: (Any, Any, Any, Any) -> sentry_sdk.tracing.Span
+def ai_client_span(
+    messages: "Any", agent: "Any", model: "Any", model_settings: "Any"
+) -> "sentry_sdk.tracing.Span":
     """Create a span for an AI client call (model request).
 
     Args:
@@ -217,8 +216,9 @@ def ai_client_span(messages, agent, model, model_settings):
     return span
 
 
-def update_ai_client_span(span, model_response):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def update_ai_client_span(
+    span: "sentry_sdk.tracing.Span", model_response: "Any"
+) -> None:
     """Update the AI client span with response data."""
     if not span:
         return

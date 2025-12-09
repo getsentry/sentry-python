@@ -28,22 +28,32 @@ METHODS_TO_INSTRUMENT = [
 ]
 
 
-def _get_span_description(method_name, args, kwargs):
-    # type: (str, tuple[Any], dict[str, Any]) -> str
+def _get_span_description(
+    method_name: str, args: "tuple[Any]", kwargs: "dict[str, Any]"
+) -> str:
     return _key_as_string(_get_safe_key(method_name, args, kwargs))
 
 
-def _patch_cache_method(cache, method_name, address, port):
-    # type: (CacheHandler, str, Optional[str], Optional[int]) -> None
+def _patch_cache_method(
+    cache: "CacheHandler",
+    method_name: str,
+    address: "Optional[str]",
+    port: "Optional[int]",
+) -> None:
     from sentry_sdk.integrations.django import DjangoIntegration
 
     original_method = getattr(cache, method_name)
 
     @ensure_integration_enabled(DjangoIntegration, original_method)
     def _instrument_call(
-        cache, method_name, original_method, args, kwargs, address, port
-    ):
-        # type: (CacheHandler, str, Callable[..., Any], tuple[Any, ...], dict[str, Any], Optional[str], Optional[int]) -> Any
+        cache: "CacheHandler",
+        method_name: str,
+        original_method: "Callable[..., Any]",
+        args: "tuple[Any, ...]",
+        kwargs: "dict[str, Any]",
+        address: "Optional[str]",
+        port: "Optional[int]",
+    ) -> "Any":
         is_set_operation = method_name.startswith("set")
         is_get_method = method_name == "get"
         is_get_many_method = method_name == "get_many"
@@ -103,8 +113,7 @@ def _patch_cache_method(cache, method_name, address, port):
             return value
 
     @functools.wraps(original_method)
-    def sentry_method(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def sentry_method(*args: "Any", **kwargs: "Any") -> "Any":
         return _instrument_call(
             cache, method_name, original_method, args, kwargs, address, port
         )
@@ -112,16 +121,18 @@ def _patch_cache_method(cache, method_name, address, port):
     setattr(cache, method_name, sentry_method)
 
 
-def _patch_cache(cache, address=None, port=None):
-    # type: (CacheHandler, Optional[str], Optional[int]) -> None
+def _patch_cache(
+    cache: "CacheHandler", address: "Optional[str]" = None, port: "Optional[int]" = None
+) -> None:
     if not hasattr(cache, "_sentry_patched"):
         for method_name in METHODS_TO_INSTRUMENT:
             _patch_cache_method(cache, method_name, address, port)
         cache._sentry_patched = True
 
 
-def _get_address_port(settings):
-    # type: (dict[str, Any]) -> tuple[Optional[str], Optional[int]]
+def _get_address_port(
+    settings: "dict[str, Any]",
+) -> "tuple[Optional[str], Optional[int]]":
     location = settings.get("LOCATION")
 
     # TODO: location can also be an array of locations
@@ -146,8 +157,7 @@ def _get_address_port(settings):
     return address, int(port) if port is not None else None
 
 
-def should_enable_cache_spans():
-    # type: () -> bool
+def should_enable_cache_spans() -> bool:
     from sentry_sdk.integrations.django import DjangoIntegration
 
     client = sentry_sdk.get_client()
@@ -160,15 +170,13 @@ def should_enable_cache_spans():
     )
 
 
-def patch_caching():
-    # type: () -> None
+def patch_caching() -> None:
     if not hasattr(CacheHandler, "_sentry_patched"):
         if DJANGO_VERSION < (3, 2):
             original_get_item = CacheHandler.__getitem__
 
             @functools.wraps(original_get_item)
-            def sentry_get_item(self, alias):
-                # type: (CacheHandler, str) -> Any
+            def sentry_get_item(self: "CacheHandler", alias: str) -> "Any":
                 cache = original_get_item(self, alias)
 
                 if should_enable_cache_spans():
@@ -189,8 +197,7 @@ def patch_caching():
             original_create_connection = CacheHandler.create_connection
 
             @functools.wraps(original_create_connection)
-            def sentry_create_connection(self, alias):
-                # type: (CacheHandler, str) -> Any
+            def sentry_create_connection(self: "CacheHandler", alias: str) -> "Any":
                 cache = original_create_connection(self, alias)
 
                 if should_enable_cache_spans():

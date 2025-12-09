@@ -14,16 +14,15 @@ if TYPE_CHECKING:
 
 
 def _capture_metric(
-    name,  # type: str
-    metric_type,  # type: MetricType
-    value,  # type: float
-    unit=None,  # type: Optional[str]
-    attributes=None,  # type: Optional[dict[str, Any]]
-):
-    # type: (...) -> None
+    name: str,
+    metric_type: "MetricType",
+    value: float,
+    unit: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Any]]" = None,
+) -> None:
     client = sentry_sdk.get_client()
 
-    attrs = {}  # type: dict[str, Union[str, bool, float, int]]
+    attrs: "dict[str, Union[str, bool, float, int]]" = {}
     if attributes:
         for k, v in attributes.items():
             attrs[k] = (
@@ -37,7 +36,7 @@ def _capture_metric(
                 else safe_repr(v)
             )
 
-    metric = {
+    metric: "Metric" = {
         "timestamp": time.time(),
         "trace_id": None,
         "span_id": None,
@@ -46,36 +45,33 @@ def _capture_metric(
         "value": float(value),
         "unit": unit,
         "attributes": attrs,
-    }  # type: Metric
+    }
 
     client._capture_metric(metric)
 
 
 def count(
-    name,  # type: str
-    value,  # type: float
-    unit=None,  # type: Optional[str]
-    attributes=None,  # type: Optional[dict[str, Any]]
-):
-    # type: (...) -> None
+    name: str,
+    value: float,
+    unit: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Any]]" = None,
+) -> None:
     _capture_metric(name, "counter", value, unit, attributes)
 
 
 def gauge(
-    name,  # type: str
-    value,  # type: float
-    unit=None,  # type: Optional[str]
-    attributes=None,  # type: Optional[dict[str, Any]]
-):
-    # type: (...) -> None
+    name: str,
+    value: float,
+    unit: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Any]]" = None,
+) -> None:
     _capture_metric(name, "gauge", value, unit, attributes)
 
 
 def distribution(
-    name,  # type: str
-    value,  # type: float
-    unit=None,  # type: Optional[str]
-    attributes=None,  # type: Optional[dict[str, Any]]
-):
-    # type: (...) -> None
+    name: str,
+    value: float,
+    unit: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Any]]" = None,
+) -> None:
     _capture_metric(name, "distribution", value, unit, attributes)

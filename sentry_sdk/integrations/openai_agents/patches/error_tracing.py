@@ -11,8 +11,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Optional
 
 
-def _patch_error_tracing():
-    # type: () -> None
+def _patch_error_tracing() -> None:
     """
     Patches agents error tracing function to inject our span error logic
     when a tool execution fails.
@@ -49,8 +48,9 @@ def _patch_error_tracing():
     original_attach_error = error_tracing_module.attach_error_to_current_span
 
     @wraps(original_attach_error)
-    def sentry_attach_error_to_current_span(error, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_attach_error_to_current_span(
+        error: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         """
         Wraps agents' error attachment to also set Sentry span status to error.
         This allows us to properly track tool execution errors even though
