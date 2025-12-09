@@ -231,6 +231,7 @@ TEST_SUITE_CONFIG = {
     },
     "litellm": {
         "package": "litellm",
+        "python": ">3.9",  # https://github.com/BerriAI/litellm/issues/17701
     },
     "litestar": {
         "package": "litestar",
