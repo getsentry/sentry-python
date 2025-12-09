@@ -1,3 +1,4 @@
+import copy
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
@@ -31,11 +32,9 @@ def _create_get_model_wrapper(original_get_model):
     def wrapped_get_model(cls, agent, run_config):
         # type: (agents.Runner, agents.Agent, agents.RunConfig) -> agents.Model
 
-        model = original_get_model(agent, run_config)
-
-        # check if we have already patched this model
-        if getattr(model, "_sentry_wrapped_get_model", False):
-            return model
+        # copy the model to double patching its methods. We use copy on purpose here (instead of deepcopy)
+        # because we only patch its direct methods, all underlying data can remain unchanged.
+        model = copy.copy(original_get_model(agent, run_config))
 
         # Wrap _fetch_response if it exists (for OpenAI models) to capture raw response model
         if hasattr(model, "_fetch_response"):
@@ -74,9 +73,6 @@ def _create_get_model_wrapper(original_get_model):
             return result
 
         model.get_response = wrapped_get_response
-
-        # set marker that we have already patched this model
-        model._sentry_wrapped_get_model = True
 
         return model
 
