@@ -24,7 +24,7 @@ def patch_tasks():
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None:
-            return old_task_enqueue(*args, **kwargs)
+            return old_task_enqueue(self, *args, **kwargs)
 
         name = (
             getattr(self.func, "__name__", repr(self.func)) or "<unknown Django task>"
@@ -33,6 +33,6 @@ def patch_tasks():
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_DJANGO, name=name, origin=DjangoIntegration.origin
         ):
-            return old_task_enqueue(*args, **kwargs)
+            return old_task_enqueue(self, *args, **kwargs)
 
     Task.enqueue = _sentry_enqueue
