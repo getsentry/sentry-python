@@ -130,10 +130,15 @@ def _set_input_data(span, get_response_kwargs):
     for message in get_response_kwargs.get("input", []):
         if "role" in message:
             normalized_role = normalize_message_role(message.get("role"))
+            content = message.get("content")
             request_messages.append(
                 {
                     "role": normalized_role,
-                    "content": message.get("content"),
+                    "content": (
+                        [{"type": "text", "text": content}]
+                        if isinstance(content, str)
+                        else content
+                    ),
                 }
             )
         else:
