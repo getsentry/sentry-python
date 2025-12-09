@@ -13,19 +13,19 @@ if TYPE_CHECKING:
 
 # Store the current agent context in a contextvar for re-entrant safety
 # Using a list as a stack to support nested agent calls
-_agent_context_stack = ContextVar("pydantic_ai_agent_context_stack", default=[])  # type: ContextVar[list[dict[str, Any]]]
+_agent_context_stack: "ContextVar[list[dict[str, Any]]]" = ContextVar(
+    "pydantic_ai_agent_context_stack", default=[]
+)
 
 
-def push_agent(agent, is_streaming=False):
-    # type: (Any, bool) -> None
+def push_agent(agent: "Any", is_streaming: bool = False) -> None:
     """Push an agent context onto the stack along with its streaming flag."""
     stack = _agent_context_stack.get().copy()
     stack.append({"agent": agent, "is_streaming": is_streaming})
     _agent_context_stack.set(stack)
 
 
-def pop_agent():
-    # type: () -> None
+def pop_agent() -> None:
     """Pop an agent context from the stack."""
     stack = _agent_context_stack.get().copy()
     if stack:
@@ -33,8 +33,7 @@ def pop_agent():
     _agent_context_stack.set(stack)
 
 
-def get_current_agent():
-    # type: () -> Any
+def get_current_agent() -> "Any":
     """Get the current agent from the contextvar stack."""
     stack = _agent_context_stack.get()
     if stack:
@@ -42,8 +41,7 @@ def get_current_agent():
     return None
 
 
-def get_is_streaming():
-    # type: () -> bool
+def get_is_streaming() -> bool:
     """Get the streaming flag from the contextvar stack."""
     stack = _agent_context_stack.get()
     if stack:
@@ -51,8 +49,7 @@ def get_is_streaming():
     return False
 
 
-def _should_send_prompts():
-    # type: () -> bool
+def _should_send_prompts() -> bool:
     """
     Check if prompts should be sent to Sentry.
 
@@ -72,8 +69,7 @@ def _should_send_prompts():
     return getattr(integration, "include_prompts", False)
 
 
-def _set_agent_data(span, agent):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
     """Set agent-related data on a span.
 
     Args:
@@ -90,8 +86,7 @@ def _set_agent_data(span, agent):
         span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
 
 
-def _get_model_name(model_obj):
-    # type: (Any) -> Optional[str]
+def _get_model_name(model_obj: "Any") -> "Optional[str]":
     """Extract model name from a model object.
 
     Args:
@@ -116,8 +111,9 @@ def _get_model_name(model_obj):
         return str(model_obj)
 
 
-def _set_model_data(span, model, model_settings):
-    # type: (sentry_sdk.tracing.Span, Any, Any) -> None
+def _set_model_data(
+    span: "sentry_sdk.tracing.Span", model: "Any", model_settings: "Any"
+) -> None:
     """Set model-related data on a span.
 
     Args:
@@ -172,8 +168,7 @@ def _set_model_data(span, model, model_settings):
                         span.set_data(spandata_key, value)
 
 
-def _set_available_tools(span, agent):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _set_available_tools(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
     """Set available tools data on a span from an agent's function toolset.
 
     Args:
@@ -211,8 +206,7 @@ def _set_available_tools(span, agent):
         pass
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc: "Any") -> None:
     set_span_errored()
 
     event, hint = event_from_exception(

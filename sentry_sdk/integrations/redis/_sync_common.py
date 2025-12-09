@@ -21,18 +21,16 @@ if TYPE_CHECKING:
 
 
 def patch_redis_pipeline(
-    pipeline_cls,
-    is_cluster,
-    get_command_args_fn,
-    set_db_data_fn,
-):
-    # type: (Any, bool, Any, Callable[[Span, Any], None]) -> None
+    pipeline_cls: "Any",
+    is_cluster: bool,
+    get_command_args_fn: "Any",
+    set_db_data_fn: "Callable[[Span, Any], None]",
+) -> None:
     old_execute = pipeline_cls.execute
 
     from sentry_sdk.integrations.redis import RedisIntegration
 
-    def sentry_patched_execute(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_patched_execute(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         if sentry_sdk.get_client().get_integration(RedisIntegration) is None:
             return old_execute(self, *args, **kwargs)
 
@@ -62,8 +60,9 @@ def patch_redis_pipeline(
     pipeline_cls.execute = sentry_patched_execute
 
 
-def patch_redis_client(cls, is_cluster, set_db_data_fn):
-    # type: (Any, bool, Callable[[Span, Any], None]) -> None
+def patch_redis_client(
+    cls: "Any", is_cluster: bool, set_db_data_fn: "Callable[[Span, Any], None]"
+) -> None:
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
@@ -72,8 +71,9 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
 
     from sentry_sdk.integrations.redis import RedisIntegration
 
-    def sentry_patched_execute_command(self, name, *args, **kwargs):
-        # type: (Any, str, *Any, **Any) -> Any
+    def sentry_patched_execute_command(
+        self: "Any", name: str, *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(RedisIntegration)
         if integration is None:
             return old_execute_command(self, name, *args, **kwargs)

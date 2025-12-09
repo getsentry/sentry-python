@@ -55,12 +55,10 @@ class BottleIntegration(Integration):
 
     def __init__(
         self,
-        transaction_style="endpoint",  # type: str
+        transaction_style: str = "endpoint",
         *,
-        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
-    ):
-        # type: (...) -> None
-
+        failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    ) -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -70,16 +68,16 @@ class BottleIntegration(Integration):
         self.failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         version = parse_version(BOTTLE_VERSION)
         _check_minimum_version(BottleIntegration, version)
 
         old_app = Bottle.__call__
 
         @ensure_integration_enabled(BottleIntegration, old_app)
-        def sentry_patched_wsgi_app(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
+        def sentry_patched_wsgi_app(
+            self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
+        ) -> "_ScopedResponse":
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),
                 span_origin=BottleIntegration.origin,
@@ -92,8 +90,7 @@ class BottleIntegration(Integration):
         old_handle = Bottle._handle
 
         @functools.wraps(old_handle)
-        def _patched_handle(self, environ):
-            # type: (Bottle, Dict[str, Any]) -> Any
+        def _patched_handle(self: "Bottle", environ: "Dict[str, Any]") -> "Any":
             integration = sentry_sdk.get_client().get_integration(BottleIntegration)
             if integration is None:
                 return old_handle(self, environ)
@@ -112,16 +109,16 @@ class BottleIntegration(Integration):
         old_make_callback = Route._make_callback
 
         @functools.wraps(old_make_callback)
-        def patched_make_callback(self, *args, **kwargs):
-            # type: (Route, *object, **object) -> Any
+        def patched_make_callback(
+            self: "Route", *args: object, **kwargs: object
+        ) -> "Any":
             prepared_callback = old_make_callback(self, *args, **kwargs)
 
             integration = sentry_sdk.get_client().get_integration(BottleIntegration)
             if integration is None:
                 return prepared_callback
 
-            def wrapped_callback(*args, **kwargs):
-                # type: (*object, **object) -> Any
+            def wrapped_callback(*args: object, **kwargs: object) -> "Any":
                 try:
                     res = prepared_callback(*args, **kwargs)
                 except Exception as exception:
@@ -142,38 +139,33 @@ class BottleIntegration(Integration):
 
 
 class BottleRequestExtractor(RequestExtractor):
-    def env(self):
-        # type: () -> Dict[str, str]
+    def env(self) -> "Dict[str, str]":
         return self.request.environ
 
-    def cookies(self):
-        # type: () -> Dict[str, str]
+    def cookies(self) -> "Dict[str, str]":
         return self.request.cookies
 
-    def raw_data(self):
-        # type: () -> bytes
+    def raw_data(self) -> bytes:
         return self.request.body.read()
 
-    def form(self):
-        # type: () -> FormsDict
+    def form(self) -> "FormsDict":
         if self.is_json():
             return None
         return self.request.forms.decode()
 
-    def files(self):
-        # type: () -> Optional[Dict[str, str]]
+    def files(self) -> "Optional[Dict[str, str]]":
         if self.is_json():
             return None
 
         return self.request.files
 
-    def size_of_file(self, file):
-        # type: (FileUpload) -> int
+    def size_of_file(self, file: "FileUpload") -> int:
         return file.content_length
 
 
-def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Event, str, Any) -> None
+def _set_transaction_name_and_source(
+    event: "Event", transaction_style: str, request: "Any"
+) -> None:
     name = ""
 
     if transaction_style == "url":
@@ -196,11 +188,10 @@ def _set_transaction_name_and_source(event, transaction_style, request):
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
 
-def _make_request_event_processor(app, request, integration):
-    # type: (Bottle, LocalRequest, BottleIntegration) -> EventProcessor
-
-    def event_processor(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+def _make_request_event_processor(
+    app: "Bottle", request: "LocalRequest", integration: "BottleIntegration"
+) -> "EventProcessor":
+    def event_processor(event: Event, hint: dict[str, Any]) -> Event:
         _set_transaction_name_and_source(event, integration.transaction_style, request)
 
         with capture_internal_exceptions():
@@ -211,8 +202,7 @@ def _make_request_event_processor(app, request, integration):
     return event_processor
 
 
-def _capture_exception(exception, handled):
-    # type: (BaseException, bool) -> None
+def _capture_exception(exception: BaseException, handled: bool) -> None:
     event, hint = event_from_exception(
         exception,
         client_options=sentry_sdk.get_client().options,

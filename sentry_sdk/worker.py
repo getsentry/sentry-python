@@ -18,29 +18,25 @@ _TERMINATOR = object()
 
 
 class BackgroundWorker:
-    def __init__(self, queue_size=DEFAULT_QUEUE_SIZE):
-        # type: (int) -> None
-        self._queue = Queue(queue_size)  # type: Queue
+    def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
+        self._queue: Queue = Queue(queue_size)
         self._lock = threading.Lock()
-        self._thread = None  # type: Optional[threading.Thread]
-        self._thread_for_pid = None  # type: Optional[int]
+        self._thread: "Optional[threading.Thread]" = None
+        self._thread_for_pid: "Optional[int]" = None
 
     @property
-    def is_alive(self):
-        # type: () -> bool
+    def is_alive(self) -> bool:
         if self._thread_for_pid != os.getpid():
             return False
         if not self._thread:
             return False
         return self._thread.is_alive()
 
-    def _ensure_thread(self):
-        # type: () -> None
+    def _ensure_thread(self) -> None:
         if not self.is_alive:
             self.start()
 
-    def _timed_queue_join(self, timeout):
-        # type: (float) -> bool
+    def _timed_queue_join(self, timeout: float) -> bool:
         deadline = time() + timeout
         queue = self._queue
 
@@ -57,8 +53,7 @@ class BackgroundWorker:
         finally:
             queue.all_tasks_done.release()
 
-    def start(self):
-        # type: () -> None
+    def start(self) -> None:
         with self._lock:
             if not self.is_alive:
                 self._thread = threading.Thread(
@@ -74,8 +69,7 @@ class BackgroundWorker:
                     # send out events.
                     self._thread = None
 
-    def kill(self):
-        # type: () -> None
+    def kill(self) -> None:
         """
         Kill worker thread. Returns immediately. Not useful for
         waiting on shutdown for events, use `flush` for that.
@@ -91,20 +85,17 @@ class BackgroundWorker:
                 self._thread = None
                 self._thread_for_pid = None
 
-    def flush(self, timeout, callback=None):
-        # type: (float, Optional[Any]) -> None
+    def flush(self, timeout: float, callback: "Optional[Any]" = None) -> None:
         logger.debug("background worker got flush request")
         with self._lock:
             if self.is_alive and timeout > 0.0:
                 self._wait_flush(timeout, callback)
         logger.debug("background worker flushed")
 
-    def full(self):
-        # type: () -> bool
+    def full(self) -> bool:
         return self._queue.full()
 
-    def _wait_flush(self, timeout, callback):
-        # type: (float, Optional[Any]) -> None
+    def _wait_flush(self, timeout: float, callback: "Optional[Any]") -> None:
         initial_timeout = min(0.1, timeout)
         if not self._timed_queue_join(initial_timeout):
             pending = self._queue.qsize() + 1
@@ -116,8 +107,7 @@ class BackgroundWorker:
                 pending = self._queue.qsize() + 1
                 logger.error("flush timed out, dropped %s events", pending)
 
-    def submit(self, callback):
-        # type: (Callable[[], None]) -> bool
+    def submit(self, callback: "Callable[[], None]") -> bool:
         self._ensure_thread()
         try:
             self._queue.put_nowait(callback)
@@ -125,8 +115,7 @@ class BackgroundWorker:
         except FullError:
             return False
 
-    def _target(self):
-        # type: () -> None
+    def _target(self) -> None:
         while True:
             callback = self._queue.get()
             try:

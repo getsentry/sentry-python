@@ -16,8 +16,7 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def _get_safe_command(name, args):
-    # type: (str, Sequence[Any]) -> str
+def _get_safe_command(name: str, args: "Sequence[Any]") -> str:
     command_parts = [name]
 
     name_low = name.lower()
@@ -44,8 +43,7 @@ def _get_safe_command(name, args):
     return command
 
 
-def _safe_decode(key):
-    # type: (Any) -> str
+def _safe_decode(key: "Any") -> str:
     if isinstance(key, bytes):
         try:
             return key.decode()
@@ -55,8 +53,7 @@ def _safe_decode(key):
     return str(key)
 
 
-def _key_as_string(key):
-    # type: (Any) -> str
+def _key_as_string(key: "Any") -> str:
     if isinstance(key, (dict, list, tuple)):
         key = ", ".join(_safe_decode(x) for x in key)
     elif isinstance(key, bytes):
@@ -69,8 +66,11 @@ def _key_as_string(key):
     return key
 
 
-def _get_safe_key(method_name, args, kwargs):
-    # type: (str, Optional[tuple[Any, ...]], Optional[dict[str, Any]]) -> Optional[tuple[str, ...]]
+def _get_safe_key(
+    method_name: str,
+    args: "Optional[tuple[Any, ...]]",
+    kwargs: "Optional[dict[str, Any]]",
+) -> "Optional[tuple[str, ...]]":
     """
     Gets the key (or keys) from the given method_name.
     The method_name could be a redis command or a django caching command
@@ -100,19 +100,17 @@ def _get_safe_key(method_name, args, kwargs):
     return key
 
 
-def _parse_rediscluster_command(command):
-    # type: (Any) -> Sequence[Any]
+def _parse_rediscluster_command(command: "Any") -> "Sequence[Any]":
     return command.args
 
 
 def _set_pipeline_data(
-    span,
-    is_cluster,
-    get_command_args_fn,
-    is_transaction,
-    commands_seq,
-):
-    # type: (Span, bool, Any, bool, Sequence[Any]) -> None
+    span: "Span",
+    is_cluster: bool,
+    get_command_args_fn: "Any",
+    is_transaction: bool,
+    commands_seq: "Sequence[Any]",
+) -> None:
     span.set_tag("redis.is_cluster", is_cluster)
     span.set_tag("redis.transaction", is_transaction)
 
@@ -133,8 +131,7 @@ def _set_pipeline_data(
     )
 
 
-def _set_client_data(span, is_cluster, name, *args):
-    # type: (Span, bool, str, *Any) -> None
+def _set_client_data(span: "Span", is_cluster: bool, name: str, *args: "Any") -> None:
     span.set_tag("redis.is_cluster", is_cluster)
     if name:
         span.set_tag("redis.command", name)

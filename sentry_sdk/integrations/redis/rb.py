@@ -8,8 +8,7 @@ from sentry_sdk.integrations.redis._sync_common import patch_redis_client
 from sentry_sdk.integrations.redis.modules.queries import _set_db_data
 
 
-def _patch_rb():
-    # type: () -> None
+def _patch_rb() -> None:
     try:
         import rb.clients  # type: ignore
     except ImportError:

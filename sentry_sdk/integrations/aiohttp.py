@@ -74,11 +74,10 @@ class AioHttpIntegration(Integration):
 
     def __init__(
         self,
-        transaction_style="handler_name",  # type: str
+        transaction_style: str = "handler_name",
         *,
-        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
-    ):
-        # type: (...) -> None
+        failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    ) -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -88,9 +87,7 @@ class AioHttpIntegration(Integration):
         self._failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         version = parse_version(AIOHTTP_VERSION)
         _check_minimum_version(AioHttpIntegration, version)
 
@@ -106,8 +103,9 @@ class AioHttpIntegration(Integration):
 
         old_handle = Application._handle
 
-        async def sentry_app_handle(self, request, *args, **kwargs):
-            # type: (Any, Request, *Any, **Any) -> Any
+        async def sentry_app_handle(
+            self: "Any", request: "Request", *args: "Any", **kwargs: "Any"
+        ) -> "Any":
             integration = sentry_sdk.get_client().get_integration(AioHttpIntegration)
             if integration is None:
                 return await old_handle(self, request, *args, **kwargs)
@@ -174,8 +172,9 @@ class AioHttpIntegration(Integration):
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
         @wraps(old_urldispatcher_resolve)
-        async def sentry_urldispatcher_resolve(self, request):
-            # type: (UrlDispatcher, Request) -> UrlMappingMatchInfo
+        async def sentry_urldispatcher_resolve(
+            self: "UrlDispatcher", request: "Request"
+        ) -> "UrlMappingMatchInfo":
             rv = await old_urldispatcher_resolve(self, request)
 
             integration = sentry_sdk.get_client().get_integration(AioHttpIntegration)
@@ -207,8 +206,7 @@ class AioHttpIntegration(Integration):
         old_client_session_init = ClientSession.__init__
 
         @ensure_integration_enabled(AioHttpIntegration, old_client_session_init)
-        def init(*args, **kwargs):
-            # type: (Any, Any) -> None
+        def init(*args: "Any", **kwargs: "Any") -> None:
             client_trace_configs = list(kwargs.get("trace_configs") or ())
             trace_config = create_trace_config()
             client_trace_configs.append(trace_config)
@@ -219,11 +217,12 @@ class AioHttpIntegration(Integration):
         ClientSession.__init__ = init
 
 
-def create_trace_config():
-    # type: () -> TraceConfig
-
-    async def on_request_start(session, trace_config_ctx, params):
-        # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
+def create_trace_config() -> "TraceConfig":
+    async def on_request_start(
+        session: ClientSession,
+        trace_config_ctx: SimpleNamespace,
+        params: TraceRequestStartParams,
+    ) -> None:
         if sentry_sdk.get_client().get_integration(AioHttpIntegration) is None:
             return
 
@@ -269,8 +268,11 @@ def create_trace_config():
 
         trace_config_ctx.span = span
 
-    async def on_request_end(session, trace_config_ctx, params):
-        # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
+    async def on_request_end(
+        session: "ClientSession",
+        trace_config_ctx: "SimpleNamespace",
+        params: "TraceRequestEndParams",
+    ) -> None:
         if trace_config_ctx.span is None:
             return
 
@@ -290,13 +292,13 @@ def create_trace_config():
     return trace_config
 
 
-def _make_request_processor(weak_request):
-    # type: (weakref.ReferenceType[Request]) -> EventProcessor
+def _make_request_processor(
+    weak_request: "weakref.ReferenceType[Request]",
+) -> "EventProcessor":
     def aiohttp_processor(
-        event,  # type: Event
-        hint,  # type: dict[str, Tuple[type, BaseException, Any]]
-    ):
-        # type: (...) -> Event
+        event: Event,
+        hint: dict[str, Tuple[type, BaseException, Any]],
+    ) -> Event:
         request = weak_request()
         if request is None:
             return event
@@ -325,8 +327,7 @@ def _make_request_processor(weak_request):
     return aiohttp_processor
 
 
-def _capture_exception():
-    # type: () -> ExcInfo
+def _capture_exception() -> "ExcInfo":
     exc_info = sys.exc_info()
     event, hint = event_from_exception(
         exc_info,
@@ -340,8 +341,9 @@ def _capture_exception():
 BODY_NOT_READ_MESSAGE = "[Can't show request body due to implementation details.]"
 
 
-def get_aiohttp_request_data(request):
-    # type: (Request) -> Union[Optional[str], AnnotatedValue]
+def get_aiohttp_request_data(
+    request: "Request",
+) -> "Union[Optional[str], AnnotatedValue]":
     bytes_body = request._read_bytes
 
     if bytes_body is not None:

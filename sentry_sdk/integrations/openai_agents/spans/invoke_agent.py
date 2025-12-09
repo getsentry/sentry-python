@@ -19,8 +19,9 @@ if TYPE_CHECKING:
     from typing import Any, Optional
 
 
-def invoke_agent_span(context, agent, kwargs):
-    # type: (agents.RunContextWrapper, agents.Agent, dict[str, Any]) -> sentry_sdk.tracing.Span
+def invoke_agent_span(
+    context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"
+) -> "sentry_sdk.tracing.Span":
     start_span_function = get_start_span_function()
     span = start_span_function(
         op=OP.GEN_AI_INVOKE_AGENT,
@@ -79,8 +80,9 @@ def invoke_agent_span(context, agent, kwargs):
     return span
 
 
-def update_invoke_agent_span(context, agent, output):
-    # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
+def update_invoke_agent_span(
+    context: "agents.RunContextWrapper", agent: "agents.Agent", output: "Any"
+) -> None:
     span = getattr(context, "_sentry_agent_span", None)
 
     if span:
@@ -97,8 +99,11 @@ def update_invoke_agent_span(context, agent, output):
         delattr(context, "_sentry_agent_span")
 
 
-def end_invoke_agent_span(context_wrapper, agent, output=None):
-    # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
+def end_invoke_agent_span(
+    context_wrapper: "agents.RunContextWrapper",
+    agent: "agents.Agent",
+    output: "Optional[Any]" = None,
+) -> None:
     """End the agent invocation span"""
     # Clear the stored agent
     if hasattr(context_wrapper, "_sentry_current_agent"):
