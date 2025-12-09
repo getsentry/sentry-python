@@ -133,7 +133,7 @@ def _set_input_data(span, get_response_kwargs):
             request_messages.append(
                 {
                     "role": normalized_role,
-                    "content": [{"type": "text", "text": message.get("content")}],
+                    "content": message.get("content"),
                 }
             )
         else:
