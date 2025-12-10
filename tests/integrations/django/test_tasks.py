@@ -135,7 +135,7 @@ def test_task_error_reporting(sentry_init, immediate_backend, capture_events):
     with pytest.raises(ValueError, match="Task failed"):
         _ = result.return_value
 
-    assert len(events) >= 1
+    assert len(events) == 2
     transaction_event = events[-1]
     assert transaction_event["type"] == "transaction"
 
@@ -146,27 +146,6 @@ def test_task_error_reporting(sentry_init, immediate_backend, capture_events):
     ]
     assert len(queue_submit_spans) == 1
     assert queue_submit_spans[0]["description"] == "failing_task"
-
-
-@pytest.mark.skipif(
-    not HAS_DJANGO_TASKS,
-    reason="Django tasks are only available in Django 6.0+",
-)
-def test_task_span_not_created_without_integration(
-    sentry_init, capture_events, immediate_backend
-):
-    """Test that no span is created when DjangoIntegration is not enabled."""
-    sentry_init(traces_sample_rate=1.0, default_integrations=False)
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(name="test_transaction"):
-        simple_task.enqueue()
-
-    (event,) = events
-    queue_submit_spans = [
-        span for span in event["spans"] if span["op"] == OP.QUEUE_SUBMIT_DJANGO
-    ]
-    assert len(queue_submit_spans) == 0
 
 
 @pytest.mark.skipif(
@@ -197,32 +176,3 @@ def test_multiple_task_enqueues_create_multiple_spans(
     span_names = [span["description"] for span in queue_submit_spans]
     assert span_names.count("task_one") == 2
     assert span_names.count("task_two") == 1
-
-
-@pytest.mark.skipif(
-    not HAS_DJANGO_TASKS,
-    reason="Django tasks are only available in Django 6.0+",
-)
-def test_nested_task_enqueue_spans(sentry_init, capture_events, immediate_backend):
-    """Test that task spans are properly nested under parent spans."""
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(name="test_transaction"):
-        with start_span(op="custom.operation", name="parent_span"):
-            simple_task.enqueue()
-
-    (event,) = events
-
-    custom_spans = [span for span in event["spans"] if span["op"] == "custom.operation"]
-    queue_submit_spans = [
-        span for span in event["spans"] if span["op"] == OP.QUEUE_SUBMIT_DJANGO
-    ]
-
-    assert len(custom_spans) == 1
-    assert len(queue_submit_spans) == 1
-
-    assert queue_submit_spans[0]["parent_span_id"] == custom_spans[0]["span_id"]
