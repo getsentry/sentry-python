@@ -831,6 +831,316 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_
     assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
 
 
+def test_pregel_invoke_span_includes_response_model(sentry_init, capture_events):
+    """
+    Test that invoke_agent spans include the response model.
+    When an agent makes multiple LLM calls, it should report the last model used.
+    """
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    def original_invoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 30,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 20,
+                    },
+                    "model_name": "gpt-4.1-2025-04-14",
+                },
+            )
+        ]
+        return {"messages": new_messages}
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
+
+    assert result is not None
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_agent_span = invoke_spans[0]
+
+    # Verify invoke_agent span has response model
+    assert invoke_agent_span["description"] == "invoke_agent test_graph"
+    assert "gen_ai.response.model" in invoke_agent_span["data"]
+    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+
+
+def test_pregel_ainvoke_span_includes_response_model(sentry_init, capture_events):
+    """
+    Test that invoke_agent spans include the response model.
+    When an agent makes multiple LLM calls, it should report the last model used.
+    """
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    async def original_ainvoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 30,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 20,
+                    },
+                    "model_name": "gpt-4.1-2025-04-14",
+                },
+            )
+        ]
+        return {"messages": new_messages}
+
+    async def run_test():
+        with start_transaction():
+            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+            result = await wrapped_ainvoke(pregel, test_state)
+            return result
+
+    result = asyncio.run(run_test())
+    assert result is not None
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_agent_span = invoke_spans[0]
+
+    # Verify invoke_agent span has response model
+    assert invoke_agent_span["description"] == "invoke_agent test_graph"
+    assert "gen_ai.response.model" in invoke_agent_span["data"]
+    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+
+
+def test_pregel_invoke_span_uses_last_response_model(sentry_init, capture_events):
+    """
+    Test that when an agent makes multiple LLM calls (e.g., with tools),
+    the invoke_agent span reports the last response model used.
+    """
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    def original_invoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 15,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 5,
+                    },
+                    "model_name": "gpt-4-0613",
+                },
+            ),
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 35,
+                        "prompt_tokens": 20,
+                        "completion_tokens": 15,
+                    },
+                    "model_name": "gpt-4.1-2025-04-14",
+                },
+            ),
+        ]
+        return {"messages": new_messages}
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
+
+    assert result is not None
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_agent_span = invoke_spans[0]
+
+    # Verify invoke_agent span uses the LAST response model
+    assert "gen_ai.response.model" in invoke_agent_span["data"]
+    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+
+
+def test_pregel_ainvoke_span_uses_last_response_model(sentry_init, capture_events):
+    """
+    Test that when an agent makes multiple LLM calls (e.g., with tools),
+    the invoke_agent span reports the last response model used.
+    """
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    async def original_ainvoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 15,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 5,
+                    },
+                    "model_name": "gpt-4-0613",
+                },
+            ),
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 35,
+                        "prompt_tokens": 20,
+                        "completion_tokens": 15,
+                    },
+                    "model_name": "gpt-4.1-2025-04-14",
+                },
+            ),
+        ]
+        return {"messages": new_messages}
+
+    async def run_test():
+        with start_transaction():
+            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+            result = await wrapped_ainvoke(pregel, test_state)
+            return result
+
+    result = asyncio.run(run_test())
+    assert result is not None
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_agent_span = invoke_spans[0]
+
+    # Verify invoke_agent span uses the LAST response model
+    assert "gen_ai.response.model" in invoke_agent_span["data"]
+    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+
+
 def test_complex_message_parsing():
     """Test message parsing with complex message structures."""
     messages = [
