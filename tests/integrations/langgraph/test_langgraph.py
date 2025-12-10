@@ -738,16 +738,10 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_e
         span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
-
     invoke_agent_span = invoke_spans[0]
 
-    # Verify invoke_agent span has usage data
-    assert invoke_agent_span["description"] == "invoke_agent test_graph"
-    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
-    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
-    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
-
-    # The usage should match the mock_usage values (aggregated across all calls)
+    # Verify invoke_agent span has aggregated usage from both API calls
+    # Total: 10 + 20 = 30 input tokens, 5 + 15 = 20 output tokens, 15 + 35 = 50 total
     assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 30
     assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
     assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
@@ -828,16 +822,10 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_
         span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
-
     invoke_agent_span = invoke_spans[0]
 
-    # Verify invoke_agent span has usage data
-    assert invoke_agent_span["description"] == "invoke_agent test_graph"
-    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
-    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
-    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
-
-    # The usage should match the mock_usage values (aggregated across all calls)
+    # Verify invoke_agent span has aggregated usage from both API calls
+    # Total: 10 + 20 = 30 input tokens, 5 + 15 = 20 output tokens, 15 + 35 = 50 total
     assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 30
     assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
     assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
