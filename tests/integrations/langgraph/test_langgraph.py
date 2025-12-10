@@ -96,6 +96,7 @@ class MockMessage:
         function_call=None,
         role=None,
         type=None,
+        response_metadata=None,
     ):
         self.content = content
         self.name = name
@@ -108,6 +109,7 @@ class MockMessage:
             self.type = name
         else:
             self.type = type
+        self.response_metadata = response_metadata
 
 
 class MockPregelInstance:
@@ -507,6 +509,338 @@ def test_pregel_invoke_with_different_graph_names(
         assert invoke_span["description"] == "invoke_agent"
         assert SPANDATA.GEN_AI_PIPELINE_NAME not in invoke_span.get("data", {})
         assert SPANDATA.GEN_AI_AGENT_NAME not in invoke_span.get("data", {})
+
+
+def test_pregel_invoke_span_includes_usage_data(sentry_init, capture_events):
+    """
+    Test that invoke_agent spans include aggregated usage data from context_wrapper.
+    This verifies the new functionality added to track token usage in invoke_agent spans.
+    """
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    def original_invoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 30,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 20,
+                    },
+                    "model_name": "gpt-4.1-2025-04-14",
+                },
+            )
+        ]
+        return {"messages": new_messages}
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
+
+    assert result is not None
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_agent_span = invoke_spans[0]
+
+    # Verify invoke_agent span has usage data
+    assert invoke_agent_span["description"] == "invoke_agent test_graph"
+    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
+
+    # The usage should match the mock_usage values (aggregated across all calls)
+    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+def test_pregel_ainvoke_span_includes_usage_data(sentry_init, capture_events):
+    """
+    Test that invoke_agent spans include aggregated usage data from context_wrapper.
+    This verifies the new functionality added to track token usage in invoke_agent spans.
+    """
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    async def original_ainvoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 30,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 20,
+                    },
+                    "model_name": "gpt-4.1-2025-04-14",
+                },
+            )
+        ]
+        return {"messages": new_messages}
+
+    async def run_test():
+        with start_transaction():
+            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+            result = await wrapped_ainvoke(pregel, test_state)
+            return result
+
+    result = asyncio.run(run_test())
+    assert result is not None
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_agent_span = invoke_spans[0]
+
+    # Verify invoke_agent span has usage data
+    assert invoke_agent_span["description"] == "invoke_agent test_graph"
+    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
+
+    # The usage should match the mock_usage values (aggregated across all calls)
+    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+def test_pregel_invoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_events):
+    """
+    Test that invoke_agent spans show aggregated usage across multiple LLM calls
+    (e.g., when tools are used and multiple API calls are made).
+    """
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    def original_invoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 15,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 5,
+                    },
+                },
+            ),
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 35,
+                        "prompt_tokens": 20,
+                        "completion_tokens": 15,
+                    },
+                },
+            ),
+        ]
+        return {"messages": new_messages}
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
+
+    assert result is not None
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_agent_span = invoke_spans[0]
+
+    # Verify invoke_agent span has usage data
+    assert invoke_agent_span["description"] == "invoke_agent test_graph"
+    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
+
+    # The usage should match the mock_usage values (aggregated across all calls)
+    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 30
+    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
+
+
+def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_events):
+    """
+    Test that invoke_agent spans show aggregated usage across multiple LLM calls
+    (e.g., when tools are used and multiple API calls are made).
+    """
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage("Of course! How can I assist you?", name="assistant"),
+        ]
+    }
+
+    pregel = MockPregelInstance("test_graph")
+
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    async def original_ainvoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 15,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 5,
+                    },
+                },
+            ),
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 35,
+                        "prompt_tokens": 20,
+                        "completion_tokens": 15,
+                    },
+                },
+            ),
+        ]
+        return {"messages": new_messages}
+
+    async def run_test():
+        with start_transaction():
+            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+            result = await wrapped_ainvoke(pregel, test_state)
+            return result
+
+    result = asyncio.run(run_test())
+    assert result is not None
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_agent_span = invoke_spans[0]
+
+    # Verify invoke_agent span has usage data
+    assert invoke_agent_span["description"] == "invoke_agent test_graph"
+    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
+    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
+
+    # The usage should match the mock_usage values (aggregated across all calls)
+    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 30
+    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
 
 
 def test_complex_message_parsing():
