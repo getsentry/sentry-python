@@ -364,6 +364,8 @@ class _Client(BaseClient):
 
         def _capture_envelope(envelope):
             # type: (Envelope) -> None
+            if self.spotlight is not None:
+                self.spotlight.capture_envelope(envelope)
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
@@ -390,6 +392,18 @@ class _Client(BaseClient):
             if self.transport:
                 if self.options["enable_backpressure_handling"]:
                     self.monitor = Monitor(self.transport)
+
+            # Setup Spotlight before creating batchers so _capture_envelope can use it.
+            # setup_spotlight handles all config/env var resolution per the SDK spec.
+            from sentry_sdk.spotlight import setup_spotlight
+
+            self.spotlight = setup_spotlight(self.options)
+            if self.spotlight is not None and not self.options["dsn"]:
+                sample_all = lambda *_args, **_kwargs: 1.0
+                self.options["send_default_pii"] = True
+                self.options["error_sampler"] = sample_all
+                self.options["traces_sampler"] = sample_all
+                self.options["profiles_sampler"] = sample_all
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
@@ -447,29 +461,6 @@ class _Client(BaseClient):
                 disabled_integrations=self.options["disabled_integrations"],
                 options=self.options,
             )
-
-            spotlight_config = self.options.get("spotlight")
-            if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
-                spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
-                spotlight_config = env_to_bool(spotlight_env_value, strict=True)
-                self.options["spotlight"] = (
-                    spotlight_config
-                    if spotlight_config is not None
-                    else spotlight_env_value
-                )
-
-            if self.options.get("spotlight"):
-                # This is intentionally here to prevent setting up spotlight
-                # stuff we don't need unless spotlight is explicitly enabled
-                from sentry_sdk.spotlight import setup_spotlight
-
-                self.spotlight = setup_spotlight(self.options)
-                if not self.options["dsn"]:
-                    sample_all = lambda *_args, **_kwargs: 1.0
-                    self.options["send_default_pii"] = True
-                    self.options["error_sampler"] = sample_all
-                    self.options["traces_sampler"] = sample_all
-                    self.options["profiles_sampler"] = sample_all
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name

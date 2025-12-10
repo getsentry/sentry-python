@@ -4,6 +4,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     normalize_message_role,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
@@ -16,6 +17,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from agents import Usage
+
+    from sentry_sdk.tracing import Span
 
 try:
     import agents
@@ -34,6 +37,20 @@ def _capture_exception(exc):
         mechanism={"type": "openai_agents", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
+
+
+def _record_exception_on_span(span, error):
+    # type: (Span, Exception) -> Any
+    set_span_errored(span)
+    span.set_data("span.status", "error")
+
+    # Optionally capture the error details if we have them
+    if hasattr(error, "__class__"):
+        span.set_data("error.type", error.__class__.__name__)
+    if hasattr(error, "__str__"):
+        error_message = str(error)
+        if error_message:
+            span.set_data("error.message", error_message)
 
 
 def _set_agent_data(span, agent):
@@ -113,10 +130,15 @@ def _set_input_data(span, get_response_kwargs):
     for message in get_response_kwargs.get("input", []):
         if "role" in message:
             normalized_role = normalize_message_role(message.get("role"))
+            content = message.get("content")
             request_messages.append(
                 {
                     "role": normalized_role,
-                    "content": [{"type": "text", "text": message.get("content")}],
+                    "content": (
+                        [{"type": "text", "text": content}]
+                        if isinstance(content, str)
+                        else content
+                    ),
                 }
             )
         else:
@@ -135,12 +157,16 @@ def _set_input_data(span, get_response_kwargs):
                     }
                 )
 
-    set_data_normalized(
-        span,
-        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-        normalize_message_roles(request_messages),
-        unpack=False,
-    )
+    normalized_messages = normalize_message_roles(request_messages)
+    scope = sentry_sdk.get_current_scope()
+    messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+    if messages_data is not None:
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            messages_data,
+            unpack=False,
+        )
 
 
 def _set_output_data(span, result):

@@ -176,8 +176,13 @@ def _make_event_processor(weak_handler):
             request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
-        with capture_internal_exceptions():
-            if handler.current_user and should_send_default_pii():
+        if should_send_default_pii():
+            try:
+                current_user = handler.current_user
+            except Exception:
+                current_user = None
+
+            if current_user:
                 event.setdefault("user", {}).setdefault("is_authenticated", True)
 
         return event

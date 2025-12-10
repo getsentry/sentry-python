@@ -15,6 +15,7 @@ from sentry_sdk import (
 )
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport
+from tests.conftest import TestTransportWithOptions
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
@@ -361,3 +362,71 @@ def test_good_sysexit_doesnt_fail_transaction(
     assert "status" not in span.get("tags", {})
     assert "status" not in event["tags"]
     assert event["contexts"]["trace"]["status"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "strict_trace_continuation,baggage_org_id,dsn_org_id,should_continue_trace",
+    (
+        (True, "sentry-org_id=1234", "o1234", True),
+        (True, "sentry-org_id=1234", "o9999", False),
+        (True, "sentry-org_id=9999", "o1234", False),
+        (False, "sentry-org_id=1234", "o1234", True),
+        (False, "sentry-org_id=9999", "o1234", False),
+        (False, "sentry-org_id=1234", "o9999", False),
+        (False, "sentry-org_id=1234", "not_org_id", True),
+        (False, "", "o1234", True),
+    ),
+)
+def test_continue_trace_strict_trace_continuation(
+    sentry_init,
+    strict_trace_continuation,
+    baggage_org_id,
+    dsn_org_id,
+    should_continue_trace,
+):
+    sentry_init(
+        dsn=f"https://mysecret@{dsn_org_id}.ingest.sentry.io/12312012",
+        strict_trace_continuation=strict_trace_continuation,
+        traces_sample_rate=1.0,
+        transport=TestTransportWithOptions,
+    )
+
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+        "baggage": (
+            "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+            f"{baggage_org_id}, "
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+            "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+        ),
+    }
+
+    transaction = continue_trace(headers, name="strict trace")
+
+    if should_continue_trace:
+        assert (
+            transaction.trace_id
+            == "771a43a4192642f0b136d5159a501700"
+            == "771a43a4192642f0b136d5159a501700"
+        )
+        assert transaction.parent_span_id == "1234567890abcdef"
+        assert transaction.parent_sampled
+    else:
+        assert (
+            transaction.trace_id
+            != "771a43a4192642f0b136d5159a501700"
+            == "771a43a4192642f0b136d5159a501700"
+        )
+        assert transaction.parent_span_id != "1234567890abcdef"
+        assert not transaction.parent_sampled
+
+
+def test_continue_trace_forces_new_traces_when_no_propagation(sentry_init):
+    """This is to make sure we don't have a long running trace because of TWP logic for the no propagation case."""
+
+    sentry_init(traces_sample_rate=1.0)
+
+    tx1 = continue_trace({}, name="tx1")
+    tx2 = continue_trace({}, name="tx2")
+
+    assert tx1.trace_id != tx2.trace_id

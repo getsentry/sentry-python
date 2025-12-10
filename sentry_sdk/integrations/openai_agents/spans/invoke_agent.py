@@ -3,19 +3,20 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
     normalize_message_roles,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data
+from ..utils import _set_agent_data, _set_usage_data
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import agents
-    from typing import Any
+    from typing import Any, Optional
 
 
 def invoke_agent_span(context, agent, kwargs):
@@ -61,12 +62,17 @@ def invoke_agent_span(context, agent, kwargs):
 
         if len(messages) > 0:
             normalized_messages = normalize_message_roles(messages)
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                normalized_messages,
-                unpack=False,
+            scope = sentry_sdk.get_current_scope()
+            messages_data = truncate_and_annotate_messages(
+                normalized_messages, span, scope
             )
+            if messages_data is not None:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    messages_data,
+                    unpack=False,
+                )
 
     _set_agent_data(span, agent)
 
@@ -75,12 +81,27 @@ def invoke_agent_span(context, agent, kwargs):
 
 def update_invoke_agent_span(context, agent, output):
     # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
-    span = sentry_sdk.get_current_span()
+    span = getattr(context, "_sentry_agent_span", None)
 
     if span:
+        # Add aggregated usage data from context_wrapper
+        if hasattr(context, "usage"):
+            _set_usage_data(span, context.usage)
+
         if should_send_default_pii():
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
             )
 
         span.__exit__(None, None, None)
+        delattr(context, "_sentry_agent_span")
+
+
+def end_invoke_agent_span(context_wrapper, agent, output=None):
+    # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
+    """End the agent invocation span"""
+    # Clear the stored agent
+    if hasattr(context_wrapper, "_sentry_current_agent"):
+        delattr(context_wrapper, "_sentry_current_agent")
+
+    update_invoke_agent_span(context_wrapper, agent, output)

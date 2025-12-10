@@ -1,8 +1,3 @@
-# This configuration is used by Craft to categorize changelog entries based on
-# PR labels. To avoid some manual work, there is a PR labeling GitHub action in
-# .github/workflows/pr-labeler.yml that adds a changelog label to PRs based on
-# the title.
-
 changelog:
   exclude:
     labels:
@@ -13,22 +8,25 @@ changelog:
     - title: New Features ✨
       labels:
         - "Changelog: Feature"
-        - Feature
-        - Improvement
-        - New Integration
+      commit_patterns:
+        - "^feat\\b"
     - title: Bug Fixes 🐛
       labels:
         - "Changelog: Bugfix"
-        - Bug
+      commit_patterns:
+        - "^(fix|bugfix)\\b"
     - title: Deprecations 🏗️
       labels:
         - "Changelog: Deprecation"
+      commit_patterns:
+        - "deprecat"  # deprecation, deprecated
     - title: Documentation 📚
       labels:
         - "Changelog: Docs"
-        - Docs
-        - "Component: Docs"
+      commit_patterns:
+        - "^docs?\\b"
     - title: Internal Changes 🔧
       labels:
         - "Changelog: Internal"
-        - Quality Improvement
+      commit_patterns:
+        - "^(build|ref|chore|ci|tests?)\\b"

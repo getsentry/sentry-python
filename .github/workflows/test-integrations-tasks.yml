@@ -38,14 +38,14 @@ jobs:
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
-      - uses: actions/checkout@v6.0.0
+      - uses: actions/checkout@v6.0.1
       - uses: actions/setup-python@v6
         if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: Start Redis
-        uses: supercharge/redis-github-action@1.8.1
+        uses: supercharge/redis-github-action@v2
       - name: Install Java
         uses: actions/setup-java@v5
         with:

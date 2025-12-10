@@ -15,7 +15,6 @@ from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     filename_for_module,
-    Dsn,
     logger,
     match_regex_list,
     qualname_from_function,
@@ -456,20 +455,28 @@ class PropagationContext:
 
     @classmethod
     def from_incoming_data(cls, incoming_data):
-        # type: (Dict[str, Any]) -> Optional[PropagationContext]
+        # type: (Dict[str, Any]) -> PropagationContext
+        propagation_context = PropagationContext()
         normalized_data = normalize_incoming_data(incoming_data)
 
         sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
         sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
-        if sentrytrace_data is None:
-            return None
 
-        propagation_context = PropagationContext()
-        propagation_context.update(sentrytrace_data)
+        # nothing to propagate if no sentry-trace
+        if sentrytrace_data is None:
+            return propagation_context
 
         baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
-        if baggage_header:
-            propagation_context.baggage = Baggage.from_incoming_header(baggage_header)
+        baggage = (
+            Baggage.from_incoming_header(baggage_header) if baggage_header else None
+        )
+
+        if not _should_continue_trace(baggage):
+            return propagation_context
+
+        propagation_context.update(sentrytrace_data)
+        if baggage:
+            propagation_context.baggage = baggage
 
         propagation_context._fill_sample_rand()
 
@@ -1236,6 +1243,41 @@ def _set_output_attributes(span, template, send_pii, result):
     :param result: The result of the wrapped function.
     """
     span.update_data(_get_output_attributes(template, send_pii, result) or {})
+
+
+def _should_continue_trace(baggage):
+    # type: (Optional[Baggage]) -> bool
+    """
+    Check if we should continue the incoming trace according to the strict_trace_continuation spec.
+    https://develop.sentry.dev/sdk/telemetry/traces/#stricttracecontinuation
+    """
+
+    client = sentry_sdk.get_client()
+    parsed_dsn = client.parsed_dsn
+    client_org_id = parsed_dsn.org_id if parsed_dsn else None
+    baggage_org_id = baggage.sentry_items.get("org_id") if baggage else None
+
+    if (
+        client_org_id is not None
+        and baggage_org_id is not None
+        and client_org_id != baggage_org_id
+    ):
+        logger.debug(
+            f"Starting a new trace because org IDs don't match (incoming baggage org_id: {baggage_org_id}, SDK org_id: {client_org_id})"
+        )
+        return False
+
+    strict_trace_continuation = client.options.get("strict_trace_continuation", False)  # type: bool
+    if strict_trace_continuation:
+        if (baggage_org_id is not None and client_org_id is None) or (
+            baggage_org_id is None and client_org_id is not None
+        ):
+            logger.debug(
+                f"Starting a new trace because strict trace continuation is enabled and one org ID is missing (incoming baggage org_id: {baggage_org_id}, SDK org_id: {client_org_id})"
+            )
+            return False
+
+    return True
 
 
 # Circular imports

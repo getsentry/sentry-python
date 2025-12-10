@@ -23,7 +23,7 @@ jobs:
           python-version: 3.14t
 
       - name: Checkout repo
-        uses: actions/checkout@v6.0.0
+        uses: actions/checkout@v6.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -54,7 +54,7 @@ jobs:
           echo "date=$DATE" >> $GITHUB_OUTPUT
 
       - name: Create pull request
-        uses: actions/github-script@v8.0.0
+        uses: actions/github-script@v8
         with:
           script: |
             const branchName = '${{ steps.create-branch.outputs.branch_name }}';
