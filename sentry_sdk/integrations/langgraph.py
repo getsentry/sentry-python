@@ -318,7 +318,7 @@ def _extract_tool_calls(messages):
 
 
 def _set_usage_data(span, messages):
-    # type: (Any, Any) -> None
+    # type: (sentry_sdk.tracing.Span, Any) -> None
     input_tokens = 0
     output_tokens = 0
     total_tokens = 0
@@ -336,13 +336,13 @@ def _set_usage_data(span, messages):
         output_tokens += int(token_usage.get("completion_tokens", 0))
         total_tokens += int(token_usage.get("total_tokens", 0))
 
-    if input_tokens is not None:
+    if input_tokens > 0:
         span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
-    if output_tokens is not None:
+    if output_tokens > 0:
         span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
-    if total_tokens is not None:
+    if total_tokens > 0:
         span.set_data(
             SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
             total_tokens,
