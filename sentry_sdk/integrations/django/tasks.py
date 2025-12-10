@@ -10,6 +10,11 @@ try:
 except ImportError:
     Task = None
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
+
 
 def patch_tasks():
     # type: () -> None
@@ -20,7 +25,7 @@ def patch_tasks():
 
     @wraps(old_task_enqueue)
     def _sentry_enqueue(self, *args, **kwargs):
-        # type: (Any, Any) -> Any
+        # type: (Any, Any, Any) -> Any
         from sentry_sdk.integrations.django import DjangoIntegration
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
