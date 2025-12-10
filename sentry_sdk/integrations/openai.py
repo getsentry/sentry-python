@@ -195,9 +195,15 @@ def _set_input_data(span, kwargs, operation, integration):
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
         if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+            # Use appropriate field based on operation type
+            if operation == "embeddings":
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
+                )
+            else:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                )
 
     # Input attributes: Common
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
@@ -243,7 +249,11 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
 
     if hasattr(response, "choices"):
         if should_send_default_pii() and integration.include_prompts:
-            response_text = [choice.message.model_dump() for choice in response.choices]
+            response_text = [
+                choice.message.model_dump()
+                for choice in response.choices
+                if choice.message is not None
+            ]
             if len(response_text) > 0:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
 

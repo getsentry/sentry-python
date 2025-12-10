@@ -440,8 +440,9 @@ def test_span_status_error(sentry_init, capture_events):
 
     (error, transaction) = events
     assert error["level"] == "error"
-    assert transaction["spans"][0]["tags"]["status"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "error"
+    assert transaction["spans"][0]["status"] == "internal_error"
+    assert transaction["spans"][0]["tags"]["status"] == "internal_error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -501,9 +502,9 @@ def test_embeddings_create(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
@@ -549,9 +550,9 @@ async def test_embeddings_create_async(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30

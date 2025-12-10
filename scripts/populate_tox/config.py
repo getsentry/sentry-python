@@ -103,6 +103,7 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
+            "py3.14,py3.14t": ["coverage==7.11.0"],
         },
     },
     "dramatiq": {
@@ -199,7 +200,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "tiktoken", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -212,7 +213,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -230,11 +231,18 @@ TEST_SUITE_CONFIG = {
     },
     "litellm": {
         "package": "litellm",
+        "python": ">3.9",  # https://github.com/BerriAI/litellm/issues/17701
     },
     "litestar": {
         "package": "litestar",
         "deps": {
-            "*": ["pytest-asyncio", "python-multipart", "requests", "cryptography"],
+            "*": [
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "cryptography",
+                "sniffio",
+            ],
             "<2.7": ["httpx<0.28"],
         },
     },
@@ -244,6 +252,12 @@ TEST_SUITE_CONFIG = {
     },
     "mcp": {
         "package": "mcp",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
+    "fastmcp": {
+        "package": "fastmcp",
         "deps": {
             "*": ["pytest-asyncio"],
         },
@@ -322,7 +336,10 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
-        "python": ">=3.9",
+        "python": {
+            ">0.0,<2.52.0": ">=3.9",
+            ">=2.52.0": ">=3.10",
+        },
         "num_versions": 2,
     },
     "redis": {

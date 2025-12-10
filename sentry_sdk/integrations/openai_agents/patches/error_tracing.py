@@ -3,6 +3,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.tracing_utils import set_span_errored
+from ..utils import _record_exception_on_span
 
 from typing import TYPE_CHECKING
 
@@ -58,16 +59,7 @@ def _patch_error_tracing():
         # Set the current Sentry span to errored
         current_span = sentry_sdk.get_current_span()
         if current_span is not None:
-            set_span_errored(current_span)
-            current_span.set_data("span.status", "error")
-
-            # Optionally capture the error details if we have them
-            if hasattr(error, "__class__"):
-                current_span.set_data("error.type", error.__class__.__name__)
-            if hasattr(error, "__str__"):
-                error_message = str(error)
-                if error_message:
-                    current_span.set_data("error.message", error_message)
+            _record_exception_on_span(current_span, error)
 
         # Call the original function
         return original_attach_error(error, *args, **kwargs)

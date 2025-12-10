@@ -2,12 +2,17 @@ from contextlib import asynccontextmanager
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import (
     ai_client_span,
     update_ai_client_span,
 )
-from pydantic_ai._agent_graph import ModelRequestNode  # type: ignore
+
+try:
+    from pydantic_ai._agent_graph import ModelRequestNode  # type: ignore
+except ImportError:
+    raise DidNotEnable("pydantic-ai not installed")
 
 from typing import TYPE_CHECKING
 

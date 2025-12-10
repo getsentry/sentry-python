@@ -65,9 +65,11 @@ IGNORE = {
     "cloud_resource_context",
     "common",
     "integration_deactivation",
+    "shadowed_module",
     "gcp",
     "gevent",
     "opentelemetry",
+    "otlp",
     "potel",
 }
 
@@ -890,7 +892,31 @@ def _normalize_package_dependencies(package_dependencies: list[dict]) -> list[di
 
 def _exit_if_not_free_threaded_interpreter():
     if "free-threading build" not in sys.version:
-        raise Exception("Running with a free-threaded interpreter is required.")
+        exc = Exception("Running with a free-threaded interpreter is required.")
+        exc.add_note(
+            "A dry run of pip is used to determine free-threading support of packages."
+        )
+        raise exc
+
+
+def _exit_if_pip_unavailable():
+    pip_help_return_code = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "--help",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode
+
+    if pip_help_return_code != 0:
+        exc = Exception("pip must be available.")
+        exc.add_note(
+            "A dry run of pip is used to determine free-threading support of packages."
+        )
+        raise exc
 
 
 def main() -> dict[str, list]:
@@ -900,6 +926,7 @@ def main() -> dict[str, list]:
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
 
     _exit_if_not_free_threaded_interpreter()
+    _exit_if_pip_unavailable()
 
     meta = _fetch_sdk_metadata()
     sdk_python_versions = _parse_python_versions_from_classifiers(

@@ -294,8 +294,10 @@ class BadDsn(ValueError):
 class Dsn:
     """Represents a DSN."""
 
-    def __init__(self, value):
-        # type: (Union[Dsn, str]) -> None
+    ORG_ID_REGEX = re.compile(r"^o(\d+)\.")
+
+    def __init__(self, value, org_id=None):
+        # type: (Union[Dsn, str], Optional[str]) -> None
         if isinstance(value, Dsn):
             self.__dict__ = dict(value.__dict__)
             return
@@ -309,6 +311,12 @@ class Dsn:
             raise BadDsn("Missing hostname")
 
         self.host = parts.hostname
+
+        if org_id is not None:
+            self.org_id = org_id  # type: Optional[str]
+        else:
+            org_id_match = Dsn.ORG_ID_REGEX.match(self.host)
+            self.org_id = org_id_match.group(1) if org_id_match else None
 
         if parts.port is None:
             self.port = self.scheme == "https" and 443 or 80  # type: int
@@ -654,7 +662,7 @@ def get_errno(exc_value):
 
 def get_error_message(exc_value):
     # type: (Optional[BaseException]) -> str
-    message = (
+    message = safe_str(
         getattr(exc_value, "message", "")
         or getattr(exc_value, "detail", "")
         or safe_str(exc_value)
@@ -1760,6 +1768,12 @@ def _normalize_module_name(name):
     return name.lower()
 
 
+def _replace_hyphens_dots_and_underscores_with_dashes(name):
+    # type: (str) -> str
+    # https://peps.python.org/pep-0503/#normalized-names
+    return re.sub(r"[-_.]+", "-", name)
+
+
 def _get_installed_modules():
     # type: () -> Dict[str, str]
     global _installed_modules
@@ -1770,8 +1784,15 @@ def _get_installed_modules():
 
 def package_version(package):
     # type: (str) -> Optional[Tuple[int, ...]]
-    installed_packages = _get_installed_modules()
-    version = installed_packages.get(package)
+    normalized_package = _normalize_module_name(
+        _replace_hyphens_dots_and_underscores_with_dashes(package)
+    )
+
+    installed_packages = {
+        _replace_hyphens_dots_and_underscores_with_dashes(module): v
+        for module, v in _get_installed_modules().items()
+    }
+    version = installed_packages.get(normalized_package)
     if version is None:
         return None
 

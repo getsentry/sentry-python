@@ -1,12 +1,17 @@
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import invoke_agent_span, update_invoke_agent_span
-from ..utils import _capture_exception
+from ..utils import _capture_exception, pop_agent, push_agent
 
 from typing import TYPE_CHECKING
-from pydantic_ai.agent import Agent  # type: ignore
+
+try:
+    from pydantic_ai.agent import Agent  # type: ignore
+except ImportError:
+    raise DidNotEnable("pydantic-ai not installed")
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -41,16 +46,19 @@ class _StreamingContextManagerWrapper:
         self._isolation_scope = sentry_sdk.isolation_scope()
         self._isolation_scope.__enter__()
 
-        # Store agent reference and streaming flag
-        sentry_sdk.get_current_scope().set_context(
-            "pydantic_ai_agent", {"_agent": self.agent, "_streaming": self.is_streaming}
-        )
-
         # Create invoke_agent span (will be closed in __aexit__)
         self._span = invoke_agent_span(
-            self.user_prompt, self.agent, self.model, self.model_settings
+            self.user_prompt,
+            self.agent,
+            self.model,
+            self.model_settings,
+            self.is_streaming,
         )
         self._span.__enter__()
+
+        # Push agent to contextvar stack after span is successfully created and entered
+        # This ensures proper pairing with pop_agent() in __aexit__ even if exceptions occur
+        push_agent(self.agent, self.is_streaming)
 
         # Enter the original context manager
         result = await self.original_ctx_manager.__aenter__()
@@ -63,15 +71,13 @@ class _StreamingContextManagerWrapper:
             # Exit the original context manager first
             await self.original_ctx_manager.__aexit__(exc_type, exc_val, exc_tb)
 
-            # Update span with output if successful
-            if exc_type is None and self._result and hasattr(self._result, "output"):
-                output = (
-                    self._result.output if hasattr(self._result, "output") else None
-                )
-                if self._span is not None:
-                    update_invoke_agent_span(self._span, output)
+            # Update span with result if successful
+            if exc_type is None and self._result and self._span is not None:
+                update_invoke_agent_span(self._span, self._result)
         finally:
-            sentry_sdk.get_current_scope().remove_context("pydantic_ai_agent")
+            # Pop agent from contextvar stack
+            pop_agent()
+
             # Clean up invoke span
             if self._span:
                 self._span.__exit__(exc_type, exc_val, exc_tb)
@@ -97,32 +103,32 @@ def _create_run_wrapper(original_func, is_streaming=False):
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
         with sentry_sdk.isolation_scope():
-            # Store agent reference and streaming flag in Sentry scope for access in nested spans
-            # We store the full agent to allow access to tools and system prompts
-            sentry_sdk.get_current_scope().set_context(
-                "pydantic_ai_agent", {"_agent": self, "_streaming": is_streaming}
-            )
-
             # Extract parameters for the span
             user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
             model = kwargs.get("model")
             model_settings = kwargs.get("model_settings")
 
             # Create invoke_agent span
-            with invoke_agent_span(user_prompt, self, model, model_settings) as span:
+            with invoke_agent_span(
+                user_prompt, self, model, model_settings, is_streaming
+            ) as span:
+                # Push agent to contextvar stack after span is successfully created and entered
+                # This ensures proper pairing with pop_agent() in finally even if exceptions occur
+                push_agent(self, is_streaming)
+
                 try:
                     result = await original_func(self, *args, **kwargs)
 
-                    # Update span with output
-                    output = result.output if hasattr(result, "output") else None
-                    update_invoke_agent_span(span, output)
+                    # Update span with result
+                    update_invoke_agent_span(span, result)
 
                     return result
                 except Exception as exc:
                     _capture_exception(exc)
                     raise exc from None
                 finally:
-                    sentry_sdk.get_current_scope().remove_context("pydantic_ai_agent")
+                    # Pop agent from contextvar stack
+                    pop_agent()
 
     return wrapper
 

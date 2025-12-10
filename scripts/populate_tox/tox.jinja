@@ -26,6 +26,9 @@ envlist =
     # === Integration Deactivation ===
     {py3.9,py3.10,py3.11,py3.12,py3.13,py3.14}-integration_deactivation
 
+    # === Shadowed Module ===
+    {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13,py3.14,py3.14t}-shadowed_module
+
     # === Integrations ===
 
     # Asgi
@@ -42,6 +45,9 @@ envlist =
 
     # OpenTelemetry (OTel)
     {py3.7,py3.9,py3.12,py3.13,py3.14,py3.14t}-opentelemetry
+
+    # OpenTelemetry with OTLP
+    {py3.7,py3.9,py3.12,py3.13,py3.14}-otlp
 
     # OpenTelemetry Experimental (POTel)
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
@@ -78,6 +84,8 @@ deps =
     # for justification of the upper bound on pytest
     {py3.6,py3.7}-common: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13,py3.14,py3.14t}-common: pytest
+    # coverage 7.11.1-7.11.3 makes some of our tests flake
+    {py3.14,py3.14t}-common: coverage==7.11.0
 
     # === Gevent ===
     {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11}-gevent: gevent>=22.10.0, <22.11.0
@@ -112,6 +120,9 @@ deps =
 
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
+
+    # OpenTelemetry with OTLP
+    otlp: opentelemetry-distro[otlp]
 
     # OpenTelemetry Experimental (POTel)
     potel: -e .[opentelemetry-experimental]
@@ -149,15 +160,21 @@ setenv =
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
     spark-v{3.0.3,3.5.6}: JAVA_HOME=/usr/lib/jvm/temurin-11-jdk-amd64
 
+    # Avoid polluting test suite with imports
+    common: PYTEST_ADDOPTS="--ignore=tests/test_shadowed_module.py"
+    gevent: PYTEST_ADDOPTS="--ignore=tests/test_shadowed_module.py"
+
     # TESTPATH definitions for test suites not managed by toxgen
     common: TESTPATH=tests
     gevent: TESTPATH=tests
     integration_deactivation: TESTPATH=tests/test_ai_integration_deactivation.py
+    shadowed_module: TESTPATH=tests/test_shadowed_module.py
     asgi: TESTPATH=tests/integrations/asgi
     aws_lambda: TESTPATH=tests/integrations/aws_lambda
     cloud_resource_context: TESTPATH=tests/integrations/cloud_resource_context
     gcp: TESTPATH=tests/integrations/gcp
     opentelemetry: TESTPATH=tests/integrations/opentelemetry
+    otlp: TESTPATH=tests/integrations/otlp
     potel: TESTPATH=tests/integrations/opentelemetry
     socket: TESTPATH=tests/integrations/socket
 

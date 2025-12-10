@@ -358,7 +358,7 @@ class SentryLogsHandler(_BaseHandler):
         project_root = client.options["project_root"]
 
         attrs = self._extra_from_record(record)  # type: Any
-        attrs["sentry.origin"] = "auto.logger.log"
+        attrs["sentry.origin"] = "auto.log.stdlib"
 
         parameters_set = False
         if record.args is not None:

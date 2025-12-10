@@ -21,6 +21,7 @@ class EndpointType(Enum):
     """
 
     ENVELOPE = "envelope"
+    OTLP_TRACES = "integration/otlp/v1/traces"
 
 
 class CompressionAlgo(Enum):
@@ -111,6 +112,11 @@ class SPANTEMPLATE(str, Enum):
 class INSTRUMENTER:
     SENTRY = "sentry"
     OTEL = "otel"
+
+
+class SPANNAME:
+    DB_COMMIT = "COMMIT"
+    DB_ROLLBACK = "ROLLBACK"
 
 
 class SPANDATA:
@@ -462,6 +468,12 @@ class SPANDATA:
     """
     The model's response message.
     Example: "The weather in Paris is rainy and overcast, with temperatures around 57°F"
+    """
+
+    GEN_AI_EMBEDDINGS_INPUT = "gen_ai.embeddings.input"
+    """
+    The input to the embeddings operation.
+    Example: "Hello!"
     """
 
     GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
@@ -852,12 +864,11 @@ class SPANSTATUS:
     CANCELLED = "cancelled"
     DATA_LOSS = "data_loss"
     DEADLINE_EXCEEDED = "deadline_exceeded"
-    ERROR = "error"  # OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
     FAILED_PRECONDITION = "failed_precondition"
     INTERNAL_ERROR = "internal_error"
     INVALID_ARGUMENT = "invalid_argument"
     NOT_FOUND = "not_found"
-    OK = "ok"  # HTTP 200 and OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
+    OK = "ok"
     OUT_OF_RANGE = "out_of_range"
     PERMISSION_DENIED = "permission_denied"
     RESOURCE_EXHAUSTED = "resource_exhausted"
@@ -865,7 +876,6 @@ class SPANSTATUS:
     UNAVAILABLE = "unavailable"
     UNIMPLEMENTED = "unimplemented"
     UNKNOWN_ERROR = "unknown_error"
-    UNSET = "unset"  # OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
 
 
 class OP:
@@ -1013,6 +1023,8 @@ class ClientConstructor:
         trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
         enable_metrics=True,  # type: bool
         before_send_metric=None,  # type: Optional[Callable[[Metric, Hint], Optional[Metric]]]
+        org_id=None,  # type: Optional[str]
+        strict_trace_continuation=False,  # type: bool
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1416,6 +1428,19 @@ class ClientConstructor:
             If `trace_ignore_status_codes` is not provided, requests with any status code
             may be traced.
 
+        :param strict_trace_continuation: If set to `True`, the SDK will only continue a trace if the `org_id` of the incoming trace found in the
+           `baggage` header matches the `org_id` of the current Sentry client and only if BOTH are present.
+
+            If set to `False`, consistency of `org_id` will only be enforced if both are present. If either are missing, the trace will be continued.
+
+            The client's organization ID is extracted from the DSN or can be set with the `org_id` option.
+            If the organization IDs do not match, the SDK will start a new trace instead of continuing the incoming one.
+            This is useful to prevent traces of unknown third-party services from being continued in your application.
+
+        :param org_id: An optional organization ID. The SDK will try to extract if from the DSN in most cases
+            but you can provide it explicitly for self-hosted and Relay setups. This value is used for
+            trace propagation and for features like `strict_trace_continuation`.
+
         :param _experiments:
         """
         pass
@@ -1441,4 +1466,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.43.0"
+VERSION = "2.47.0"

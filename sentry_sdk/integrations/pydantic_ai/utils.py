@@ -1,4 +1,5 @@
 import sentry_sdk
+from contextvars import ContextVar
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import set_span_errored
@@ -7,7 +8,47 @@ from sentry_sdk.utils import event_from_exception, safe_serialize
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional
+
+
+# Store the current agent context in a contextvar for re-entrant safety
+# Using a list as a stack to support nested agent calls
+_agent_context_stack = ContextVar("pydantic_ai_agent_context_stack", default=[])  # type: ContextVar[list[dict[str, Any]]]
+
+
+def push_agent(agent, is_streaming=False):
+    # type: (Any, bool) -> None
+    """Push an agent context onto the stack along with its streaming flag."""
+    stack = _agent_context_stack.get().copy()
+    stack.append({"agent": agent, "is_streaming": is_streaming})
+    _agent_context_stack.set(stack)
+
+
+def pop_agent():
+    # type: () -> None
+    """Pop an agent context from the stack."""
+    stack = _agent_context_stack.get().copy()
+    if stack:
+        stack.pop()
+    _agent_context_stack.set(stack)
+
+
+def get_current_agent():
+    # type: () -> Any
+    """Get the current agent from the contextvar stack."""
+    stack = _agent_context_stack.get()
+    if stack:
+        return stack[-1]["agent"]
+    return None
+
+
+def get_is_streaming():
+    # type: () -> bool
+    """Get the streaming flag from the contextvar stack."""
+    stack = _agent_context_stack.get()
+    if stack:
+        return stack[-1].get("is_streaming", False)
+    return False
 
 
 def _should_send_prompts():
@@ -37,23 +78,20 @@ def _set_agent_data(span, agent):
 
     Args:
         span: The span to set data on
-        agent: Agent object (can be None, will try to get from Sentry scope if not provided)
+        agent: Agent object (can be None, will try to get from contextvar if not provided)
     """
-    # Extract agent name from agent object or Sentry scope
+    # Extract agent name from agent object or contextvar
     agent_obj = agent
     if not agent_obj:
-        # Try to get from Sentry scope
-        agent_data = (
-            sentry_sdk.get_current_scope()._contexts.get("pydantic_ai_agent") or {}
-        )
-        agent_obj = agent_data.get("_agent")
+        # Try to get from contextvar
+        agent_obj = get_current_agent()
 
     if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
         span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
 
 
 def _get_model_name(model_obj):
-    # type: (Any) -> str | None
+    # type: (Any) -> Optional[str]
     """Extract model name from a model object.
 
     Args:
@@ -87,9 +125,8 @@ def _set_model_data(span, model, model_settings):
         model: Model object (can be None, will try to get from agent if not provided)
         model_settings: Model settings (can be None, will try to get from agent if not provided)
     """
-    # Try to get agent from Sentry scope if we need it
-    agent_data = sentry_sdk.get_current_scope()._contexts.get("pydantic_ai_agent") or {}
-    agent_obj = agent_data.get("_agent")
+    # Try to get agent from contextvar if we need it
+    agent_obj = get_current_agent()
 
     # Extract model information
     model_obj = model
