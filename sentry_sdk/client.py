@@ -945,7 +945,7 @@ class _Client(BaseClient):
 
     def _capture_span(self, span):
         # type: (Span) -> None
-        # Used for span streaming (trace_lifecycle == "stream").
+        # This function is only used for span streaming (trace_lifecycle == "stream")
         if not has_span_streaming_enabled(self.options):
             return
 
