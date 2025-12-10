@@ -350,6 +350,7 @@ def _set_usage_data(span, messages):
 
 
 def _set_response_model_name(span, messages):
+    # type: (sentry_sdk.tracing.Span, Any) -> None
     last_message = messages[-1]
     response_metadata = last_message.get("response_metadata")
     if response_metadata is None:
