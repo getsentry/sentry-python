@@ -3,7 +3,7 @@ import functools
 import time
 from typing import Any
 
-from sentry_sdk import get_client
+import sentry_sdk
 from sentry_sdk.utils import safe_repr, capture_internal_exceptions
 
 OTEL_RANGES = [
@@ -28,8 +28,6 @@ class _dict_default_key(dict):  # type: ignore[type-arg]
 
 def _capture_log(severity_text, severity_number, template, **kwargs):
     # type: (str, int, str, **Any) -> None
-    client = get_client()
-
     body = template
     attrs = {}  # type: dict[str, str | bool | float | int]
     if "attributes" in kwargs:
@@ -58,7 +56,7 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     }
 
     # noinspection PyProtectedMember
-    client._capture_log(
+    sentry_sdk.get_current_scope()._capture_log(
         {
             "severity_text": severity_text,
             "severity_number": severity_number,

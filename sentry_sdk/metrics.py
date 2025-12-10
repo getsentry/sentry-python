@@ -21,8 +21,6 @@ def _capture_metric(
     attributes=None,  # type: Optional[dict[str, Any]]
 ):
     # type: (...) -> None
-    client = sentry_sdk.get_client()
-
     attrs = {}  # type: dict[str, Union[str, bool, float, int]]
     if attributes:
         for k, v in attributes.items():
@@ -48,7 +46,7 @@ def _capture_metric(
         "attributes": attrs,
     }  # type: Metric
 
-    client._capture_metric(metric)
+    sentry_sdk.get_current_scope()._capture_metric(metric)
 
 
 def count(

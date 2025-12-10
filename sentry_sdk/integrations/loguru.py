@@ -201,7 +201,7 @@ def loguru_sentry_logs_handler(message):
             else:
                 attrs[f"sentry.message.parameter.{key}"] = safe_repr(value)
 
-    client._capture_log(
+    sentry_sdk.get_current_scope()._capture_log(
         {
             "severity_text": otel_severity_text,
             "severity_number": otel_severity_number,
