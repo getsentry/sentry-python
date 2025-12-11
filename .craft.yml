@@ -1,4 +1,4 @@
-minVersion: 0.34.1
+minVersion: 2.14.0
 targets:
   - name: pypi
     includeNames: /^sentry[_\-]sdk.*$/
