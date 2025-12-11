@@ -22,16 +22,16 @@ changelog:
         - "Changelog: Deprecation"
       commit_patterns:
         - "deprecat"  # deprecation, deprecated
-      semver: minor
+      semver: patch
     - title: Documentation 📚
       labels:
         - "Changelog: Docs"
       commit_patterns:
         - "^docs?\\b"
-      semver: minor
+      semver: patch
     - title: Internal Changes 🔧
       labels:
         - "Changelog: Internal"
       commit_patterns:
         - "^(build|ref|chore|ci|tests?)\\b"
-      semver: minor
+      semver: patch
