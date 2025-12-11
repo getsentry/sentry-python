@@ -49,7 +49,7 @@ def patch_views():
         # efficient way to wrap views (or build a cache?)
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-        if integration is not None and integration.middleware_spans:
+        if integration is not None:
             is_async_view = (
                 iscoroutinefunction is not None
                 and wrap_async_view is not None
@@ -85,6 +85,10 @@ def _wrap_sync_view(callback):
         # this isn't necessary for async views since that runs on main
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
+
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+        if not integration or not integration.middleware_spans:
+            return callback(request, *args, **kwargs)
 
         with sentry_sdk.start_span(
             op=OP.VIEW_RENDER,
