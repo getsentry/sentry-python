@@ -349,6 +349,23 @@ def _set_usage_data(span, messages):
         )
 
 
+def _set_response_model_name(span, messages):
+    # type: (sentry_sdk.tracing.Span, Any) -> None
+    if len(messages) == 0:
+        return
+
+    last_message = messages[-1]
+    response_metadata = last_message.get("response_metadata")
+    if response_metadata is None:
+        return
+
+    model_name = response_metadata.get("model_name")
+    if model_name is None:
+        return
+
+    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model_name)
+
+
 def _set_response_attributes(span, input_messages, result, integration):
     # type: (Any, Optional[List[Any]], Any, LanggraphIntegration) -> None
     parsed_response_messages = _parse_langgraph_messages(result)
@@ -358,6 +375,7 @@ def _set_response_attributes(span, input_messages, result, integration):
         return
 
     _set_usage_data(span, new_messages)
+    _set_response_model_name(span, new_messages)
 
     if not (should_send_default_pii() and integration.include_prompts):
         return
