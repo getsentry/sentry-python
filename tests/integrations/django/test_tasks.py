@@ -71,7 +71,10 @@ def test_task_span_is_created(sentry_init, capture_events, immediate_backend):
         span for span in event["spans"] if span["op"] == OP.QUEUE_SUBMIT_DJANGO
     ]
     assert len(queue_submit_spans) == 1
-    assert queue_submit_spans[0]["description"] == "simple_task"
+    assert (
+        queue_submit_spans[0]["description"]
+        == "tests.integrations.django.test_tasks.simple_task"
+    )
     assert queue_submit_spans[0]["origin"] == "auto.http.django"
 
 
@@ -114,7 +117,10 @@ def test_task_enqueue_with_kwargs(sentry_init, immediate_backend, capture_events
         span for span in event["spans"] if span["op"] == OP.QUEUE_SUBMIT_DJANGO
     ]
     assert len(queue_submit_spans) == 1
-    assert queue_submit_spans[0]["description"] == "greet"
+    assert (
+        queue_submit_spans[0]["description"]
+        == "tests.integrations.django.test_tasks.greet"
+    )
 
 
 @pytest.mark.skipif(
@@ -145,7 +151,10 @@ def test_task_error_reporting(sentry_init, immediate_backend, capture_events):
         if span["op"] == OP.QUEUE_SUBMIT_DJANGO
     ]
     assert len(queue_submit_spans) == 1
-    assert queue_submit_spans[0]["description"] == "failing_task"
+    assert (
+        queue_submit_spans[0]["description"]
+        == "tests.integrations.django.test_tasks.failing_task"
+    )
 
 
 @pytest.mark.skipif(
@@ -174,5 +183,5 @@ def test_multiple_task_enqueues_create_multiple_spans(
     assert len(queue_submit_spans) == 3
 
     span_names = [span["description"] for span in queue_submit_spans]
-    assert span_names.count("task_one") == 2
-    assert span_names.count("task_two") == 1
+    assert span_names.count("tests.integrations.django.test_tasks.task_one") == 2
+    assert span_names.count("tests.integrations.django.test_tasks.task_two") == 1
