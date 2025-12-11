@@ -3,6 +3,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.tracing import SPANSTATUS
+from sentry_sdk.utils import qualname_from_function
 
 try:
     # django.tasks were added in Django 6.0
@@ -32,9 +33,7 @@ def patch_tasks():
         if integration is None:
             return old_task_enqueue(self, *args, **kwargs)
 
-        name = (
-            getattr(self.func, "__name__", repr(self.func)) or "<unknown Django task>"
-        )
+        name = qualname_from_function(self.func) or "<unknown Django task>"
 
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_DJANGO, name=name, origin=DjangoIntegration.origin
