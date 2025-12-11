@@ -8,6 +8,7 @@ from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
+    MAX_SINGLE_MESSAGE_CONTENT_CHARS,
     set_data_normalized,
     truncate_and_annotate_messages,
     truncate_messages_by_size,
@@ -226,8 +227,7 @@ class TestTruncateMessagesBySize:
         )
         assert len(result) < len(large_messages)
 
-        if result:
-            assert result[-1] == large_messages[-1]
+        assert result[-1] == large_messages[-1]
         assert truncation_index == len(large_messages) - len(result)
 
     def test_empty_messages_list(self):
@@ -277,6 +277,33 @@ class TestTruncateMessagesBySize:
             assert current_count <= prev_count
             assert current_count >= 1
             prev_count = current_count
+
+    def test_single_message_truncation(self):
+        large_content = "This is a very long message. " * 10_000
+
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": large_content},
+        ]
+
+        result, truncation_index = truncate_messages_by_size(
+            messages, max_single_message_chars=MAX_SINGLE_MESSAGE_CONTENT_CHARS
+        )
+
+        assert len(result) == 1
+        assert (
+            len(result[0]["content"].rstrip("...")) <= MAX_SINGLE_MESSAGE_CONTENT_CHARS
+        )
+
+        # If the last message is too large, the system message is not present
+        system_msgs = [m for m in result if m.get("role") == "system"]
+        assert len(system_msgs) == 0
+
+        # Confirm the user message is truncated with '...'
+        user_msgs = [m for m in result if m.get("role") == "user"]
+        assert len(user_msgs) == 1
+        assert user_msgs[0]["content"].endswith("...")
+        assert len(user_msgs[0]["content"]) < len(large_content)
 
 
 class TestTruncateAndAnnotateMessages:
