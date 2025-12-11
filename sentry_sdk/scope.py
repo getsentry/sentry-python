@@ -45,7 +45,7 @@ from sentry_sdk.utils import (
 )
 
 import typing
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -525,13 +525,11 @@ class Scope:
         """
         Returns the Dynamic Sampling Context from the Propagation Context.
         If not existing, creates a new one.
+
+        Deprecated: Logic moved to PropagationContext, don't use directly.
         """
         if self._propagation_context is None:
             return None
-
-        baggage = self.get_baggage()
-        if baggage is not None:
-            self._propagation_context.baggage = baggage
 
         return self._propagation_context.dynamic_sampling_context
 
@@ -547,16 +545,8 @@ class Scope:
         if has_tracing_enabled(client.options) and self.span is not None:
             return self.span.to_traceparent()
 
-        # If this scope has a propagation context, return traceparent from there
-        if self._propagation_context is not None:
-            traceparent = "%s-%s" % (
-                self._propagation_context.trace_id,
-                self._propagation_context.span_id,
-            )
-            return traceparent
-
-        # Fall back to isolation scope's traceparent. It always has one
-        return self.get_isolation_scope().get_traceparent()
+        # else return traceparent from the propagation context
+        return self.get_active_propagation_context().to_traceparent()
 
     def get_baggage(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[Baggage]
@@ -570,12 +560,8 @@ class Scope:
         if has_tracing_enabled(client.options) and self.span is not None:
             return self.span.to_baggage()
 
-        # If this scope has a propagation context, return baggage from there
-        if self._propagation_context is not None:
-            return self._propagation_context.baggage or Baggage.from_options(self)
-
-        # Fall back to isolation scope's baggage. It always has one
-        return self.get_isolation_scope().get_baggage()
+        # else return baggage from the propagation context
+        return self.get_active_propagation_context().get_baggage()
 
     def get_trace_context(self):
         # type: () -> Dict[str, Any]
@@ -592,14 +578,12 @@ class Scope:
             return {"trace_id": trace_id, "span_id": span_id}
 
         propagation_context = self.get_active_propagation_context()
-        if propagation_context is None:
-            return {}
 
         return {
             "trace_id": propagation_context.trace_id,
             "span_id": propagation_context.span_id,
             "parent_span_id": propagation_context.parent_span_id,
-            "dynamic_sampling_context": self.get_dynamic_sampling_context(),
+            "dynamic_sampling_context": propagation_context.dynamic_sampling_context,
         }
 
     def trace_propagation_meta(self, *args, **kwargs):
@@ -616,19 +600,8 @@ class Scope:
 
         meta = ""
 
-        sentry_trace = self.get_traceparent()
-        if sentry_trace is not None:
-            meta += '<meta name="%s" content="%s">' % (
-                SENTRY_TRACE_HEADER_NAME,
-                sentry_trace,
-            )
-
-        baggage = self.get_baggage()
-        if baggage is not None:
-            meta += '<meta name="%s" content="%s">' % (
-                BAGGAGE_HEADER_NAME,
-                baggage.serialize(),
-            )
+        for name, content in self.iter_trace_propagation_headers():
+            meta += f'<meta name="{name}" content="{content}">'
 
         return meta
 
@@ -636,16 +609,10 @@ class Scope:
         # type: () -> Iterator[Tuple[str, str]]
         """
         Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
+        Deprecated: use PropagationContext.iter_headers instead.
         """
         if self._propagation_context is not None:
-            traceparent = self.get_traceparent()
-            if traceparent is not None:
-                yield SENTRY_TRACE_HEADER_NAME, traceparent
-
-            dsc = self.get_dynamic_sampling_context()
-            if dsc is not None:
-                baggage = Baggage(dsc).serialize()
-                yield BAGGAGE_HEADER_NAME, baggage
+            yield from self._propagation_context.iter_headers()
 
     def iter_trace_propagation_headers(self, *args, **kwargs):
         # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
@@ -671,26 +638,11 @@ class Scope:
             for header in span.iter_headers():
                 yield header
         else:
-            # If this scope has a propagation context, return headers from there
-            # (it could be that self is not the current scope nor the isolation scope)
-            if self._propagation_context is not None:
-                for header in self.iter_headers():
-                    yield header
-            else:
-                # otherwise try headers from current scope
-                current_scope = self.get_current_scope()
-                if current_scope._propagation_context is not None:
-                    for header in current_scope.iter_headers():
-                        yield header
-                else:
-                    # otherwise fall back to headers from isolation scope
-                    isolation_scope = self.get_isolation_scope()
-                    if isolation_scope._propagation_context is not None:
-                        for header in isolation_scope.iter_headers():
-                            yield header
+            for header in self.get_active_propagation_context().iter_headers():
+                yield header
 
     def get_active_propagation_context(self):
-        # type: () -> Optional[PropagationContext]
+        # type: () -> PropagationContext
         if self._propagation_context is not None:
             return self._propagation_context
 
@@ -699,10 +651,10 @@ class Scope:
             return current_scope._propagation_context
 
         isolation_scope = self.get_isolation_scope()
-        if isolation_scope._propagation_context is not None:
-            return isolation_scope._propagation_context
-
-        return None
+        # should actually never happen, but just in case someone calls scope.clear
+        if isolation_scope._propagation_context is None:
+            isolation_scope._propagation_context = PropagationContext()
+        return isolation_scope._propagation_context
 
     def clear(self):
         # type: () -> None
@@ -1091,10 +1043,11 @@ class Scope:
         # update the sample rate in the dsc
         if transaction.sample_rate is not None:
             propagation_context = self.get_active_propagation_context()
-            if propagation_context:
-                baggage = propagation_context.baggage
-                if baggage is not None:
-                    baggage.sentry_items["sample_rate"] = str(transaction.sample_rate)
+            baggage = propagation_context.baggage
+
+            if baggage is not None:
+                baggage.sentry_items["sample_rate"] = str(transaction.sample_rate)
+
             if transaction._baggage:
                 transaction._baggage.sentry_items["sample_rate"] = str(
                     transaction.sample_rate
@@ -1168,8 +1121,7 @@ class Scope:
                 # New spans get the `trace_id` from the scope
                 if "trace_id" not in kwargs:
                     propagation_context = self.get_active_propagation_context()
-                    if propagation_context is not None:
-                        kwargs["trace_id"] = propagation_context.trace_id
+                    kwargs["trace_id"] = propagation_context.trace_id
 
                 span = Span(**kwargs)
             else:
@@ -1188,7 +1140,7 @@ class Scope:
         self.generate_propagation_context(environ_or_headers)
 
         # generate_propagation_context ensures that the propagation_context is not None.
-        propagation_context = typing.cast(PropagationContext, self._propagation_context)
+        propagation_context = cast(PropagationContext, self._propagation_context)
 
         optional_kwargs = {}
         if name:
