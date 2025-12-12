@@ -1192,7 +1192,9 @@ def test_custom_urlconf_middleware(
     settings.MIDDLEWARE.insert(0, urlconf)
     client.application.load_middleware()
 
-    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[DjangoIntegration(middleware_spans=True)], traces_sample_rate=1.0
+    )
     events = capture_events()
 
     content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
