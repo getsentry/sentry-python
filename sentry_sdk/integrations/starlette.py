@@ -144,18 +144,22 @@ def _enable_span_for_middleware(middleware_class):
     async def _create_span_call(app, scope, receive, send, **kwargs):
         # type: (Any, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]], Any) -> None
         integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
-        if integration is None or not integration.middleware_spans:
+        if integration is None:
             return await old_call(app, scope, receive, send, **kwargs)
-
-        middleware_name = app.__class__.__name__
 
         # Update transaction name with middleware name
         name, source = _get_transaction_from_middleware(app, scope, integration)
+
         if name is not None:
             sentry_sdk.get_current_scope().set_transaction_name(
                 name,
                 source=source,
             )
+
+        if not integration.middleware_spans:
+            return await old_call(app, scope, receive, send, **kwargs)
+
+        middleware_name = app.__class__.__name__
 
         with sentry_sdk.start_span(
             op=OP.MIDDLEWARE_STARLETTE,
