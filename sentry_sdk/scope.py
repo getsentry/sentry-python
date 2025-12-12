@@ -165,6 +165,11 @@ def get_external_propagation_context():
     )
 
 
+def has_external_propagation_context():
+    # type: () -> bool
+    return _external_propagation_context_fn is not None
+
+
 def _attr_setter(fn):
     # type: (Any) -> Any
     return property(fset=fn, doc=fn.__doc__)
@@ -637,6 +642,10 @@ class Scope:
         if has_tracing_enabled(client.options) and span is not None:
             for header in span.iter_headers():
                 yield header
+        elif has_external_propagation_context():
+            # when we have an external_propagation_context (otlp)
+            # we leave outgoing propagation to the propagator
+            return
         else:
             for header in self.get_active_propagation_context().iter_headers():
                 yield header

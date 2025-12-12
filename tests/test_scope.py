@@ -997,10 +997,14 @@ def test_trace_context_external_tracing(sentry_init):
 
     register_external_propagation_context(external_propagation_context)
 
-    trace_context = sentry_sdk.get_current_scope().get_trace_context()
+    scope = sentry_sdk.get_current_scope()
 
+    trace_context = scope.get_trace_context()
     assert trace_context["trace_id"] == "trace_id_foo"
     assert trace_context["span_id"] == "span_id_bar"
+
+    headers = list(scope.iter_trace_propagation_headers())
+    assert not headers
 
     remove_external_propagation_context()
 
