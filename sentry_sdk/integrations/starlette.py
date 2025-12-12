@@ -36,15 +36,26 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
-
+    from typing import (
+        Any,
+        Awaitable,
+        Callable,
+        Container,
+        Dict,
+        Optional,
+        Tuple,
+        Union,
+        Protocol,
+        TypeVar,
+    )
+    from types import CoroutineType
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
 try:
     import starlette  # type: ignore
     from starlette import __version__ as STARLETTE_VERSION
     from starlette.applications import Starlette  # type: ignore
-    from starlette.datastructures import UploadFile  # type: ignore
+    from starlette.datastructures import UploadFile, FormData  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
     from starlette.middleware.authentication import (  # type: ignore
         AuthenticationMiddleware,
@@ -54,6 +65,16 @@ try:
     from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
+
+if TYPE_CHECKING:
+    from contextlib import AbstractAsyncContextManager
+
+    T_co = TypeVar("T_co", covariant=True)
+
+    class AwaitableOrContextManager(
+        Awaitable[T_co], AbstractAsyncContextManager[T_co], Protocol[T_co]
+    ): ...
+
 
 try:
     # Starlette 0.20
@@ -424,6 +445,35 @@ def _is_async_callable(obj):
     )
 
 
+def _patch_request(request):
+    # type: (Request) -> None
+    _original_body = request.body
+    _original_json = request.json
+    _original_form = request.form
+
+    @functools.wraps(_original_body)
+    def sentry_body():
+        # type: () -> CoroutineType[Any, Any, bytes]
+        request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
+        return _original_body()
+
+    @functools.wraps(_original_json)
+    def sentry_json():
+        # type: () -> CoroutineType[Any, Any, Any]
+        request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
+        return _original_json()
+
+    @functools.wraps(_original_form)
+    def sentry_form(*args, **kwargs):
+        # type: (*Any, **Any) -> AwaitableOrContextManager[FormData]
+        request.scope.setdefault("state", {})["sentry_sdk.is_body_cached"] = True
+        return _original_form(*args, **kwargs)
+
+    request.body = sentry_body
+    request.json = sentry_json
+    request.form = sentry_form
+
+
 def patch_request_response():
     # type: () -> None
     old_request_response = starlette.routing.request_response
@@ -444,6 +494,7 @@ def patch_request_response():
                     return await old_func(*args, **kwargs)
 
                 request = args[0]
+                _patch_request(request)
 
                 _set_transaction_name_and_source(
                     sentry_sdk.get_current_scope(),
@@ -452,33 +503,54 @@ def patch_request_response():
                 )
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
-                extractor = StarletteRequestExtractor(request)
-                info = await extractor.extract_request_info()
+                sentry_scope._name = StarletteIntegration.identifier
 
-                def _make_request_event_processor(req, integration):
-                    # type: (Any, Any) -> Callable[[Event, dict[str, Any]], Event]
+                def _make_cookies_event_processor(cookies):
+                    # type: (Optional[Dict[str, Any]]) -> Callable[[Event, Dict[str, Any]], Event]
                     def event_processor(event, hint):
                         # type: (Event, Dict[str, Any]) -> Event
-
-                        # Add info from request to event
-                        request_info = event.get("request", {})
-                        if info:
-                            if "cookies" in info:
-                                request_info["cookies"] = info["cookies"]
-                            if "data" in info:
-                                request_info["data"] = info["data"]
-                        event["request"] = deepcopy(request_info)
+                        if cookies and should_send_default_pii():
+                            event.setdefault("request", {})["cookies"] = deepcopy(
+                                cookies
+                            )
 
                         return event
 
                     return event_processor
 
-                sentry_scope._name = StarletteIntegration.identifier
+                def _make_request_body_event_processor(info):
+                    # type: (Optional[Dict[str, Any]]) -> Callable[[Event, Dict[str, Any]], Event]
+                    def event_processor(event, hint):
+                        # type: (Event, Dict[str, Any]) -> Event
+                        if info and "data" in info:
+                            event.setdefault("request", {})["data"] = deepcopy(
+                                info["data"]
+                            )
+
+                        return event
+
+                    return event_processor
+
+                extractor = StarletteRequestExtractor(request)
+                cookies = extractor.extract_cookies_from_request()
+                sentry_scope.add_event_processor(_make_cookies_event_processor(cookies))
+
+                try:
+                    response = await old_func(*args, **kwargs)
+                except Exception as exception:
+                    info = await extractor.extract_request_info()
+                    sentry_scope.add_event_processor(
+                        _make_request_body_event_processor(info)
+                    )
+
+                    raise exception
+
+                info = await extractor.extract_request_info()
                 sentry_scope.add_event_processor(
-                    _make_request_event_processor(request, integration)
+                    _make_request_body_event_processor(info)
                 )
 
-                return await old_func(*args, **kwargs)
+                return response
 
             func = _sentry_async_func
 
@@ -623,6 +695,18 @@ class StarletteRequestExtractor:
                 client, content_length
             ):
                 request_info["data"] = AnnotatedValue.removed_because_over_size_limit()
+                return request_info
+
+            # Avoid hangs by not parsing body when ASGI stream is consumed
+            is_body_cached = (
+                "state" in self.request.scope
+                and "sentry_sdk.is_body_cached" in self.request.scope["state"]
+                and self.request.scope["state"]["sentry_sdk.is_body_cached"]
+            )
+            if not is_body_cached:
+                request_info["data"] = (
+                    AnnotatedValue.removed_because_body_consumed_and_not_cached()
+                )
                 return request_info
 
             # Add JSON body, if it is a JSON request
