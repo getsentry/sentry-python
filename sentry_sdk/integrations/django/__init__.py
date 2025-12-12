@@ -130,7 +130,7 @@ class DjangoIntegration(Integration):
     def __init__(
         self,
         transaction_style="url",  # type: str
-        middleware_spans=True,  # type: bool
+        middleware_spans=False,  # type: bool
         signals_spans=True,  # type: bool
         cache_spans=False,  # type: bool
         db_transaction_spans=False,  # type: bool
