@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, TypeVar, Union
 
+from sentry_sdk.consts import SPANSTATUS
 
 # Re-exported for compat, since code out there in the wild might use this variable.
 MYPY = TYPE_CHECKING
@@ -222,27 +223,32 @@ if TYPE_CHECKING:
     # TODO: Make a proper type definition for this (PRs welcome!)
     Hint = Dict[str, Any]
 
+    AttributeValue = (
+        str | bool | float | int | list[str] | list[bool] | list[float] | list[int]
+    )
+    Attributes = dict[str, AttributeValue]
+
+    SerializedAttributeValue = TypedDict(
+        "SerializedAttributeValue",
+        {
+            "type": Literal["string", "boolean", "double", "integer"],
+            "value": AttributeValue,
+        },
+    )
+
     Log = TypedDict(
         "Log",
         {
             "severity_text": str,
             "severity_number": int,
             "body": str,
-            "attributes": dict[str, str | bool | float | int],
+            "attributes": Attributes,
             "time_unix_nano": int,
             "trace_id": Optional[str],
         },
     )
 
     MetricType = Literal["counter", "gauge", "distribution"]
-
-    MetricAttributeValue = TypedDict(
-        "MetricAttributeValue",
-        {
-            "value": Union[str, bool, float, int],
-            "type": Literal["string", "boolean", "double", "integer"],
-        },
-    )
 
     Metric = TypedDict(
         "Metric",
@@ -254,11 +260,28 @@ if TYPE_CHECKING:
             "type": MetricType,
             "value": float,
             "unit": Optional[str],
-            "attributes": dict[str, str | bool | float | int],
+            "attributes": Attributes,
         },
     )
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
+
+    # This is the V2 span format
+    # https://develop.sentry.dev/sdk/telemetry/spans/span-protocol/
+    SpanV2 = TypedDict(
+        "SpanV2",
+        {
+            "trace_id": str,
+            "span_id": str,
+            "parent_span_id": Optional[str],
+            "name": str,
+            "status": Literal[SPANSTATUS.OK, SPANSTATUS.ERROR],
+            "is_segment": bool,
+            "start_timestamp": float,
+            "end_timestamp": float,
+            "attributes": Attributes,
+        },
+    )
 
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]
@@ -337,3 +360,5 @@ if TYPE_CHECKING:
     )
 
     HttpStatusCodeRange = Union[int, Container[int]]
+
+    TraceLifecycleMode = Literal["static", "stream"]
