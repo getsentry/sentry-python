@@ -154,6 +154,7 @@ def get_default_release():
         "CODEBUILD_RESOLVED_SOURCE_VERSION",
         "CIRCLE_SHA1",
         "GAE_DEPLOYMENT_ID",
+        "K_REVISION",
     ):
         release = os.environ.get(var)
         if release:

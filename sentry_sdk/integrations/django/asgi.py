@@ -180,6 +180,10 @@ def wrap_async_view(callback):
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
 
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+        if not integration or not integration.middleware_spans:
+            return await callback(request, *args, **kwargs)
+
         with sentry_sdk.start_span(
             op=OP.VIEW_RENDER,
             name=request.resolver_match.view_name,
