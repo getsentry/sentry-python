@@ -1180,8 +1180,9 @@ def test_csrf(sentry_init, client):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
+@pytest.mark.parametrize("middleware_spans", [False, True])
 def test_custom_urlconf_middleware(
-    settings, sentry_init, client, capture_events, render_span_tree
+    settings, sentry_init, client, capture_events, render_span_tree, middleware_spans
 ):
     """
     Some middlewares (for instance in django-tenants) overwrite request.urlconf.
@@ -1193,7 +1194,8 @@ def test_custom_urlconf_middleware(
     client.application.load_middleware()
 
     sentry_init(
-        integrations=[DjangoIntegration(middleware_spans=True)], traces_sample_rate=1.0
+        integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
+        traces_sample_rate=1.0,
     )
     events = capture_events()
 
@@ -1203,7 +1205,8 @@ def test_custom_urlconf_middleware(
 
     event = events.pop(0)
     assert event["transaction"] == "/custom/ok"
-    assert "custom_urlconf_middleware" in render_span_tree(event)
+    if middleware_spans:
+        assert "custom_urlconf_middleware" in render_span_tree(event)
 
     _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
     assert status.lower() == "500 internal server error"
@@ -1212,7 +1215,8 @@ def test_custom_urlconf_middleware(
     assert error_event["transaction"] == "/custom/exc"
     assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
     assert transaction_event["transaction"] == "/custom/exc"
-    assert "custom_urlconf_middleware" in render_span_tree(transaction_event)
+    if middleware_spans:
+        assert "custom_urlconf_middleware" in render_span_tree(transaction_event)
 
     settings.MIDDLEWARE.pop(0)
 
