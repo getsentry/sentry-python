@@ -1023,7 +1023,7 @@ else:
 def test_middleware_spans(sentry_init, client, capture_events, render_span_tree):
     sentry_init(
         integrations=[
-            DjangoIntegration(signals_spans=False),
+            DjangoIntegration(middleware_spans=True, signals_spans=False),
         ],
         traces_sample_rate=1.0,
     )
@@ -1040,7 +1040,7 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
 def test_middleware_spans_disabled(sentry_init, client, capture_events):
     sentry_init(
         integrations=[
-            DjangoIntegration(middleware_spans=False, signals_spans=False),
+            DjangoIntegration(signals_spans=False),
         ],
         traces_sample_rate=1.0,
     )
