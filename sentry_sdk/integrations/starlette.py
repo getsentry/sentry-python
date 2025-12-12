@@ -89,7 +89,7 @@ class StarletteIntegration(Integration):
         self,
         transaction_style="url",  # type: str
         failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Union[Set[int], list[HttpStatusCodeRange], None]
-        middleware_spans=True,  # type: bool
+        middleware_spans=False,  # type: bool
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
         # type: (...) -> None
