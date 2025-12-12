@@ -222,27 +222,32 @@ if TYPE_CHECKING:
     # TODO: Make a proper type definition for this (PRs welcome!)
     Hint = Dict[str, Any]
 
+    AttributeValue = (
+        str | bool | float | int | list[str] | list[bool] | list[float] | list[int]
+    )
+    Attributes = dict[str, AttributeValue]
+
+    SerializedAttributeValue = TypedDict(
+        "SerializedAttributeValue",
+        {
+            "type": Literal["string", "boolean", "double", "integer"],
+            "value": AttributeValue,
+        },
+    )
+
     Log = TypedDict(
         "Log",
         {
             "severity_text": str,
             "severity_number": int,
             "body": str,
-            "attributes": dict[str, str | bool | float | int],
+            "attributes": Attributes,
             "time_unix_nano": int,
             "trace_id": Optional[str],
         },
     )
 
     MetricType = Literal["counter", "gauge", "distribution"]
-
-    MetricAttributeValue = TypedDict(
-        "MetricAttributeValue",
-        {
-            "value": Union[str, bool, float, int],
-            "type": Literal["string", "boolean", "double", "integer"],
-        },
-    )
 
     Metric = TypedDict(
         "Metric",
@@ -254,7 +259,7 @@ if TYPE_CHECKING:
             "type": MetricType,
             "value": float,
             "unit": Optional[str],
-            "attributes": dict[str, str | bool | float | int],
+            "attributes": Attributes,
         },
     )
 
