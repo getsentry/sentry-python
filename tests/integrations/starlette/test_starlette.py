@@ -646,7 +646,7 @@ def test_user_information_transaction_no_pii(sentry_init, capture_events):
 def test_middleware_spans(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[StarletteIntegration()],
+        integrations=[StarletteIntegration(middleware_spans=True)],
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
