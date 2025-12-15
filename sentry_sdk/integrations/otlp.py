@@ -119,7 +119,7 @@ class SentryOTLPPropagator(SentryPropagator):
         if baggage is not None and isinstance(baggage, Baggage):
             baggage_data = baggage.serialize()
             if baggage_data:
-                setter.set(carrier, BAGGAGE_HEADER_NAME, baggage.serialize())
+                setter.set(carrier, BAGGAGE_HEADER_NAME, baggage_data)
 
 
 def _to_traceparent(span_context):
