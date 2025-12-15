@@ -49,8 +49,7 @@ if TYPE_CHECKING:
     from typing import Optional, Dict, Any, Tuple
 
 
-def otel_propagation_context():
-    # type: () -> Optional[Tuple[str, str]]
+def otel_propagation_context() -> "Optional[Tuple[str, str]]":
     """
     Get the (trace_id, span_id) from opentelemetry if exists.
     """
@@ -62,8 +61,7 @@ def otel_propagation_context():
     return (format_trace_id(ctx.trace_id), format_span_id(ctx.span_id))
 
 
-def setup_otlp_traces_exporter(dsn=None):
-    # type: (Optional[str]) -> None
+def setup_otlp_traces_exporter(dsn: "Optional[str]" = None) -> None:
     tracer_provider = get_tracer_provider()
 
     if not isinstance(tracer_provider, TracerProvider):
@@ -97,8 +95,12 @@ class SentryOTLPPropagator(SentryPropagator):
     For incoming baggage, we just pass it on as is so that case is correctly handled.
     """
 
-    def inject(self, carrier, context=None, setter=default_setter):
-        # type: (CarrierT, Optional[Context], Setter[CarrierT]) -> None
+    def inject(
+        self,
+        carrier: "CarrierT",
+        context: "Optional[Context]" = None,
+        setter: "Setter[CarrierT]" = default_setter,
+    ) -> None:
         otlp_integration = get_client().get_integration(OTLPIntegration)
         if otlp_integration is None:
             return
@@ -122,8 +124,7 @@ class SentryOTLPPropagator(SentryPropagator):
                 setter.set(carrier, BAGGAGE_HEADER_NAME, baggage_data)
 
 
-def _to_traceparent(span_context):
-    # type: (SpanContext) -> str
+def _to_traceparent(span_context: "SpanContext") -> str:
     """
     Helper method to generate the sentry-trace header.
     """
@@ -137,22 +138,23 @@ def _to_traceparent(span_context):
 class OTLPIntegration(Integration):
     identifier = "otlp"
 
-    def __init__(self, setup_otlp_traces_exporter=True, setup_propagator=True):
-        # type: (bool, bool) -> None
+    def __init__(
+        self, setup_otlp_traces_exporter: bool = True, setup_propagator: bool = True
+    ) -> None:
         self.setup_otlp_traces_exporter = setup_otlp_traces_exporter
         self.setup_propagator = setup_propagator
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         logger.debug("[OTLP] Setting up trace linking for all events")
         register_external_propagation_context(otel_propagation_context)
 
-    def setup_once_with_options(self, options=None):
-        # type: (Optional[Dict[str, Any]]) -> None
+    def setup_once_with_options(
+        self, options: "Optional[Dict[str, Any]]" = None
+    ) -> None:
         if self.setup_otlp_traces_exporter:
             logger.debug("[OTLP] Setting up OTLP exporter")
-            dsn = options.get("dsn") if options else None  # type: Optional[str]
+            dsn: "Optional[str]" = options.get("dsn") if options else None
             setup_otlp_traces_exporter(dsn)
 
         if self.setup_propagator:

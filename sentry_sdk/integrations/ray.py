@@ -27,8 +27,7 @@ if TYPE_CHECKING:
     from sentry_sdk.utils import ExcInfo
 
 
-def _check_sentry_initialized():
-    # type: () -> None
+def _check_sentry_initialized() -> None:
     if sentry_sdk.get_client().is_active():
         return
 
@@ -37,14 +36,13 @@ def _check_sentry_initialized():
     )
 
 
-def _patch_ray_remote():
-    # type: () -> None
+def _patch_ray_remote() -> None:
     old_remote = ray.remote
 
     @functools.wraps(old_remote)
-    def new_remote(f=None, *args, **kwargs):
-        # type: (Optional[Callable[..., Any]], *Any, **Any) -> Callable[..., Any]
-
+    def new_remote(
+        f: "Optional[Callable[..., Any]]" = None, *args: "Any", **kwargs: "Any"
+    ) -> "Callable[..., Any]":
         if inspect.isclass(f):
             # Ray Actors
             # (https://docs.ray.io/en/latest/ray-core/actors.html)
@@ -52,8 +50,7 @@ def _patch_ray_remote():
             # (Only Ray Tasks are supported)
             return old_remote(f, *args, **kwargs)
 
-        def wrapper(user_f):
-            # type: (Callable[..., Any]) -> Any
+        def wrapper(user_f: "Callable[..., Any]") -> "Any":
             if inspect.isclass(user_f):
                 # Ray Actors
                 # (https://docs.ray.io/en/latest/ray-core/actors.html)
@@ -62,8 +59,11 @@ def _patch_ray_remote():
                 return old_remote(*args, **kwargs)(user_f)
 
             @functools.wraps(user_f)
-            def new_func(*f_args, _sentry_tracing=None, **f_kwargs):
-                # type: (Any, Optional[dict[str, Any]], Any) -> Any
+            def new_func(
+                *f_args: "Any",
+                _sentry_tracing: "Optional[dict[str, Any]]" = None,
+                **f_kwargs: "Any",
+            ) -> "Any":
                 _check_sentry_initialized()
 
                 transaction = sentry_sdk.continue_trace(
@@ -105,8 +105,9 @@ def _patch_ray_remote():
                 rv = old_remote(*args, **kwargs)(new_func)
             old_remote_method = rv.remote
 
-            def _remote_method_with_header_propagation(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
+            def _remote_method_with_header_propagation(
+                *args: "Any", **kwargs: "Any"
+            ) -> "Any":
                 """
                 Ray Client
                 """
@@ -144,8 +145,7 @@ def _patch_ray_remote():
     ray.remote = new_remote
 
 
-def _capture_exception(exc_info, **kwargs):
-    # type: (ExcInfo, **Any) -> None
+def _capture_exception(exc_info: "ExcInfo", **kwargs: "Any") -> None:
     client = sentry_sdk.get_client()
 
     event, hint = event_from_exception(
@@ -164,8 +164,7 @@ class RayIntegration(Integration):
     origin = f"auto.queue.{identifier}"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         version = package_version("ray")
         _check_minimum_version(RayIntegration, version)
 

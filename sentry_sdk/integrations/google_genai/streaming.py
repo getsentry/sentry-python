@@ -26,16 +26,17 @@ if TYPE_CHECKING:
 
 
 class AccumulatedResponse(TypedDict):
-    id: Optional[str]
-    model: Optional[str]
+    id: "Optional[str]"
+    model: "Optional[str]"
     text: str
-    finish_reasons: List[str]
-    tool_calls: List[dict[str, Any]]
-    usage_metadata: UsageData
+    finish_reasons: "List[str]"
+    tool_calls: "List[dict[str, Any]]"
+    usage_metadata: "UsageData"
 
 
-def accumulate_streaming_response(chunks):
-    # type: (List[GenerateContentResponse]) -> AccumulatedResponse
+def accumulate_streaming_response(
+    chunks: "List[GenerateContentResponse]",
+) -> "AccumulatedResponse":
     """Accumulate streaming chunks into a single response-like object."""
     accumulated_text = []
     finish_reasons = []
@@ -93,8 +94,9 @@ def accumulate_streaming_response(chunks):
     return accumulated_response
 
 
-def set_span_data_for_streaming_response(span, integration, accumulated_response):
-    # type: (Span, Any, AccumulatedResponse) -> None
+def set_span_data_for_streaming_response(
+    span: "Span", integration: "Any", accumulated_response: "AccumulatedResponse"
+) -> None:
     """Set span data for accumulated streaming response."""
     if (
         should_send_default_pii()

@@ -26,15 +26,17 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def _set_async_cluster_db_data(span, async_redis_cluster_instance):
-    # type: (Span, AsyncRedisCluster[Any]) -> None
+def _set_async_cluster_db_data(
+    span: "Span", async_redis_cluster_instance: "AsyncRedisCluster[Any]"
+) -> None:
     default_node = async_redis_cluster_instance.get_default_node()
     if default_node is not None and default_node.connection_kwargs is not None:
         _set_db_data_on_span(span, default_node.connection_kwargs)
 
 
-def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
-    # type: (Span, AsyncClusterPipeline[Any]) -> None
+def _set_async_cluster_pipeline_db_data(
+    span: "Span", async_redis_cluster_pipeline_instance: "AsyncClusterPipeline[Any]"
+) -> None:
     with capture_internal_exceptions():
         client = getattr(async_redis_cluster_pipeline_instance, "cluster_client", None)
         if client is None:
@@ -52,8 +54,9 @@ def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_insta
         )
 
 
-def _set_cluster_db_data(span, redis_cluster_instance):
-    # type: (Span, RedisCluster[Any]) -> None
+def _set_cluster_db_data(
+    span: "Span", redis_cluster_instance: "RedisCluster[Any]"
+) -> None:
     default_node = redis_cluster_instance.get_default_node()
 
     if default_node is not None:
@@ -64,8 +67,7 @@ def _set_cluster_db_data(span, redis_cluster_instance):
         _set_db_data_on_span(span, connection_params)
 
 
-def _patch_redis_cluster():
-    # type: () -> None
+def _patch_redis_cluster() -> None:
     """Patches the cluster module on redis SDK (as opposed to rediscluster library)"""
     try:
         from redis import RedisCluster, cluster

@@ -17,8 +17,7 @@ if TYPE_CHECKING:
     from typing import Any, Optional
 
 
-def _get_op(name):
-    # type: (str) -> Optional[str]
+def _get_op(name: str) -> "Optional[str]":
     op = None
     if name.lower() in GET_COMMANDS:
         op = OP.CACHE_GET
@@ -28,8 +27,12 @@ def _get_op(name):
     return op
 
 
-def _compile_cache_span_properties(redis_command, args, kwargs, integration):
-    # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> dict[str, Any]
+def _compile_cache_span_properties(
+    redis_command: str,
+    args: "tuple[Any, ...]",
+    kwargs: "dict[str, Any]",
+    integration: "RedisIntegration",
+) -> "dict[str, Any]":
     key = _get_safe_key(redis_command, args, kwargs)
     key_as_string = _key_as_string(key)
     keys_as_string = key_as_string.split(", ")
@@ -62,8 +65,12 @@ def _compile_cache_span_properties(redis_command, args, kwargs, integration):
     return properties
 
 
-def _get_cache_span_description(redis_command, args, kwargs, integration):
-    # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> str
+def _get_cache_span_description(
+    redis_command: str,
+    args: "tuple[Any, ...]",
+    kwargs: "dict[str, Any]",
+    integration: "RedisIntegration",
+) -> str:
     description = _key_as_string(_get_safe_key(redis_command, args, kwargs))
 
     if integration.max_data_size and len(description) > integration.max_data_size:
@@ -72,8 +79,12 @@ def _get_cache_span_description(redis_command, args, kwargs, integration):
     return description
 
 
-def _set_cache_data(span, redis_client, properties, return_value):
-    # type: (Span, Any, dict[str, Any], Optional[Any]) -> None
+def _set_cache_data(
+    span: "Span",
+    redis_client: "Any",
+    properties: "dict[str, Any]",
+    return_value: "Optional[Any]",
+) -> None:
     with capture_internal_exceptions():
         span.set_data(SPANDATA.CACHE_KEY, properties["key"])
 

@@ -18,15 +18,14 @@ class UnraisablehookIntegration(Integration):
     identifier = "unraisablehook"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         sys.unraisablehook = _make_unraisable(sys.unraisablehook)
 
 
-def _make_unraisable(old_unraisablehook):
-    # type: (Callable[[sys.UnraisableHookArgs], Any]) -> Callable[[sys.UnraisableHookArgs], Any]
-    def sentry_sdk_unraisablehook(unraisable):
-        # type: (sys.UnraisableHookArgs) -> None
+def _make_unraisable(
+    old_unraisablehook: "Callable[[sys.UnraisableHookArgs], Any]",
+) -> "Callable[[sys.UnraisableHookArgs], Any]":
+    def sentry_sdk_unraisablehook(unraisable: "sys.UnraisableHookArgs") -> None:
         integration = sentry_sdk.get_client().get_integration(UnraisablehookIntegration)
 
         # Note: If  we replace this with ensure_integration_enabled then

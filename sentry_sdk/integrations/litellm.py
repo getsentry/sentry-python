@@ -23,8 +23,7 @@ except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
 
-def _get_metadata_dict(kwargs):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+def _get_metadata_dict(kwargs: "Dict[str, Any]") -> "Dict[str, Any]":
     """Get the metadata dictionary from the kwargs."""
     litellm_params = kwargs.setdefault("litellm_params", {})
 
@@ -36,8 +35,7 @@ def _get_metadata_dict(kwargs):
     return metadata
 
 
-def _input_callback(kwargs):
-    # type: (Dict[str, Any]) -> None
+def _input_callback(kwargs: "Dict[str, Any]") -> None:
     """Handle the start of a request."""
     integration = sentry_sdk.get_client().get_integration(LiteLLMIntegration)
 
@@ -138,8 +136,12 @@ def _input_callback(kwargs):
             set_data_normalized(span, f"gen_ai.litellm.{key}", value)
 
 
-def _success_callback(kwargs, completion_response, start_time, end_time):
-    # type: (Dict[str, Any], Any, datetime, datetime) -> None
+def _success_callback(
+    kwargs: "Dict[str, Any]",
+    completion_response: "Any",
+    start_time: "datetime",
+    end_time: "datetime",
+) -> None:
     """Handle successful completion."""
 
     span = _get_metadata_dict(kwargs).get("_sentry_span")
@@ -198,8 +200,12 @@ def _success_callback(kwargs, completion_response, start_time, end_time):
         span.__exit__(None, None, None)
 
 
-def _failure_callback(kwargs, exception, start_time, end_time):
-    # type: (Dict[str, Any], Exception, datetime, datetime) -> None
+def _failure_callback(
+    kwargs: "Dict[str, Any]",
+    exception: Exception,
+    start_time: "datetime",
+    end_time: "datetime",
+) -> None:
     """Handle request failure."""
     span = _get_metadata_dict(kwargs).get("_sentry_span")
     if span is None:
@@ -266,13 +272,11 @@ class LiteLLMIntegration(Integration):
     identifier = "litellm"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (LiteLLMIntegration, bool) -> None
+    def __init__(self: "LiteLLMIntegration", include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """Set up LiteLLM callbacks for monitoring."""
         litellm.input_callback = litellm.input_callback or []
         if _input_callback not in litellm.input_callback:

@@ -17,8 +17,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable
 
 
-def _create_run_wrapper(original_func):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run methods to create a root span for the agent workflow runs.
 
@@ -27,8 +26,7 @@ def _create_run_wrapper(original_func):
     """
 
     @wraps(original_func)
-    async def wrapper(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
         with sentry_sdk.isolation_scope():

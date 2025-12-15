@@ -49,16 +49,13 @@ class SpotlightClient:
     INITIAL_RETRY_DELAY = 1.0  # Start with 1 second
     MAX_RETRY_DELAY = 60.0  # Max 60 seconds
 
-    def __init__(self, url):
-        # type: (str) -> None
+    def __init__(self, url: str) -> None:
         self.url = url
         self.http = urllib3.PoolManager()
         self._retry_delay = self.INITIAL_RETRY_DELAY
-        self._last_error_time = 0.0  # type: float
+        self._last_error_time: float = 0.0
 
-    def capture_envelope(self, envelope):
-        # type: (Envelope) -> None
-
+    def capture_envelope(self, envelope: "Envelope") -> None:
         # Check if we're in backoff period - skip sending to avoid blocking
         if self._last_error_time > 0:
             time_since_error = time.time() - self._last_error_time
@@ -119,11 +116,10 @@ try:
     )
 
     class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
-        _spotlight_script = None  # type: Optional[str]
-        _spotlight_url = None  # type: Optional[str]
+        _spotlight_script: "Optional[str]" = None
+        _spotlight_url: "Optional[str]" = None
 
-        def __init__(self, get_response):
-            # type: (Self, Callable[..., HttpResponse]) -> None
+        def __init__(self: "Self", get_response: "Callable[..., HttpResponse]") -> None:
             super().__init__(get_response)
 
             import sentry_sdk.api
@@ -140,8 +136,7 @@ try:
             self._spotlight_url = urllib.parse.urljoin(spotlight_client.url, "../")
 
         @property
-        def spotlight_script(self):
-            # type: (Self) -> Optional[str]
+        def spotlight_script(self: "Self") -> "Optional[str]":
             if self._spotlight_url is not None and self._spotlight_script is None:
                 try:
                     spotlight_js_url = urllib.parse.urljoin(
@@ -165,8 +160,9 @@ try:
 
             return self._spotlight_script
 
-        def process_response(self, _request, response):
-            # type: (Self, HttpRequest, HttpResponse) -> Optional[HttpResponse]
+        def process_response(
+            self: "Self", _request: "HttpRequest", response: "HttpResponse"
+        ) -> "Optional[HttpResponse]":
             content_type_header = tuple(
                 p.strip()
                 for p in response.headers.get("Content-Type", "").lower().split(";")
@@ -210,8 +206,9 @@ try:
 
             return response
 
-        def process_exception(self, _request, exception):
-            # type: (Self, HttpRequest, Exception) -> Optional[HttpResponseServerError]
+        def process_exception(
+            self: "Self", _request: "HttpRequest", exception: Exception
+        ) -> "Optional[HttpResponseServerError]":
             if not settings.DEBUG or not self._spotlight_url:
                 return None
 
@@ -236,8 +233,9 @@ except ImportError:
     settings = None
 
 
-def _resolve_spotlight_url(spotlight_config, sentry_logger):
-    # type: (Any, Any) -> Optional[str]
+def _resolve_spotlight_url(
+    spotlight_config: "Any", sentry_logger: "Any"
+) -> "Optional[str]":
     """
     Resolve the Spotlight URL based on config and environment variable.
 
@@ -249,8 +247,8 @@ def _resolve_spotlight_url(spotlight_config, sentry_logger):
     spotlight_env_value = os.environ.get("SENTRY_SPOTLIGHT")
 
     # Parse env var to determine if it's a boolean or URL
-    spotlight_from_env = None  # type: Optional[bool]
-    spotlight_env_url = None  # type: Optional[str]
+    spotlight_from_env: "Optional[bool]" = None
+    spotlight_env_url: "Optional[str]" = None
     if spotlight_env_value:
         parsed = env_to_bool(spotlight_env_value, strict=True)
         if parsed is None:
@@ -298,8 +296,7 @@ def _resolve_spotlight_url(spotlight_config, sentry_logger):
     return None
 
 
-def setup_spotlight(options):
-    # type: (Dict[str, Any]) -> Optional[SpotlightClient]
+def setup_spotlight(options: "Dict[str, Any]") -> "Optional[SpotlightClient]":
     url = _resolve_spotlight_url(options.get("spotlight"), sentry_logger)
 
     if url is None:
