@@ -25,7 +25,7 @@ except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
 try:
-    from fastmcp import FastMCP
+    from fastmcp import FastMCP  # type: ignore[import-not-found]
 except ImportError:
     FastMCP = None
 
