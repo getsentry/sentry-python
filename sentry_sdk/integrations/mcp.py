@@ -24,6 +24,11 @@ try:
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
+try:
+    from fastmcp import FastMCP
+except ImportError:
+    FastMCP = None
+
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -51,6 +56,9 @@ class MCPIntegration(Integration):
         Patches MCP server classes to instrument handler execution.
         """
         _patch_lowlevel_server()
+
+        if FastMCP is not None:
+            _patch_fastmcp()
 
 
 def _get_request_context_data():
@@ -564,3 +572,100 @@ def _patch_lowlevel_server():
         )(func)
 
     Server.read_resource = patched_read_resource
+
+
+def _patch_fastmcp():
+    # type: () -> None
+    """
+    Patches the standalone fastmcp package's FastMCP class.
+
+    The standalone fastmcp package (v2.14.0+) registers its own handlers for
+    prompts and resources directly, bypassing the Server decorators we patch.
+    This function patches the _get_prompt_mcp and _read_resource_mcp methods
+    to add instrumentation for those handlers.
+    """
+    if hasattr(FastMCP, "_get_prompt_mcp"):
+        original_get_prompt_mcp = FastMCP._get_prompt_mcp
+
+        @wraps(original_get_prompt_mcp)
+        async def patched_get_prompt_mcp(self, name, arguments=None):
+            # type: (Any, str, Optional[dict[str, Any]]) -> Any
+            return await _async_fastmcp_handler_wrapper(
+                "prompt",
+                lambda n, a: original_get_prompt_mcp(self, n, a),
+                (name, arguments),
+            )
+
+        FastMCP._get_prompt_mcp = patched_get_prompt_mcp
+
+    # Patch _read_resource_mcp
+    if hasattr(FastMCP, "_read_resource_mcp"):
+        original_read_resource_mcp = FastMCP._read_resource_mcp
+
+        @wraps(original_read_resource_mcp)
+        async def patched_read_resource_mcp(self, uri):
+            # type: (Any, Any) -> Any
+            return await _async_fastmcp_handler_wrapper(
+                "resource",
+                lambda u: original_read_resource_mcp(self, u),
+                (uri,),
+            )
+
+        FastMCP._read_resource_mcp = patched_read_resource_mcp
+
+
+async def _async_fastmcp_handler_wrapper(handler_type, func, original_args):
+    # type: (str, Callable[..., Any], tuple[Any, ...]) -> Any
+    """
+    Async wrapper for standalone FastMCP handlers.
+
+    Similar to _async_handler_wrapper but the original function is already
+    a coroutine function that we call directly.
+    """
+    (
+        handler_name,
+        arguments,
+        span_data_key,
+        span_name,
+        mcp_method_name,
+        result_data_key,
+    ) = _prepare_handler_data(handler_type, original_args)
+
+    with get_start_span_function()(
+        op=OP.MCP_SERVER,
+        name=span_name,
+        origin=MCPIntegration.origin,
+    ) as span:
+        request_id, session_id, mcp_transport = _get_request_context_data()
+
+        _set_span_input_data(
+            span,
+            handler_name,
+            span_data_key,
+            mcp_method_name,
+            arguments,
+            request_id,
+            session_id,
+            mcp_transport,
+        )
+
+        if handler_type == "resource":
+            uri = original_args[0]
+            protocol = None
+            if hasattr(uri, "scheme"):
+                protocol = uri.scheme
+            elif handler_name and "://" in handler_name:
+                protocol = handler_name.split("://")[0]
+            if protocol:
+                span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
+
+        try:
+            result = await func(*original_args)
+        except Exception as e:
+            if handler_type == "tool":
+                span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
+            sentry_sdk.capture_exception(e)
+            raise
+
+        _set_span_output_data(span, result, result_data_key, handler_type)
+        return result
