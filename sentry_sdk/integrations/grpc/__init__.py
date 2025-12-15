@@ -80,7 +80,9 @@ def _wrap_intercept_channel(func: "Callable[P, Channel]") -> "Callable[P, Channe
     return patched_intercept_channel  # type: ignore
 
 
-def _wrap_channel_async(func: "Callable[P, AsyncChannel]") -> "Callable[P, AsyncChannel]":
+def _wrap_channel_async(
+    func: "Callable[P, AsyncChannel]",
+) -> "Callable[P, AsyncChannel]":
     "Wrapper for asynchronous secure and insecure channel."
 
     @wraps(func)

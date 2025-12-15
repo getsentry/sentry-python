@@ -456,7 +456,9 @@ def patch_request_response() -> None:
                 def _make_request_event_processor(
                     req: "Any", integration: "Any"
                 ) -> "Callable[[Event, dict[str, Any]], Event]":
-                    def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
+                    def event_processor(
+                        event: "Event", hint: "Dict[str, Any]"
+                    ) -> "Event":
                         # Add info from request to event
                         request_info = event.get("request", {})
                         if info:
@@ -509,7 +511,9 @@ def patch_request_response() -> None:
                 def _make_request_event_processor(
                     req: "Any", integration: "Any"
                 ) -> "Callable[[Event, dict[str, Any]], Event]":
-                    def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
+                    def event_processor(
+                        event: "Event", hint: "dict[str, Any]"
+                    ) -> "Event":
                         # Extract information from request
                         request_info = event.get("request", {})
                         if cookies:

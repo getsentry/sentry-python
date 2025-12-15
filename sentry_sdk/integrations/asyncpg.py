@@ -153,7 +153,9 @@ def _wrap_cursor_creation(f: "Callable[..., T]") -> "Callable[..., T]":
     return _inner
 
 
-def _wrap_connect_addr(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[T]]":
+def _wrap_connect_addr(
+    f: "Callable[..., Awaitable[T]]",
+) -> "Callable[..., Awaitable[T]]":
     async def _inner(*args: "Any", **kwargs: "Any") -> "T":
         if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
             return await f(*args, **kwargs)

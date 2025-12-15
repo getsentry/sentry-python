@@ -157,7 +157,9 @@ def _make_event_processor(
 
 
 def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine":
-    async def _sentry_coroutine(ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any") -> "Any":
+    async def _sentry_coroutine(
+        ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(ArqIntegration)
         if integration is None:
             return await coroutine(ctx, *args, **kwargs)
