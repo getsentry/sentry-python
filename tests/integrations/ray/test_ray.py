@@ -183,7 +183,9 @@ def test_errors_in_ray_tasks():
             shutil.rmtree(ray_temp_dir, ignore_errors=True)
 
 
-def test_tracing_in_ray_actors():
+# Arbitrary keyword argument to test all decorator paths
+@pytest.mark.parametrize("remote_kwargs", [{}, {"namespace": "actors"}])
+def test_tracing_in_ray_actors(remote_kwargs):
     setup_sentry()
 
     ray.init(
@@ -194,16 +196,30 @@ def test_tracing_in_ray_actors():
     )
 
     # Setup ray actor
-    @ray.remote
-    class Counter:
-        def __init__(self):
-            self.n = 0
+    if remote_kwargs:
 
-        def increment(self):
-            with sentry_sdk.start_span(op="task", name="example actor execution"):
-                self.n += 1
+        @ray.remote(**remote_kwargs)
+        class Counter:
+            def __init__(self):
+                self.n = 0
 
-            return sentry_sdk.get_client().transport.envelopes
+            def increment(self):
+                with sentry_sdk.start_span(op="task", name="example actor execution"):
+                    self.n += 1
+
+                return sentry_sdk.get_client().transport.envelopes
+    else:
+
+        @ray.remote
+        class Counter:
+            def __init__(self):
+                self.n = 0
+
+            def increment(self):
+                with sentry_sdk.start_span(op="task", name="example actor execution"):
+                    self.n += 1
+
+                return sentry_sdk.get_client().transport.envelopes
 
     with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
         counter = Counter.remote()
