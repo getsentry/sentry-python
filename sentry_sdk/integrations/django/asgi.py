@@ -51,10 +51,8 @@ else:
         return func
 
 
-def _make_asgi_request_event_processor(request):
-    # type: (ASGIRequest) -> EventProcessor
-    def asgi_request_event_processor(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcessor":
+    def asgi_request_event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -81,15 +79,14 @@ def _make_asgi_request_event_processor(request):
     return asgi_request_event_processor
 
 
-def patch_django_asgi_handler_impl(cls):
-    # type: (Any) -> None
-
+def patch_django_asgi_handler_impl(cls: "Any") -> None:
     from sentry_sdk.integrations.django import DjangoIntegration
 
     old_app = cls.__call__
 
-    async def sentry_patched_asgi_handler(self, scope, receive, send):
-        # type: (Any, Any, Any, Any) -> Any
+    async def sentry_patched_asgi_handler(
+        self: "Any", scope: "Any", receive: "Any", send: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None:
             return await old_app(self, scope, receive, send)
@@ -110,8 +107,9 @@ def patch_django_asgi_handler_impl(cls):
         old_create_request = cls.create_request
 
         @ensure_integration_enabled(DjangoIntegration, old_create_request)
-        def sentry_patched_create_request(self, *args, **kwargs):
-            # type: (Any, *Any, **Any) -> Any
+        def sentry_patched_create_request(
+            self: "Any", *args: "Any", **kwargs: "Any"
+        ) -> "Any":
             request, error_response = old_create_request(self, *args, **kwargs)
             scope = sentry_sdk.get_isolation_scope()
             scope.add_event_processor(_make_asgi_request_event_processor(request))
@@ -121,20 +119,19 @@ def patch_django_asgi_handler_impl(cls):
         cls.create_request = sentry_patched_create_request
 
 
-def patch_get_response_async(cls, _before_get_response):
-    # type: (Any, Any) -> None
+def patch_get_response_async(cls: "Any", _before_get_response: "Any") -> None:
     old_get_response_async = cls.get_response_async
 
-    async def sentry_patched_get_response_async(self, request):
-        # type: (Any, Any) -> Union[HttpResponse, BaseException]
+    async def sentry_patched_get_response_async(
+        self: "Any", request: "Any"
+    ) -> "Union[HttpResponse, BaseException]":
         _before_get_response(request)
         return await old_get_response_async(self, request)
 
     cls.get_response_async = sentry_patched_get_response_async
 
 
-def patch_channels_asgi_handler_impl(cls):
-    # type: (Any) -> None
+def patch_channels_asgi_handler_impl(cls: "Any") -> None:
     import channels  # type: ignore
 
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -142,8 +139,9 @@ def patch_channels_asgi_handler_impl(cls):
     if channels.__version__ < "3.0.0":
         old_app = cls.__call__
 
-        async def sentry_patched_asgi_handler(self, receive, send):
-            # type: (Any, Any, Any) -> Any
+        async def sentry_patched_asgi_handler(
+            self: "Any", receive: "Any", send: "Any"
+        ) -> "Any":
             integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
             if integration is None:
                 return await old_app(self, receive, send)
@@ -165,13 +163,13 @@ def patch_channels_asgi_handler_impl(cls):
         patch_django_asgi_handler_impl(cls)
 
 
-def wrap_async_view(callback):
-    # type: (Any) -> Any
+def wrap_async_view(callback: "Any") -> "Any":
     from sentry_sdk.integrations.django import DjangoIntegration
 
     @functools.wraps(callback)
-    async def sentry_wrapped_callback(request, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    async def sentry_wrapped_callback(
+        request: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         current_scope = sentry_sdk.get_current_scope()
         if current_scope.transaction is not None:
             current_scope.transaction.update_active_thread()
@@ -194,8 +192,9 @@ def wrap_async_view(callback):
     return sentry_wrapped_callback
 
 
-def _asgi_middleware_mixin_factory(_check_middleware_span):
-    # type: (Callable[..., Any]) -> Any
+def _asgi_middleware_mixin_factory(
+    _check_middleware_span: "Callable[..., Any]",
+) -> "Any":
     """
     Mixin class factory that generates a middleware mixin for handling requests
     in async mode.
@@ -205,14 +204,12 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
         if TYPE_CHECKING:
             _inner = None
 
-        def __init__(self, get_response):
-            # type: (Callable[..., Any]) -> None
+        def __init__(self, get_response: "Callable[..., Any]") -> None:
             self.get_response = get_response
             self._acall_method = None
             self._async_check()
 
-        def _async_check(self):
-            # type: () -> None
+        def _async_check(self) -> None:
             """
             If get_response is a coroutine function, turns us into async mode so
             a thread is not consumed during a whole request.
@@ -221,16 +218,14 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
             if iscoroutinefunction(self.get_response):
                 markcoroutinefunction(self)
 
-        def async_route_check(self):
-            # type: () -> bool
+        def async_route_check(self) -> bool:
             """
             Function that checks if we are in async mode,
             and if we are forwards the handling of requests to __acall__
             """
             return iscoroutinefunction(self.get_response)
 
-        async def __acall__(self, *args, **kwargs):
-            # type: (*Any, **Any) -> Any
+        async def __acall__(self, *args: "Any", **kwargs: "Any") -> "Any":
             f = self._acall_method
             if f is None:
                 if hasattr(self._inner, "__acall__"):

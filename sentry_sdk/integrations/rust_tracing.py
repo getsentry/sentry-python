@@ -58,8 +58,7 @@ class EventTypeMapping(Enum):
     Event = auto()
 
 
-def tracing_level_to_sentry_level(level):
-    # type: (str) -> sentry_sdk._types.LogLevelStr
+def tracing_level_to_sentry_level(level: str) -> "sentry_sdk._types.LogLevelStr":
     level = RustTracingLevel(level)
     if level in (RustTracingLevel.Trace, RustTracingLevel.Debug):
         return "debug"
@@ -74,7 +73,7 @@ def tracing_level_to_sentry_level(level):
         return "info"
 
 
-def extract_contexts(event: Dict[str, Any]) -> Dict[str, Any]:
+def extract_contexts(event: "Dict[str, Any]") -> "Dict[str, Any]":
     metadata = event.get("metadata", {})
     contexts = {}
 
@@ -94,36 +93,36 @@ def extract_contexts(event: Dict[str, Any]) -> Dict[str, Any]:
     return contexts
 
 
-def process_event(event: Dict[str, Any]) -> None:
+def process_event(event: "Dict[str, Any]") -> None:
     metadata = event.get("metadata", {})
 
     logger = metadata.get("target")
     level = tracing_level_to_sentry_level(metadata.get("level"))
-    message = event.get("message")  # type: sentry_sdk._types.Any
+    message: "sentry_sdk._types.Any" = event.get("message")
     contexts = extract_contexts(event)
 
-    sentry_event = {
+    sentry_event: "sentry_sdk._types.Event" = {
         "logger": logger,
         "level": level,
         "message": message,
         "contexts": contexts,
-    }  # type: sentry_sdk._types.Event
+    }
 
     sentry_sdk.capture_event(sentry_event)
 
 
-def process_exception(event: Dict[str, Any]) -> None:
+def process_exception(event: "Dict[str, Any]") -> None:
     process_event(event)
 
 
-def process_breadcrumb(event: Dict[str, Any]) -> None:
+def process_breadcrumb(event: "Dict[str, Any]") -> None:
     level = tracing_level_to_sentry_level(event.get("metadata", {}).get("level"))
     message = event.get("message")
 
     sentry_sdk.add_breadcrumb(level=level, message=message)
 
 
-def default_span_filter(metadata: Dict[str, Any]) -> bool:
+def default_span_filter(metadata: "Dict[str, Any]") -> bool:
     return RustTracingLevel(metadata.get("level")) in (
         RustTracingLevel.Error,
         RustTracingLevel.Warn,
@@ -131,7 +130,7 @@ def default_span_filter(metadata: Dict[str, Any]) -> bool:
     )
 
 
-def default_event_type_mapping(metadata: Dict[str, Any]) -> EventTypeMapping:
+def default_event_type_mapping(metadata: "Dict[str, Any]") -> "EventTypeMapping":
     level = RustTracingLevel(metadata.get("level"))
     if level == RustTracingLevel.Error:
         return EventTypeMapping.Exc
@@ -147,11 +146,11 @@ class RustTracingLayer:
     def __init__(
         self,
         origin: str,
-        event_type_mapping: Callable[
+        event_type_mapping: """Callable[
             [Dict[str, Any]], EventTypeMapping
-        ] = default_event_type_mapping,
-        span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
-        include_tracing_fields: Optional[bool] = None,
+        ]""" = default_event_type_mapping,
+        span_filter: "Callable[[Dict[str, Any]], bool]" = default_span_filter,
+        include_tracing_fields: "Optional[bool]" = None,
     ):
         self.origin = origin
         self.event_type_mapping = event_type_mapping
@@ -171,7 +170,7 @@ class RustTracingLayer:
             else self.include_tracing_fields
         )
 
-    def on_event(self, event: str, _span_state: TraceState) -> None:
+    def on_event(self, event: str, _span_state: "TraceState") -> None:
         deserialized_event = json.loads(event)
         metadata = deserialized_event.get("metadata", {})
 
@@ -185,7 +184,7 @@ class RustTracingLayer:
         elif event_type == EventTypeMapping.Event:
             process_event(deserialized_event)
 
-    def on_new_span(self, attrs: str, span_id: str) -> TraceState:
+    def on_new_span(self, attrs: str, span_id: str) -> "TraceState":
         attrs = json.loads(attrs)
         metadata = attrs.get("metadata", {})
 
@@ -228,7 +227,7 @@ class RustTracingLayer:
         scope.span = sentry_span
         return (parent_sentry_span, sentry_span)
 
-    def on_close(self, span_id: str, span_state: TraceState) -> None:
+    def on_close(self, span_id: str, span_state: "TraceState") -> None:
         if span_state is None:
             return
 
@@ -236,7 +235,7 @@ class RustTracingLayer:
         sentry_span.finish()
         sentry_sdk.get_current_scope().span = parent_sentry_span
 
-    def on_record(self, span_id: str, values: str, span_state: TraceState) -> None:
+    def on_record(self, span_id: str, values: str, span_state: "TraceState") -> None:
         if span_state is None:
             return
         _parent_sentry_span, sentry_span = span_state
@@ -264,12 +263,12 @@ class RustTracingIntegration(Integration):
     def __init__(
         self,
         identifier: str,
-        initializer: Callable[[RustTracingLayer], None],
-        event_type_mapping: Callable[
+        initializer: "Callable[[RustTracingLayer], None]",
+        event_type_mapping: """Callable[
             [Dict[str, Any]], EventTypeMapping
-        ] = default_event_type_mapping,
-        span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
-        include_tracing_fields: Optional[bool] = None,
+        ]""" = default_event_type_mapping,
+        span_filter: "Callable[[Dict[str, Any]], bool]" = default_span_filter,
+        include_tracing_fields: "Optional[bool]" = None,
     ):
         self.identifier = identifier
         origin = f"auto.function.rust_tracing.{identifier}"

@@ -47,8 +47,7 @@ class TornadoIntegration(Integration):
     origin = f"auto.http.{identifier}"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         _check_minimum_version(TornadoIntegration, TORNADO_VERSION)
 
         if not HAS_REAL_CONTEXTVARS:
@@ -68,16 +67,18 @@ class TornadoIntegration(Integration):
         if awaitable:
             # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
             # In that case our method should be a coroutine function too
-            async def sentry_execute_request_handler(self, *args, **kwargs):
-                # type: (RequestHandler, *Any, **Any) -> Any
+            async def sentry_execute_request_handler(
+                self: "RequestHandler", *args: "Any", **kwargs: "Any"
+            ) -> "Any":
                 with _handle_request_impl(self):
                     return await old_execute(self, *args, **kwargs)
 
         else:
 
             @coroutine  # type: ignore
-            def sentry_execute_request_handler(self, *args, **kwargs):
-                # type: (RequestHandler, *Any, **Any) -> Any
+            def sentry_execute_request_handler(
+                self: "RequestHandler", *args: "Any", **kwargs: "Any"
+            ) -> "Any":
                 with _handle_request_impl(self):
                     result = yield from old_execute(self, *args, **kwargs)
                     return result
@@ -86,8 +87,14 @@ class TornadoIntegration(Integration):
 
         old_log_exception = RequestHandler.log_exception
 
-        def sentry_log_exception(self, ty, value, tb, *args, **kwargs):
-            # type: (Any, type, BaseException, Any, *Any, **Any) -> Optional[Any]
+        def sentry_log_exception(
+            self: "Any",
+            ty: type,
+            value: BaseException,
+            tb: "Any",
+            *args: "Any",
+            **kwargs: "Any",
+        ) -> "Optional[Any]":
             _capture_exception(ty, value, tb)
             return old_log_exception(self, ty, value, tb, *args, **kwargs)
 
@@ -95,8 +102,7 @@ class TornadoIntegration(Integration):
 
 
 @contextlib.contextmanager
-def _handle_request_impl(self):
-    # type: (RequestHandler) -> Generator[None, None, None]
+def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]":
     integration = sentry_sdk.get_client().get_integration(TornadoIntegration)
 
     if integration is None:
@@ -130,8 +136,7 @@ def _handle_request_impl(self):
 
 
 @ensure_integration_enabled(TornadoIntegration)
-def _capture_exception(ty, value, tb):
-    # type: (type, BaseException, Any) -> None
+def _capture_exception(ty: type, value: BaseException, tb: "Any") -> None:
     if isinstance(value, HTTPError):
         return
 
@@ -144,10 +149,10 @@ def _capture_exception(ty, value, tb):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _make_event_processor(weak_handler):
-    # type: (Callable[[], RequestHandler]) -> EventProcessor
-    def tornado_processor(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+def _make_event_processor(
+    weak_handler: "Callable[[], RequestHandler]",
+) -> "EventProcessor":
+    def tornado_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         handler = weak_handler()
         if handler is None:
             return event
@@ -191,35 +196,28 @@ def _make_event_processor(weak_handler):
 
 
 class TornadoRequestExtractor(RequestExtractor):
-    def content_length(self):
-        # type: () -> int
+    def content_length(self) -> int:
         if self.request.body is None:
             return 0
         return len(self.request.body)
 
-    def cookies(self):
-        # type: () -> Dict[str, str]
+    def cookies(self) -> "Dict[str, str]":
         return {k: v.value for k, v in self.request.cookies.items()}
 
-    def raw_data(self):
-        # type: () -> bytes
+    def raw_data(self) -> bytes:
         return self.request.body
 
-    def form(self):
-        # type: () -> Dict[str, Any]
+    def form(self) -> "Dict[str, Any]":
         return {
             k: [v.decode("latin1", "replace") for v in vs]
             for k, vs in self.request.body_arguments.items()
         }
 
-    def is_json(self):
-        # type: () -> bool
+    def is_json(self) -> bool:
         return _is_json_content_type(self.request.headers.get("content-type"))
 
-    def files(self):
-        # type: () -> Dict[str, Any]
+    def files(self) -> "Dict[str, Any]":
         return {k: v[0] for k, v in self.request.files.items() if v}
 
-    def size_of_file(self, file):
-        # type: (Any) -> int
+    def size_of_file(self, file: "Any") -> int:
         return len(file.body or ())

@@ -23,8 +23,7 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-def _patch_agent_run():
-    # type: () -> None
+def _patch_agent_run() -> None:
     """
     Patches AgentRunner methods to create agent invocation spans.
     This directly patches the execution flow to track when agents start and stop.
@@ -35,8 +34,11 @@ def _patch_agent_run():
     original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
 
-    def _start_invoke_agent_span(context_wrapper, agent, kwargs):
-        # type: (agents.RunContextWrapper, agents.Agent, dict[str, Any]) -> Span
+    def _start_invoke_agent_span(
+        context_wrapper: "agents.RunContextWrapper",
+        agent: "agents.Agent",
+        kwargs: "dict[str, Any]",
+    ) -> "Span":
         """Start an agent invocation span"""
         # Store the agent on the context wrapper so we can access it later
         context_wrapper._sentry_current_agent = agent
@@ -45,13 +47,13 @@ def _patch_agent_run():
 
         return span
 
-    def _has_active_agent_span(context_wrapper):
-        # type: (agents.RunContextWrapper) -> bool
+    def _has_active_agent_span(context_wrapper: "agents.RunContextWrapper") -> bool:
         """Check if there's an active agent span for this context"""
         return getattr(context_wrapper, "_sentry_current_agent", None) is not None
 
-    def _get_current_agent(context_wrapper):
-        # type: (agents.RunContextWrapper) -> Optional[agents.Agent]
+    def _get_current_agent(
+        context_wrapper: "agents.RunContextWrapper",
+    ) -> "Optional[agents.Agent]":
         """Get the current agent from context wrapper"""
         return getattr(context_wrapper, "_sentry_current_agent", None)
 
@@ -60,8 +62,9 @@ def _patch_agent_run():
         if hasattr(original_run_single_turn, "__func__")
         else original_run_single_turn
     )
-    async def patched_run_single_turn(cls, *args, **kwargs):
-        # type: (agents.Runner, *Any, **Any) -> Any
+    async def patched_run_single_turn(
+        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         """Patched _run_single_turn that creates agent invocation spans"""
         agent = kwargs.get("agent")
         context_wrapper = kwargs.get("context_wrapper")
@@ -96,8 +99,9 @@ def _patch_agent_run():
         if hasattr(original_execute_handoffs, "__func__")
         else original_execute_handoffs
     )
-    async def patched_execute_handoffs(cls, *args, **kwargs):
-        # type: (agents.Runner, *Any, **Any) -> Any
+    async def patched_execute_handoffs(
+        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         """Patched execute_handoffs that creates handoff spans and ends agent span for handoffs"""
 
         context_wrapper = kwargs.get("context_wrapper")
@@ -126,8 +130,9 @@ def _patch_agent_run():
         if hasattr(original_execute_final_output, "__func__")
         else original_execute_final_output
     )
-    async def patched_execute_final_output(cls, *args, **kwargs):
-        # type: (agents.Runner, *Any, **Any) -> Any
+    async def patched_execute_final_output(
+        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         """Patched execute_final_output that ends agent span for final outputs"""
 
         agent = kwargs.get("agent")

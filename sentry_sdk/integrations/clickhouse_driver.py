@@ -71,9 +71,9 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
+def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
     @ensure_integration_enabled(ClickhouseDriverIntegration, f)
-    def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
+    def _inner(*args: "P.args", **kwargs: "P.kwargs") -> "T":
         connection = args[0]
         query = args[1]
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
@@ -105,8 +105,8 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
     return _inner
 
 
-def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
-    def _inner_end(*args: P.args, **kwargs: P.kwargs) -> T:
+def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
+    def _inner_end(*args: "P.args", **kwargs: "P.kwargs") -> "T":
         res = f(*args, **kwargs)
         instance = args[0]
         span = getattr(instance.connection, "_sentry_span", None)  # type: ignore[attr-defined]
@@ -168,7 +168,7 @@ def _wrap_send_data() -> None:
 
 
 def _set_db_data(
-    span: Span, connection: clickhouse_driver.connection.Connection
+    span: "Span", connection: "clickhouse_driver.connection.Connection"
 ) -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
     span.set_data(SPANDATA.SERVER_ADDRESS, connection.host)

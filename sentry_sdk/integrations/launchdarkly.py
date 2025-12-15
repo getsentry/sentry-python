@@ -20,8 +20,7 @@ except ImportError:
 class LaunchDarklyIntegration(Integration):
     identifier = "launchdarkly"
 
-    def __init__(self, ld_client=None):
-        # type: (LDClient | None) -> None
+    def __init__(self, ld_client: "LDClient | None" = None) -> None:
         """
         :param client: An initialized LDClient instance. If a client is not provided, this
             integration will attempt to use the shared global instance.
@@ -38,24 +37,27 @@ class LaunchDarklyIntegration(Integration):
         client.add_hook(LaunchDarklyHook())
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         pass
 
 
 class LaunchDarklyHook(Hook):
     @property
-    def metadata(self):
-        # type: () -> Metadata
+    def metadata(self) -> "Metadata":
         return Metadata(name="sentry-flag-auditor")
 
-    def after_evaluation(self, series_context, data, detail):
-        # type: (EvaluationSeriesContext, dict[Any, Any], EvaluationDetail) -> dict[Any, Any]
+    def after_evaluation(
+        self,
+        series_context: "EvaluationSeriesContext",
+        data: "dict[Any, Any]",
+        detail: "EvaluationDetail",
+    ) -> "dict[Any, Any]":
         if isinstance(detail.value, bool):
             add_feature_flag(series_context.key, detail.value)
 
         return data
 
-    def before_evaluation(self, series_context, data):
-        # type: (EvaluationSeriesContext, dict[Any, Any]) -> dict[Any, Any]
+    def before_evaluation(
+        self, series_context: "EvaluationSeriesContext", data: "dict[Any, Any]"
+    ) -> "dict[Any, Any]":
         return data  # No-op.
