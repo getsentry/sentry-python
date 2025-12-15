@@ -4,10 +4,7 @@ from sentry_sdk.integrations import DidNotEnable
 import sentry_sdk
 
 from ..spans import execute_tool_span, update_execute_tool_span
-from ..utils import (
-    _capture_exception,
-    get_current_agent,
-)
+from ..utils import get_current_agent
 
 from typing import TYPE_CHECKING
 
@@ -73,18 +70,14 @@ def _patch_tool_execution() -> None:
                     agent,
                     tool_type=tool_type,
                 ) as span:
-                    try:
-                        result = await original_call_tool(
-                            self,
-                            call,
-                            *args,
-                            **kwargs,
-                        )
-                        update_execute_tool_span(span, result)
-                        return result
-                    except Exception as exc:
-                        _capture_exception(exc)
-                        raise exc from None
+                    result = await original_call_tool(
+                        self,
+                        call,
+                        *args,
+                        **kwargs,
+                    )
+                    update_execute_tool_span(span, result)
+                    return result
 
         # No span context - just call original
         return await original_call_tool(
