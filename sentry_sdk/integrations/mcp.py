@@ -290,26 +290,51 @@ def _set_span_output_data(span, result, result_data_key, handler_type):
 # Handler data preparation and wrapping
 
 
-def _prepare_handler_data(handler_type, original_args):
-    # type: (str, tuple[Any, ...]) -> tuple[str, dict[str, Any], str, str, str, Optional[str]]
+def _prepare_handler_data(handler_type, original_args, original_kwargs=None):
+    # type: (str, tuple[Any, ...], Optional[dict[str, Any]]) -> tuple[str, dict[str, Any], str, str, str, Optional[str]]
     """
     Prepare common handler data for both async and sync wrappers.
 
     Returns:
         Tuple of (handler_name, arguments, span_data_key, span_name, mcp_method_name, result_data_key)
     """
+    original_kwargs = original_kwargs or {}
+
     # Extract handler-specific data based on handler type
     if handler_type == "tool":
-        handler_name = original_args[0]  # tool_name
-        arguments = original_args[1] if len(original_args) > 1 else {}
+        if original_args:
+            handler_name = original_args[0]
+        elif original_kwargs.get("tool_name"):
+            handler_name = original_kwargs["tool_name"]
+
+        arguments = {}
+        if len(original_args) > 1:
+            arguments = original_args[1]
+        elif original_kwargs.get("arguments"):
+            arguments = original_kwargs["arguments"]
+
     elif handler_type == "prompt":
-        handler_name = original_args[0]  # name
-        arguments = original_args[1] if len(original_args) > 1 else {}
+        if original_args:
+            handler_name = original_args[0]
+        elif original_kwargs.get("tool_name"):
+            handler_name = original_kwargs["tool_name"]
+
+        arguments = {}
+        if len(original_args) > 1:
+            arguments = original_args[1]
+        elif original_kwargs.get("arguments"):
+            arguments = original_kwargs["arguments"]
+
         # Include name in arguments dict for span data
         arguments = {"name": handler_name, **(arguments or {})}
+
     else:  # resource
-        uri = original_args[0]
-        handler_name = str(uri) if uri else "unknown"
+        handler_name = "unknown"
+        if original_args:
+            handler_name = str(original_args[0])
+        elif original_kwargs.get("uri"):
+            handler_name = str(original_kwargs["uri"])
+
         arguments = {}
 
     # Get span configuration
@@ -327,8 +352,10 @@ def _prepare_handler_data(handler_type, original_args):
     )
 
 
-async def _async_handler_wrapper(handler_type, func, original_args):
-    # type: (str, Callable[..., Any], tuple[Any, ...]) -> Any
+async def _async_handler_wrapper(
+    handler_type, func, original_args, original_kwargs=None
+):
+    # type: (str, Callable[..., Any], tuple[Any, ...], Optional[dict[Any, Any]]) -> Any
     """
     Async wrapper for MCP handlers.
 
@@ -337,6 +364,9 @@ async def _async_handler_wrapper(handler_type, func, original_args):
         func: The async handler function to wrap
         original_args: Original arguments passed to the handler
     """
+    if original_kwargs is None:
+        original_kwargs = {}
+
     (
         handler_name,
         arguments,
@@ -344,7 +374,7 @@ async def _async_handler_wrapper(handler_type, func, original_args):
         span_name,
         mcp_method_name,
         result_data_key,
-    ) = _prepare_handler_data(handler_type, original_args)
+    ) = _prepare_handler_data(handler_type, original_args, original_kwargs)
 
     # Start span and execute
     with get_start_span_function()(
@@ -380,7 +410,7 @@ async def _async_handler_wrapper(handler_type, func, original_args):
 
         try:
             # Execute the async handler
-            result = await func(*original_args)
+            result = await func(*original_args, **original_kwargs)
         except Exception as e:
             # Set error flag for tools
             if handler_type == "tool":
@@ -588,84 +618,28 @@ def _patch_fastmcp():
         original_get_prompt_mcp = FastMCP._get_prompt_mcp
 
         @wraps(original_get_prompt_mcp)
-        async def patched_get_prompt_mcp(self, name, arguments=None):
-            # type: (Any, str, Optional[dict[str, Any]]) -> Any
-            return await _async_fastmcp_handler_wrapper(
+        async def patched_get_prompt_mcp(self, *args, **kwargs):
+            # type: (Any, Any) -> Any
+            return await _async_handler_wrapper(
                 "prompt",
-                lambda n, a: original_get_prompt_mcp(self, n, a),
-                (name, arguments),
+                original_get_prompt_mcp,
+                args,
+                kwargs,
             )
 
         FastMCP._get_prompt_mcp = patched_get_prompt_mcp
 
-    # Patch _read_resource_mcp
     if hasattr(FastMCP, "_read_resource_mcp"):
         original_read_resource_mcp = FastMCP._read_resource_mcp
 
         @wraps(original_read_resource_mcp)
-        async def patched_read_resource_mcp(self, uri):
+        async def patched_read_resource_mcp(self, *args, **kwargs):
             # type: (Any, Any) -> Any
-            return await _async_fastmcp_handler_wrapper(
+            return await _async_handler_wrapper(
                 "resource",
-                lambda u: original_read_resource_mcp(self, u),
-                (uri,),
+                original_read_resource_mcp,
+                args,
+                kwargs,
             )
 
         FastMCP._read_resource_mcp = patched_read_resource_mcp
-
-
-async def _async_fastmcp_handler_wrapper(handler_type, func, original_args):
-    # type: (str, Callable[..., Any], tuple[Any, ...]) -> Any
-    """
-    Async wrapper for standalone FastMCP handlers.
-
-    Similar to _async_handler_wrapper but the original function is already
-    a coroutine function that we call directly.
-    """
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data(handler_type, original_args)
-
-    with get_start_span_function()(
-        op=OP.MCP_SERVER,
-        name=span_name,
-        origin=MCPIntegration.origin,
-    ) as span:
-        request_id, session_id, mcp_transport = _get_request_context_data()
-
-        _set_span_input_data(
-            span,
-            handler_name,
-            span_data_key,
-            mcp_method_name,
-            arguments,
-            request_id,
-            session_id,
-            mcp_transport,
-        )
-
-        if handler_type == "resource":
-            uri = original_args[0]
-            protocol = None
-            if hasattr(uri, "scheme"):
-                protocol = uri.scheme
-            elif handler_name and "://" in handler_name:
-                protocol = handler_name.split("://")[0]
-            if protocol:
-                span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
-
-        try:
-            result = await func(*original_args)
-        except Exception as e:
-            if handler_type == "tool":
-                span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
-            sentry_sdk.capture_exception(e)
-            raise
-
-        _set_span_output_data(span, result, result_data_key, handler_type)
-        return result
