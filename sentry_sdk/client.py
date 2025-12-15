@@ -24,8 +24,6 @@ from sentry_sdk.utils import (
     handle_in_app,
     is_gevent,
     logger,
-    get_before_send_log,
-    get_before_send_metric,
     has_logs_enabled,
     has_metrics_enabled,
 )
@@ -932,39 +930,21 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_telemetry(self, telemetry, type_, scope):
-        # type: (Telemetry, str, Scope) -> None
-        # Capture attributes-based telemetry (logs, metrics, spansV2)
-        before_send_getter = {
-            "log": lambda: get_before_send_log(self.options),
-            "metric": lambda: get_before_send_metric(self.options),
-        }.get(type_)
-
-        if before_send_getter is not None:
-            before_send = before_send_getter()
-            if before_send is not None:
-                telemetry = before_send(telemetry, {})
+    def _capture_telemetry(self, telemetry, scope):
+        # type: (Telemetry, Scope) -> None
+        # Capture attributes-based telemetry (logs, metrics, spansV2).
+        before_send = telemetry.get_before_send()
+        if before_send is not None:
+            telemetry = before_send(telemetry, {})
 
         if telemetry is None:
             return
 
         scope.apply_to_telemetry(telemetry)
 
-        batcher = {
-            "log": self.log_batcher,
-            "metric": self.metrics_batcher,
-        }.get(type_)  # type: Optional[LogBatcher, MetricsBatcher]
-
+        batcher = telemetry.get_batcher()
         if batcher:
             batcher.add(telemetry)
-
-    def _capture_log(self, log, scope):
-        # type: (Optional[Log], Scope) -> None
-        self._capture_telemetry(log, "log", scope)
-
-    def _capture_metric(self, metric, scope):
-        # type: (Optional[Metric]) -> None
-        self._capture_telemetry(metric, "metric", scope)
 
     def capture_session(
         self,

@@ -8,7 +8,7 @@ from sentry_sdk.utils import format_timestamp, safe_repr
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Log
+    from sentry_sdk.telemetry import Log
 
 
 class LogBatcher:
@@ -122,32 +122,13 @@ class LogBatcher:
     @staticmethod
     def _log_to_transport_format(log):
         # type: (Log) -> Any
-        def format_attribute(val):
-            # type: (int | float | str | bool) -> Any
-            if isinstance(val, bool):
-                return {"value": val, "type": "boolean"}
-            if isinstance(val, int):
-                return {"value": val, "type": "integer"}
-            if isinstance(val, float):
-                return {"value": val, "type": "double"}
-            if isinstance(val, str):
-                return {"value": val, "type": "string"}
-            return {"value": safe_repr(val), "type": "string"}
+        # XXX[ivana] move this
+        if "sentry.severity_number" not in log.attributes:
+            log.attributes["sentry.severity_number"] = log.severity_number
+        if "sentry.severity_text" not in log.attributes:
+            log.attributes["sentry.severity_text"] = log.severity_text
 
-        if "sentry.severity_number" not in log["attributes"]:
-            log["attributes"]["sentry.severity_number"] = log["severity_number"]
-        if "sentry.severity_text" not in log["attributes"]:
-            log["attributes"]["sentry.severity_text"] = log["severity_text"]
-
-        res = {
-            "timestamp": int(log["time_unix_nano"]) / 1.0e9,
-            "trace_id": log.get("trace_id", "00000000-0000-0000-0000-000000000000"),
-            "level": str(log["severity_text"]),
-            "body": str(log["body"]),
-            "attributes": {
-                k: format_attribute(v) for (k, v) in log["attributes"].items()
-            },
-        }
+        res = log.to_transport_format()
 
         return res
 

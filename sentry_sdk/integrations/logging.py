@@ -6,6 +6,7 @@ from fnmatch import fnmatch
 import sentry_sdk
 from sentry_sdk.client import BaseClient
 from sentry_sdk.logger import _log_level_to_otel
+from sentry_sdk.telemetry import Log
 from sentry_sdk.utils import (
     safe_repr,
     to_string,
@@ -409,13 +410,13 @@ class SentryLogsHandler(_BaseHandler):
             attrs["logger.name"] = record.name
 
         # noinspection PyProtectedMember
-        sentry_sdk.get_current_scope()._capture_log(
-            {
-                "severity_text": otel_severity_text,
-                "severity_number": otel_severity_number,
-                "body": record.message,
-                "attributes": attrs,
-                "time_unix_nano": int(record.created * 1e9),
-                "trace_id": None,
-            },
+        sentry_sdk.get_current_scope()._capture_telemetry(
+            Log(
+                severity_text=otel_severity_text,
+                severity_number=otel_severity_number,
+                body=record.message,
+                attributes=attrs,
+                time_unix_nano=int(record.created * 1e9),
+                trace_id=None,
+            )
         )

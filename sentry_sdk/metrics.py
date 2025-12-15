@@ -7,10 +7,11 @@ import time
 from typing import Any, Optional, TYPE_CHECKING, Union
 
 import sentry_sdk
+from sentry_sdk.telemetry import Metric
 from sentry_sdk.utils import safe_repr
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Metric, MetricType
+    from sentry_sdk._types import MetricType
 
 
 def _capture_metric(
@@ -35,18 +36,18 @@ def _capture_metric(
                 else safe_repr(v)
             )
 
-    metric = {
-        "timestamp": time.time(),
-        "trace_id": None,
-        "span_id": None,
-        "name": name,
-        "type": metric_type,
-        "value": float(value),
-        "unit": unit,
-        "attributes": attrs,
-    }  # type: Metric
-
-    sentry_sdk.get_current_scope()._capture_metric(metric)
+    sentry_sdk.get_current_scope()._capture_telemetry(
+        Metric(
+            timestamp=time.time(),
+            trace_id=None,
+            span_id=None,
+            name=name,
+            type=metric_type,
+            value=float(value),
+            unit=unit,
+            attributes=attrs,
+        )
+    )
 
 
 def count(

@@ -1246,56 +1246,25 @@ class Scope:
 
         return event_id
 
-    def _capture_log(self, log, scope=None, **scope_kwargs):
-        # type: (Optional[Log], Optional[Scope], Any) -> None
-        if log is None:
+    def _capture_telemetry(self, telemetry, scope=None, **scope_kwargs):
+        # type: (Optional[Telemetry], Optional[Scope], Any) -> None
+        # Attributes-based telemetry (logs, metrics, spansV2) goes through here.
+        if telemetry is None:
             return
 
         client = self.get_client()
-        if not has_logs_enabled(client.options) or log is None:
+
+        if not telemetry.enabled():
             return
 
         scope = self._merge_scopes(scope, scope_kwargs)
-
-        trace_context = scope.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        if trace_id is not None and log.get("trace_id") is None:
-            log["trace_id"] = trace_id
-
-        # If debug is enabled, log the log to the console
-        debug = client.options.get("debug", False)
-        if debug:
-            logger.debug(
-                f"[Sentry Logs] [{log.get('severity_text')}] {log.get('body')}"
-            )
-
-        client._capture_log(log, scope=scope)
-
-    def _capture_metric(self, metric, scope=None, **scope_kwargs):
-        # type: (Optional[Metric], Optional[Scope], Any) -> None
-        if metric is None:
-            return
-
-        client = self.get_client()
-        if not has_metrics_enabled(client.options):
-            return
-
-        scope = self._merge_scopes(scope, scope_kwargs)
-
-        trace_context = scope.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        span_id = trace_context.get("span_id")
-        metric["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
-        if span_id is not None:
-            metric["span_id"] = span_id
+        telemetry.set_trace_context(scope)
 
         debug = client.options.get("debug", False)
         if debug:
-            logger.debug(
-                f"[Sentry Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
-            )
+            telemetry.log_debug()
 
-        client._capture_metric(metric, scope=scope)
+        client._capture_telemetry(telemetry, scope=scope)
 
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
         # type: (str, Optional[LogLevelStr], Optional[Scope], Any) -> Optional[str]
@@ -1530,13 +1499,11 @@ class Scope:
 
     def _apply_global_attributes_to_telemetry(self, telemetry, options):
         # TODO: Global stuff like this should just be retrieved at init time and
-        # put onto the global scope's attributes
-        # TODO: These attrs will actually be saved on and retrieved from
-        # the global scope directly in a later step instead of constructing
-        # them anew
+        # put onto the global scope's attributes and then taken from there
+        # (follow up PR coming)
         from sentry_sdk.client import SDK_INFO
 
-        attributes = telemetry["attributes"]
+        attributes = telemetry.attributes
 
         attributes["sentry.sdk.name"] = SDK_INFO["name"]
         attributes["sentry.sdk.version"] = SDK_INFO["version"]
@@ -1554,7 +1521,7 @@ class Scope:
             attributes["sentry.release"] = release
 
     def _apply_tracing_attributes_to_telemetry(self, telemetry):
-        attributes = telemetry["attributes"]
+        attributes = telemetry.attributes
 
         trace_context = self.get_trace_context()
         span_id = trace_context.get("span_id")
@@ -1563,7 +1530,7 @@ class Scope:
             attributes["sentry.trace.parent_span_id"] = span_id
 
     def _apply_user_attributes_to_telemetry(self, telemetry):
-        attributes = telemetry["attributes"]
+        attributes = telemetry.attributes
 
         if self._user is None:
             return

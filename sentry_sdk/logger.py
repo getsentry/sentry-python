@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 import sentry_sdk
+from sentry_sdk.telemetry import Log
 from sentry_sdk.utils import safe_repr, capture_internal_exceptions
 
 OTEL_RANGES = [
@@ -56,15 +57,15 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     }
 
     # noinspection PyProtectedMember
-    sentry_sdk.get_current_scope()._capture_log(
-        {
-            "severity_text": severity_text,
-            "severity_number": severity_number,
-            "attributes": attrs,
-            "body": body,
-            "time_unix_nano": time.time_ns(),
-            "trace_id": None,
-        },
+    sentry_sdk.get_current_scope()._capture_telemetry(
+        Log(
+            severity_text=severity_text,
+            severity_number=severity_number,
+            attributes=attrs,
+            body=body,
+            time_unix_nano=time.time_ns(),
+            trace_id=None,
+        )
     )
 
 

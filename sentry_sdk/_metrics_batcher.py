@@ -8,7 +8,7 @@ from sentry_sdk.utils import format_timestamp, safe_repr
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Metric
+    from sentry_sdk.telemetry import Metric
 
 
 class MetricsBatcher:
@@ -103,29 +103,10 @@ class MetricsBatcher:
     @staticmethod
     def _metric_to_transport_format(metric):
         # type: (Metric) -> Any
-        def format_attribute(val):
-            # type: (Union[int, float, str, bool]) -> Any
-            if isinstance(val, bool):
-                return {"value": val, "type": "boolean"}
-            if isinstance(val, int):
-                return {"value": val, "type": "integer"}
-            if isinstance(val, float):
-                return {"value": val, "type": "double"}
-            if isinstance(val, str):
-                return {"value": val, "type": "string"}
-            return {"value": safe_repr(val), "type": "string"}
+        res = metric.to_transport_format()
 
-        res = {
-            "timestamp": metric["timestamp"],
-            "trace_id": metric["trace_id"],
-            "name": metric["name"],
-            "type": metric["type"],
-            "value": metric["value"],
-            "attributes": {
-                k: format_attribute(v) for (k, v) in metric["attributes"].items()
-            },
-        }
-
+        # XXX[ivana] why is this here
+        # XXX[ivana] just yeet the whole func (also in log batcher)
         if metric.get("span_id") is not None:
             res["span_id"] = metric["span_id"]
 
@@ -136,7 +117,6 @@ class MetricsBatcher:
 
     def _flush(self):
         # type: (...) -> Optional[Envelope]
-
         envelope = Envelope(
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
         )

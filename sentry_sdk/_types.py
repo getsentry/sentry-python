@@ -113,6 +113,8 @@ if TYPE_CHECKING:
     from typing import Type
     from typing_extensions import Literal, TypedDict
 
+    from sentry_sdk import telemetry
+
     class SDKInfo(TypedDict):
         name: str
         version: str
@@ -235,35 +237,26 @@ if TYPE_CHECKING:
         },
     )
 
-    Log = TypedDict(
-        "Log",
+    AttributeValue = (
+        str | bool | float | int | list[str] | list[bool] | list[float] | list[int]
+    )
+    Attributes = dict[str, AttributeValue]
+
+    SerializedAttributeValue = TypedDict(
+        "SerializedAttributeValue",
         {
-            "severity_text": str,
-            "severity_number": int,
-            "body": str,
-            "attributes": Attributes,
-            "time_unix_nano": int,
-            "trace_id": Optional[str],
+            "type": Literal["string", "boolean", "double", "integer"],
+            "value": AttributeValue,
         },
     )
+
+    Log = telemetry.Log
+    Metric = telemetry.Metric
 
     MetricType = Literal["counter", "gauge", "distribution"]
-
-    Metric = TypedDict(
-        "Metric",
-        {
-            "timestamp": float,
-            "trace_id": Optional[str],
-            "span_id": Optional[str],
-            "name": str,
-            "type": MetricType,
-            "value": float,
-            "unit": Optional[str],
-            "attributes": Attributes,
-        },
-    )
-
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
+
+    Telemetry = Union[Log, Metric]
 
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]

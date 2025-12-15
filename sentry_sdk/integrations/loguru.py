@@ -8,6 +8,7 @@ from sentry_sdk.integrations.logging import (
     _BaseHandler,
 )
 from sentry_sdk.logger import _log_level_to_otel
+from sentry_sdk.telemetry import Log
 from sentry_sdk.utils import has_logs_enabled, safe_repr
 
 from typing import TYPE_CHECKING
@@ -201,13 +202,13 @@ def loguru_sentry_logs_handler(message):
             else:
                 attrs[f"sentry.message.parameter.{key}"] = safe_repr(value)
 
-    sentry_sdk.get_current_scope()._capture_log(
-        {
-            "severity_text": otel_severity_text,
-            "severity_number": otel_severity_number,
-            "body": record["message"],
-            "attributes": attrs,
-            "time_unix_nano": int(record["time"].timestamp() * 1e9),
-            "trace_id": None,
-        }
+    sentry_sdk.get_current_scope()._capture_telemetry(
+        Log(
+            severity_text=otel_severity_text,
+            severity_number=otel_severity_number,
+            body=record["message"],
+            attributes=attrs,
+            time_unix_nano=int(record["time"].timestamp() * 1e9),
+            trace_id=None,
+        )
     )
