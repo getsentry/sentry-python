@@ -1,6 +1,7 @@
 import json
 import sys
 from typing import List, Any, Mapping
+from unittest import mock
 import pytest
 
 import sentry_sdk
@@ -272,3 +273,116 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
     assert len(lost_event_calls) == 5
     for lost_event_call in lost_event_calls:
         assert lost_event_call == ("queue_overflow", "trace_metric", 1)
+
+
+def test_metrics_sample_rate_basic(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    sentry_sdk.metrics.count("test.counter", 1, sample_rate=0.5)
+    sentry_sdk.metrics.gauge("test.gauge", 42, sample_rate=0.8)
+    sentry_sdk.metrics.distribution("test.distribution", 200, sample_rate=1.0)
+
+    get_client().flush()
+    metrics = envelopes_to_metrics(envelopes)
+
+    assert len(metrics) == 3
+
+    assert metrics[0]["name"] == "test.counter"
+    # No sentry.client_sample_rate when there's no trace context
+    assert "sentry.client_sample_rate" not in metrics[0]["attributes"]
+
+    assert metrics[1]["name"] == "test.gauge"
+    # No sentry.client_sample_rate when there's no trace context
+    assert "sentry.client_sample_rate" not in metrics[1]["attributes"]
+
+    assert metrics[2]["name"] == "test.distribution"
+    assert "sentry.client_sample_rate" not in metrics[2]["attributes"]
+
+
+def test_metrics_sample_rate_normalization(sentry_init, capture_envelopes, monkeypatch):
+    sentry_init()
+    envelopes = capture_envelopes()
+    client = sentry_sdk.get_client()
+
+    lost_event_calls = []
+
+    def record_lost_event(reason, data_category, quantity):
+        lost_event_calls.append((reason, data_category, quantity))
+
+    monkeypatch.setattr(client.transport, "record_lost_event", record_lost_event)
+
+    sentry_sdk.metrics.count("test.counter1", 1, sample_rate=0.0)  # <= 0
+    sentry_sdk.metrics.count("test.counter2", 1, sample_rate=-0.5)  # < 0
+    sentry_sdk.metrics.count("test.counter3", 1, sample_rate=0.5)  # > 0 but < 1.0
+    sentry_sdk.metrics.count("test.counter4", 1, sample_rate=1.0)  # = 1.0
+    sentry_sdk.metrics.count("test.counter4", 1, sample_rate=1.5)  # > 1.0
+
+    client.flush()
+    metrics = envelopes_to_metrics(envelopes)
+
+    assert len(metrics) == 2
+
+    # No sentry.client_sample_rate when there's no trace context
+    assert "sentry.client_sample_rate" not in metrics[0]["attributes"]
+    assert (
+        "sentry.client_sample_rate" not in metrics[1]["attributes"]
+    )  # 1.0 does not need a sample rate, it's implied to be 1.0
+
+    assert len(lost_event_calls) == 3
+    assert lost_event_calls[0] == ("invalid_sample_rate", "trace_metric", 1)
+    assert lost_event_calls[1] == ("invalid_sample_rate", "trace_metric", 1)
+    assert lost_event_calls[2] == ("invalid_sample_rate", "trace_metric", 1)
+
+
+def test_metrics_no_sample_rate(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    sentry_sdk.metrics.count("test.counter", 1)
+
+    get_client().flush()
+    metrics = envelopes_to_metrics(envelopes)
+
+    assert len(metrics) == 1
+
+    assert "sentry.client_sample_rate" not in metrics[0]["attributes"]
+
+
+@pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
+@pytest.mark.parametrize("sample_rate", (0.0, 0.25, 0.5, 0.75, 1.0))
+def test_metrics_sampling_decision(
+    sentry_init, capture_envelopes, sample_rate, sample_rand, monkeypatch
+):
+    sentry_init(traces_sample_rate=1.0)
+    envelopes = capture_envelopes()
+    client = sentry_sdk.get_client()
+
+    lost_event_calls = []
+
+    def record_lost_event(reason, data_category, quantity):
+        lost_event_calls.append((reason, data_category, quantity))
+
+    monkeypatch.setattr(client.transport, "record_lost_event", record_lost_event)
+
+    with mock.patch(
+        "sentry_sdk.tracing_utils.Random.randrange",
+        return_value=int(sample_rand * 1000000),
+    ):
+        with sentry_sdk.start_transaction() as _:
+            sentry_sdk.metrics.count("test.counter", 1, sample_rate=sample_rate)
+
+    get_client().flush()
+    metrics = envelopes_to_metrics(envelopes)
+
+    should_be_sampled = sample_rand < sample_rate and sample_rate > 0.0
+    assert len(metrics) == int(should_be_sampled)
+
+    if sample_rate <= 0.0:
+        assert len(lost_event_calls) == 1
+        assert lost_event_calls[0] == ("invalid_sample_rate", "trace_metric", 1)
+    elif not should_be_sampled:
+        assert len(lost_event_calls) == 1
+        assert lost_event_calls[0] == ("sample_rate", "trace_metric", 1)
+    else:
+        assert len(lost_event_calls) == 0
