@@ -290,7 +290,7 @@ def _set_span_output_data(
 def _prepare_handler_data(
     handler_type: str,
     original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]",
+    original_kwargs: "Optional[dict[str, Any]]" = None,
 ) -> "tuple[str, dict[str, Any], str, str, str, Optional[str]]":
     """
     Prepare common handler data for both async and sync wrappers.
