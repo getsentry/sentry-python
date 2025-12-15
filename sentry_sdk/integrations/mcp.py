@@ -316,8 +316,8 @@ def _prepare_handler_data(
     elif handler_type == "prompt":
         if original_args:
             handler_name = original_args[0]
-        elif original_kwargs.get("tool_name"):
-            handler_name = original_kwargs["tool_name"]
+        elif original_kwargs.get("name"):
+            handler_name = original_kwargs["name"]
 
         arguments = {}
         if len(original_args) > 1:
@@ -357,6 +357,7 @@ async def _async_handler_wrapper(
     func: "Callable[..., Any]",
     original_args: "tuple[Any, ...]",
     original_kwargs: "Optional[dict[str, Any]]" = None,
+    self: "Optional[Any]" = None,
 ) -> "Any":
     """
     Async wrapper for MCP handlers.
@@ -365,6 +366,8 @@ async def _async_handler_wrapper(
         handler_type: "tool", "prompt", or "resource"
         func: The async handler function to wrap
         original_args: Original arguments passed to the handler
+        original_kwargs: Original keyword arguments passed to the handler
+        self: Optional instance for bound methods
     """
     if original_kwargs is None:
         original_kwargs = {}
@@ -416,6 +419,8 @@ async def _async_handler_wrapper(
 
         try:
             # Execute the async handler
+            if self is not None:
+                original_args = (self, *original_args)
             result = await func(*original_args, **original_kwargs)
         except Exception as e:
             # Set error flag for tools
@@ -627,12 +632,13 @@ def _patch_fastmcp():
         original_get_prompt_mcp = FastMCP._get_prompt_mcp
 
         @wraps(original_get_prompt_mcp)
-        async def patched_get_prompt_mcp(*args: "Any", **kwargs: "Any") -> "Any":
+        async def patched_get_prompt_mcp(self, *args: "Any", **kwargs: "Any") -> "Any":
             return await _async_handler_wrapper(
                 "prompt",
                 original_get_prompt_mcp,
                 args,
                 kwargs,
+                self,
             )
 
         FastMCP._get_prompt_mcp = patched_get_prompt_mcp
@@ -641,12 +647,15 @@ def _patch_fastmcp():
         original_read_resource_mcp = FastMCP._read_resource_mcp
 
         @wraps(original_read_resource_mcp)
-        async def patched_read_resource_mcp(*args: "Any", **kwargs: "Any") -> "Any":
+        async def patched_read_resource_mcp(
+            self, *args: "Any", **kwargs: "Any"
+        ) -> "Any":
             return await _async_handler_wrapper(
                 "resource",
                 original_read_resource_mcp,
                 args,
                 kwargs,
+                self,
             )
 
         FastMCP._read_resource_mcp = patched_read_resource_mcp
