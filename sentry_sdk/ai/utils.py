@@ -1,9 +1,9 @@
 import inspect
 import json
-from copy import deepcopy
 from collections import deque
-from typing import TYPE_CHECKING
+from copy import deepcopy
 from sys import getsizeof
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -107,8 +107,9 @@ def get_start_span_function() -> "Callable[..., Any]":
     return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
 
 
-def _truncate_single_message_content_if_present(message: "Tuple[Dict[str, Any], int]", max_chars: int) -> "Dict[str, Any]":
-    # type: (Dict[str, Any], int) -> Dict[str, Any]
+def _truncate_single_message_content_if_present(
+    message: "Dict[str, Any]", max_chars: int
+) -> "Dict[str, Any]":
     """
     Truncate a message's content to at most `max_chars` characters and append an
     ellipsis if truncation occurs.
@@ -144,7 +145,7 @@ def truncate_messages_by_size(
     messages: "List[Dict[str, Any]]",
     max_bytes: int = MAX_GEN_AI_MESSAGE_BYTES,
     max_single_message_chars: int = MAX_SINGLE_MESSAGE_CONTENT_CHARS,
-):
+) -> "Tuple[List[Dict[str, Any]], int]":
     """
     Returns a truncated messages list, consisting of
     - the last message, with its content truncated to `max_single_message_chars` characters,

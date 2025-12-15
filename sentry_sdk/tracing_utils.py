@@ -660,7 +660,9 @@ class Baggage:
         return Baggage.populate_from_propagation_context(scope._propagation_context)
 
     @classmethod
-    def populate_from_propagation_context(cls, propagation_context: "PropagationContext") -> "Baggage":
+    def populate_from_propagation_context(
+        cls, propagation_context: "PropagationContext"
+    ) -> "Baggage":
         sentry_items: "Dict[str, str]" = {}
         third_party_items = ""
         mutable = False
