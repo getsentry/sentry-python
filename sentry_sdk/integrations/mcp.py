@@ -401,7 +401,11 @@ async def _async_handler_wrapper(
 
         # For resources, extract and set protocol
         if handler_type == "resource":
-            uri = original_args[0]
+            if original_args:
+                uri = original_args[0]
+            else:
+                uri = original_kwargs.get("uri")
+
             protocol = None
             if hasattr(uri, "scheme"):
                 protocol = uri.scheme
@@ -623,9 +627,7 @@ def _patch_fastmcp():
         original_get_prompt_mcp = FastMCP._get_prompt_mcp
 
         @wraps(original_get_prompt_mcp)
-        async def patched_get_prompt_mcp(
-            self: "Any", *args: "Any", **kwargs: "Any"
-        ) -> "Any":
+        async def patched_get_prompt_mcp(*args: "Any", **kwargs: "Any") -> "Any":
             return await _async_handler_wrapper(
                 "prompt",
                 original_get_prompt_mcp,
@@ -639,9 +641,7 @@ def _patch_fastmcp():
         original_read_resource_mcp = FastMCP._read_resource_mcp
 
         @wraps(original_read_resource_mcp)
-        async def patched_read_resource_mcp(
-            self: "Any", *args: "Any", **kwargs: "Any"
-        ) -> "Any":
+        async def patched_read_resource_mcp(*args: "Any", **kwargs: "Any") -> "Any":
             return await _async_handler_wrapper(
                 "resource",
                 original_read_resource_mcp,
