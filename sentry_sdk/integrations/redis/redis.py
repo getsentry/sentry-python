@@ -16,13 +16,11 @@ if TYPE_CHECKING:
     from typing import Any, Sequence
 
 
-def _get_redis_command_args(command):
-    # type: (Any) -> Sequence[Any]
+def _get_redis_command_args(command: "Any") -> "Sequence[Any]":
     return command[0]
 
 
-def _patch_redis(StrictRedis, client):  # noqa: N803
-    # type: (Any, Any) -> None
+def _patch_redis(StrictRedis: "Any", client: "Any") -> None:  # noqa: N803
     patch_redis_client(
         StrictRedis,
         is_cluster=False,

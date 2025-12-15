@@ -17,8 +17,11 @@ if TYPE_CHECKING:
 class RedisIntegration(Integration):
     identifier = "redis"
 
-    def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE, cache_prefixes=None):
-        # type: (Optional[int], Optional[list[str]]) -> None
+    def __init__(
+        self,
+        max_data_size: "Optional[int]" = _DEFAULT_MAX_DATA_SIZE,
+        cache_prefixes: "Optional[list[str]]" = None,
+    ) -> None:
         self.max_data_size = max_data_size
         self.cache_prefixes = cache_prefixes if cache_prefixes is not None else []
 
@@ -31,8 +34,7 @@ class RedisIntegration(Integration):
             )
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         try:
             from redis import StrictRedis, client
         except ImportError:

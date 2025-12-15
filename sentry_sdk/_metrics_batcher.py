@@ -18,23 +18,21 @@ class MetricsBatcher:
 
     def __init__(
         self,
-        capture_func,  # type: Callable[[Envelope], None]
-        record_lost_func,  # type: Callable[..., None]
-    ):
-        # type: (...) -> None
-        self._metric_buffer = []  # type: List[Metric]
+        capture_func: "Callable[[Envelope], None]",
+        record_lost_func: "Callable[..., None]",
+    ) -> None:
+        self._metric_buffer: "List[Metric]" = []
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
         self._lock = threading.Lock()
 
-        self._flush_event = threading.Event()  # type: threading.Event
+        self._flush_event: "threading.Event" = threading.Event()
 
-        self._flusher = None  # type: Optional[threading.Thread]
-        self._flusher_pid = None  # type: Optional[int]
+        self._flusher: "Optional[threading.Thread]" = None
+        self._flusher_pid: "Optional[int]" = None
 
-    def _ensure_thread(self):
-        # type: (...) -> bool
+    def _ensure_thread(self) -> bool:
         if not self._running:
             return False
 
@@ -59,8 +57,7 @@ class MetricsBatcher:
 
         return True
 
-    def _flush_loop(self):
-        # type: (...) -> None
+    def _flush_loop(self) -> None:
         while self._running:
             self._flush_event.wait(self.FLUSH_WAIT_TIME + random.random())
             self._flush_event.clear()
@@ -68,9 +65,8 @@ class MetricsBatcher:
 
     def add(
         self,
-        metric,  # type: Metric
-    ):
-        # type: (...) -> None
+        metric: "Metric",
+    ) -> None:
         if not self._ensure_thread() or self._flusher is None:
             return None
 
@@ -87,8 +83,7 @@ class MetricsBatcher:
             if len(self._metric_buffer) >= self.MAX_METRICS_BEFORE_FLUSH:
                 self._flush_event.set()
 
-    def kill(self):
-        # type: (...) -> None
+    def kill(self) -> None:
         if self._flusher is None:
             return
 
@@ -96,15 +91,12 @@ class MetricsBatcher:
         self._flush_event.set()
         self._flusher = None
 
-    def flush(self):
-        # type: (...) -> None
+    def flush(self) -> None:
         self._flush()
 
     @staticmethod
-    def _metric_to_transport_format(metric):
-        # type: (Metric) -> Any
-        def format_attribute(val):
-            # type: (Union[int, float, str, bool]) -> Any
+    def _metric_to_transport_format(metric: "Metric") -> "Any":
+        def format_attribute(val: "Union[int, float, str, bool]") -> "Any":
             if isinstance(val, bool):
                 return {"value": val, "type": "boolean"}
             if isinstance(val, int):
@@ -134,9 +126,7 @@ class MetricsBatcher:
 
         return res
 
-    def _flush(self):
-        # type: (...) -> Optional[Envelope]
-
+    def _flush(self) -> "Optional[Envelope]":
         envelope = Envelope(
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
         )

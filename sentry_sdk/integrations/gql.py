@@ -41,19 +41,17 @@ class GQLIntegration(Integration):
     identifier = "gql"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         gql_version = parse_version(gql.__version__)
         _check_minimum_version(GQLIntegration, gql_version)
 
         _patch_execute()
 
 
-def _data_from_document(document):
-    # type: (DocumentNode) -> EventDataType
+def _data_from_document(document: "DocumentNode") -> "EventDataType":
     try:
         operation_ast = get_operation_ast(document)
-        data = {"query": print_ast(document)}  # type: EventDataType
+        data: "EventDataType" = {"query": print_ast(document)}
 
         if operation_ast is not None:
             data["variables"] = operation_ast.variable_definitions
@@ -65,8 +63,7 @@ def _data_from_document(document):
         return dict()
 
 
-def _transport_method(transport):
-    # type: (Union[Transport, AsyncTransport]) -> str
+def _transport_method(transport: "Union[Transport, AsyncTransport]") -> str:
     """
     The RequestsHTTPTransport allows defining the HTTP method; all
     other transports use POST.
@@ -77,8 +74,9 @@ def _transport_method(transport):
         return "POST"
 
 
-def _request_info_from_transport(transport):
-    # type: (Union[Transport, AsyncTransport, None]) -> Dict[str, str]
+def _request_info_from_transport(
+    transport: "Union[Transport, AsyncTransport, None]",
+) -> "Dict[str, str]":
     if transport is None:
         return {}
 
@@ -94,13 +92,16 @@ def _request_info_from_transport(transport):
     return request_info
 
 
-def _patch_execute():
-    # type: () -> None
+def _patch_execute() -> None:
     real_execute = gql.Client.execute
 
     @ensure_integration_enabled(GQLIntegration, real_execute)
-    def sentry_patched_execute(self, document_or_request, *args, **kwargs):
-        # type: (gql.Client, DocumentNode, Any, Any) -> Any
+    def sentry_patched_execute(
+        self: "gql.Client",
+        document_or_request: "DocumentNode",
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> "Any":
         scope = sentry_sdk.get_isolation_scope()
         scope.add_event_processor(_make_gql_event_processor(self, document_or_request))
 
@@ -119,10 +120,10 @@ def _patch_execute():
     gql.Client.execute = sentry_patched_execute
 
 
-def _make_gql_event_processor(client, document_or_request):
-    # type: (gql.Client, Union[DocumentNode, gql.GraphQLRequest]) -> EventProcessor
-    def processor(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+def _make_gql_event_processor(
+    client: "gql.Client", document_or_request: "Union[DocumentNode, gql.GraphQLRequest]"
+) -> "EventProcessor":
+    def processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         try:
             errors = hint["exc_info"][1].errors
         except (AttributeError, KeyError):

@@ -11,8 +11,9 @@ if TYPE_CHECKING:
     from typing import Any, Optional
 
 
-def execute_tool_span(tool_name, tool_args, agent, tool_type="function"):
-    # type: (str, Any, Any, str) -> sentry_sdk.tracing.Span
+def execute_tool_span(
+    tool_name: str, tool_args: "Any", agent: "Any", tool_type: str = "function"
+) -> "sentry_sdk.tracing.Span":
     """Create a span for tool execution.
 
     Args:
@@ -39,8 +40,7 @@ def execute_tool_span(tool_name, tool_args, agent, tool_type="function"):
     return span
 
 
-def update_execute_tool_span(span, result):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def update_execute_tool_span(span: "sentry_sdk.tracing.Span", result: "Any") -> None:
     """Update the execute tool span with the result."""
     if not span:
         return

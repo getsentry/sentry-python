@@ -18,12 +18,10 @@ class _InitGuard:
         "functionality, and we will remove it in the next major release."
     )
 
-    def __init__(self, client):
-        # type: (sentry_sdk.Client) -> None
+    def __init__(self, client: "sentry_sdk.Client") -> None:
         self._client = client
 
-    def __enter__(self):
-        # type: () -> _InitGuard
+    def __enter__(self) -> "_InitGuard":
         warnings.warn(
             self._CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE,
             stacklevel=2,
@@ -32,8 +30,7 @@ class _InitGuard:
 
         return self
 
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
+    def __exit__(self, exc_type: "Any", exc_value: "Any", tb: "Any") -> None:
         warnings.warn(
             self._CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE,
             stacklevel=2,
@@ -45,16 +42,14 @@ class _InitGuard:
             c.close()
 
 
-def _check_python_deprecations():
-    # type: () -> None
+def _check_python_deprecations() -> None:
     # Since we're likely to deprecate Python versions in the future, I'm keeping
     # this handy function around. Use this to detect the Python version used and
     # to output logger.warning()s if it's deprecated.
     pass
 
 
-def _init(*args, **kwargs):
-    # type: (*Optional[str], **Any) -> ContextManager[Any]
+def _init(*args: "Optional[str]", **kwargs: "Any") -> "ContextManager[Any]":
     """Initializes the SDK and optionally integrations.
 
     This takes the same arguments as the client constructor.

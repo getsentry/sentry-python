@@ -20,8 +20,9 @@ if TYPE_CHECKING:
     from typing import Union
 
 
-def is_auto_session_tracking_enabled(hub=None):
-    # type: (Optional[sentry_sdk.Hub]) -> Union[Any, bool, None]
+def is_auto_session_tracking_enabled(
+    hub: "Optional[sentry_sdk.Hub]" = None,
+) -> "Union[Any, bool, None]":
     """DEPRECATED: Utility function to find out if session tracking is enabled."""
 
     # Internal callers should use private _is_auto_session_tracking_enabled, instead.
@@ -45,8 +46,9 @@ def is_auto_session_tracking_enabled(hub=None):
 
 
 @contextmanager
-def auto_session_tracking(hub=None, session_mode="application"):
-    # type: (Optional[sentry_sdk.Hub], str) -> Generator[None, None, None]
+def auto_session_tracking(
+    hub: "Optional[sentry_sdk.Hub]" = None, session_mode: str = "application"
+) -> "Generator[None, None, None]":
     """DEPRECATED: Use track_session instead
     Starts and stops a session automatically around a block.
     """
@@ -71,8 +73,7 @@ def auto_session_tracking(hub=None, session_mode="application"):
             hub.end_session()
 
 
-def is_auto_session_tracking_enabled_scope(scope):
-    # type: (sentry_sdk.Scope) -> bool
+def is_auto_session_tracking_enabled_scope(scope: "sentry_sdk.Scope") -> bool:
     """
     DEPRECATED: Utility function to find out if session tracking is enabled.
     """
@@ -88,8 +89,7 @@ def is_auto_session_tracking_enabled_scope(scope):
     return _is_auto_session_tracking_enabled(scope)
 
 
-def _is_auto_session_tracking_enabled(scope):
-    # type: (sentry_sdk.Scope) -> bool
+def _is_auto_session_tracking_enabled(scope: "sentry_sdk.Scope") -> bool:
     """
     Utility function to find out if session tracking is enabled.
     """
@@ -103,8 +103,9 @@ def _is_auto_session_tracking_enabled(scope):
 
 
 @contextmanager
-def auto_session_tracking_scope(scope, session_mode="application"):
-    # type: (sentry_sdk.Scope, str) -> Generator[None, None, None]
+def auto_session_tracking_scope(
+    scope: "sentry_sdk.Scope", session_mode: str = "application"
+) -> "Generator[None, None, None]":
     """DEPRECATED: This function is a deprecated alias for track_session.
     Starts and stops a session automatically around a block.
     """
@@ -120,8 +121,9 @@ def auto_session_tracking_scope(scope, session_mode="application"):
 
 
 @contextmanager
-def track_session(scope, session_mode="application"):
-    # type: (sentry_sdk.Scope, str) -> Generator[None, None, None]
+def track_session(
+    scope: "sentry_sdk.Scope", session_mode: str = "application"
+) -> "Generator[None, None, None]":
     """
     Start a new session in the provided scope, assuming session tracking is enabled.
     This is a no-op context manager if session tracking is not enabled.
@@ -141,30 +143,27 @@ TERMINAL_SESSION_STATES = ("exited", "abnormal", "crashed")
 MAX_ENVELOPE_ITEMS = 100
 
 
-def make_aggregate_envelope(aggregate_states, attrs):
-    # type: (Any, Any) -> Any
+def make_aggregate_envelope(aggregate_states: "Any", attrs: "Any") -> "Any":
     return {"attrs": dict(attrs), "aggregates": list(aggregate_states.values())}
 
 
 class SessionFlusher:
     def __init__(
         self,
-        capture_func,  # type: Callable[[Envelope], None]
-        flush_interval=60,  # type: int
-    ):
-        # type: (...) -> None
+        capture_func: "Callable[[Envelope], None]",
+        flush_interval: int = 60,
+    ) -> None:
         self.capture_func = capture_func
         self.flush_interval = flush_interval
-        self.pending_sessions = []  # type: List[Any]
-        self.pending_aggregates = {}  # type: Dict[Any, Any]
-        self._thread = None  # type: Optional[Thread]
+        self.pending_sessions: "List[Any]" = []
+        self.pending_aggregates: "Dict[Any, Any]" = {}
+        self._thread: "Optional[Thread]" = None
         self._thread_lock = Lock()
         self._aggregate_lock = Lock()
-        self._thread_for_pid = None  # type: Optional[int]
+        self._thread_for_pid: "Optional[int]" = None
         self.__shutdown_requested = Event()
 
-    def flush(self):
-        # type: (...) -> None
+    def flush(self) -> None:
         pending_sessions = self.pending_sessions
         self.pending_sessions = []
 
@@ -190,8 +189,7 @@ class SessionFlusher:
         if len(envelope.items) > 0:
             self.capture_func(envelope)
 
-    def _ensure_running(self):
-        # type: (...) -> None
+    def _ensure_running(self) -> None:
         """
         Check that we have an active thread to run in, or create one if not.
 
@@ -205,8 +203,7 @@ class SessionFlusher:
             if self._thread_for_pid == os.getpid() and self._thread is not None:
                 return None
 
-            def _thread():
-                # type: (...) -> None
+            def _thread() -> None:
                 running = True
                 while running:
                     running = not self.__shutdown_requested.wait(self.flush_interval)
@@ -229,9 +226,8 @@ class SessionFlusher:
 
     def add_aggregate_session(
         self,
-        session,  # type: Session
-    ):
-        # type: (...) -> None
+        session: "Session",
+    ) -> None:
         # NOTE on `session.did`:
         # the protocol can deal with buckets that have a distinct-id, however
         # in practice we expect the python SDK to have an extremely high cardinality
@@ -261,15 +257,13 @@ class SessionFlusher:
 
     def add_session(
         self,
-        session,  # type: Session
-    ):
-        # type: (...) -> None
+        session: "Session",
+    ) -> None:
         if session.session_mode == "request":
             self.add_aggregate_session(session)
         else:
             self.pending_sessions.append(session.to_json())
         self._ensure_running()
 
-    def kill(self):
-        # type: (...) -> None
+    def kill(self) -> None:
         self.__shutdown_requested.set()

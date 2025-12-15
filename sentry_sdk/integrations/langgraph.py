@@ -24,13 +24,11 @@ class LanggraphIntegration(Integration):
     identifier = "langgraph"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (LanggraphIntegration, bool) -> None
+    def __init__(self: "LanggraphIntegration", include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         # LangGraph lets users create agents using a StateGraph or the Functional API.
         # StateGraphs are then compiled to a CompiledStateGraph. Both CompiledStateGraph and
         # the functional API execute on a Pregel instance. Pregel is the runtime for the graph
@@ -45,8 +43,7 @@ class LanggraphIntegration(Integration):
             Pregel.ainvoke = _wrap_pregel_ainvoke(Pregel.ainvoke)
 
 
-def _get_graph_name(graph_obj):
-    # type: (Any) -> Optional[str]
+def _get_graph_name(graph_obj: "Any") -> "Optional[str]":
     for attr in ["name", "graph_name", "__name__", "_name"]:
         if hasattr(graph_obj, attr):
             name = getattr(graph_obj, attr)
@@ -55,8 +52,7 @@ def _get_graph_name(graph_obj):
     return None
 
 
-def _normalize_langgraph_message(message):
-    # type: (Any) -> Any
+def _normalize_langgraph_message(message: "Any") -> "Any":
     if not hasattr(message, "content"):
         return None
 
@@ -77,8 +73,7 @@ def _normalize_langgraph_message(message):
     return parsed
 
 
-def _parse_langgraph_messages(state):
-    # type: (Any) -> Optional[List[Any]]
+def _parse_langgraph_messages(state: "Any") -> "Optional[List[Any]]":
     if not state:
         return None
 
@@ -109,11 +104,9 @@ def _parse_langgraph_messages(state):
     return normalized_messages if normalized_messages else None
 
 
-def _wrap_state_graph_compile(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _wrap_state_graph_compile(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_compile(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
+    def new_compile(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -155,12 +148,9 @@ def _wrap_state_graph_compile(f):
     return new_compile
 
 
-def _wrap_pregel_invoke(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-
+def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_invoke(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
+    def new_invoke(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -212,12 +202,9 @@ def _wrap_pregel_invoke(f):
     return new_invoke
 
 
-def _wrap_pregel_ainvoke(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-
+def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    async def new_ainvoke(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
+    async def new_ainvoke(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
         if integration is None:
             return await f(self, *args, **kwargs)
@@ -268,8 +255,9 @@ def _wrap_pregel_ainvoke(f):
     return new_ainvoke
 
 
-def _get_new_messages(input_messages, output_messages):
-    # type: (Optional[List[Any]], Optional[List[Any]]) -> Optional[List[Any]]
+def _get_new_messages(
+    input_messages: "Optional[List[Any]]", output_messages: "Optional[List[Any]]"
+) -> "Optional[List[Any]]":
     """Extract only the new messages added during this invocation."""
     if not output_messages:
         return None
@@ -286,8 +274,7 @@ def _get_new_messages(input_messages, output_messages):
     return new_messages if new_messages else None
 
 
-def _extract_llm_response_text(messages):
-    # type: (Optional[List[Any]]) -> Optional[str]
+def _extract_llm_response_text(messages: "Optional[List[Any]]") -> "Optional[str]":
     if not messages:
         return None
 
@@ -302,8 +289,7 @@ def _extract_llm_response_text(messages):
     return None
 
 
-def _extract_tool_calls(messages):
-    # type: (Optional[List[Any]]) -> Optional[List[Any]]
+def _extract_tool_calls(messages: "Optional[List[Any]]") -> "Optional[List[Any]]":
     if not messages:
         return None
 
@@ -317,8 +303,7 @@ def _extract_tool_calls(messages):
     return tool_calls if tool_calls else None
 
 
-def _set_usage_data(span, messages):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     input_tokens = 0
     output_tokens = 0
     total_tokens = 0
@@ -349,8 +334,7 @@ def _set_usage_data(span, messages):
         )
 
 
-def _set_response_model_name(span, messages):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _set_response_model_name(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     if len(messages) == 0:
         return
 
@@ -366,8 +350,12 @@ def _set_response_model_name(span, messages):
     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model_name)
 
 
-def _set_response_attributes(span, input_messages, result, integration):
-    # type: (Any, Optional[List[Any]], Any, LanggraphIntegration) -> None
+def _set_response_attributes(
+    span: "Any",
+    input_messages: "Optional[List[Any]]",
+    result: "Any",
+    integration: "LanggraphIntegration",
+) -> None:
     parsed_response_messages = _parse_langgraph_messages(result)
     new_messages = _get_new_messages(input_messages, parsed_response_messages)
 

@@ -13,8 +13,7 @@ from sentry_sdk.integrations.redis.modules.queries import _set_db_data
 from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 
 
-def _patch_rediscluster():
-    # type: () -> None
+def _patch_rediscluster() -> None:
     try:
         import rediscluster  # type: ignore
     except ImportError:
