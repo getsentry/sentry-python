@@ -320,7 +320,7 @@ def _capture_exception(exception: "Union[ExcInfo, BaseException]") -> None:
 
 
 def _make_request_processor(weak_request: "Callable[[], Request]") -> "EventProcessor":
-    def sanic_processor(event: Event, hint: Optional[Hint]) -> Optional[Event]:
+    def sanic_processor(event: "Event", hint: "Optional[Hint]") -> "Optional[Event]":
         try:
             if hint and issubclass(hint["exc_info"][0], SanicException):
                 return None

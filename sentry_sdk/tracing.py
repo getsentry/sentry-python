@@ -77,16 +77,16 @@ if TYPE_CHECKING:
         description: str
         """A description of what operation is being performed within the span. This argument is DEPRECATED. Please use the `name` parameter, instead."""
 
-        hub: Optional["sentry_sdk.Hub"]
+        hub: "Optional[sentry_sdk.Hub]"
         """The hub to use for this span. This argument is DEPRECATED. Please use the `scope` parameter, instead."""
 
         status: str
         """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
 
-        containing_transaction: Optional["Transaction"]
+        containing_transaction: "Optional[Transaction]"
         """The transaction that this span belongs to."""
 
-        start_timestamp: Optional[Union[datetime, float]]
+        start_timestamp: "Optional[Union[datetime, float]]"
         """
         The timestamp when the span started. If omitted, the current time
         will be used.
@@ -716,7 +716,7 @@ class Span:
         return rv
 
     def get_trace_context(self) -> "Any":
-        rv: Dict[str, Any] = {
+        rv: "Dict[str, Any]" = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,

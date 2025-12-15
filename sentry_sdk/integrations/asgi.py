@@ -161,7 +161,7 @@ class SentryAsgiMiddleware:
         return _capture_exception(exc=exc, mechanism_type=self.mechanism_type)
 
     def _run_asgi2(self, scope: "Any") -> "Any":
-        async def inner(receive: Any, send: Any) -> Any:
+        async def inner(receive: "Any", send: "Any") -> "Any":
             return await self._run_app(scope, receive, send, asgi_version=2)
 
         return inner

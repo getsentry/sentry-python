@@ -29,9 +29,9 @@ def serverless_function(f: None = None, flush: bool = True) -> "Callable[[F], F]
 def serverless_function(  # noqa
     f: "Optional[F]" = None, flush: bool = True
 ) -> "Union[F, Callable[[F], F]]":
-    def wrapper(f: F) -> F:
+    def wrapper(f: "F") -> "F":
         @wraps(f)
-        def inner(*args: Any, **kwargs: Any) -> Any:
+        def inner(*args: "Any", **kwargs: "Any") -> "Any":
             with sentry_sdk.isolation_scope() as scope:
                 scope.clear_breadcrumbs()
 

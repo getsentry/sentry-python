@@ -64,7 +64,7 @@ class GoogleGenAIIntegration(Integration):
 
 def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_generate_content_stream(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def new_generate_content_stream(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(GoogleGenAIIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -100,7 +100,7 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
 
             # Create wrapper iterator to accumulate responses
             def new_iterator() -> "Iterator[Any]":
-                chunks: List[Any] = []
+                chunks: "List[Any]" = []
                 try:
                     for chunk in stream:
                         chunks.append(chunk)
@@ -138,8 +138,8 @@ def _wrap_async_generate_content_stream(
 ) -> "Callable[..., Any]":
     @wraps(f)
     async def new_async_generate_content_stream(
-        self: Any, *args: Any, **kwargs: Any
-    ) -> Any:
+        self: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(GoogleGenAIIntegration)
         if integration is None:
             return await f(self, *args, **kwargs)
@@ -175,7 +175,7 @@ def _wrap_async_generate_content_stream(
 
             # Create wrapper async iterator to accumulate responses
             async def new_async_iterator() -> "AsyncIterator[Any]":
-                chunks: List[Any] = []
+                chunks: "List[Any]" = []
                 try:
                     async for chunk in stream:
                         chunks.append(chunk)
@@ -210,7 +210,7 @@ def _wrap_async_generate_content_stream(
 
 def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_generate_content(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def new_generate_content(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(GoogleGenAIIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -256,7 +256,7 @@ def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
 def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    async def new_async_generate_content(self: Any, *args: Any, **kwargs: Any) -> Any:
+    async def new_async_generate_content(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(GoogleGenAIIntegration)
         if integration is None:
             return await f(self, *args, **kwargs)
@@ -300,7 +300,7 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
 
 def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_embed_content(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def new_embed_content(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(GoogleGenAIIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -333,7 +333,7 @@ def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
 def _wrap_async_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    async def new_async_embed_content(self: Any, *args: Any, **kwargs: Any) -> Any:
+    async def new_async_embed_content(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(GoogleGenAIIntegration)
         if integration is None:
             return await f(self, *args, **kwargs)

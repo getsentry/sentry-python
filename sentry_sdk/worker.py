@@ -19,7 +19,7 @@ _TERMINATOR = object()
 
 class BackgroundWorker:
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
-        self._queue: Queue = Queue(queue_size)
+        self._queue: "Queue" = Queue(queue_size)
         self._lock = threading.Lock()
         self._thread: "Optional[threading.Thread]" = None
         self._thread_for_pid: "Optional[int]" = None

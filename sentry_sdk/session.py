@@ -150,7 +150,7 @@ class Session:
         return attrs
 
     def to_json(self) -> "Any":
-        rv: Dict[str, Any] = {
+        rv: "Dict[str, Any]" = {
             "sid": str(self.sid),
             "init": True,
             "started": format_timestamp(self.started),

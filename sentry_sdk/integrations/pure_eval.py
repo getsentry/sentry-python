@@ -37,7 +37,7 @@ class PureEvalIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         @add_global_event_processor
-        def add_executing_info(event: Event, hint: Optional[Hint]) -> Optional[Event]:
+        def add_executing_info(event: "Event", hint: "Optional[Hint]") -> "Optional[Event]":
             if sentry_sdk.get_client().get_integration(PureEvalIntegration) is None:
                 return event
 

@@ -191,7 +191,7 @@ class FlaskRequestExtractor(RequestExtractor):
 def _make_request_event_processor(
     app: "Flask", request: "Callable[[], Request]", integration: "FlaskIntegration"
 ) -> "EventProcessor":
-    def inner(event: Event, hint: dict[str, Any]) -> Event:
+    def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.

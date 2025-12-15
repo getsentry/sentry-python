@@ -152,7 +152,7 @@ def _capture_exception(ty: type, value: BaseException, tb: "Any") -> None:
 def _make_event_processor(
     weak_handler: "Callable[[], RequestHandler]",
 ) -> "EventProcessor":
-    def tornado_processor(event: Event, hint: dict[str, Any]) -> Event:
+    def tornado_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         handler = weak_handler()
         if handler is None:
             return event

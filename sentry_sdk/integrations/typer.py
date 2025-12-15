@@ -36,9 +36,9 @@ class TyperIntegration(Integration):
 
 def _make_excepthook(old_excepthook: "Excepthook") -> "Excepthook":
     def sentry_sdk_excepthook(
-        type_: Type[BaseException],
+        type_: "Type[BaseException]",
         value: BaseException,
-        traceback: Optional[TracebackType],
+        traceback: "Optional[TracebackType]",
     ) -> None:
         integration = sentry_sdk.get_client().get_integration(TyperIntegration)
 

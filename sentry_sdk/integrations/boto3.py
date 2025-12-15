@@ -88,7 +88,7 @@ def _sentry_request_created(
 def _sentry_after_call(
     context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
 ) -> None:
-    span: Optional[Span] = context.pop("_sentrysdk_span", None)
+    span: "Optional[Span]" = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
@@ -130,7 +130,7 @@ def _sentry_after_call(
 def _sentry_after_call_error(
     context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any"
 ) -> None:
-    span: Optional[Span] = context.pop("_sentrysdk_span", None)
+    span: "Optional[Span]" = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:

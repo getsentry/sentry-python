@@ -26,7 +26,7 @@ class Monitor:
     def __init__(
         self, transport: "sentry_sdk.transport.Transport", interval: float = 10
     ) -> None:
-        self.transport: sentry_sdk.transport.Transport = transport
+        self.transport: "sentry_sdk.transport.Transport" = transport
         self.interval: float = interval
 
         self._healthy = True

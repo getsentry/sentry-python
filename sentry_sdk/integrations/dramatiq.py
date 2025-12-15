@@ -192,7 +192,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
 def _make_message_event_processor(
     message: "Message[R]", integration: "DramatiqIntegration"
 ) -> "Callable[[Event, Hint], Optional[Event]]":
-    def inner(event: Event, hint: Hint) -> Optional[Event]:
+    def inner(event: "Event", hint: "Hint") -> "Optional[Event]":
         with capture_internal_exceptions():
             DramatiqMessageExtractor(message).extract_into_event(event)
 

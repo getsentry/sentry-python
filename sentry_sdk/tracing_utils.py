@@ -631,7 +631,7 @@ class Baggage:
 
     @classmethod
     def from_options(cls, scope: "sentry_sdk.scope.Scope") -> "Optional[Baggage]":
-        sentry_items: Dict[str, str] = {}
+        sentry_items: "Dict[str, str]" = {}
         third_party_items = ""
         mutable = False
 

@@ -109,7 +109,7 @@ if TYPE_CHECKING:
     class SDKInfo(TypedDict):
         name: str
         version: str
-        packages: Sequence[Mapping[str, str]]
+        packages: "Sequence[Mapping[str, str]]"
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]

@@ -119,8 +119,8 @@ class PyramidIntegration(Integration):
             self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
         ) -> "_ScopedResponse":
             def sentry_patched_inner_wsgi_call(
-                environ: Dict[str, Any], start_response: Callable[..., Any]
-            ) -> Any:
+                environ: "Dict[str, Any]", start_response: "Callable[..., Any]"
+            ) -> "Any":
                 try:
                     return old_wsgi_call(self, environ, start_response)
                 except Exception:
@@ -205,7 +205,7 @@ class PyramidRequestExtractor(RequestExtractor):
 def _make_event_processor(
     weak_request: "Callable[[], Request]", integration: "PyramidIntegration"
 ) -> "EventProcessor":
-    def pyramid_event_processor(event: Event, hint: Dict[str, Any]) -> Event:
+    def pyramid_event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
         request = weak_request()
         if request is None:
             return event

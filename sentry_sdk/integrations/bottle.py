@@ -191,7 +191,7 @@ def _set_transaction_name_and_source(
 def _make_request_event_processor(
     app: "Bottle", request: "LocalRequest", integration: "BottleIntegration"
 ) -> "EventProcessor":
-    def event_processor(event: Event, hint: dict[str, Any]) -> Event:
+    def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         _set_transaction_name_and_source(event, integration.transaction_style, request)
 
         with capture_internal_exceptions():

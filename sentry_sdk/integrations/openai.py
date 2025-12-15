@@ -120,7 +120,7 @@ def _calculate_token_usage(
     streaming_message_responses: "Optional[List[str]]",
     count_tokens: "Callable[..., Any]",
 ) -> None:
-    input_tokens: Optional[int] = 0
+    input_tokens: "Optional[int]" = 0
     input_tokens_cached: "Optional[int]" = 0
     output_tokens: "Optional[int]" = 0
     output_tokens_reasoning: "Optional[int]" = 0
@@ -310,7 +310,7 @@ def _set_output_data(
             span.__exit__(None, None, None)
 
     elif hasattr(response, "_iterator"):
-        data_buf: list[list[str]] = []  # one for each choice
+        data_buf: "list[list[str]]" = []  # one for each choice
 
         old_iterator = response._iterator
 
@@ -468,7 +468,7 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
 
 def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
-    def _execute_sync(f: Any, *args: Any, **kwargs: Any) -> Any:
+    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_chat_completion_common(f, *args, **kwargs)
 
         try:
@@ -500,7 +500,7 @@ def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]
 
 
 def _wrap_async_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
-    async def _execute_async(f: Any, *args: Any, **kwargs: Any) -> Any:
+    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_chat_completion_common(f, *args, **kwargs)
 
         try:
@@ -554,7 +554,7 @@ def _new_embeddings_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
 
 def _wrap_embeddings_create(f: "Any") -> "Any":
-    def _execute_sync(f: Any, *args: Any, **kwargs: Any) -> Any:
+    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_embeddings_create_common(f, *args, **kwargs)
 
         try:
@@ -585,7 +585,7 @@ def _wrap_embeddings_create(f: "Any") -> "Any":
 
 
 def _wrap_async_embeddings_create(f: "Any") -> "Any":
-    async def _execute_async(f: Any, *args: Any, **kwargs: Any) -> Any:
+    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_embeddings_create_common(f, *args, **kwargs)
 
         try:
@@ -640,7 +640,7 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
 
 
 def _wrap_responses_create(f: "Any") -> "Any":
-    def _execute_sync(f: Any, *args: Any, **kwargs: Any) -> Any:
+    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_responses_create_common(f, *args, **kwargs)
 
         try:
@@ -671,7 +671,7 @@ def _wrap_responses_create(f: "Any") -> "Any":
 
 
 def _wrap_async_responses_create(f: "Any") -> "Any":
-    async def _execute_async(f: Any, *args: Any, **kwargs: Any) -> Any:
+    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_responses_create_common(f, *args, **kwargs)
 
         try:

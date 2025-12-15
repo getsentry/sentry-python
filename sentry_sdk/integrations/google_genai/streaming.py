@@ -26,12 +26,12 @@ if TYPE_CHECKING:
 
 
 class AccumulatedResponse(TypedDict):
-    id: Optional[str]
-    model: Optional[str]
+    id: "Optional[str]"
+    model: "Optional[str]"
     text: str
-    finish_reasons: List[str]
-    tool_calls: List[dict[str, Any]]
-    usage_metadata: UsageData
+    finish_reasons: "List[str]"
+    tool_calls: "List[dict[str, Any]]"
+    usage_metadata: "UsageData"
 
 
 def accumulate_streaming_response(

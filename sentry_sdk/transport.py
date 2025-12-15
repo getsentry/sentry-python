@@ -400,7 +400,7 @@ class BaseHttpTransport(Transport):
             self.capture_envelope(Envelope(items=[client_report]))
 
     def _check_disabled(self, category: str) -> bool:
-        def _disabled(bucket: Any) -> bool:
+        def _disabled(bucket: "Any") -> bool:
             ts = self._disabled_until.get(bucket)
             return ts is not None and ts > datetime.now(timezone.utc)
 
@@ -571,7 +571,7 @@ class BaseHttpTransport(Transport):
 
 class HttpTransport(BaseHttpTransport):
     if TYPE_CHECKING:
-        _pool: Union[PoolManager, ProxyManager]
+        _pool: "Union[PoolManager, ProxyManager]"
 
     def _get_pool_options(self: "Self") -> "Dict[str, Any]":
         num_pools = self.options.get("_experiments", {}).get("transport_num_pools")
@@ -694,9 +694,9 @@ else:
         TIMEOUT = 15
 
         if TYPE_CHECKING:
-            _pool: Union[
+            _pool: """Union[
                 httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool
-            ]
+            ]"""
 
         def _get_header_value(
             self: "Self", response: "httpcore.Response", header: str
@@ -734,7 +734,7 @@ else:
             return response
 
         def _get_pool_options(self: "Self") -> "Dict[str, Any]":
-            options: Dict[str, Any] = {
+            options: "Dict[str, Any]" = {
                 "http2": self.parsed_dsn is not None
                 and self.parsed_dsn.scheme == "https",
                 "retries": 3,
@@ -834,7 +834,7 @@ class _FunctionTransport(Transport):
         self._func(event)
         return None
 
-    def capture_envelope(self, envelope: Envelope) -> None:
+    def capture_envelope(self, envelope: "Envelope") -> None:
         # Since function transports expect to be called with an event, we need
         # to iterate over the envelope and call the function for each event, via
         # the deprecated capture_event method.

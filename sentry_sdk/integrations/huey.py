@@ -75,7 +75,7 @@ def patch_enqueue() -> None:
 
 
 def _make_event_processor(task: "Any") -> "EventProcessor":
-    def event_processor(event: Event, hint: Hint) -> Optional[Event]:
+    def event_processor(event: "Event", hint: "Hint") -> "Optional[Event]":
         with capture_internal_exceptions():
             tags = event.setdefault("tags", {})
             tags["huey_task_id"] = task.id
@@ -119,7 +119,7 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
 
 def _wrap_task_execute(func: "F") -> "F":
     @ensure_integration_enabled(HueyIntegration, func)
-    def _sentry_execute(*args: Any, **kwargs: Any) -> Any:
+    def _sentry_execute(*args: "Any", **kwargs: "Any") -> "Any":
         try:
             result = func(*args, **kwargs)
         except Exception:

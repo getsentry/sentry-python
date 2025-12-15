@@ -440,7 +440,7 @@ def should_hide_frame(frame: "FrameType") -> bool:
 
 
 def iter_stacks(tb: "Optional[TracebackType]") -> "Iterator[TracebackType]":
-    tb_: Optional[TracebackType] = tb
+    tb_: "Optional[TracebackType]" = tb
     while tb_ is not None:
         if not should_hide_frame(tb_.tb_frame):
             yield tb_
@@ -1823,7 +1823,7 @@ def ensure_integration_enabled(
         original_function = cast(Callable[P, R], original_function)
 
     def patcher(sentry_patched_function: "Callable[P, R]") -> "Callable[P, R]":
-        def runner(*args: "P.args", **kwargs: "P.kwargs") -> R:
+        def runner(*args: "P.args", **kwargs: "P.kwargs") -> "R":
             if sentry_sdk.get_client().get_integration(integration) is None:
                 return original_function(*args, **kwargs)
 

@@ -209,7 +209,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def __init__(
         self, max_span_map_size: "Optional[int]", include_prompts: bool
     ) -> None:
-        self.span_map: OrderedDict[UUID, WatchedSpan] = OrderedDict()
+        self.span_map: "OrderedDict[UUID, WatchedSpan]" = OrderedDict()
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
 
@@ -811,11 +811,11 @@ def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
     def new_configure(
         callback_manager_cls: type,
-        inheritable_callbacks: Callbacks = None,
-        local_callbacks: Callbacks = None,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any:
+        inheritable_callbacks: "Callbacks" = None,
+        local_callbacks: "Callbacks" = None,
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(
@@ -889,7 +889,7 @@ def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
 def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_invoke(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def new_invoke(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -952,7 +952,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
 
 def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_stream(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def new_stream(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -1002,7 +1002,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         old_iterator = result
 
         def new_iterator() -> "Iterator[Any]":
-            exc_info: tuple[Any, Any, Any] = (None, None, None)
+            exc_info: "tuple[Any, Any, Any]" = (None, None, None)
             try:
                 for event in old_iterator:
                     yield event
@@ -1028,7 +1028,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 span.__exit__(*exc_info)
 
         async def new_iterator_async() -> "AsyncIterator[Any]":
-            exc_info: tuple[Any, Any, Any] = (None, None, None)
+            exc_info: "tuple[Any, Any, Any]" = (None, None, None)
             try:
                 async for event in old_iterator:
                     yield event

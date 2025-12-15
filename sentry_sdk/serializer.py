@@ -73,7 +73,7 @@ class Memo:
     __slots__ = ("_ids", "_objs")
 
     def __init__(self) -> None:
-        self._ids: Dict[int, Any] = {}
+        self._ids: "Dict[int, Any]" = {}
         self._objs: "List[Any]" = []
 
     def memoize(self, obj: "Any") -> "ContextManager[bool]":

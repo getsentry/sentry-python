@@ -22,7 +22,7 @@ class DedupeIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         @add_global_event_processor
-        def processor(event: Event, hint: Optional[Hint]) -> Optional[Event]:
+        def processor(event: "Event", hint: "Optional[Hint]") -> "Optional[Event]":
             if hint is None:
                 return event
 

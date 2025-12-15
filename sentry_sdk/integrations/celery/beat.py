@@ -58,7 +58,7 @@ def _get_headers(task: "Task") -> "dict[str, Any]":
 def _get_monitor_config(
     celery_schedule: "Any", app: "Celery", monitor_name: str
 ) -> "MonitorConfig":
-    monitor_config: MonitorConfig = {}
+    monitor_config: "MonitorConfig" = {}
     schedule_type: "Optional[MonitorConfigScheduleType]" = None
     schedule_value: "Optional[Union[str, int]]" = None
     schedule_unit: "Optional[MonitorConfigScheduleUnit]" = None

@@ -456,7 +456,7 @@ def patch_request_response() -> None:
                 def _make_request_event_processor(
                     req: "Any", integration: "Any"
                 ) -> "Callable[[Event, dict[str, Any]], Event]":
-                    def event_processor(event: Event, hint: Dict[str, Any]) -> Event:
+                    def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
                         # Add info from request to event
                         request_info = event.get("request", {})
                         if info:
@@ -509,7 +509,7 @@ def patch_request_response() -> None:
                 def _make_request_event_processor(
                     req: "Any", integration: "Any"
                 ) -> "Callable[[Event, dict[str, Any]], Event]":
-                    def event_processor(event: Event, hint: dict[str, Any]) -> Event:
+                    def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
                         # Extract information from request
                         request_info = event.get("request", {})
                         if cookies:
@@ -557,7 +557,7 @@ def patch_templates() -> None:
         def _sentry_jinja2templates_init(
             self: "Jinja2Templates", *args: "Any", **kwargs: "Any"
         ) -> None:
-            def add_sentry_trace_meta(request: Request) -> Dict[str, Any]:
+            def add_sentry_trace_meta(request: "Request") -> "Dict[str, Any]":
                 trace_meta = Markup(
                     sentry_sdk.get_current_scope().trace_propagation_meta()
                 )
@@ -589,7 +589,7 @@ class StarletteRequestExtractor:
     def extract_cookies_from_request(
         self: "StarletteRequestExtractor",
     ) -> "Optional[Dict[str, Any]]":
-        cookies: Optional[Dict[str, Any]] = None
+        cookies: "Optional[Dict[str, Any]]" = None
         if should_send_default_pii():
             cookies = self.cookies()
 

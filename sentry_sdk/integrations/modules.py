@@ -16,7 +16,7 @@ class ModulesIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         @add_global_event_processor
-        def processor(event: Event, hint: Any) -> Event:
+        def processor(event: "Event", hint: "Any") -> "Event":
             if event.get("type") == "transaction":
                 return event
 

@@ -110,7 +110,7 @@ def patch_get_request_handler() -> None:
             def _make_request_event_processor(
                 req: "Any", integration: "Any"
             ) -> "Callable[[Event, Dict[str, Any]], Event]":
-                def event_processor(event: Event, hint: Dict[str, Any]) -> Event:
+                def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
                     # Extract information from request
                     request_info = event.get("request", {})
                     if info:

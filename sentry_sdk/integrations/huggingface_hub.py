@@ -63,7 +63,7 @@ def _capture_exception(exc: "Any") -> None:
 
 def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., Any]":
     @wraps(f)
-    def new_huggingface_task(*args: Any, **kwargs: Any) -> Any:
+    def new_huggingface_task(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(HuggingfaceHubIntegration)
         if integration is None:
             return f(*args, **kwargs)
@@ -133,7 +133,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         # Output attributes
         finish_reason = None
         response_model = None
-        response_text_buffer: list[str] = []
+        response_text_buffer: "list[str]" = []
         tokens_used = 0
         tool_calls = None
         usage = None
@@ -227,7 +227,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 # text-generation stream output
                 def new_details_iterator() -> "Iterable[Any]":
                     finish_reason = None
-                    response_text_buffer: list[str] = []
+                    response_text_buffer: "list[str]" = []
                     tokens_used = 0
 
                     with capture_internal_exceptions():
@@ -285,7 +285,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 def new_iterator() -> "Iterable[str]":
                     finish_reason = None
                     response_model = None
-                    response_text_buffer: list[str] = []
+                    response_text_buffer: "list[str]" = []
                     tool_calls = None
                     usage = None
 

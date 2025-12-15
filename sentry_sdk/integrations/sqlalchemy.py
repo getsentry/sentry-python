@@ -74,7 +74,7 @@ def _after_cursor_execute(
     context: "Any",
     *args: "Any",
 ) -> None:
-    ctx_mgr: Optional[ContextManager[Any]] = getattr(
+    ctx_mgr: "Optional[ContextManager[Any]]" = getattr(
         context, "_sentry_sql_span_manager", None
     )
 

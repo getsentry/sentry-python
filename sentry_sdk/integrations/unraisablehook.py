@@ -25,7 +25,7 @@ class UnraisablehookIntegration(Integration):
 def _make_unraisable(
     old_unraisablehook: "Callable[[sys.UnraisableHookArgs], Any]",
 ) -> "Callable[[sys.UnraisableHookArgs], Any]":
-    def sentry_sdk_unraisablehook(unraisable: sys.UnraisableHookArgs) -> None:
+    def sentry_sdk_unraisablehook(unraisable: "sys.UnraisableHookArgs") -> None:
         integration = sentry_sdk.get_client().get_integration(UnraisablehookIntegration)
 
         # Note: If  we replace this with ensure_integration_enabled then

@@ -33,7 +33,7 @@ class SysExitIntegration(Integration):
 
     @staticmethod
     def _patch_sys_exit() -> None:
-        old_exit: Callable[[Union[str, int, None]], NoReturn] = sys.exit
+        old_exit: "Callable[[Union[str, int, None]], NoReturn]" = sys.exit
 
         @functools.wraps(old_exit)
         def sentry_patched_exit(__status: "Union[str, int, None]" = 0) -> "NoReturn":
@@ -56,7 +56,7 @@ class SysExitIntegration(Integration):
         sys.exit = sentry_patched_exit
 
 
-def _capture_exception(exc: SystemExit) -> None:
+def _capture_exception(exc: "SystemExit") -> None:
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,

@@ -85,7 +85,7 @@ class SentrySpanProcessor(SpanProcessor):
 
     def __init__(self) -> None:
         @add_global_event_processor
-        def global_event_processor(event: Event, hint: Hint) -> Event:
+        def global_event_processor(event: "Event", hint: "Hint") -> "Event":
             return link_trace_context_to_error_event(event, self.otel_span_map)
 
     def _prune_old_spans(self: "SentrySpanProcessor") -> None:

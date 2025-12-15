@@ -180,7 +180,7 @@ class BaseClient:
     spotlight: "Optional[SpotlightClient]" = None
 
     def __init__(self, options: "Optional[Dict[str, Any]]" = None) -> None:
-        self.options: Dict[str, Any] = (
+        self.options: "Dict[str, Any]" = (
             options if options is not None else DEFAULT_OPTIONS
         )
 
@@ -495,7 +495,7 @@ class _Client(BaseClient):
         hint: "Hint",
         scope: "Optional[Scope]",
     ) -> "Optional[Event]":
-        previous_total_spans: Optional[int] = None
+        previous_total_spans: "Optional[int]" = None
         previous_total_breadcrumbs: "Optional[int]" = None
 
         if event.get("timestamp") is None:

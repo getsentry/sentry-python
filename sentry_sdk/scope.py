@@ -121,7 +121,7 @@ class ScopeType(Enum):
 
 class _ScopeManager:
     def __init__(self, hub: "Optional[Any]" = None) -> None:
-        self._old_scopes: List[Scope] = []
+        self._old_scopes: "List[Scope]" = []
 
     def __enter__(self) -> "Scope":
         isolation_scope = Scope.get_isolation_scope()
@@ -166,7 +166,7 @@ def _attr_setter(fn: "Any") -> "Any":
 
 def _disable_capture(fn: "F") -> "F":
     @wraps(fn)
-    def wrapper(self: Any, *args: Dict[str, Any], **kwargs: Any) -> Any:
+    def wrapper(self: "Any", *args: "Dict[str, Any]", **kwargs: "Any") -> "Any":
         if not self._should_capture:
             return
         try:

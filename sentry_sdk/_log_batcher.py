@@ -21,7 +21,7 @@ class LogBatcher:
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
     ) -> None:
-        self._log_buffer: List[Log] = []
+        self._log_buffer: "List[Log]" = []
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
@@ -115,7 +115,7 @@ class LogBatcher:
 
     @staticmethod
     def _log_to_transport_format(log: "Log") -> "Any":
-        def format_attribute(val: int | float | str | bool) -> Any:
+        def format_attribute(val: int | float | str | bool) -> "Any":
             if isinstance(val, bool):
                 return {"value": val, "type": "boolean"}
             if isinstance(val, int):

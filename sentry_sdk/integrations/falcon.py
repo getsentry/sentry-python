@@ -248,7 +248,7 @@ def _set_transaction_name_and_source(
 def _make_request_event_processor(
     req: "falcon.Request", integration: "FalconIntegration"
 ) -> "EventProcessor":
-    def event_processor(event: Event, hint: dict[str, Any]) -> Event:
+    def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         _set_transaction_name_and_source(event, integration.transaction_style, req)
 
         with capture_internal_exceptions():

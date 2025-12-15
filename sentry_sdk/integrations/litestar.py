@@ -287,7 +287,7 @@ def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[dict[str, Any]
 
 @ensure_integration_enabled(LitestarIntegration)
 def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
-    user_info: Optional[dict[str, Any]] = None
+    user_info: "Optional[dict[str, Any]]" = None
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):

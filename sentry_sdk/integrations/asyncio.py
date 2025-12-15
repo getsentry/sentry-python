@@ -53,7 +53,7 @@ def patch_asyncio() -> None:
             **kwargs: "Any",
         ) -> "asyncio.Future[Any]":
             @_wrap_coroutine(coro)
-            async def _task_with_sentry_span_creation() -> Any:
+            async def _task_with_sentry_span_creation() -> "Any":
                 result = None
 
                 with sentry_sdk.isolation_scope():

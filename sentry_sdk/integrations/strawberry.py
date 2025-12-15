@@ -357,7 +357,7 @@ def _patch_views() -> None:
 def _make_request_event_processor(
     execution_context: "ExecutionContext",
 ) -> "EventProcessor":
-    def inner(event: Event, hint: dict[str, Any]) -> Event:
+    def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         with capture_internal_exceptions():
             if should_send_default_pii():
                 request_data = event.setdefault("request", {})
@@ -386,7 +386,7 @@ def _make_request_event_processor(
 def _make_response_event_processor(
     response_data: "GraphQLHTTPResponse",
 ) -> "EventProcessor":
-    def inner(event: Event, hint: dict[str, Any]) -> Event:
+    def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
         with capture_internal_exceptions():
             if should_send_default_pii():
                 contexts = event.setdefault("contexts", {})

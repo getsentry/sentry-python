@@ -489,7 +489,7 @@ def _patch_get_response() -> None:
 def _make_wsgi_request_event_processor(
     weak_request: "Callable[[], WSGIRequest]", integration: "DjangoIntegration"
 ) -> "EventProcessor":
-    def wsgi_request_event_processor(event: Event, hint: dict[str, Any]) -> Event:
+    def wsgi_request_event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.

@@ -122,7 +122,7 @@ class monitor:  # noqa: N801
         self, fn: "Callable[P, Awaitable[Any]]"
     ) -> "Callable[P, Awaitable[Any]]":
         @wraps(fn)
-        async def inner(*args: "P.args", **kwargs: "P.kwargs") -> R:
+        async def inner(*args: "P.args", **kwargs: "P.kwargs") -> "R":
             with self:
                 return await fn(*args, **kwargs)
 
@@ -130,7 +130,7 @@ class monitor:  # noqa: N801
 
     def _sync_wrapper(self, fn: "Callable[P, R]") -> "Callable[P, R]":
         @wraps(fn)
-        def inner(*args: "P.args", **kwargs: "P.kwargs") -> R:
+        def inner(*args: "P.args", **kwargs: "P.kwargs") -> "R":
             with self:
                 return fn(*args, **kwargs)
 

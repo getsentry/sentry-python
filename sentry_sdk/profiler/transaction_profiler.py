@@ -418,7 +418,7 @@ class Profile:
         # This collects the thread metadata at the end of a profile. Doing it
         # this way means that any threads that terminate before the profile ends
         # will not have any metadata associated with it.
-        thread_metadata: Dict[str, ProcessedThreadMetadata] = {
+        thread_metadata: "Dict[str, ProcessedThreadMetadata]" = {
             str(thread.ident): {
                 "name": str(thread.name),
             }

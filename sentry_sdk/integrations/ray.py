@@ -53,10 +53,10 @@ def _patch_ray_remote() -> None:
         def wrapper(user_f: "Callable[..., Any]") -> "Any":
             @functools.wraps(user_f)
             def new_func(
-                *f_args: Any,
-                _sentry_tracing: Optional[dict[str, Any]] = None,
-                **f_kwargs: Any,
-            ) -> Any:
+                *f_args: "Any",
+                _sentry_tracing: "Optional[dict[str, Any]]" = None,
+                **f_kwargs: "Any",
+            ) -> "Any":
                 _check_sentry_initialized()
 
                 transaction = sentry_sdk.continue_trace(

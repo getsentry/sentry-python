@@ -50,8 +50,8 @@ def _create_get_all_tools_wrapper(
             ) -> "Callable[..., Any]":
                 @wraps(current_on_invoke)
                 async def sentry_wrapped_on_invoke_tool(
-                    *args: Any, **kwargs: Any
-                ) -> Any:
+                    *args: "Any", **kwargs: "Any"
+                ) -> "Any":
                     with execute_tool_span(current_tool, *args, **kwargs) as span:
                         # We can not capture exceptions in tool execution here because
                         # `_on_invoke_tool` is swallowing the exception here:

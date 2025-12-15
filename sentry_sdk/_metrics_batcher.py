@@ -21,7 +21,7 @@ class MetricsBatcher:
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
     ) -> None:
-        self._metric_buffer: List[Metric] = []
+        self._metric_buffer: "List[Metric]" = []
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
@@ -96,7 +96,7 @@ class MetricsBatcher:
 
     @staticmethod
     def _metric_to_transport_format(metric: "Metric") -> "Any":
-        def format_attribute(val: Union[int, float, str, bool]) -> Any:
+        def format_attribute(val: "Union[int, float, str, bool]") -> "Any":
             if isinstance(val, bool):
                 return {"value": val, "type": "boolean"}
             if isinstance(val, int):

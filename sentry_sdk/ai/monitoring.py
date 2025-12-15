@@ -26,8 +26,8 @@ def get_ai_pipeline_name() -> "Optional[str]":
 
 
 def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
-    def decorator(f: F) -> F:
-        def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
+    def decorator(f: "F") -> "F":
+        def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 

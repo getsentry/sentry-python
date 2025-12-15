@@ -129,7 +129,7 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
 def _make_event_processor(
     ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
 ) -> "EventProcessor":
-    def event_processor(event: Event, hint: Hint) -> Optional[Event]:
+    def event_processor(event: "Event", hint: "Hint") -> "Optional[Event]":
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
             if scope.transaction is not None:
@@ -157,7 +157,7 @@ def _make_event_processor(
 
 
 def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine":
-    async def _sentry_coroutine(ctx: Dict[Any, Any], *args: Any, **kwargs: Any) -> Any:
+    async def _sentry_coroutine(ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(ArqIntegration)
         if integration is None:
             return await coroutine(ctx, *args, **kwargs)

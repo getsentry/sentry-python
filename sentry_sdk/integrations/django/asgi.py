@@ -52,7 +52,7 @@ else:
 
 
 def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcessor":
-    def asgi_request_event_processor(event: Event, hint: dict[str, Any]) -> Event:
+    def asgi_request_event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.

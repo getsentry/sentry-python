@@ -123,8 +123,8 @@ def _wrap_run(
     old_run_func: "F",
 ) -> "F":
     @wraps(old_run_func)
-    def run(*a: Any, **kw: Any) -> Any:
-        def _run_old_run_func() -> Any:
+    def run(*a: "Any", **kw: "Any") -> "Any":
+        def _run_old_run_func() -> "Any":
             try:
                 self = current_thread()
                 return old_run_func(self, *a[1:], **kw)

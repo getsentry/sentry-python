@@ -42,7 +42,7 @@ MILLIS_TO_SECONDS = 1000.0
 
 def _wrap_init_error(init_error: "F") -> "F":
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
-    def sentry_init_error(*args: Any, **kwargs: Any) -> Any:
+    def sentry_init_error(*args: "Any", **kwargs: "Any") -> "Any":
         client = sentry_sdk.get_client()
 
         with capture_internal_exceptions():
@@ -73,8 +73,8 @@ def _wrap_init_error(init_error: "F") -> "F":
 def _wrap_handler(handler: "F") -> "F":
     @functools.wraps(handler)
     def sentry_handler(
-        aws_event: Any, aws_context: Any, *args: Any, **kwargs: Any
-    ) -> Any:
+        aws_event: "Any", aws_context: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         # Per https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html,
         # `event` here is *likely* a dictionary, but also might be a number of
         # other types (str, int, float, None).
@@ -268,7 +268,7 @@ class AwsLambdaIntegration(Integration):
             # even when the SDK is initialized inside of the handler
 
             def _wrap_post_function(f: "F") -> "F":
-                def inner(*args: Any, **kwargs: Any) -> Any:
+                def inner(*args: "Any", **kwargs: "Any") -> "Any":
                     _drain_queue()
                     return f(*args, **kwargs)
 

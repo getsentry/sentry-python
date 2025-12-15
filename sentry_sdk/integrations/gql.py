@@ -123,7 +123,7 @@ def _patch_execute() -> None:
 def _make_gql_event_processor(
     client: "gql.Client", document_or_request: "Union[DocumentNode, gql.GraphQLRequest]"
 ) -> "EventProcessor":
-    def processor(event: Event, hint: dict[str, Any]) -> Event:
+    def processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         try:
             errors = hint["exc_info"][1].errors
         except (AttributeError, KeyError):

@@ -118,7 +118,7 @@ class RqIntegration(Integration):
 
 
 def _make_event_processor(weak_job: "Callable[[], Job]") -> "EventProcessor":
-    def event_processor(event: Event, hint: dict[str, Any]) -> Event:
+    def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         job = weak_job()
         if job is not None:
             with capture_internal_exceptions():

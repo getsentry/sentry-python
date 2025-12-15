@@ -95,7 +95,7 @@ def _capture_exception(exc: "Any") -> None:
 
 def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]":
     def collect_chat_response_fields(
-        span: Span, res: NonStreamedChatResponse, include_pii: bool
+        span: "Span", res: "NonStreamedChatResponse", include_pii: bool
     ) -> None:
         if include_pii:
             if hasattr(res, "text"):
@@ -218,7 +218,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
 def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_embed(*args: Any, **kwargs: Any) -> Any:
+    def new_embed(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(CohereIntegration)
         if integration is None:
             return f(*args, **kwargs)

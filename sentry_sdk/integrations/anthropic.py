@@ -374,7 +374,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
 
 def _wrap_message_create(f: "Any") -> "Any":
-    def _execute_sync(f: Any, *args: Any, **kwargs: Any) -> Any:
+    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _sentry_patched_create_common(f, *args, **kwargs)
 
         try:
@@ -410,7 +410,7 @@ def _wrap_message_create(f: "Any") -> "Any":
 
 
 def _wrap_message_create_async(f: "Any") -> "Any":
-    async def _execute_async(f: Any, *args: Any, **kwargs: Any) -> Any:
+    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _sentry_patched_create_common(f, *args, **kwargs)
 
         try:

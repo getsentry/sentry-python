@@ -61,7 +61,7 @@ def patch_signals() -> None:
             receiver: "Callable[..., Any]",
         ) -> "Callable[..., Any]":
             @wraps(receiver)
-            def wrapper(*args: Any, **kwargs: Any) -> Any:
+            def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
                 signal_name = _get_receiver_name(receiver)
                 with sentry_sdk.start_span(
                     op=OP.EVENT_DJANGO,

@@ -134,7 +134,7 @@ def _make_event_processor(
     kwargs: "Any",
     request: "Optional[Any]" = None,
 ) -> "EventProcessor":
-    def event_processor(event: Event, hint: Hint) -> Optional[Event]:
+    def event_processor(event: "Event", hint: "Hint") -> "Optional[Event]":
         with capture_internal_exceptions():
             tags = event.setdefault("tags", {})
             tags["celery_task_id"] = uuid
@@ -244,7 +244,7 @@ class NoOpMgr:
 
 def _wrap_task_run(f: "F") -> "F":
     @wraps(f)
-    def apply_async(*args: Any, **kwargs: Any) -> Any:
+    def apply_async(*args: "Any", **kwargs: "Any") -> "Any":
         # Note: kwargs can contain headers=None, so no setdefault!
         # Unsure which backend though.
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
@@ -296,7 +296,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
     # crashes.
     @wraps(f)
     @ensure_integration_enabled(CeleryIntegration, f)
-    def _inner(*args: Any, **kwargs: Any) -> Any:
+    def _inner(*args: "Any", **kwargs: "Any") -> "Any":
         with isolation_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
@@ -360,7 +360,7 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
     # to add @functools.wraps(f) here.
     # https://github.com/getsentry/sentry-python/issues/421
     @ensure_integration_enabled(CeleryIntegration, f)
-    def _inner(*args: Any, **kwargs: Any) -> Any:
+    def _inner(*args: "Any", **kwargs: "Any") -> "Any":
         try:
             with sentry_sdk.start_span(
                 op=OP.QUEUE_PROCESS,

@@ -219,9 +219,9 @@ class AioHttpIntegration(Integration):
 
 def create_trace_config() -> "TraceConfig":
     async def on_request_start(
-        session: ClientSession,
-        trace_config_ctx: SimpleNamespace,
-        params: TraceRequestStartParams,
+        session: "ClientSession",
+        trace_config_ctx: "SimpleNamespace",
+        params: "TraceRequestStartParams",
     ) -> None:
         if sentry_sdk.get_client().get_integration(AioHttpIntegration) is None:
             return
@@ -296,9 +296,9 @@ def _make_request_processor(
     weak_request: "weakref.ReferenceType[Request]",
 ) -> "EventProcessor":
     def aiohttp_processor(
-        event: Event,
-        hint: dict[str, Tuple[type, BaseException, Any]],
-    ) -> Event:
+        event: "Event",
+        hint: "dict[str, Tuple[type, BaseException, Any]]",
+    ) -> "Event":
         request = weak_request()
         if request is None:
             return event

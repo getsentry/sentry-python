@@ -27,7 +27,7 @@ def _generate_default_integrations_iterator(
 ) -> "Callable[[bool], Iterator[Type[Integration]]]":
     def iter_default_integrations(
         with_auto_enabling_integrations: bool,
-    ) -> Iterator[Type[Integration]]:
+    ) -> "Iterator[Type[Integration]]":
         """Returns an iterator of the default integration classes:"""
         from importlib import import_module
 

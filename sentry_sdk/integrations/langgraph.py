@@ -100,7 +100,7 @@ def _parse_langgraph_messages(state: "Any") -> "Optional[List[Any]]":
 
 def _wrap_state_graph_compile(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_compile(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def new_compile(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -144,7 +144,7 @@ def _wrap_state_graph_compile(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
 def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_invoke(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def new_invoke(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -198,7 +198,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
 def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    async def new_ainvoke(self: Any, *args: Any, **kwargs: Any) -> Any:
+    async def new_ainvoke(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
         if integration is None:
             return await f(self, *args, **kwargs)
