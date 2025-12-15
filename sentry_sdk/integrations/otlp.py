@@ -95,8 +95,12 @@ class SentryOTLPPropagator(SentryPropagator):
     For incoming baggage, we just pass it on as is so that case is correctly handled.
     """
 
-    def inject(self, carrier, context=None, setter=default_setter):
-        # type: (CarrierT, Optional[Context], Setter[CarrierT]) -> None
+    def inject(
+        self,
+        carrier: "CarrierT",
+        context: "Optional[Context]" = None,
+        setter: "Setter[CarrierT]" = default_setter,
+    ) -> None:
         otlp_integration = get_client().get_integration(OTLPIntegration)
         if otlp_integration is None:
             return
@@ -120,8 +124,7 @@ class SentryOTLPPropagator(SentryPropagator):
                 setter.set(carrier, BAGGAGE_HEADER_NAME, baggage_data)
 
 
-def _to_traceparent(span_context):
-    # type: (SpanContext) -> str
+def _to_traceparent(span_context: "SpanContext") -> str:
     """
     Helper method to generate the sentry-trace header.
     """
