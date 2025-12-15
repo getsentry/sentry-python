@@ -77,6 +77,22 @@ class AnnotatedValue:
         )
 
     @classmethod
+    def removed_because_body_consumed_and_not_cached(cls, value=""):
+        # type: (Any) -> AnnotatedValue
+        """The actual value was removed because the underlying stream has been consumed, without caching the value."""
+        return AnnotatedValue(
+            value=value,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!consumed",  # Because the original stream is unavailable
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
     def substituted_because_contains_sensitive_data(cls):
         # type: () -> AnnotatedValue
         """The actual value was removed because it contained sensitive information."""
