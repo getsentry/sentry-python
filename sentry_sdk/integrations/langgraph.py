@@ -334,7 +334,7 @@ def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
         )
 
 
-def _set_response_model_name(span: "sentry_sdk.tracing.Span", messages: Any) -> None:
+def _set_response_model_name(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     if len(messages) == 0:
         return
 

@@ -91,9 +91,9 @@ SubCursor = TypeVar("SubCursor", bound=BaseCursor)
 
 @contextlib.contextmanager
 def _record(
-    cursor: "SubCursor" | None,
+    cursor: "SubCursor | None",
     query: str,
-    params_list: "tuple[Any, ...]" | None,
+    params_list: "tuple[Any, ...] | None",
     *,
     executemany: bool = False,
 ) -> "Iterator[Span]":

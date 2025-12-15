@@ -115,7 +115,7 @@ class LogBatcher:
 
     @staticmethod
     def _log_to_transport_format(log: "Log") -> "Any":
-        def format_attribute(val: int | float | str | bool) -> "Any":
+        def format_attribute(val: "int | float | str | bool") -> "Any":
             if isinstance(val, bool):
                 return {"value": val, "type": "boolean"}
             if isinstance(val, int):
