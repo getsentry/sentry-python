@@ -646,7 +646,7 @@ def test_user_information_transaction_no_pii(sentry_init, capture_events):
 def test_middleware_spans(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[StarletteIntegration()],
+        integrations=[StarletteIntegration(middleware_spans=True)],
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1099,6 +1099,7 @@ def test_transaction_name_in_traces_sampler(
     client.get(request_url)
 
 
+@pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.parametrize(
     "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
@@ -1118,6 +1119,7 @@ def test_transaction_name_in_traces_sampler(
 )
 def test_transaction_name_in_middleware(
     sentry_init,
+    middleware_spans,
     request_url,
     transaction_style,
     expected_transaction_name,
@@ -1130,7 +1132,9 @@ def test_transaction_name_in_middleware(
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[
-            StarletteIntegration(transaction_style=transaction_style),
+            StarletteIntegration(
+                transaction_style=transaction_style, middleware_spans=middleware_spans
+            ),
         ],
         traces_sample_rate=1.0,
     )

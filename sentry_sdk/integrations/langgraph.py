@@ -58,7 +58,13 @@ def _normalize_langgraph_message(message: "Any") -> "Any":
 
     parsed = {"role": getattr(message, "type", None), "content": message.content}
 
-    for attr in ["name", "tool_calls", "function_call", "tool_call_id"]:
+    for attr in [
+        "name",
+        "tool_calls",
+        "function_call",
+        "tool_call_id",
+        "response_metadata",
+    ]:
         if hasattr(message, attr):
             value = getattr(message, attr)
             if value is not None:
@@ -297,17 +303,70 @@ def _extract_tool_calls(messages: "Optional[List[Any]]") -> "Optional[List[Any]]
     return tool_calls if tool_calls else None
 
 
+def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
+    input_tokens = 0
+    output_tokens = 0
+    total_tokens = 0
+
+    for message in messages:
+        response_metadata = message.get("response_metadata")
+        if response_metadata is None:
+            continue
+
+        token_usage = response_metadata.get("token_usage")
+        if not token_usage:
+            continue
+
+        input_tokens += int(token_usage.get("prompt_tokens", 0))
+        output_tokens += int(token_usage.get("completion_tokens", 0))
+        total_tokens += int(token_usage.get("total_tokens", 0))
+
+    if input_tokens > 0:
+        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+
+    if output_tokens > 0:
+        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    if total_tokens > 0:
+        span.set_data(
+            SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+            total_tokens,
+        )
+
+
+def _set_response_model_name(span: "sentry_sdk.tracing.Span", messages: Any) -> None:
+    if len(messages) == 0:
+        return
+
+    last_message = messages[-1]
+    response_metadata = last_message.get("response_metadata")
+    if response_metadata is None:
+        return
+
+    model_name = response_metadata.get("model_name")
+    if model_name is None:
+        return
+
+    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model_name)
+
+
 def _set_response_attributes(
     span: "Any",
     input_messages: "Optional[List[Any]]",
     result: "Any",
     integration: "LanggraphIntegration",
 ) -> None:
-    if not (should_send_default_pii() and integration.include_prompts):
-        return
-
     parsed_response_messages = _parse_langgraph_messages(result)
     new_messages = _get_new_messages(input_messages, parsed_response_messages)
+
+    if new_messages is None:
+        return
+
+    _set_usage_data(span, new_messages)
+    _set_response_model_name(span, new_messages)
+
+    if not (should_send_default_pii() and integration.include_prompts):
+        return
 
     llm_response_text = _extract_llm_response_text(new_messages)
     if llm_response_text:

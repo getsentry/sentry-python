@@ -8,15 +8,16 @@ from opentelemetry.trace import (
     ProxyTracerProvider,
     format_span_id,
     format_trace_id,
+    get_current_span,
 )
+from opentelemetry.context import attach, detach
 from opentelemetry.propagate import get_global_textmap, set_global_textmap
 from opentelemetry.util._once import Once
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-from sentry_sdk.integrations.otlp import OTLPIntegration
-from sentry_sdk.integrations.opentelemetry import SentryPropagator
+from sentry_sdk.integrations.otlp import OTLPIntegration, SentryOTLPPropagator
 from sentry_sdk.scope import get_external_propagation_context
 
 
@@ -111,7 +112,7 @@ def test_sets_propagator(sentry_init):
     )
 
     propagator = get_global_textmap()
-    assert isinstance(get_global_textmap(), SentryPropagator)
+    assert isinstance(get_global_textmap(), SentryOTLPPropagator)
     assert propagator is not original_propagator
 
 
@@ -122,7 +123,7 @@ def test_does_not_set_propagator_if_disabled(sentry_init):
     )
 
     propagator = get_global_textmap()
-    assert not isinstance(propagator, SentryPropagator)
+    assert not isinstance(propagator, SentryOTLPPropagator)
     assert propagator is original_propagator
 
 
@@ -152,3 +153,72 @@ def test_otel_propagation_context(sentry_init):
     assert trace_id == format_trace_id(root_span.get_span_context().trace_id)
     assert trace_id == format_trace_id(span.get_span_context().trace_id)
     assert span_id == format_span_id(span.get_span_context().span_id)
+
+
+def test_propagator_inject_head_of_trace(sentry_init):
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        integrations=[OTLPIntegration()],
+    )
+
+    tracer = trace.get_tracer(__name__)
+    propagator = get_global_textmap()
+    carrier = {}
+
+    with tracer.start_as_current_span("foo") as span:
+        propagator.inject(carrier)
+
+        span_context = span.get_span_context()
+        trace_id = format_trace_id(span_context.trace_id)
+        span_id = format_span_id(span_context.span_id)
+
+        assert "sentry-trace" in carrier
+        assert carrier["sentry-trace"] == f"{trace_id}-{span_id}-1"
+
+        #! we cannot populate baggage in otlp as head SDK yet
+        assert "baggage" not in carrier
+
+
+def test_propagator_inject_continue_trace(sentry_init):
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        integrations=[OTLPIntegration()],
+    )
+
+    tracer = trace.get_tracer(__name__)
+    propagator = get_global_textmap()
+    carrier = {}
+
+    incoming_headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+        "baggage": (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,sentry-sampled=true"
+        ),
+    }
+
+    ctx = propagator.extract(incoming_headers)
+    token = attach(ctx)
+
+    parent_span_context = get_current_span().get_span_context()
+    assert (
+        format_trace_id(parent_span_context.trace_id)
+        == "771a43a4192642f0b136d5159a501700"
+    )
+    assert format_span_id(parent_span_context.span_id) == "1234567890abcdef"
+
+    with tracer.start_as_current_span("foo") as span:
+        propagator.inject(carrier)
+
+        span_context = span.get_span_context()
+        trace_id = format_trace_id(span_context.trace_id)
+        span_id = format_span_id(span_context.span_id)
+
+        assert trace_id == "771a43a4192642f0b136d5159a501700"
+
+        assert "sentry-trace" in carrier
+        assert carrier["sentry-trace"] == f"{trace_id}-{span_id}-1"
+
+        assert "baggage" in carrier
+        assert carrier["baggage"] == incoming_headers["baggage"]
+
+    detach(token)

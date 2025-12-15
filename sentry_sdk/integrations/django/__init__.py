@@ -62,6 +62,7 @@ from sentry_sdk.integrations.django.templates import (
 )
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 from sentry_sdk.integrations.django.signals_handlers import patch_signals
+from sentry_sdk.integrations.django.tasks import patch_tasks
 from sentry_sdk.integrations.django.views import patch_views
 
 if DJANGO_VERSION[:2] > (1, 8):
@@ -127,7 +128,7 @@ class DjangoIntegration(Integration):
     def __init__(
         self,
         transaction_style: str = "url",
-        middleware_spans: bool = True,
+        middleware_spans: bool = False,
         signals_spans: bool = True,
         cache_spans: bool = False,
         db_transaction_spans: bool = False,
@@ -270,6 +271,7 @@ class DjangoIntegration(Integration):
         patch_views()
         patch_templates()
         patch_signals()
+        patch_tasks()
         add_template_context_repr_sequence()
 
         if patch_caching is not None:

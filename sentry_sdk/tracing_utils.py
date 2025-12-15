@@ -35,6 +35,8 @@ if TYPE_CHECKING:
     from typing import Generator
     from typing import Optional
     from typing import Union
+    from typing import Iterator
+    from typing import Tuple
 
     from types import FrameType
 
@@ -494,7 +496,25 @@ class PropagationContext:
 
     @property
     def dynamic_sampling_context(self) -> "Optional[Dict[str, Any]]":
-        return self.baggage.dynamic_sampling_context() if self.baggage else None
+        return self.get_baggage().dynamic_sampling_context()
+
+    def to_traceparent(self) -> str:
+        return f"{self.trace_id}-{self.span_id}"
+
+    def get_baggage(self) -> "Baggage":
+        if self.baggage is None:
+            self.baggage = Baggage.populate_from_propagation_context(self)
+        return self.baggage
+
+    def iter_headers(self) -> "Iterator[Tuple[str, str]]":
+        """
+        Creates a generator which returns the propagation_context's ``sentry-trace`` and ``baggage`` headers.
+        """
+        yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
+
+        baggage = self.get_baggage().serialize()
+        if baggage:
+            yield BAGGAGE_HEADER_NAME, baggage
 
     def update(self, other_dict: "Dict[str, Any]") -> None:
         """
@@ -631,20 +651,28 @@ class Baggage:
 
     @classmethod
     def from_options(cls, scope: "sentry_sdk.scope.Scope") -> "Optional[Baggage]":
+        """
+        Deprecated: use populate_from_propagation_context
+        """
+        if scope._propagation_context is None:
+            return Baggage({})
+
+        return Baggage.populate_from_propagation_context(scope._propagation_context)
+
+    @classmethod
+    def populate_from_propagation_context(cls, propagation_context: "PropagationContext") -> "Baggage":
         sentry_items: "Dict[str, str]" = {}
         third_party_items = ""
         mutable = False
 
         client = sentry_sdk.get_client()
 
-        if not client.is_active() or scope._propagation_context is None:
+        if not client.is_active():
             return Baggage(sentry_items)
 
         options = client.options
-        propagation_context = scope._propagation_context
 
-        if propagation_context is not None:
-            sentry_items["trace_id"] = propagation_context.trace_id
+        sentry_items["trace_id"] = propagation_context.trace_id
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]

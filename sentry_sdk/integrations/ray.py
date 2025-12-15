@@ -51,6 +51,13 @@ def _patch_ray_remote() -> None:
             return old_remote(f, *args, **kwargs)
 
         def wrapper(user_f: "Callable[..., Any]") -> "Any":
+            if inspect.isclass(user_f):
+                # Ray Actors
+                # (https://docs.ray.io/en/latest/ray-core/actors.html)
+                # are not supported
+                # (Only Ray Tasks are supported)
+                return old_remote(*args, **kwargs)(user_f)
+
             @functools.wraps(user_f)
             def new_func(
                 *f_args: "Any",
