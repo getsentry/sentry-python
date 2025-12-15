@@ -1,18 +1,42 @@
 import sys
+import asyncio
+import inspect
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import TypeVar
+    from typing import Callable
 
     T = TypeVar("T")
+    _F = TypeVar("_F", bound=Callable[..., Any])
 
 
+# Use a conservative cutoff (Python 3.13+) before switching to
+# inspect.iscoroutinefunction. See contributor discussion and
+# references to Starlette/Uvicorn behavior for rationale.
+PY313 = sys.version_info[0] == 3 and sys.version_info[1] >= 13
+
+# Backwards-compatible version flags expected across the codebase
 PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
 PY38 = sys.version_info[0] == 3 and sys.version_info[1] >= 8
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
+
+
+# Public shim symbol so other modules can import a stable API. For Python
+# 3.13+ prefer inspect.iscoroutinefunction, otherwise fall back to
+# asyncio.iscoroutinefunction to preserve historical behavior on older Pythons.
+iscoroutinefunction: Callable[[Any], bool] = cast(
+    Callable[[Any], bool], inspect.iscoroutinefunction if PY313 else asyncio.iscoroutinefunction
+)
+
+
+# We intentionally do not export `markcoroutinefunction` here. The decorator
+# is only used by the Django ASGI integration and historically may be applied
+# to middleware instances (non-callables). Keeping the marker local to the
+# integration reduces import surface and avoids potential circular imports.
 
 
 def with_metaclass(meta, *bases):
