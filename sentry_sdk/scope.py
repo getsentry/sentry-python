@@ -1511,17 +1511,6 @@ class Scope:
         if release is not None:
             attributes["sentry.release"] = release
 
-    def _apply_tracing_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
-    ) -> None:
-        attributes = telemetry["attributes"]
-
-        trace_context = self.get_trace_context()
-        span_id = trace_context.get("span_id")
-
-        if span_id is not None and "sentry.trace_parent_span_id" not in attributes:
-            attributes["sentry.trace.parent_span_id"] = span_id
-
     def _apply_user_attributes_to_telemetry(
         self, telemetry: "Union[Log, Metric]"
     ) -> None:
@@ -1650,8 +1639,15 @@ class Scope:
         # spansV2)
         options = self.get_client().options
 
+        trace_context = self.get_trace_context()
+        trace_id = trace_context.get("span_id")
+        span_id = trace_context.get("span_id")
+        if telemetry.get("trace_id") is None:
+            telemetry["trace_id"] = trace_id
+        if telemetry.get("span_id") is None:
+            telemetry["span_id"] = span_id
+
         self._apply_global_attributes_to_telemetry(telemetry, options)
-        self._apply_tracing_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
 
     def update_from_scope(self, scope: "Scope") -> None:
