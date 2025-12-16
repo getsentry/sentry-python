@@ -304,8 +304,8 @@ def _prepare_handler_data(
     if handler_type == "tool":
         if original_args:
             handler_name = original_args[0]
-        elif original_kwargs.get("tool_name"):
-            handler_name = original_kwargs["tool_name"]
+        elif original_kwargs.get("name"):
+            handler_name = original_kwargs["name"]
 
         arguments = {}
         if len(original_args) > 1:
