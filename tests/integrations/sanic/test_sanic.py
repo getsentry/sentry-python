@@ -341,13 +341,12 @@ class TransactionTestConfig:
 
     def __init__(
         self,
-        integration_args,
-        url,
-        expected_status,
-        expected_transaction_name,
-        expected_source=None,
-    ):
-        # type: (Iterable[Optional[Container[int]]], str, int, Optional[str], Optional[str]) -> None
+        integration_args: "Iterable[Optional[Container[int]]]",
+        url: str,
+        expected_status: int,
+        expected_transaction_name: "Optional[str]",
+        expected_source: "Optional[str]" = None,
+    ) -> None:
         """
         expected_transaction_name of None indicates we expect to not receive a transaction
         """
@@ -404,9 +403,12 @@ class TransactionTestConfig:
         ),
     ],
 )
-def test_transactions(test_config, sentry_init, app, capture_events):
-    # type: (TransactionTestConfig, Any, Any, Any) -> None
-
+def test_transactions(
+    test_config: "TransactionTestConfig",
+    sentry_init: "Any",
+    app: "Any",
+    capture_events: "Any",
+) -> None:
     # Init the SanicIntegration with the desired arguments
     sentry_init(
         integrations=[SanicIntegration(*test_config.integration_args)],

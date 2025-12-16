@@ -618,8 +618,7 @@ def _patch_lowlevel_server() -> None:
     Server.read_resource = patched_read_resource
 
 
-def _patch_fastmcp():
-    # type: () -> None
+def _patch_fastmcp() -> None:
     """
     Patches the standalone fastmcp package's FastMCP class.
 
