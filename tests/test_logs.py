@@ -319,7 +319,9 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)
-    assert logs[0]["attributes"]["sentry.trace.parent_span_id"] == trx.span_id
+
+    assert "span_id" in logs[0]
+    assert logs[0]["span_id"] == trx.span_id
 
 
 @minimum_python_37
@@ -336,7 +338,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)
-    assert logs[0]["attributes"]["sentry.trace.parent_span_id"] == span.span_id
+    assert logs[0]["span_id"] == span.span_id
 
 
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
@@ -491,6 +493,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                     "level": "info",
                     "timestamp": mock.ANY,
                     "trace_id": mock.ANY,
+                    "span_id": mock.ANY,
                     "attributes": {
                         "sentry.environment": {
                             "type": "string",
@@ -515,10 +518,6 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                         "sentry.severity_text": {
                             "type": "string",
                             "value": "info",
-                        },
-                        "sentry.trace.parent_span_id": {
-                            "type": "string",
-                            "value": mock.ANY,
                         },
                         "server.address": {
                             "type": "string",
