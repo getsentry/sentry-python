@@ -144,6 +144,7 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
             "attributes",
             "time_unix_nano",
             "trace_id",
+            "span_id",
         }
 
         if record["severity_text"] in ["fatal", "error"]:
