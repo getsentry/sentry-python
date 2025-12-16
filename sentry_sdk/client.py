@@ -927,14 +927,11 @@ class _Client(BaseClient):
         if trace_id is not None and log.get("trace_id") is None:
             log["trace_id"] = trace_id
 
-        if (
-            span_id is not None
-            and "sentry.trace.parent_span_id" not in log["attributes"]
-        ):
-            log["attributes"]["sentry.trace.parent_span_id"] = span_id
+        if span_id is not None and log.get("span_id") is None:
+            log["span_id"] = span_id
 
         # The user, if present, is always set on the isolation scope.
-        if isolation_scope._user is not None:
+        if self.should_send_default_pii() and isolation_scope._user is not None:
             for log_attribute, user_attribute in (
                 ("user.id", "id"),
                 ("user.name", "username"),
@@ -998,7 +995,7 @@ class _Client(BaseClient):
         if span_id is not None:
             metric["span_id"] = span_id
 
-        if isolation_scope._user is not None:
+        if self.should_send_default_pii() and isolation_scope._user is not None:
             for metric_attribute, user_attribute in (
                 ("user.id", "id"),
                 ("user.name", "username"),

@@ -116,7 +116,7 @@ def test_metrics_with_attributes(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_user(sentry_init, capture_envelopes):
-    sentry_init()
+    sentry_init(send_default_pii=True)
     envelopes = capture_envelopes()
 
     sentry_sdk.set_user(
@@ -132,6 +132,25 @@ def test_metrics_with_user(sentry_init, capture_envelopes):
     assert metrics[0]["attributes"]["user.id"] == "user-123"
     assert metrics[0]["attributes"]["user.email"] == "test@example.com"
     assert metrics[0]["attributes"]["user.name"] == "testuser"
+
+
+def test_metrics_no_user_if_pii_off(sentry_init, capture_envelopes):
+    sentry_init(send_default_pii=False)
+    envelopes = capture_envelopes()
+
+    sentry_sdk.set_user(
+        {"id": "user-123", "email": "test@example.com", "username": "testuser"}
+    )
+    sentry_sdk.metrics.count("test.user.counter", 1)
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    assert len(metrics) == 1
+
+    assert "user.id" not in metrics[0]["attributes"]
+    assert "user.email" not in metrics[0]["attributes"]
+    assert "user.name" not in metrics[0]["attributes"]
 
 
 def test_metrics_with_span(sentry_init, capture_envelopes):

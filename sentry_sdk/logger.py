@@ -66,6 +66,7 @@ def _capture_log(
             "body": body,
             "time_unix_nano": time.time_ns(),
             "trace_id": None,
+            "span_id": None,
         },
     )
 
