@@ -17,22 +17,17 @@ if TYPE_CHECKING:
 _ai_pipeline_name = ContextVar("ai_pipeline_name", default=None)
 
 
-def set_ai_pipeline_name(name):
-    # type: (Optional[str]) -> None
+def set_ai_pipeline_name(name: "Optional[str]") -> None:
     _ai_pipeline_name.set(name)
 
 
-def get_ai_pipeline_name():
-    # type: () -> Optional[str]
+def get_ai_pipeline_name() -> "Optional[str]":
     return _ai_pipeline_name.get()
 
 
-def ai_track(description, **span_kwargs):
-    # type: (str, Any) -> Callable[[F], F]
-    def decorator(f):
-        # type: (F) -> F
-        def sync_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
+    def decorator(f: "F") -> "F":
+        def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
@@ -60,8 +55,7 @@ def ai_track(description, **span_kwargs):
                         _ai_pipeline_name.set(None)
                     return res
 
-        async def async_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+        async def async_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
@@ -98,15 +92,13 @@ def ai_track(description, **span_kwargs):
 
 
 def record_token_usage(
-    span,
-    input_tokens=None,
-    input_tokens_cached=None,
-    output_tokens=None,
-    output_tokens_reasoning=None,
-    total_tokens=None,
-):
-    # type: (Span, Optional[int], Optional[int], Optional[int], Optional[int], Optional[int]) -> None
-
+    span: "Span",
+    input_tokens: "Optional[int]" = None,
+    input_tokens_cached: "Optional[int]" = None,
+    output_tokens: "Optional[int]" = None,
+    output_tokens_reasoning: "Optional[int]" = None,
+    total_tokens: "Optional[int]" = None,
+) -> None:
     # TODO: move pipeline name elsewhere
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:

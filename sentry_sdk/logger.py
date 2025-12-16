@@ -21,15 +21,15 @@ OTEL_RANGES = [
 class _dict_default_key(dict):  # type: ignore[type-arg]
     """dict that returns the key if missing."""
 
-    def __missing__(self, key):
-        # type: (str) -> str
+    def __missing__(self, key: str) -> str:
         return "{" + key + "}"
 
 
-def _capture_log(severity_text, severity_number, template, **kwargs):
-    # type: (str, int, str, **Any) -> None
+def _capture_log(
+    severity_text: str, severity_number: int, template: str, **kwargs: "Any"
+) -> None:
     body = template
-    attrs = {}  # type: dict[str, str | bool | float | int]
+    attrs: "dict[str, str | bool | float | int]" = {}
     if "attributes" in kwargs:
         attrs.update(kwargs.pop("attributes"))
     for k, v in kwargs.items():
@@ -76,8 +76,7 @@ error = functools.partial(_capture_log, "error", 17)
 fatal = functools.partial(_capture_log, "fatal", 21)
 
 
-def _otel_severity_text(otel_severity_number):
-    # type: (int) -> str
+def _otel_severity_text(otel_severity_number: int) -> str:
     for (lower, upper), severity in OTEL_RANGES:
         if lower <= otel_severity_number <= upper:
             return severity
@@ -85,8 +84,7 @@ def _otel_severity_text(otel_severity_number):
     return "default"
 
 
-def _log_level_to_otel(level, mapping):
-    # type: (int, dict[Any, int]) -> tuple[int, str]
+def _log_level_to_otel(level: int, mapping: "dict[Any, int]") -> "tuple[int, str]":
     for py_level, otel_severity_number in sorted(mapping.items(), reverse=True):
         if level >= py_level:
             return otel_severity_number, _otel_severity_text(otel_severity_number)

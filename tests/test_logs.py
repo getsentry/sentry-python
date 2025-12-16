@@ -359,8 +359,8 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
 
 
 def test_log_user_attributes(sentry_init, capture_envelopes):
-    """User attributes are sent if enable_logs is True."""
-    sentry_init(enable_logs=True)
+    """User attributes are sent if enable_logs is True and send_default_pii is True."""
+    sentry_init(enable_logs=True, send_default_pii=True)
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     envelopes = capture_envelopes()
@@ -379,6 +379,26 @@ def test_log_user_attributes(sentry_init, capture_envelopes):
         ("user.email", "test@example.com"),
         ("user.name", "test"),
     }
+
+
+def test_log_no_user_attributes_if_no_pii(sentry_init, capture_envelopes):
+    """User attributes are not if PII sending is off."""
+    sentry_init(enable_logs=True, send_default_pii=False)
+
+    sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("Hello, world!")
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log,) = logs
+
+    assert "user.id" not in log["attributes"]
+    assert "user.email" not in log["attributes"]
+    assert "user.name" not in log["attributes"]
 
 
 @minimum_python_37

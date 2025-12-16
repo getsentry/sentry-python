@@ -17,16 +17,14 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def patch_tasks():
-    # type: () -> None
+def patch_tasks() -> None:
     if Task is None:
         return
 
     old_task_enqueue = Task.enqueue
 
     @wraps(old_task_enqueue)
-    def _sentry_enqueue(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
+    def _sentry_enqueue(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         from sentry_sdk.integrations.django import DjangoIntegration
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)

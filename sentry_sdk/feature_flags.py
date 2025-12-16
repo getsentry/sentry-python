@@ -15,8 +15,7 @@ DEFAULT_FLAG_CAPACITY = 100
 
 
 class FlagBuffer:
-    def __init__(self, capacity):
-        # type: (int) -> None
+    def __init__(self, capacity: int) -> None:
         self.capacity = capacity
         self.lock = Lock()
 
@@ -24,26 +23,22 @@ class FlagBuffer:
         # directly you're on your own!
         self.__buffer = LRUCache(capacity)
 
-    def clear(self):
-        # type: () -> None
+    def clear(self) -> None:
         self.__buffer = LRUCache(self.capacity)
 
-    def __deepcopy__(self, memo):
-        # type: (dict[int, Any]) -> FlagBuffer
+    def __deepcopy__(self, memo: "dict[int, Any]") -> "FlagBuffer":
         with self.lock:
             buffer = FlagBuffer(self.capacity)
             buffer.__buffer = copy.deepcopy(self.__buffer, memo)
             return buffer
 
-    def get(self):
-        # type: () -> list[FlagData]
+    def get(self) -> "list[FlagData]":
         with self.lock:
             return [
                 {"flag": key, "result": value} for key, value in self.__buffer.get_all()
             ]
 
-    def set(self, flag, result):
-        # type: (str, bool) -> None
+    def set(self, flag: str, result: bool) -> None:
         if isinstance(result, FlagBuffer):
             # If someone were to insert `self` into `self` this would create a circular dependency
             # on the lock. This is of course a deadlock. However, this is far outside the expected
@@ -57,8 +52,7 @@ class FlagBuffer:
             self.__buffer.set(flag, result)
 
 
-def add_feature_flag(flag, result):
-    # type: (str, bool) -> None
+def add_feature_flag(flag: str, result: bool) -> None:
     """
     Records a flag and its value to be sent on subsequent error events.
     We recommend you do this on flag evaluations. Flags are buffered per Sentry scope.

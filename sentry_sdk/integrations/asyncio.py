@@ -23,8 +23,7 @@ if TYPE_CHECKING:
     T = TypeVar("T", bound=Callable[..., Any])
 
 
-def get_name(coro):
-    # type: (Any) -> str
+def get_name(coro: "Any") -> str:
     return (
         getattr(coro, "__qualname__", None)
         or getattr(coro, "__name__", None)
@@ -32,8 +31,7 @@ def get_name(coro):
     )
 
 
-def _wrap_coroutine(wrapped):
-    # type: (Coroutine[Any, Any, Any]) -> Callable[[T], T]
+def _wrap_coroutine(wrapped: "Coroutine[Any, Any, Any]") -> "Callable[[T], T]":
     # Only __name__ and __qualname__ are copied from function to coroutine in CPython
     return functools.partial(
         functools.update_wrapper,
@@ -43,19 +41,19 @@ def _wrap_coroutine(wrapped):
     )
 
 
-def patch_asyncio():
-    # type: () -> None
+def patch_asyncio() -> None:
     orig_task_factory = None
     try:
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
 
-        def _sentry_task_factory(loop, coro, **kwargs):
-            # type: (asyncio.AbstractEventLoop, Coroutine[Any, Any, Any], Any) -> asyncio.Future[Any]
-
+        def _sentry_task_factory(
+            loop: "asyncio.AbstractEventLoop",
+            coro: "Coroutine[Any, Any, Any]",
+            **kwargs: "Any",
+        ) -> "asyncio.Future[Any]":
             @_wrap_coroutine(coro)
-            async def _task_with_sentry_span_creation():
-                # type: () -> Any
+            async def _task_with_sentry_span_creation() -> "Any":
                 result = None
 
                 with sentry_sdk.isolation_scope():
@@ -116,8 +114,7 @@ def patch_asyncio():
         )
 
 
-def _capture_exception():
-    # type: () -> ExcInfo
+def _capture_exception() -> "ExcInfo":
     exc_info = sys.exc_info()
 
     client = sentry_sdk.get_client()
@@ -139,6 +136,5 @@ class AsyncioIntegration(Integration):
     origin = f"auto.function.{identifier}"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         patch_asyncio()
