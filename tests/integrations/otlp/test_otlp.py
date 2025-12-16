@@ -25,6 +25,25 @@ original_propagator = get_global_textmap()
 
 
 @pytest.fixture(autouse=True)
+def mock_otlp_ingest():
+    responses.start()
+    responses.add(
+        responses.POST,
+        url="https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/",
+        status=200,
+    )
+
+    yield
+
+    tracer_provider = get_tracer_provider()
+    if isinstance(tracer_provider, TracerProvider):
+        tracer_provider.force_flush()
+
+    responses.stop()
+    responses.reset()
+
+
+@pytest.fixture(autouse=True)
 def reset_otlp(uninstall_integration):
     trace._TRACER_PROVIDER_SET_ONCE = Once()
     trace._TRACER_PROVIDER = None
@@ -127,14 +146,7 @@ def test_does_not_set_propagator_if_disabled(sentry_init):
     assert propagator is original_propagator
 
 
-@responses.activate
 def test_otel_propagation_context(sentry_init):
-    responses.add(
-        responses.POST,
-        url="https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/",
-        status=200,
-    )
-
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
         integrations=[OTLPIntegration()],
@@ -144,9 +156,6 @@ def test_otel_propagation_context(sentry_init):
     with tracer.start_as_current_span("foo") as root_span:
         with tracer.start_as_current_span("bar") as span:
             external_propagation_context = get_external_propagation_context()
-
-    # Force flush to ensure spans are exported while mock is active
-    get_tracer_provider().force_flush()
 
     assert external_propagation_context is not None
     (trace_id, span_id) = external_propagation_context
@@ -222,3 +231,74 @@ def test_propagator_inject_continue_trace(sentry_init):
         assert carrier["baggage"] == incoming_headers["baggage"]
 
     detach(token)
+
+
+def test_capture_exceptions_enabled(sentry_init, capture_events):
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        integrations=[OTLPIntegration(capture_exceptions=True)],
+    )
+
+    events = capture_events()
+
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("test_span") as span:
+        try:
+            raise ValueError("Test exception")
+        except ValueError as e:
+            span.record_exception(e)
+
+    (event,) = events
+    assert event["exception"]["values"][0]["type"] == "ValueError"
+    assert event["exception"]["values"][0]["value"] == "Test exception"
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "otlp"
+    assert event["exception"]["values"][0]["mechanism"]["handled"] is False
+
+    trace_context = event["contexts"]["trace"]
+    assert trace_context["trace_id"] == format_trace_id(
+        span.get_span_context().trace_id
+    )
+    assert trace_context["span_id"] == format_span_id(span.get_span_context().span_id)
+
+
+def test_capture_exceptions_disabled(sentry_init, capture_events):
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        integrations=[OTLPIntegration(capture_exceptions=False)],
+    )
+
+    events = capture_events()
+
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("test_span") as span:
+        try:
+            raise ValueError("Test exception")
+        except ValueError as e:
+            span.record_exception(e)
+
+    assert len(events) == 0
+
+
+def test_capture_exceptions_preserves_otel_behavior(sentry_init, capture_events):
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        integrations=[OTLPIntegration(capture_exceptions=True)],
+    )
+
+    events = capture_events()
+
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("test_span") as span:
+        try:
+            raise ValueError("Test exception")
+        except ValueError as e:
+            span.record_exception(e, attributes={"foo": "bar"})
+
+        # Verify the span recorded the exception (OpenTelemetry behavior)
+        # The span should have events with the exception information
+        (otel_event,) = span._events
+        assert otel_event.name == "exception"
+        assert otel_event.attributes["foo"] == "bar"
+
+    # verify sentry also captured it
+    assert len(events) == 1

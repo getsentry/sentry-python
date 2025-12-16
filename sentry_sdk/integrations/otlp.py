@@ -1,7 +1,12 @@
-from sentry_sdk import get_client
+from sentry_sdk import get_client, capture_event
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.scope import register_external_propagation_context
-from sentry_sdk.utils import logger, Dsn
+from sentry_sdk.utils import (
+    Dsn,
+    logger,
+    event_from_exception,
+    capture_internal_exceptions,
+)
 from sentry_sdk.consts import VERSION, EndpointType
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.tracing import (
@@ -11,7 +16,7 @@ from sentry_sdk.tracing import (
 
 try:
     from opentelemetry.propagate import set_global_textmap
-    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace import TracerProvider, Span
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
@@ -82,6 +87,38 @@ def setup_otlp_traces_exporter(dsn: "Optional[str]" = None) -> None:
     tracer_provider.add_span_processor(span_processor)
 
 
+_sentry_patched_exception = False
+
+
+def setup_capture_exceptions() -> None:
+    """
+    Intercept otel's Span.record_exception to automatically capture those exceptions in Sentry.
+    """
+    global _sentry_patched_exception
+    _original_record_exception = Span.record_exception
+
+    if _sentry_patched_exception:
+        return
+
+    def _sentry_patched_record_exception(
+        self: "Span", exception: "BaseException", *args: "Any", **kwargs: "Any"
+    ) -> None:
+        otlp_integration = get_client().get_integration(OTLPIntegration)
+        if otlp_integration and otlp_integration.capture_exceptions:
+            with capture_internal_exceptions():
+                event, hint = event_from_exception(
+                    exception,
+                    client_options=get_client().options,
+                    mechanism={"type": OTLPIntegration.identifier, "handled": False},
+                )
+                capture_event(event, hint=hint)
+
+        _original_record_exception(self, exception, *args, **kwargs)
+
+    Span.record_exception = _sentry_patched_record_exception  # type: ignore[method-assign]
+    _sentry_patched_exception = True
+
+
 class SentryOTLPPropagator(SentryPropagator):
     """
     We need to override the inject of the older propagator since that
@@ -136,13 +173,28 @@ def _to_traceparent(span_context: "SpanContext") -> str:
 
 
 class OTLPIntegration(Integration):
+    """
+    Automatically setup OTLP ingestion from the DSN.
+
+    :param setup_otlp_traces_exporter: Automatically configure an Exporter to send OTLP traces from the DSN, defaults to True.
+        Set to False if using a custom collector or to setup the TracerProvider manually.
+    :param setup_propagator: Automatically configure the Sentry Propagator for Distributed Tracing, defaults to True.
+        Set to False to configure propagators manually or to disable propagation.
+    :param capture_exceptions: Intercept and capture exceptions on the OpenTelemetry Span in Sentry as well, defaults to False.
+        Set to True to turn on capturing but be aware that since Sentry captures most exceptions, duplicate exceptions might be dropped by DedupeIntegration in many cases.
+    """
+
     identifier = "otlp"
 
     def __init__(
-        self, setup_otlp_traces_exporter: bool = True, setup_propagator: bool = True
+        self,
+        setup_otlp_traces_exporter: bool = True,
+        setup_propagator: bool = True,
+        capture_exceptions: bool = False,
     ) -> None:
         self.setup_otlp_traces_exporter = setup_otlp_traces_exporter
         self.setup_propagator = setup_propagator
+        self.capture_exceptions = capture_exceptions
 
     @staticmethod
     def setup_once() -> None:
@@ -161,3 +213,5 @@ class OTLPIntegration(Integration):
             logger.debug("[OTLP] Setting up propagator for distributed tracing")
             # TODO-neel better propagator support, chain with existing ones if possible instead of replacing
             set_global_textmap(SentryOTLPPropagator())
+
+        setup_capture_exceptions()
