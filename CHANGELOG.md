@@ -3,7 +3,7 @@
 ## 2.48.0
 
 Middleware spans are now disabled by default in Django, Starlette and FastAPI integrations. Set the `middleware_spans` integration-level
-option to enable capturing individual spans per middleware layer. To record Django middleware spans, for example, configure as follows
+option to capture individual spans per middleware layer. To record Django middleware spans, for example, configure as follows
 
 ```python
   import sentry_sdk
@@ -12,7 +12,7 @@ option to enable capturing individual spans per middleware layer. To record Djan
   sentry_sdk.init(
       dsn="<your-dsn>",
       integrations=[
-        DjangoIntegration(middleware_spans=True),
+          DjangoIntegration(middleware_spans=True),
       ],
   )
 ```
