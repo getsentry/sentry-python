@@ -55,7 +55,9 @@ def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
                         "attributes": otel_attributes_to_dict(log_json["attributes"]),
                         "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
                         "trace_id": log_json["trace_id"],
+                        "span_id": log_json["span_id"],
                     }  # type: Log
+
                     res.append(log)
     return res
 
