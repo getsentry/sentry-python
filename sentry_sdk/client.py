@@ -920,7 +920,7 @@ class _Client(BaseClient):
         if before_send_getter is not None:
             before_send = before_send_getter()
             if before_send is not None:
-                telemetry = before_send(telemetry, {})
+                telemetry = before_send(telemetry, {})  # type: ignore[arg-type]
 
         if telemetry is None:
             return
@@ -933,7 +933,7 @@ class _Client(BaseClient):
         }.get(ty)
 
         if batcher:
-            batcher.add(telemetry)
+            batcher.add(telemetry)  # type: ignore[arg-type]
 
     def _capture_log(self, log: "Optional[Log]", scope: "Scope") -> None:
         self._capture_telemetry(log, "log", scope)
