@@ -1196,14 +1196,6 @@ class Scope:
 
         scope = self._merge_scopes(scope, scope_kwargs)
 
-        trace_context = scope.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        span_id = trace_context.get("span_id")
-        if trace_id is not None and log.get("trace_id") is None:
-            log["trace_id"] = trace_id
-        if span_id is not None and log.get("span_id") is None:
-            log["span_id"] = span_id
-
         # If debug is enabled, log the log to the console
         debug = client.options.get("debug", False)
         if debug:
@@ -1227,13 +1219,6 @@ class Scope:
             return
 
         scope = self._merge_scopes(scope, scope_kwargs)
-
-        trace_context = scope.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        span_id = trace_context.get("span_id")
-        metric["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
-        if span_id is not None:
-            metric["span_id"] = span_id
 
         debug = client.options.get("debug", False)
         if debug:
