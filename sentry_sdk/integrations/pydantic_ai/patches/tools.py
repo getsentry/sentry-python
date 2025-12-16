@@ -20,7 +20,7 @@ except ImportError:
 
 try:
     from pydantic_ai._tool_manager import ToolManager  # type: ignore
-    from pydantic_ai.exceptions import ToolRetryError
+    from pydantic_ai.exceptions import ToolRetryError  # type: ignore
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
