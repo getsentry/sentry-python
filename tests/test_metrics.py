@@ -10,14 +10,13 @@ from sentry_sdk.types import Metric
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
-def envelopes_to_metrics(envelopes):
-    # type: (List[Envelope]) -> List[Metric]
+def envelopes_to_metrics(envelopes: "List[Envelope]") -> "List[Metric]":
     res = []  # type: List[Metric]
     for envelope in envelopes:
         for item in envelope.items:
             if item.type == "trace_metric":
                 for metric_json in item.payload.json["items"]:
-                    metric = {
+                    metric: "Metric" = {
                         "timestamp": metric_json["timestamp"],
                         "trace_id": metric_json["trace_id"],
                         "span_id": metric_json.get("span_id"),
@@ -29,7 +28,7 @@ def envelopes_to_metrics(envelopes):
                             k: v["value"]
                             for (k, v) in metric_json["attributes"].items()
                         },
-                    }  # type: Metric
+                    }
                     res.append(metric)
     return res
 

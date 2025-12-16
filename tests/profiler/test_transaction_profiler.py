@@ -664,16 +664,13 @@ def test_max_profile_duration_reached(scheduler_class):
 
 
 class NoopScheduler(Scheduler):
-    def setup(self):
-        # type: () -> None
+    def setup(self) -> None:
         pass
 
-    def teardown(self):
-        # type: () -> None
+    def teardown(self) -> None:
         pass
 
-    def ensure_running(self):
-        # type: () -> None
+    def ensure_running(self) -> None:
         pass
 
 

@@ -472,13 +472,12 @@ def mock_hf_chat_completion_api_streaming_tools(httpx_mock):
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation(
-    sentry_init,
-    capture_events,
-    send_default_pii,
-    include_prompts,
-    mock_hf_text_generation_api,
-):
-    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init: "Any",
+    capture_events: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    mock_hf_text_generation_api: "Any",
+) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -541,13 +540,12 @@ def test_text_generation(
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation_streaming(
-    sentry_init,
-    capture_events,
-    send_default_pii,
-    include_prompts,
-    mock_hf_text_generation_api_streaming,
-):
-    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init: "Any",
+    capture_events: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    mock_hf_text_generation_api_streaming: "Any",
+) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -611,13 +609,12 @@ def test_text_generation_streaming(
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion(
-    sentry_init,
-    capture_events,
-    send_default_pii,
-    include_prompts,
-    mock_hf_chat_completion_api,
-):
-    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init: "Any",
+    capture_events: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    mock_hf_chat_completion_api: "Any",
+) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -683,13 +680,12 @@ def test_chat_completion(
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming(
-    sentry_init,
-    capture_events,
-    send_default_pii,
-    include_prompts,
-    mock_hf_chat_completion_api_streaming,
-):
-    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init: "Any",
+    capture_events: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    mock_hf_chat_completion_api_streaming: "Any",
+) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -755,9 +751,8 @@ def test_chat_completion_streaming(
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 def test_chat_completion_api_error(
-    sentry_init, capture_events, mock_hf_api_with_errors
-):
-    # type: (Any, Any, Any) -> None
+    sentry_init: "Any", capture_events: "Any", mock_hf_api_with_errors: "Any"
+) -> None:
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
@@ -809,8 +804,9 @@ def test_chat_completion_api_error(
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors):
-    # type: (Any, Any, Any) -> None
+def test_span_status_error(
+    sentry_init: "Any", capture_events: "Any", mock_hf_api_with_errors: "Any"
+) -> None:
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
@@ -846,13 +842,12 @@ def test_span_status_error(sentry_init, capture_events, mock_hf_api_with_errors)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_with_tools(
-    sentry_init,
-    capture_events,
-    send_default_pii,
-    include_prompts,
-    mock_hf_chat_completion_api_tools,
-):
-    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init: "Any",
+    capture_events: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    mock_hf_chat_completion_api_tools: "Any",
+) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -935,13 +930,12 @@ def test_chat_completion_with_tools(
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming_with_tools(
-    sentry_init,
-    capture_events,
-    send_default_pii,
-    include_prompts,
-    mock_hf_chat_completion_api_streaming_tools,
-):
-    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init: "Any",
+    capture_events: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    mock_hf_chat_completion_api_streaming_tools: "Any",
+) -> None:
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,

@@ -63,8 +63,7 @@ def make_client(request, capturing_server):
     return inner
 
 
-def mock_transaction_envelope(span_count):
-    # type: (int) -> Envelope
+def mock_transaction_envelope(span_count: int) -> "Envelope":
     event = defaultdict(
         mock.MagicMock,
         type="transaction",
