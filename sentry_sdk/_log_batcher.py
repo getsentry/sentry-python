@@ -134,6 +134,7 @@ class LogBatcher:
         res = {
             "timestamp": int(log["time_unix_nano"]) / 1.0e9,
             "trace_id": log.get("trace_id", "00000000-0000-0000-0000-000000000000"),
+            "span_id": log.get("span_id"),
             "level": str(log["severity_text"]),
             "body": str(log["body"]),
             "attributes": {

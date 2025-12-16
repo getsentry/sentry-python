@@ -404,5 +404,6 @@ class SentryLogsHandler(_BaseHandler):
                 "attributes": attrs,
                 "time_unix_nano": int(record.created * 1e9),
                 "trace_id": None,
+                "span_id": None,
             },
         )

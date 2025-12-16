@@ -237,6 +237,7 @@ if TYPE_CHECKING:
             "attributes": Attributes,
             "time_unix_nano": int,
             "trace_id": Optional[str],
+            "span_id": Optional[str],
         },
     )
 

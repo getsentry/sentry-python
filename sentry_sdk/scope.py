@@ -1199,8 +1199,11 @@ class Scope:
 
         trace_context = scope.get_trace_context()
         trace_id = trace_context.get("trace_id")
+        span_id = trace_context.get("span_id")
         if trace_id is not None and log.get("trace_id") is None:
             log["trace_id"] = trace_id
+        if span_id is not None and log.get("span_id") is None:
+            log["span_id"] = span_id
 
         # If debug is enabled, log the log to the console
         debug = client.options.get("debug", False)
@@ -1519,7 +1522,7 @@ class Scope:
     def _apply_user_attributes_to_telemetry(self, telemetry):
         attributes = telemetry["attributes"]
 
-        if self._user is None:
+        if not should_send_default_pii() or self._user is None:
             return
 
         for attribute_name, user_attribute in (

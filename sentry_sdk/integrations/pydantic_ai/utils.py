@@ -206,12 +206,12 @@ def _set_available_tools(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
         pass
 
 
-def _capture_exception(exc: "Any") -> None:
+def _capture_exception(exc: "Any", handled: bool = False) -> None:
     set_span_errored()
 
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
-        mechanism={"type": "pydantic_ai", "handled": False},
+        mechanism={"type": "pydantic_ai", "handled": handled},
     )
     sentry_sdk.capture_event(event, hint=hint)
