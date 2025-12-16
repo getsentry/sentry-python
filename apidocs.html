@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.47.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.48.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=e1a1ceaf" />
-    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=14737038" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=a318c5d4" />
     <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -256,8 +256,59 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </div><div class="flex flex-col break-words justify-between">
-      <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
-        <article class="yue" role="main">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  
+
+
+<div class="copy-page-wrapper relative pb-4 lg:absolute lg:top-8 lg:right-6 xl:right-12">
+  <div id="copy-page-trigger">
+    <button
+      type="button"
+      class="js-copy px-3 py-1 inline-flex items-center gap-1"
+      data-url="_sources/apidocs.rst.txt"
+    >
+      <i class="i-lucide" data-icon="copy"></i>
+      <span>Copy page</span>
+    </button>
+    <button class="js-menu px-2 py-1" type="button" aria-label="More actions"
+      aria-haspopup="menu" aria-expanded="false" aria-controls="copy-page-content">
+      <i class="i-lucide chevron-down"></i>
+    </button>
+  </div>
+  <div id="copy-page-content" role="menu" aria-orientation="vertical" aria-hidden="true">
+    <div role="presentation">
+      <div class="flex flex-col" role="group">
+        <button class="js-copy" type="button" role="menuitem"
+          data-url="_sources/apidocs.rst.txt">
+          <span class="iconify-icon">
+            <i class="i-lucide" data-icon="copy"></i>
+          </span>
+          <span>Copy page</span>
+        </button>
+        <a role="menuitem" href="_sources/apidocs.rst.txt" target="_blank" rel="nofollow">
+          
+            <iconify-icon icon="bi:code-slash"></iconify-icon>
+            <span>View Source</span>
+          
+        </a>
+        
+        <a role="menuitem" href="https://chatgpt.com/?hints=search&q=Read%20_sources/apidocs.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:openai"></iconify-icon>
+          <span>Open in ChatGPT</span>
+        </a>
+        
+        
+        <a role="menuitem" href="https://claude.ai/new?q=Read%20_sources/apidocs.rst.txt%20so%20I%20can%20ask%20questions%20about%20it." target="_blank" rel="nofollow">
+          <iconify-icon icon="bi:claude"></iconify-icon>
+          <span>Open in Claude</span>
+        </a>
+        
+        
+      </div>
+    </div>
+  </div>
+</div>
+<article class="yue" role="main">
           <section id="api-docs">
 <h1>API Docs<a class="headerlink" href="#api-docs" title="Link to this heading">¶</a></h1>
 <dl class="py class">
@@ -1001,6 +1052,7 @@ If no client is available a <a class="reference internal" href="#sentry_sdk.clie
 <span class="sig-name descname"><span class="pre">get_dynamic_sampling_context</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.get_dynamic_sampling_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.get_dynamic_sampling_context" title="Link to this definition">¶</a></dt>
 <dd><p>Returns the Dynamic Sampling Context from the Propagation Context.
 If not existing, creates a new one.</p>
+<p>Deprecated: Logic moved to PropagationContext, don’t use directly.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]]</span></p>
@@ -1062,7 +1114,8 @@ currently active span or the scopes Propagation Context.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.iter_headers">
 <span class="sig-name descname"><span class="pre">iter_headers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.iter_headers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.iter_headers" title="Link to this definition">¶</a></dt>
-<dd><p>Creates a generator which returns the <cite>sentry-trace</cite> and <cite>baggage</cite> headers from the Propagation Context.</p>
+<dd><p>Creates a generator which returns the <cite>sentry-trace</cite> and <cite>baggage</cite> headers from the Propagation Context.
+Deprecated: use PropagationContext.iter_headers instead.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterator" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterator</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]]</span></p>
@@ -1758,7 +1811,7 @@ All finished spans in the transaction will also be sent to Sentry.</p>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>scope</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>]</span>) – The Scope to use for this transaction.
 If not provided, the current Scope will be used.</p></li>
-<li><p><strong>end_timestamp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span>) – Optional timestamp that should
+<li><p><strong>end_timestamp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span>) – Optional timestamp that should
 be used as timestamp instead of the current time.</p></li>
 <li><p><strong>hub</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Hub" title="sentry_sdk.hub.Hub"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hub</span></code></a>]</span>) – The hub to use for this transaction.
 This argument is DEPRECATED. Please use the <cite>scope</cite>
@@ -1879,7 +1932,7 @@ for this span when provided.</p></li>
 <li><p><strong>status</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span>) – The span’s status. Possible values are listed at
 <a class="reference external" href="https://develop.sentry.dev/sdk/event-payloads/span/">https://develop.sentry.dev/sdk/event-payloads/span/</a></p></li>
 <li><p><strong>containing_transaction</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>]</span>) – The transaction that this span belongs to.</p></li>
-<li><p><strong>start_timestamp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span>) – The timestamp when the span started. If omitted, the current time
+<li><p><strong>start_timestamp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span>) – The timestamp when the span started. If omitted, the current time
 will be used.</p></li>
 <li><p><strong>scope</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>]</span>) – The scope to use for this span. If not provided, we use the current scope.</p></li>
 </ul>
@@ -1945,7 +1998,7 @@ if the span represents a database or HTTP request.</p>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>scope</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>]</span>) – The scope to use for this transaction.
 If not provided, the current scope will be used.</p></li>
-<li><p><strong>end_timestamp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span>) – Optional timestamp that should
+<li><p><strong>end_timestamp</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span>) – Optional timestamp that should
 be used as timestamp instead of the current time.</p></li>
 </ul>
 </dd>
@@ -2207,8 +2260,8 @@ each envelope may have at most one Item with type “event” or “transaction�
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=b017378a"></script>
+      <script src="_static/documentation_options.js?v=0604980e"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="_static/shibuya.js?v=c1cf1a6b"></script></body>
+      <script src="_static/shibuya.js?v=cac61aee"></script></body>
 </html>

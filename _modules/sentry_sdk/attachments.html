@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.attachments - sentry-python 2.47.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.attachments - sentry-python 2.48.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=14737038" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=a318c5d4" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -103,8 +103,9 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </div><div class="flex flex-col break-words justify-between">
-      <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
-        <article class="yue" role="main">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  
+  <article class="yue" role="main">
           <h1>Source code for sentry_sdk.attachments</h1><div class="highlight"><pre>
 <span></span><span data-line="1"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 </span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">mimetypes</span>
@@ -141,51 +142,48 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="31">
 </span><span data-line="32">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span data-line="33">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="34">        <span class="nb">bytes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Union[None, bytes, Callable[[], bytes]]</span>
-</span><span data-line="35">        <span class="n">filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="36">        <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="37">        <span class="n">content_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="38">        <span class="n">add_to_transactions</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="39">    <span class="p">):</span>
-</span><span data-line="40">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span data-line="41">        <span class="k">if</span> <span class="nb">bytes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="42">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;path or raw bytes required for attachment&quot;</span><span class="p">)</span>
-</span><span data-line="43">        <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="44">            <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
-</span><span data-line="45">        <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="46">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;filename is required for attachment&quot;</span><span class="p">)</span>
-</span><span data-line="47">        <span class="k">if</span> <span class="n">content_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="48">            <span class="n">content_type</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">filename</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-</span><span data-line="49">        <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="o">=</span> <span class="nb">bytes</span>
-</span><span data-line="50">        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
-</span><span data-line="51">        <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">path</span>
-</span><span data-line="52">        <span class="bp">self</span><span class="o">.</span><span class="n">content_type</span> <span class="o">=</span> <span class="n">content_type</span>
-</span><span data-line="53">        <span class="bp">self</span><span class="o">.</span><span class="n">add_to_transactions</span> <span class="o">=</span> <span class="n">add_to_transactions</span>
-</span><span data-line="54">
+</span><span data-line="34">        <span class="nb">bytes</span><span class="p">:</span> <span class="s2">&quot;Union[None, bytes, Callable[[], bytes]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="35">        <span class="n">filename</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="36">        <span class="n">path</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="37">        <span class="n">content_type</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="38">        <span class="n">add_to_transactions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span data-line="39">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="40">        <span class="k">if</span> <span class="nb">bytes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="41">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;path or raw bytes required for attachment&quot;</span><span class="p">)</span>
+</span><span data-line="42">        <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="43">            <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</span><span data-line="44">        <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="45">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;filename is required for attachment&quot;</span><span class="p">)</span>
+</span><span data-line="46">        <span class="k">if</span> <span class="n">content_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="47">            <span class="n">content_type</span> <span class="o">=</span> <span class="n">mimetypes</span><span class="o">.</span><span class="n">guess_type</span><span class="p">(</span><span class="n">filename</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+</span><span data-line="48">        <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="o">=</span> <span class="nb">bytes</span>
+</span><span data-line="49">        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
+</span><span data-line="50">        <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">path</span>
+</span><span data-line="51">        <span class="bp">self</span><span class="o">.</span><span class="n">content_type</span> <span class="o">=</span> <span class="n">content_type</span>
+</span><span data-line="52">        <span class="bp">self</span><span class="o">.</span><span class="n">add_to_transactions</span> <span class="o">=</span> <span class="n">add_to_transactions</span>
+</span><span data-line="53">
 <div class="viewcode-block" id="Attachment.to_envelope_item">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.attachments.Attachment.to_envelope_item">[docs]</a>
-</span><span data-line="55">    <span class="k">def</span><span class="w"> </span><span class="nf">to_envelope_item</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span data-line="56">        <span class="c1"># type: () -&gt; Item</span>
-</span><span data-line="57"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns an envelope item for this attachment.&quot;&quot;&quot;</span>
-</span><span data-line="58">        <span class="n">payload</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Union[None, PayloadRef, bytes]</span>
-</span><span data-line="59">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="60">            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bytes</span><span class="p">):</span>
-</span><span data-line="61">                <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span><span class="p">()</span>
-</span><span data-line="62">            <span class="k">else</span><span class="p">:</span>
-</span><span data-line="63">                <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span>
-</span><span data-line="64">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="65">            <span class="n">payload</span> <span class="o">=</span> <span class="n">PayloadRef</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
-</span><span data-line="66">        <span class="k">return</span> <span class="n">Item</span><span class="p">(</span>
-</span><span data-line="67">            <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span>
-</span><span data-line="68">            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;attachment&quot;</span><span class="p">,</span>
-</span><span data-line="69">            <span class="n">content_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">content_type</span><span class="p">,</span>
-</span><span data-line="70">            <span class="n">filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
-</span><span data-line="71">        <span class="p">)</span></div>
+</span><span data-line="54">    <span class="k">def</span><span class="w"> </span><span class="nf">to_envelope_item</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Item&quot;</span><span class="p">:</span>
+</span><span data-line="55"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns an envelope item for this attachment.&quot;&quot;&quot;</span>
+</span><span data-line="56">        <span class="n">payload</span><span class="p">:</span> <span class="s2">&quot;Union[None, PayloadRef, bytes]&quot;</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="57">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="58">            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bytes</span><span class="p">):</span>
+</span><span data-line="59">                <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span><span class="p">()</span>
+</span><span data-line="60">            <span class="k">else</span><span class="p">:</span>
+</span><span data-line="61">                <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span>
+</span><span data-line="62">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="63">            <span class="n">payload</span> <span class="o">=</span> <span class="n">PayloadRef</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+</span><span data-line="64">        <span class="k">return</span> <span class="n">Item</span><span class="p">(</span>
+</span><span data-line="65">            <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span>
+</span><span data-line="66">            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;attachment&quot;</span><span class="p">,</span>
+</span><span data-line="67">            <span class="n">content_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">content_type</span><span class="p">,</span>
+</span><span data-line="68">            <span class="n">filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
+</span><span data-line="69">        <span class="p">)</span></div>
 
-</span><span data-line="72">
-</span><span data-line="73">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span data-line="74">        <span class="c1"># type: () -&gt; str</span>
-</span><span data-line="75">        <span class="k">return</span> <span class="s2">&quot;&lt;Attachment </span><span class="si">%r</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,)</span></div>
+</span><span data-line="70">
+</span><span data-line="71">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="72">        <span class="k">return</span> <span class="s2">&quot;&lt;Attachment </span><span class="si">%r</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,)</span></div>
 
 </span></pre></div>
         </article><button class="back-to-top" type="button">
@@ -217,8 +215,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=b017378a"></script>
+      <script src="../../_static/documentation_options.js?v=0604980e"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=c1cf1a6b"></script></body>
+      <script src="../../_static/shibuya.js?v=cac61aee"></script></body>
 </html>

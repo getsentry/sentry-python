@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.consts - sentry-python 2.47.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.consts - sentry-python 2.48.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=14737038" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=a318c5d4" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -103,8 +103,9 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </div><div class="flex flex-col break-words justify-between">
-      <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
-        <article class="yue" role="main">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  
+  <article class="yue" role="main">
           <h1>Source code for sentry_sdk.consts</h1><div class="highlight"><pre>
 <span></span><span data-line="1"><span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
 </span><span data-line="2"><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
@@ -138,82 +139,82 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="30">
 </span><span data-line="31">
 </span><span data-line="32"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="33">    <span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
-</span><span data-line="34">
-</span><span data-line="35">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
-</span><span data-line="36">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
-</span><span data-line="37">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
-</span><span data-line="38">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
-</span><span data-line="39">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span>
-</span><span data-line="40">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
-</span><span data-line="41">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
-</span><span data-line="42">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequence</span>
-</span><span data-line="43">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
-</span><span data-line="44">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">AbstractSet</span>
-</span><span data-line="45">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
-</span><span data-line="46">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypedDict</span>
+</span><span data-line="33">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="34">        <span class="n">AbstractSet</span><span class="p">,</span>
+</span><span data-line="35">        <span class="n">Any</span><span class="p">,</span>
+</span><span data-line="36">        <span class="n">Callable</span><span class="p">,</span>
+</span><span data-line="37">        <span class="n">Dict</span><span class="p">,</span>
+</span><span data-line="38">        <span class="n">List</span><span class="p">,</span>
+</span><span data-line="39">        <span class="n">Optional</span><span class="p">,</span>
+</span><span data-line="40">        <span class="n">Sequence</span><span class="p">,</span>
+</span><span data-line="41">        <span class="n">Tuple</span><span class="p">,</span>
+</span><span data-line="42">        <span class="n">Type</span><span class="p">,</span>
+</span><span data-line="43">        <span class="n">Union</span><span class="p">,</span>
+</span><span data-line="44">    <span class="p">)</span>
+</span><span data-line="45">
+</span><span data-line="46">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">TypedDict</span>
 </span><span data-line="47">
-</span><span data-line="48">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span data-line="49">        <span class="n">BreadcrumbProcessor</span><span class="p">,</span>
-</span><span data-line="50">        <span class="n">ContinuousProfilerMode</span><span class="p">,</span>
-</span><span data-line="51">        <span class="n">Event</span><span class="p">,</span>
-</span><span data-line="52">        <span class="n">EventProcessor</span><span class="p">,</span>
-</span><span data-line="53">        <span class="n">Hint</span><span class="p">,</span>
-</span><span data-line="54">        <span class="n">Log</span><span class="p">,</span>
-</span><span data-line="55">        <span class="n">MeasurementUnit</span><span class="p">,</span>
-</span><span data-line="56">        <span class="n">Metric</span><span class="p">,</span>
-</span><span data-line="57">        <span class="n">ProfilerMode</span><span class="p">,</span>
-</span><span data-line="58">        <span class="n">TracesSampler</span><span class="p">,</span>
-</span><span data-line="59">        <span class="n">TransactionProcessor</span><span class="p">,</span>
-</span><span data-line="60">    <span class="p">)</span>
-</span><span data-line="61">
-</span><span data-line="62">    <span class="c1"># Experiments are feature flags to enable and disable certain unstable SDK</span>
-</span><span data-line="63">    <span class="c1"># functionality. Changing them from the defaults (`None`) in production</span>
-</span><span data-line="64">    <span class="c1"># code is highly discouraged. They are not subject to any stability</span>
-</span><span data-line="65">    <span class="c1"># guarantees such as the ones from semantic versioning.</span>
-</span><span data-line="66">    <span class="n">Experiments</span> <span class="o">=</span> <span class="n">TypedDict</span><span class="p">(</span>
-</span><span data-line="67">        <span class="s2">&quot;Experiments&quot;</span><span class="p">,</span>
-</span><span data-line="68">        <span class="p">{</span>
-</span><span data-line="69">            <span class="s2">&quot;max_spans&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-</span><span data-line="70">            <span class="s2">&quot;max_flags&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-</span><span data-line="71">            <span class="s2">&quot;record_sql_params&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="72">            <span class="s2">&quot;continuous_profiling_auto_start&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="73">            <span class="s2">&quot;continuous_profiling_mode&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ContinuousProfilerMode</span><span class="p">],</span>
-</span><span data-line="74">            <span class="s2">&quot;otel_powered_performance&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="75">            <span class="s2">&quot;transport_zlib_compression_level&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-</span><span data-line="76">            <span class="s2">&quot;transport_compression_level&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-</span><span data-line="77">            <span class="s2">&quot;transport_compression_algo&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CompressionAlgo</span><span class="p">],</span>
-</span><span data-line="78">            <span class="s2">&quot;transport_num_pools&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-</span><span data-line="79">            <span class="s2">&quot;transport_http2&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="80">            <span class="s2">&quot;enable_logs&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="81">            <span class="s2">&quot;before_send_log&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Log</span><span class="p">,</span> <span class="n">Hint</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Log</span><span class="p">]]],</span>
-</span><span data-line="82">            <span class="s2">&quot;enable_metrics&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="83">            <span class="s2">&quot;before_send_metric&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Metric</span><span class="p">,</span> <span class="n">Hint</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Metric</span><span class="p">]]],</span>
-</span><span data-line="84">        <span class="p">},</span>
-</span><span data-line="85">        <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span data-line="86">    <span class="p">)</span>
-</span><span data-line="87">
-</span><span data-line="88"><span class="n">DEFAULT_QUEUE_SIZE</span> <span class="o">=</span> <span class="mi">100</span>
-</span><span data-line="89"><span class="n">DEFAULT_MAX_BREADCRUMBS</span> <span class="o">=</span> <span class="mi">100</span>
-</span><span data-line="90"><span class="n">MATCH_ALL</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;.*&quot;</span>
-</span><span data-line="91">
-</span><span data-line="92"><span class="n">FALSE_VALUES</span> <span class="o">=</span> <span class="p">[</span>
-</span><span data-line="93">    <span class="s2">&quot;false&quot;</span><span class="p">,</span>
-</span><span data-line="94">    <span class="s2">&quot;no&quot;</span><span class="p">,</span>
-</span><span data-line="95">    <span class="s2">&quot;off&quot;</span><span class="p">,</span>
-</span><span data-line="96">    <span class="s2">&quot;n&quot;</span><span class="p">,</span>
-</span><span data-line="97">    <span class="s2">&quot;0&quot;</span><span class="p">,</span>
-</span><span data-line="98"><span class="p">]</span>
-</span><span data-line="99">
+</span><span data-line="48">    <span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
+</span><span data-line="49">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="50">        <span class="n">BreadcrumbProcessor</span><span class="p">,</span>
+</span><span data-line="51">        <span class="n">ContinuousProfilerMode</span><span class="p">,</span>
+</span><span data-line="52">        <span class="n">Event</span><span class="p">,</span>
+</span><span data-line="53">        <span class="n">EventProcessor</span><span class="p">,</span>
+</span><span data-line="54">        <span class="n">Hint</span><span class="p">,</span>
+</span><span data-line="55">        <span class="n">Log</span><span class="p">,</span>
+</span><span data-line="56">        <span class="n">MeasurementUnit</span><span class="p">,</span>
+</span><span data-line="57">        <span class="n">Metric</span><span class="p">,</span>
+</span><span data-line="58">        <span class="n">ProfilerMode</span><span class="p">,</span>
+</span><span data-line="59">        <span class="n">TracesSampler</span><span class="p">,</span>
+</span><span data-line="60">        <span class="n">TransactionProcessor</span><span class="p">,</span>
+</span><span data-line="61">    <span class="p">)</span>
+</span><span data-line="62">
+</span><span data-line="63">    <span class="c1"># Experiments are feature flags to enable and disable certain unstable SDK</span>
+</span><span data-line="64">    <span class="c1"># functionality. Changing them from the defaults (`None`) in production</span>
+</span><span data-line="65">    <span class="c1"># code is highly discouraged. They are not subject to any stability</span>
+</span><span data-line="66">    <span class="c1"># guarantees such as the ones from semantic versioning.</span>
+</span><span data-line="67">    <span class="n">Experiments</span> <span class="o">=</span> <span class="n">TypedDict</span><span class="p">(</span>
+</span><span data-line="68">        <span class="s2">&quot;Experiments&quot;</span><span class="p">,</span>
+</span><span data-line="69">        <span class="p">{</span>
+</span><span data-line="70">            <span class="s2">&quot;max_spans&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+</span><span data-line="71">            <span class="s2">&quot;max_flags&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+</span><span data-line="72">            <span class="s2">&quot;record_sql_params&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="73">            <span class="s2">&quot;continuous_profiling_auto_start&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="74">            <span class="s2">&quot;continuous_profiling_mode&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ContinuousProfilerMode</span><span class="p">],</span>
+</span><span data-line="75">            <span class="s2">&quot;otel_powered_performance&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="76">            <span class="s2">&quot;transport_zlib_compression_level&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+</span><span data-line="77">            <span class="s2">&quot;transport_compression_level&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+</span><span data-line="78">            <span class="s2">&quot;transport_compression_algo&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CompressionAlgo</span><span class="p">],</span>
+</span><span data-line="79">            <span class="s2">&quot;transport_num_pools&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+</span><span data-line="80">            <span class="s2">&quot;transport_http2&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="81">            <span class="s2">&quot;enable_logs&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="82">            <span class="s2">&quot;before_send_log&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Log</span><span class="p">,</span> <span class="n">Hint</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Log</span><span class="p">]]],</span>
+</span><span data-line="83">            <span class="s2">&quot;enable_metrics&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="84">            <span class="s2">&quot;before_send_metric&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Metric</span><span class="p">,</span> <span class="n">Hint</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Metric</span><span class="p">]]],</span>
+</span><span data-line="85">        <span class="p">},</span>
+</span><span data-line="86">        <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span data-line="87">    <span class="p">)</span>
+</span><span data-line="88">
+</span><span data-line="89"><span class="n">DEFAULT_QUEUE_SIZE</span> <span class="o">=</span> <span class="mi">100</span>
+</span><span data-line="90"><span class="n">DEFAULT_MAX_BREADCRUMBS</span> <span class="o">=</span> <span class="mi">100</span>
+</span><span data-line="91"><span class="n">MATCH_ALL</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;.*&quot;</span>
+</span><span data-line="92">
+</span><span data-line="93"><span class="n">FALSE_VALUES</span> <span class="o">=</span> <span class="p">[</span>
+</span><span data-line="94">    <span class="s2">&quot;false&quot;</span><span class="p">,</span>
+</span><span data-line="95">    <span class="s2">&quot;no&quot;</span><span class="p">,</span>
+</span><span data-line="96">    <span class="s2">&quot;off&quot;</span><span class="p">,</span>
+</span><span data-line="97">    <span class="s2">&quot;n&quot;</span><span class="p">,</span>
+</span><span data-line="98">    <span class="s2">&quot;0&quot;</span><span class="p">,</span>
+</span><span data-line="99"><span class="p">]</span>
 </span><span data-line="100">
-</span><span data-line="101"><span class="k">class</span><span class="w"> </span><span class="nc">SPANTEMPLATE</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
-</span><span data-line="102">    <span class="n">DEFAULT</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
-</span><span data-line="103">    <span class="n">AI_AGENT</span> <span class="o">=</span> <span class="s2">&quot;ai_agent&quot;</span>
-</span><span data-line="104">    <span class="n">AI_TOOL</span> <span class="o">=</span> <span class="s2">&quot;ai_tool&quot;</span>
-</span><span data-line="105">    <span class="n">AI_CHAT</span> <span class="o">=</span> <span class="s2">&quot;ai_chat&quot;</span>
-</span><span data-line="106">
-</span><span data-line="107">    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span data-line="108">        <span class="c1"># type: () -&gt; str</span>
+</span><span data-line="101">
+</span><span data-line="102"><span class="k">class</span><span class="w"> </span><span class="nc">SPANTEMPLATE</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+</span><span data-line="103">    <span class="n">DEFAULT</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
+</span><span data-line="104">    <span class="n">AI_AGENT</span> <span class="o">=</span> <span class="s2">&quot;ai_agent&quot;</span>
+</span><span data-line="105">    <span class="n">AI_TOOL</span> <span class="o">=</span> <span class="s2">&quot;ai_tool&quot;</span>
+</span><span data-line="106">    <span class="n">AI_CHAT</span> <span class="o">=</span> <span class="s2">&quot;ai_chat&quot;</span>
+</span><span data-line="107">
+</span><span data-line="108">    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 </span><span data-line="109">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span>
 </span><span data-line="110">
 </span><span data-line="111">
@@ -1044,101 +1045,101 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="936">    <span class="n">QUEUE_SUBMIT_RAY</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.ray&quot;</span>
 </span><span data-line="937">    <span class="n">QUEUE_TASK_RAY</span> <span class="o">=</span> <span class="s2">&quot;queue.task.ray&quot;</span>
 </span><span data-line="938">    <span class="n">QUEUE_TASK_DRAMATIQ</span> <span class="o">=</span> <span class="s2">&quot;queue.task.dramatiq&quot;</span>
-</span><span data-line="939">    <span class="n">SUBPROCESS</span> <span class="o">=</span> <span class="s2">&quot;subprocess&quot;</span>
-</span><span data-line="940">    <span class="n">SUBPROCESS_WAIT</span> <span class="o">=</span> <span class="s2">&quot;subprocess.wait&quot;</span>
-</span><span data-line="941">    <span class="n">SUBPROCESS_COMMUNICATE</span> <span class="o">=</span> <span class="s2">&quot;subprocess.communicate&quot;</span>
-</span><span data-line="942">    <span class="n">TEMPLATE_RENDER</span> <span class="o">=</span> <span class="s2">&quot;template.render&quot;</span>
-</span><span data-line="943">    <span class="n">VIEW_RENDER</span> <span class="o">=</span> <span class="s2">&quot;view.render&quot;</span>
-</span><span data-line="944">    <span class="n">VIEW_RESPONSE_RENDER</span> <span class="o">=</span> <span class="s2">&quot;view.response.render&quot;</span>
-</span><span data-line="945">    <span class="n">WEBSOCKET_SERVER</span> <span class="o">=</span> <span class="s2">&quot;websocket.server&quot;</span>
-</span><span data-line="946">    <span class="n">SOCKET_CONNECTION</span> <span class="o">=</span> <span class="s2">&quot;socket.connection&quot;</span>
-</span><span data-line="947">    <span class="n">SOCKET_DNS</span> <span class="o">=</span> <span class="s2">&quot;socket.dns&quot;</span>
-</span><span data-line="948">    <span class="n">MCP_SERVER</span> <span class="o">=</span> <span class="s2">&quot;mcp.server&quot;</span>
-</span><span data-line="949">
+</span><span data-line="939">    <span class="n">QUEUE_SUBMIT_DJANGO</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.django&quot;</span>
+</span><span data-line="940">    <span class="n">SUBPROCESS</span> <span class="o">=</span> <span class="s2">&quot;subprocess&quot;</span>
+</span><span data-line="941">    <span class="n">SUBPROCESS_WAIT</span> <span class="o">=</span> <span class="s2">&quot;subprocess.wait&quot;</span>
+</span><span data-line="942">    <span class="n">SUBPROCESS_COMMUNICATE</span> <span class="o">=</span> <span class="s2">&quot;subprocess.communicate&quot;</span>
+</span><span data-line="943">    <span class="n">TEMPLATE_RENDER</span> <span class="o">=</span> <span class="s2">&quot;template.render&quot;</span>
+</span><span data-line="944">    <span class="n">VIEW_RENDER</span> <span class="o">=</span> <span class="s2">&quot;view.render&quot;</span>
+</span><span data-line="945">    <span class="n">VIEW_RESPONSE_RENDER</span> <span class="o">=</span> <span class="s2">&quot;view.response.render&quot;</span>
+</span><span data-line="946">    <span class="n">WEBSOCKET_SERVER</span> <span class="o">=</span> <span class="s2">&quot;websocket.server&quot;</span>
+</span><span data-line="947">    <span class="n">SOCKET_CONNECTION</span> <span class="o">=</span> <span class="s2">&quot;socket.connection&quot;</span>
+</span><span data-line="948">    <span class="n">SOCKET_DNS</span> <span class="o">=</span> <span class="s2">&quot;socket.dns&quot;</span>
+</span><span data-line="949">    <span class="n">MCP_SERVER</span> <span class="o">=</span> <span class="s2">&quot;mcp.server&quot;</span>
 </span><span data-line="950">
-</span><span data-line="951"><span class="c1"># This type exists to trick mypy and PyCharm into thinking `init` and `Client`</span>
-</span><span data-line="952"><span class="c1"># take these arguments (even though they take opaque **kwargs)</span>
+</span><span data-line="951">
+</span><span data-line="952"><span class="c1"># This type exists to trick mypy and PyCharm into thinking `init` and `Client`</span>
+</span><span data-line="953"><span class="c1"># take these arguments (even though they take opaque **kwargs)</span>
 <div class="viewcode-block" id="ClientConstructor">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.client.ClientConstructor">[docs]</a>
-</span><span data-line="953"><span class="k">class</span><span class="w"> </span><span class="nc">ClientConstructor</span><span class="p">:</span>
+</span><span data-line="954"><span class="k">class</span><span class="w"> </span><span class="nc">ClientConstructor</span><span class="p">:</span>
 <div class="viewcode-block" id="ClientConstructor.__init__">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.client.ClientConstructor.__init__">[docs]</a>
-</span><span data-line="954">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span data-line="955">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="956">        <span class="n">dsn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="957">        <span class="o">*</span><span class="p">,</span>
-</span><span data-line="958">        <span class="n">max_breadcrumbs</span><span class="o">=</span><span class="n">DEFAULT_MAX_BREADCRUMBS</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="959">        <span class="n">release</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="960">        <span class="n">environment</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="961">        <span class="n">server_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="962">        <span class="n">shutdown_timeout</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># type: float</span>
-</span><span data-line="963">        <span class="n">integrations</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006</span>
-</span><span data-line="964">        <span class="n">in_app_include</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: List[str]  # noqa: B006</span>
-</span><span data-line="965">        <span class="n">in_app_exclude</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: List[str]  # noqa: B006</span>
-</span><span data-line="966">        <span class="n">default_integrations</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="967">        <span class="n">dist</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="968">        <span class="n">transport</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]</span>
-</span><span data-line="969">        <span class="n">transport_queue_size</span><span class="o">=</span><span class="n">DEFAULT_QUEUE_SIZE</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="970">        <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>  <span class="c1"># type: float</span>
-</span><span data-line="971">        <span class="n">send_default_pii</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="972">        <span class="n">http_proxy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="973">        <span class="n">https_proxy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="974">        <span class="n">ignore_errors</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[Union[type, str]]  # noqa: B006</span>
-</span><span data-line="975">        <span class="n">max_request_body_size</span><span class="o">=</span><span class="s2">&quot;medium&quot;</span><span class="p">,</span>  <span class="c1"># type: str</span>
-</span><span data-line="976">        <span class="n">socket_options</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[List[Tuple[int, int, int | bytes]]]</span>
-</span><span data-line="977">        <span class="n">keep_alive</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="978">        <span class="n">before_send</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[EventProcessor]</span>
-</span><span data-line="979">        <span class="n">before_breadcrumb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[BreadcrumbProcessor]</span>
-</span><span data-line="980">        <span class="n">debug</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="981">        <span class="n">attach_stacktrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="982">        <span class="n">ca_certs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="983">        <span class="n">propagate_traces</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="984">        <span class="n">traces_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span data-line="985">        <span class="n">traces_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TracesSampler]</span>
-</span><span data-line="986">        <span class="n">profiles_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span data-line="987">        <span class="n">profiles_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TracesSampler]</span>
-</span><span data-line="988">        <span class="n">profiler_mode</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[ProfilerMode]</span>
-</span><span data-line="989">        <span class="n">profile_lifecycle</span><span class="o">=</span><span class="s2">&quot;manual&quot;</span><span class="p">,</span>  <span class="c1"># type: Literal[&quot;manual&quot;, &quot;trace&quot;]</span>
-</span><span data-line="990">        <span class="n">profile_session_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span data-line="991">        <span class="n">auto_enabling_integrations</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="992">        <span class="n">disabled_integrations</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Sequence[sentry_sdk.integrations.Integration]]</span>
-</span><span data-line="993">        <span class="n">auto_session_tracking</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="994">        <span class="n">send_client_reports</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="995">        <span class="n">_experiments</span><span class="o">=</span><span class="p">{},</span>  <span class="c1"># type: Experiments  # noqa: B006</span>
-</span><span data-line="996">        <span class="n">proxy_headers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
-</span><span data-line="997">        <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="998">        <span class="n">before_send_transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TransactionProcessor]</span>
-</span><span data-line="999">        <span class="n">project_root</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="1000">        <span class="n">enable_tracing</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="1001">        <span class="n">include_local_variables</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="1002">        <span class="n">include_source_context</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="1003">        <span class="n">trace_propagation_targets</span><span class="o">=</span><span class="p">[</span>  <span class="c1"># noqa: B006</span>
-</span><span data-line="1004">            <span class="n">MATCH_ALL</span>
-</span><span data-line="1005">        <span class="p">],</span>  <span class="c1"># type: Optional[Sequence[str]]</span>
-</span><span data-line="1006">        <span class="n">functions_to_trace</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[Dict[str, str]]  # noqa: B006</span>
-</span><span data-line="1007">        <span class="n">event_scrubber</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[sentry_sdk.scrubber.EventScrubber]</span>
-</span><span data-line="1008">        <span class="n">max_value_length</span><span class="o">=</span><span class="n">DEFAULT_MAX_VALUE_LENGTH</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="1009">        <span class="n">enable_backpressure_handling</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="1010">        <span class="n">error_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Event, Hint], Union[float, bool]]]</span>
-</span><span data-line="1011">        <span class="n">enable_db_query_source</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="1012">        <span class="n">db_query_source_threshold_ms</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="1013">        <span class="n">enable_http_request_source</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="1014">        <span class="n">http_request_source_threshold_ms</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="1015">        <span class="n">spotlight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[bool, str]]</span>
-</span><span data-line="1016">        <span class="n">cert_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="1017">        <span class="n">key_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="1018">        <span class="n">custom_repr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[..., Optional[str]]]</span>
-</span><span data-line="1019">        <span class="n">add_full_stack</span><span class="o">=</span><span class="n">DEFAULT_ADD_FULL_STACK</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="1020">        <span class="n">max_stack_frames</span><span class="o">=</span><span class="n">DEFAULT_MAX_STACK_FRAMES</span><span class="p">,</span>  <span class="c1"># type: Optional[int]</span>
-</span><span data-line="1021">        <span class="n">enable_logs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="1022">        <span class="n">before_send_log</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Log, Hint], Optional[Log]]]</span>
-</span><span data-line="1023">        <span class="n">trace_ignore_status_codes</span><span class="o">=</span><span class="nb">frozenset</span><span class="p">(),</span>  <span class="c1"># type: AbstractSet[int]</span>
-</span><span data-line="1024">        <span class="n">enable_metrics</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="1025">        <span class="n">before_send_metric</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Metric, Hint], Optional[Metric]]]</span>
-</span><span data-line="1026">        <span class="n">org_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="1027">        <span class="n">strict_trace_continuation</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="1028">    <span class="p">):</span>
-</span><span data-line="1029">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span data-line="955">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="956">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="957">        <span class="n">dsn</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="958">        <span class="o">*</span><span class="p">,</span>
+</span><span data-line="959">        <span class="n">max_breadcrumbs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_BREADCRUMBS</span><span class="p">,</span>
+</span><span data-line="960">        <span class="n">release</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="961">        <span class="n">environment</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="962">        <span class="n">server_name</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="963">        <span class="n">shutdown_timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+</span><span data-line="964">        <span class="n">integrations</span><span class="p">:</span> <span class="s2">&quot;Sequence[sentry_sdk.integrations.Integration]&quot;</span> <span class="o">=</span> <span class="p">[],</span>  <span class="c1"># noqa: B006</span>
+</span><span data-line="965">        <span class="n">in_app_include</span><span class="p">:</span> <span class="s2">&quot;List[str]&quot;</span> <span class="o">=</span> <span class="p">[],</span>  <span class="c1"># noqa: B006</span>
+</span><span data-line="966">        <span class="n">in_app_exclude</span><span class="p">:</span> <span class="s2">&quot;List[str]&quot;</span> <span class="o">=</span> <span class="p">[],</span>  <span class="c1"># noqa: B006</span>
+</span><span data-line="967">        <span class="n">default_integrations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="968">        <span class="n">dist</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="969">        <span class="n">transport</span><span class="p">:</span> <span class="s2">&quot;Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="970">        <span class="n">transport_queue_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_QUEUE_SIZE</span><span class="p">,</span>
+</span><span data-line="971">        <span class="n">sample_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+</span><span data-line="972">        <span class="n">send_default_pii</span><span class="p">:</span> <span class="s2">&quot;Optional[bool]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="973">        <span class="n">http_proxy</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="974">        <span class="n">https_proxy</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="975">        <span class="n">ignore_errors</span><span class="p">:</span> <span class="s2">&quot;Sequence[Union[type, str]]&quot;</span> <span class="o">=</span> <span class="p">[],</span>  <span class="c1"># noqa: B006</span>
+</span><span data-line="976">        <span class="n">max_request_body_size</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;medium&quot;</span><span class="p">,</span>
+</span><span data-line="977">        <span class="n">socket_options</span><span class="p">:</span> <span class="s2">&quot;Optional[List[Tuple[int, int, int | bytes]]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="978">        <span class="n">keep_alive</span><span class="p">:</span> <span class="s2">&quot;Optional[bool]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="979">        <span class="n">before_send</span><span class="p">:</span> <span class="s2">&quot;Optional[EventProcessor]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="980">        <span class="n">before_breadcrumb</span><span class="p">:</span> <span class="s2">&quot;Optional[BreadcrumbProcessor]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="981">        <span class="n">debug</span><span class="p">:</span> <span class="s2">&quot;Optional[bool]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="982">        <span class="n">attach_stacktrace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span data-line="983">        <span class="n">ca_certs</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="984">        <span class="n">propagate_traces</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="985">        <span class="n">traces_sample_rate</span><span class="p">:</span> <span class="s2">&quot;Optional[float]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="986">        <span class="n">traces_sampler</span><span class="p">:</span> <span class="s2">&quot;Optional[TracesSampler]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="987">        <span class="n">profiles_sample_rate</span><span class="p">:</span> <span class="s2">&quot;Optional[float]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="988">        <span class="n">profiles_sampler</span><span class="p">:</span> <span class="s2">&quot;Optional[TracesSampler]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="989">        <span class="n">profiler_mode</span><span class="p">:</span> <span class="s2">&quot;Optional[ProfilerMode]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="990">        <span class="n">profile_lifecycle</span><span class="p">:</span> <span class="s1">&#39;Literal[&quot;manual&quot;, &quot;trace&quot;]&#39;</span> <span class="o">=</span> <span class="s2">&quot;manual&quot;</span><span class="p">,</span>
+</span><span data-line="991">        <span class="n">profile_session_sample_rate</span><span class="p">:</span> <span class="s2">&quot;Optional[float]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="992">        <span class="n">auto_enabling_integrations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="993">        <span class="n">disabled_integrations</span><span class="p">:</span> <span class="s2">&quot;Optional[Sequence[sentry_sdk.integrations.Integration]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="994">        <span class="n">auto_session_tracking</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="995">        <span class="n">send_client_reports</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="996">        <span class="n">_experiments</span><span class="p">:</span> <span class="s2">&quot;Experiments&quot;</span> <span class="o">=</span> <span class="p">{},</span>  <span class="c1"># noqa: B006</span>
+</span><span data-line="997">        <span class="n">proxy_headers</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, str]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="998">        <span class="n">instrumenter</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span>
+</span><span data-line="999">        <span class="n">before_send_transaction</span><span class="p">:</span> <span class="s2">&quot;Optional[TransactionProcessor]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1000">        <span class="n">project_root</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1001">        <span class="n">enable_tracing</span><span class="p">:</span> <span class="s2">&quot;Optional[bool]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1002">        <span class="n">include_local_variables</span><span class="p">:</span> <span class="s2">&quot;Optional[bool]&quot;</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="1003">        <span class="n">include_source_context</span><span class="p">:</span> <span class="s2">&quot;Optional[bool]&quot;</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="1004">        <span class="n">trace_propagation_targets</span><span class="p">:</span> <span class="s2">&quot;Optional[Sequence[str]]&quot;</span> <span class="o">=</span> <span class="p">[</span>  <span class="c1"># noqa: B006</span>
+</span><span data-line="1005">            <span class="n">MATCH_ALL</span>
+</span><span data-line="1006">        <span class="p">],</span>
+</span><span data-line="1007">        <span class="n">functions_to_trace</span><span class="p">:</span> <span class="s2">&quot;Sequence[Dict[str, str]]&quot;</span> <span class="o">=</span> <span class="p">[],</span>  <span class="c1"># noqa: B006</span>
+</span><span data-line="1008">        <span class="n">event_scrubber</span><span class="p">:</span> <span class="s2">&quot;Optional[sentry_sdk.scrubber.EventScrubber]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1009">        <span class="n">max_value_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_VALUE_LENGTH</span><span class="p">,</span>
+</span><span data-line="1010">        <span class="n">enable_backpressure_handling</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="1011">        <span class="n">error_sampler</span><span class="p">:</span> <span class="s2">&quot;Optional[Callable[[Event, Hint], Union[float, bool]]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1012">        <span class="n">enable_db_query_source</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="1013">        <span class="n">db_query_source_threshold_ms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+</span><span data-line="1014">        <span class="n">enable_http_request_source</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="1015">        <span class="n">http_request_source_threshold_ms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+</span><span data-line="1016">        <span class="n">spotlight</span><span class="p">:</span> <span class="s2">&quot;Optional[Union[bool, str]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1017">        <span class="n">cert_file</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1018">        <span class="n">key_file</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1019">        <span class="n">custom_repr</span><span class="p">:</span> <span class="s2">&quot;Optional[Callable[..., Optional[str]]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1020">        <span class="n">add_full_stack</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEFAULT_ADD_FULL_STACK</span><span class="p">,</span>
+</span><span data-line="1021">        <span class="n">max_stack_frames</span><span class="p">:</span> <span class="s2">&quot;Optional[int]&quot;</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_STACK_FRAMES</span><span class="p">,</span>
+</span><span data-line="1022">        <span class="n">enable_logs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span data-line="1023">        <span class="n">before_send_log</span><span class="p">:</span> <span class="s2">&quot;Optional[Callable[[Log, Hint], Optional[Log]]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1024">        <span class="n">trace_ignore_status_codes</span><span class="p">:</span> <span class="s2">&quot;AbstractSet[int]&quot;</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(),</span>
+</span><span data-line="1025">        <span class="n">enable_metrics</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span data-line="1026">        <span class="n">before_send_metric</span><span class="p">:</span> <span class="s2">&quot;Optional[Callable[[Metric, Hint], Optional[Metric]]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1027">        <span class="n">org_id</span><span class="p">:</span> <span class="s2">&quot;Optional[str]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1028">        <span class="n">strict_trace_continuation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span data-line="1029">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="1030"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.</span>
 </span><span data-line="1031">
 </span><span data-line="1032"><span class="sd">        :param dsn: The DSN tells the SDK where to send the events.</span>
@@ -1560,27 +1561,26 @@ data-aria-dark="Switch to auto color mode">
 
 </span><span data-line="1447">
 </span><span data-line="1448">
-</span><span data-line="1449"><span class="k">def</span><span class="w"> </span><span class="nf">_get_default_options</span><span class="p">():</span>
-</span><span data-line="1450">    <span class="c1"># type: () -&gt; dict[str, Any]</span>
-</span><span data-line="1451">    <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
-</span><span data-line="1452">
-</span><span data-line="1453">    <span class="n">a</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getfullargspec</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="o">.</span><span class="fm">__init__</span><span class="p">)</span>
-</span><span data-line="1454">    <span class="n">defaults</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">defaults</span> <span class="ow">or</span> <span class="p">()</span>
-</span><span data-line="1455">    <span class="n">kwonlydefaults</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">kwonlydefaults</span> <span class="ow">or</span> <span class="p">{}</span>
-</span><span data-line="1456">
-</span><span data-line="1457">    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
-</span><span data-line="1458">        <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span>
-</span><span data-line="1459">            <span class="nb">zip</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">defaults</span><span class="p">)</span> <span class="p">:],</span> <span class="n">defaults</span><span class="p">),</span>
-</span><span data-line="1460">            <span class="n">kwonlydefaults</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
-</span><span data-line="1461">        <span class="p">)</span>
-</span><span data-line="1462">    <span class="p">)</span>
+</span><span data-line="1449"><span class="k">def</span><span class="w"> </span><span class="nf">_get_default_options</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;dict[str, Any]&quot;</span><span class="p">:</span>
+</span><span data-line="1450">    <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+</span><span data-line="1451">
+</span><span data-line="1452">    <span class="n">a</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getfullargspec</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="o">.</span><span class="fm">__init__</span><span class="p">)</span>
+</span><span data-line="1453">    <span class="n">defaults</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">defaults</span> <span class="ow">or</span> <span class="p">()</span>
+</span><span data-line="1454">    <span class="n">kwonlydefaults</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">kwonlydefaults</span> <span class="ow">or</span> <span class="p">{}</span>
+</span><span data-line="1455">
+</span><span data-line="1456">    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+</span><span data-line="1457">        <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span>
+</span><span data-line="1458">            <span class="nb">zip</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">defaults</span><span class="p">)</span> <span class="p">:],</span> <span class="n">defaults</span><span class="p">),</span>
+</span><span data-line="1459">            <span class="n">kwonlydefaults</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
+</span><span data-line="1460">        <span class="p">)</span>
+</span><span data-line="1461">    <span class="p">)</span>
+</span><span data-line="1462">
 </span><span data-line="1463">
-</span><span data-line="1464">
-</span><span data-line="1465"><span class="n">DEFAULT_OPTIONS</span> <span class="o">=</span> <span class="n">_get_default_options</span><span class="p">()</span>
-</span><span data-line="1466"><span class="k">del</span> <span class="n">_get_default_options</span>
+</span><span data-line="1464"><span class="n">DEFAULT_OPTIONS</span> <span class="o">=</span> <span class="n">_get_default_options</span><span class="p">()</span>
+</span><span data-line="1465"><span class="k">del</span> <span class="n">_get_default_options</span>
+</span><span data-line="1466">
 </span><span data-line="1467">
-</span><span data-line="1468">
-</span><span data-line="1469"><span class="n">VERSION</span> <span class="o">=</span> <span class="s2">&quot;2.47.0&quot;</span>
+</span><span data-line="1468"><span class="n">VERSION</span> <span class="o">=</span> <span class="s2">&quot;2.48.0&quot;</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -1611,8 +1611,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=b017378a"></script>
+      <script src="../../_static/documentation_options.js?v=0604980e"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=c1cf1a6b"></script></body>
+      <script src="../../_static/shibuya.js?v=cac61aee"></script></body>
 </html>
