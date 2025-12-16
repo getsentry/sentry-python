@@ -2,6 +2,21 @@
 
 ## 2.48.0
 
+Middleware spans are now disabled by default in Django, Starlette and FastAPI integrations. Set the `middleware_spans` integration-level
+option to enable capturing individual spans per middleware layer. To record Django middleware spans, for example, configure as follows
+
+```python
+  import sentry_sdk
+  from sentry_sdk.integrations.django import DjangoIntegration
+
+  sentry_sdk.init(
+      dsn="<your-dsn>",
+      integrations=[
+        DjangoIntegration(middleware_spans=True),
+      ],
+  )
+```
+
 ### New Features ✨
 
 - feat(ai): add single message truncation by @shellmayr in [#5079](https://github.com/getsentry/sentry-python/pull/5079)
@@ -24,10 +39,9 @@
 
 ### Bug Fixes 🐛
 
-- fix(django): Set active thread ID when middleware spans are disabled by @alexander-alderman-webb in [#5220](https://github.com/getsentry/sentry-python/pull/5220)
-
 #### Integrations
 
+- fix(django): Set active thread ID when middleware spans are disabled by @alexander-alderman-webb in [#5220](https://github.com/getsentry/sentry-python/pull/5220)
 - fix(integrations): openai-agents fixing the input messages structure which was wrapped too much in some cases by @constantinius in [#5203](https://github.com/getsentry/sentry-python/pull/5203)
 - fix(integrations): openai-agents fix multi-patching of `get_model` function by @constantinius in [#5195](https://github.com/getsentry/sentry-python/pull/5195)
 - fix(integrations): add values for pydantic-ai and openai-agents to `_INTEGRATION_DEACTIVATES` to prohibit double span creation by @constantinius in [#5196](https://github.com/getsentry/sentry-python/pull/5196)
@@ -56,9 +70,6 @@
 - ref: Cleanup outgoing propagation_context logic by @sl0thentr0py in [#5215](https://github.com/getsentry/sentry-python/pull/5215)
 - ci: Pin Python version to at least 3.10 for LiteLLM by @alexander-alderman-webb in [#5202](https://github.com/getsentry/sentry-python/pull/5202)
 - test: Remove skipped test by @sentrivana in [#5197](https://github.com/getsentry/sentry-python/pull/5197)
-
-### Other
-
 - Convert all remaining type annotations into the modern format by @zsol in [#5239](https://github.com/getsentry/sentry-python/pull/5239)
 - Convert sentry_sdk type annotations into the modern format by @zsol in [#5206](https://github.com/getsentry/sentry-python/pull/5206)
 
