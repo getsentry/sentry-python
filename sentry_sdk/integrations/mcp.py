@@ -24,6 +24,11 @@ try:
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
+try:
+    from fastmcp import FastMCP  # type: ignore[import-not-found]
+except ImportError:
+    FastMCP = None
+
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -49,6 +54,9 @@ class MCPIntegration(Integration):
         Patches MCP server classes to instrument handler execution.
         """
         _patch_lowlevel_server()
+
+        if FastMCP is not None:
+            _patch_fastmcp()
 
 
 def _get_request_context_data() -> "tuple[Optional[str], Optional[str], str]":
@@ -280,7 +288,9 @@ def _set_span_output_data(
 
 
 def _prepare_handler_data(
-    handler_type: str, original_args: "tuple[Any, ...]"
+    handler_type: str,
+    original_args: "tuple[Any, ...]",
+    original_kwargs: "Optional[dict[str, Any]]" = None,
 ) -> "tuple[str, dict[str, Any], str, str, str, Optional[str]]":
     """
     Prepare common handler data for both async and sync wrappers.
@@ -288,18 +298,43 @@ def _prepare_handler_data(
     Returns:
         Tuple of (handler_name, arguments, span_data_key, span_name, mcp_method_name, result_data_key)
     """
+    original_kwargs = original_kwargs or {}
+
     # Extract handler-specific data based on handler type
     if handler_type == "tool":
-        handler_name = original_args[0]  # tool_name
-        arguments = original_args[1] if len(original_args) > 1 else {}
+        if original_args:
+            handler_name = original_args[0]
+        elif original_kwargs.get("name"):
+            handler_name = original_kwargs["name"]
+
+        arguments = {}
+        if len(original_args) > 1:
+            arguments = original_args[1]
+        elif original_kwargs.get("arguments"):
+            arguments = original_kwargs["arguments"]
+
     elif handler_type == "prompt":
-        handler_name = original_args[0]  # name
-        arguments = original_args[1] if len(original_args) > 1 else {}
+        if original_args:
+            handler_name = original_args[0]
+        elif original_kwargs.get("name"):
+            handler_name = original_kwargs["name"]
+
+        arguments = {}
+        if len(original_args) > 1:
+            arguments = original_args[1]
+        elif original_kwargs.get("arguments"):
+            arguments = original_kwargs["arguments"]
+
         # Include name in arguments dict for span data
         arguments = {"name": handler_name, **(arguments or {})}
+
     else:  # resource
-        uri = original_args[0]
-        handler_name = str(uri) if uri else "unknown"
+        handler_name = "unknown"
+        if original_args:
+            handler_name = str(original_args[0])
+        elif original_kwargs.get("uri"):
+            handler_name = str(original_kwargs["uri"])
+
         arguments = {}
 
     # Get span configuration
@@ -318,7 +353,11 @@ def _prepare_handler_data(
 
 
 async def _async_handler_wrapper(
-    handler_type: str, func: "Callable[..., Any]", original_args: "tuple[Any, ...]"
+    handler_type: str,
+    func: "Callable[..., Any]",
+    original_args: "tuple[Any, ...]",
+    original_kwargs: "Optional[dict[str, Any]]" = None,
+    self: "Optional[Any]" = None,
 ) -> "Any":
     """
     Async wrapper for MCP handlers.
@@ -327,7 +366,12 @@ async def _async_handler_wrapper(
         handler_type: "tool", "prompt", or "resource"
         func: The async handler function to wrap
         original_args: Original arguments passed to the handler
+        original_kwargs: Original keyword arguments passed to the handler
+        self: Optional instance for bound methods
     """
+    if original_kwargs is None:
+        original_kwargs = {}
+
     (
         handler_name,
         arguments,
@@ -335,7 +379,7 @@ async def _async_handler_wrapper(
         span_name,
         mcp_method_name,
         result_data_key,
-    ) = _prepare_handler_data(handler_type, original_args)
+    ) = _prepare_handler_data(handler_type, original_args, original_kwargs)
 
     # Start span and execute
     with get_start_span_function()(
@@ -360,7 +404,11 @@ async def _async_handler_wrapper(
 
         # For resources, extract and set protocol
         if handler_type == "resource":
-            uri = original_args[0]
+            if original_args:
+                uri = original_args[0]
+            else:
+                uri = original_kwargs.get("uri")
+
             protocol = None
             if hasattr(uri, "scheme"):
                 protocol = uri.scheme
@@ -371,7 +419,9 @@ async def _async_handler_wrapper(
 
         try:
             # Execute the async handler
-            result = await func(*original_args)
+            if self is not None:
+                original_args = (self, *original_args)
+            result = await func(*original_args, **original_kwargs)
         except Exception as e:
             # Set error flag for tools
             if handler_type == "tool":
@@ -566,3 +616,48 @@ def _patch_lowlevel_server() -> None:
         )(func)
 
     Server.read_resource = patched_read_resource
+
+
+def _patch_fastmcp():
+    # type: () -> None
+    """
+    Patches the standalone fastmcp package's FastMCP class.
+
+    The standalone fastmcp package (v2.14.0+) registers its own handlers for
+    prompts and resources directly, bypassing the Server decorators we patch.
+    This function patches the _get_prompt_mcp and _read_resource_mcp methods
+    to add instrumentation for those handlers.
+    """
+    if hasattr(FastMCP, "_get_prompt_mcp"):
+        original_get_prompt_mcp = FastMCP._get_prompt_mcp
+
+        @wraps(original_get_prompt_mcp)
+        async def patched_get_prompt_mcp(
+            self: "Any", *args: "Any", **kwargs: "Any"
+        ) -> "Any":
+            return await _async_handler_wrapper(
+                "prompt",
+                original_get_prompt_mcp,
+                args,
+                kwargs,
+                self,
+            )
+
+        FastMCP._get_prompt_mcp = patched_get_prompt_mcp
+
+    if hasattr(FastMCP, "_read_resource_mcp"):
+        original_read_resource_mcp = FastMCP._read_resource_mcp
+
+        @wraps(original_read_resource_mcp)
+        async def patched_read_resource_mcp(
+            self: "Any", *args: "Any", **kwargs: "Any"
+        ) -> "Any":
+            return await _async_handler_wrapper(
+                "resource",
+                original_read_resource_mcp,
+                args,
+                kwargs,
+                self,
+            )
+
+        FastMCP._read_resource_mcp = patched_read_resource_mcp
