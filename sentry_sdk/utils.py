@@ -2055,4 +2055,21 @@ def format_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
         return {"value": val, "type": "double"}
     if isinstance(val, str):
         return {"value": val, "type": "string"}
+
+    if isinstance(val, list):
+        if not val:
+            return {"value": val, "type": str}
+
+        # Only lists of elements of a single type are supported
+        list_types = {
+            str: "string[]",
+            int: "integer[]",
+            float: "double[]",
+            bool: "boolean[]",
+        }
+
+        ty = type(val[0])
+        if ty in list_types and all(isinstance(v, ty) for v in val):
+            return {"value": val, "type": list_types[ty]}
+
     return {"value": safe_repr(val), "type": "string"}
