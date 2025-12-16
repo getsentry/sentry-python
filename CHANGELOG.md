@@ -1,5 +1,65 @@
 # Changelog
 
+## 2.48.0
+
+### New Features ✨
+
+- feat(ai): add single message truncation by @shellmayr in [#5079](https://github.com/getsentry/sentry-python/pull/5079)
+
+- feat(django): Add span around `Task.enqueue` by @sentrivana in [#5209](https://github.com/getsentry/sentry-python/pull/5209)
+
+#### Langgraph
+
+- feat(langgraph): Response model attribute on invocation spans by @alexander-alderman-webb in [#5212](https://github.com/getsentry/sentry-python/pull/5212)
+- feat(langgraph): Usage attributes on invocation spans by @alexander-alderman-webb in [#5211](https://github.com/getsentry/sentry-python/pull/5211)
+
+- feat(otlp): Optionally capture exceptions from otel's Span.record_exception api by @sl0thentr0py in [#5235](https://github.com/getsentry/sentry-python/pull/5235)
+
+- feat(starlette): Set transaction name when middleware spans are disabled by @alexander-alderman-webb in [#5223](https://github.com/getsentry/sentry-python/pull/5223)
+
+- feat: Implement new Propagator.inject for OTLPIntegration by @sl0thentr0py in [#5221](https://github.com/getsentry/sentry-python/pull/5221)
+- feat: Add "K_REVISION" to environment variable release check (exposed by cloud run) by @rpradal in [#5222](https://github.com/getsentry/sentry-python/pull/5222)
+
+### Bug Fixes 🐛
+
+- fix(django): Set active thread ID when middleware spans are disabled by @alexander-alderman-webb in [#5220](https://github.com/getsentry/sentry-python/pull/5220)
+
+#### Integrations
+
+- fix(integrations): openai-agents fixing the input messages structure which was wrapped too much in some cases by @constantinius in [#5203](https://github.com/getsentry/sentry-python/pull/5203)
+- fix(integrations): openai-agents fix multi-patching of `get_model` function by @constantinius in [#5195](https://github.com/getsentry/sentry-python/pull/5195)
+- fix(integrations): add values for pydantic-ai and openai-agents to `_INTEGRATION_DEACTIVATES` to prohibit double span creation by @constantinius in [#5196](https://github.com/getsentry/sentry-python/pull/5196)
+
+- fix(logs): Set `span_id` instead of `sentry.trace.parent_span_id` attribute by @sentrivana in [#5241](https://github.com/getsentry/sentry-python/pull/5241)
+
+- fix(logs, metrics): Gate metrics, logs user attributes behind `send_default_pii` by @sentrivana in [#5240](https://github.com/getsentry/sentry-python/pull/5240)
+
+- fix(pydantic-ai): Stop capturing internal exceptions by @alexander-alderman-webb in [#5237](https://github.com/getsentry/sentry-python/pull/5237)
+
+- fix(ray): Actor class decorator with arguments by @alexander-alderman-webb in [#5230](https://github.com/getsentry/sentry-python/pull/5230)
+
+- fix: Don't log internal exception for tornado user auth by @sl0thentr0py in [#5208](https://github.com/getsentry/sentry-python/pull/5208)
+- fix: Fix changelog config by @sentrivana in [#5192](https://github.com/getsentry/sentry-python/pull/5192)
+
+### Internal Changes 🔧
+
+- chore(django): Disable middleware spans by default by @alexander-alderman-webb in [#5219](https://github.com/getsentry/sentry-python/pull/5219)
+
+- chore(starlette): Disable middleware spans by default by @alexander-alderman-webb in [#5224](https://github.com/getsentry/sentry-python/pull/5224)
+
+- ci: Unpin Python version for LiteLLM tests by @alexander-alderman-webb in [#5238](https://github.com/getsentry/sentry-python/pull/5238)
+- ci: 🤖 Update test matrix with new releases (12/15) by @github-actions in [#5229](https://github.com/getsentry/sentry-python/pull/5229)
+- chore: Ignore type annotation migration in blame by @alexander-alderman-webb in [#5234](https://github.com/getsentry/sentry-python/pull/5234)
+- ref: Clean up get_active_propagation_context by @sl0thentr0py in [#5217](https://github.com/getsentry/sentry-python/pull/5217)
+- ref: Cleanup outgoing propagation_context logic by @sl0thentr0py in [#5215](https://github.com/getsentry/sentry-python/pull/5215)
+- ci: Pin Python version to at least 3.10 for LiteLLM by @alexander-alderman-webb in [#5202](https://github.com/getsentry/sentry-python/pull/5202)
+- test: Remove skipped test by @sentrivana in [#5197](https://github.com/getsentry/sentry-python/pull/5197)
+
+### Other
+
+- Convert all remaining type annotations into the modern format by @zsol in [#5239](https://github.com/getsentry/sentry-python/pull/5239)
+- Convert sentry_sdk type annotations into the modern format by @zsol in [#5206](https://github.com/getsentry/sentry-python/pull/5206)
+
 ## 2.47.0
 
 ### Bug Fixes 🐛
