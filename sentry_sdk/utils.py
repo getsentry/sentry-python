@@ -59,7 +59,15 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    from sentry_sdk._types import Event, ExcInfo, Hint, Log, Metric
+    from sentry_sdk._types import (
+        AttributeValue,
+        SerializedAttributeValue,
+        Event,
+        ExcInfo,
+        Hint,
+        Log,
+        Metric,
+    )
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -2036,3 +2044,15 @@ def get_before_send_metric(
     return options.get("before_send_metric") or options["_experiments"].get(
         "before_send_metric"
     )
+
+
+def format_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
+    if isinstance(val, bool):
+        return {"value": val, "type": "boolean"}
+    if isinstance(val, int):
+        return {"value": val, "type": "integer"}
+    if isinstance(val, float):
+        return {"value": val, "type": "double"}
+    if isinstance(val, str):
+        return {"value": val, "type": "string"}
+    return {"value": safe_repr(val), "type": "string"}

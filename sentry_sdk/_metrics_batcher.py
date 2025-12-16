@@ -4,7 +4,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Optional, List, Callable, TYPE_CHECKING, Any, Union
 
-from sentry_sdk.utils import format_timestamp, safe_repr
+from sentry_sdk.utils import format_attribute, format_timestamp, safe_repr
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
@@ -96,17 +96,6 @@ class MetricsBatcher:
 
     @staticmethod
     def _metric_to_transport_format(metric: "Metric") -> "Any":
-        def format_attribute(val: "Union[int, float, str, bool]") -> "Any":
-            if isinstance(val, bool):
-                return {"value": val, "type": "boolean"}
-            if isinstance(val, int):
-                return {"value": val, "type": "integer"}
-            if isinstance(val, float):
-                return {"value": val, "type": "double"}
-            if isinstance(val, str):
-                return {"value": val, "type": "string"}
-            return {"value": safe_repr(val), "type": "string"}
-
         res = {
             "timestamp": metric["timestamp"],
             "trace_id": metric["trace_id"],
