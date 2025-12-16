@@ -927,7 +927,7 @@ class _Client(BaseClient):
         if trace_id is not None and log.get("trace_id") is None:
             log["trace_id"] = trace_id
 
-        if span_id is not None and not log.get("span_id"):
+        if span_id is not None and log.get("span_id") is None:
             log["span_id"] = span_id
 
         # The user, if present, is always set on the isolation scope.

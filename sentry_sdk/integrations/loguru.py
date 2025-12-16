@@ -204,5 +204,6 @@ def loguru_sentry_logs_handler(message: "Message") -> None:
             "attributes": attrs,
             "time_unix_nano": int(record["time"].timestamp() * 1e9),
             "trace_id": None,
+            "span_id": None,
         }
     )

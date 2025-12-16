@@ -224,6 +224,7 @@ if TYPE_CHECKING:
             "attributes": dict[str, str | bool | float | int],
             "time_unix_nano": int,
             "trace_id": Optional[str],
+            "span_id": Optional[str],
         },
     )
 

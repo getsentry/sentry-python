@@ -418,10 +418,10 @@ def test_logger_with_all_attributes(
 
     logs = envelopes_to_logs(envelopes)
 
-    attributes = logs[0]["attributes"]
-
     assert "span_id" in logs[0]
     assert isinstance(logs[0]["span_id"], str)
+
+    attributes = logs[0]["attributes"]
 
     assert "process.pid" in attributes
     assert isinstance(attributes["process.pid"], int)
