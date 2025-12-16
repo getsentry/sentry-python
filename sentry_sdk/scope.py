@@ -84,7 +84,6 @@ if TYPE_CHECKING:
         LogLevelStr,
         Metric,
         SamplingContext,
-        Telemetry,
         Type,
     )
 
@@ -1487,7 +1486,9 @@ class Scope:
                 {"values": flags}
             )
 
-    def _apply_global_attributes_to_telemetry(self, telemetry, options):
+    def _apply_global_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]", options: "dict[str, Any]"
+    ) -> None:
         # TODO: Global stuff like this should just be retrieved at init time and
         # put onto the global scope's attributes and then applied to events
         # from there
@@ -1510,7 +1511,9 @@ class Scope:
         if release is not None:
             attributes["sentry.release"] = release
 
-    def _apply_tracing_attributes_to_telemetry(self, telemetry):
+    def _apply_tracing_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]"
+    ) -> None:
         attributes = telemetry["attributes"]
 
         trace_context = self.get_trace_context()
@@ -1519,7 +1522,9 @@ class Scope:
         if span_id is not None and "sentry.trace_parent_span_id" not in attributes:
             attributes["sentry.trace.parent_span_id"] = span_id
 
-    def _apply_user_attributes_to_telemetry(self, telemetry):
+    def _apply_user_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]"
+    ) -> None:
         attributes = telemetry["attributes"]
 
         if not should_send_default_pii() or self._user is None:
@@ -1640,7 +1645,7 @@ class Scope:
         return event
 
     @_disable_capture
-    def apply_to_telemetry(self, telemetry: "Telemetry") -> None:
+    def apply_to_telemetry(self, telemetry: "Union[Log, Metric]") -> None:
         # Attributes-based events and telemetry go through here (logs, metrics,
         # spansV2)
         options = self.get_client().options

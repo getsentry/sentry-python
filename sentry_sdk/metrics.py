@@ -18,7 +18,7 @@ def _capture_metric(
     metric_type: "MetricType",
     value: float,
     unit: "Optional[str]" = None,
-    attributes: "Attributes" = None,
+    attributes: "Optional[Attributes]" = None,
 ) -> None:
     attrs: "Attributes" = {}
 

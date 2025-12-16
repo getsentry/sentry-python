@@ -68,7 +68,6 @@ if TYPE_CHECKING:
         SDKInfo,
         Log,
         Metric,
-        Telemetry,
         EventDataCategory,
     )
     from sentry_sdk.integrations import Integration
@@ -225,10 +224,10 @@ class BaseClient:
     def capture_event(self, *args: "Any", **kwargs: "Any") -> "Optional[str]":
         return None
 
-    def _capture_log(self, log: "Log") -> None:
+    def _capture_log(self, log: "Log", scope: "Scope") -> None:
         pass
 
-    def _capture_metric(self, metric: "Metric") -> None:
+    def _capture_metric(self, metric: "Metric", scope: "Scope") -> None:
         pass
 
     def capture_session(self, *args: "Any", **kwargs: "Any") -> None:
@@ -907,9 +906,12 @@ class _Client(BaseClient):
         return return_value
 
     def _capture_telemetry(
-        self, telemetry: "Telemetry", ty: str, scope: "Scope"
+        self, telemetry: "Optional[Union[Log, Metric]]", ty: str, scope: "Scope"
     ) -> None:
         # Capture attributes-based telemetry (logs, metrics, spansV2)
+        if telemetry is None:
+            return
+
         before_send_getter = {
             "log": lambda: get_before_send_log(self.options),
             "metric": lambda: get_before_send_metric(self.options),
@@ -925,7 +927,7 @@ class _Client(BaseClient):
 
         scope.apply_to_telemetry(telemetry)
 
-        batcher: "Optional[LogBatcher, MetricsBatcher]" = {
+        batcher: "Optional[Union[LogBatcher, MetricsBatcher]]" = {
             "log": self.log_batcher,
             "metric": self.metrics_batcher,
         }.get(ty)
