@@ -221,6 +221,7 @@ if TYPE_CHECKING:
     Attributes = dict[str, AttributeValue]
 
     SerializedAttributeValue = TypedDict(
+        # https://develop.sentry.dev/sdk/telemetry/attributes/#supported-types
         "SerializedAttributeValue",
         {
             "type": Literal[
