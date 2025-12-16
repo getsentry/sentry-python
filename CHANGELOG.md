@@ -8,17 +8,19 @@
 
 - feat(django): Add span around `Task.enqueue` by @sentrivana in [#5209](https://github.com/getsentry/sentry-python/pull/5209)
 
+- feat(starlette): Set transaction name when middleware spans are disabled by @alexander-alderman-webb in [#5223](https://github.com/getsentry/sentry-python/pull/5223)
+
+- feat: Add "K_REVISION" to environment variable release check (exposed by cloud run) by @rpradal in [#5222](https://github.com/getsentry/sentry-python/pull/5222)
+
 #### Langgraph
 
 - feat(langgraph): Response model attribute on invocation spans by @alexander-alderman-webb in [#5212](https://github.com/getsentry/sentry-python/pull/5212)
 - feat(langgraph): Usage attributes on invocation spans by @alexander-alderman-webb in [#5211](https://github.com/getsentry/sentry-python/pull/5211)
 
+#### OTLP
+
 - feat(otlp): Optionally capture exceptions from otel's Span.record_exception api by @sl0thentr0py in [#5235](https://github.com/getsentry/sentry-python/pull/5235)
-
-- feat(starlette): Set transaction name when middleware spans are disabled by @alexander-alderman-webb in [#5223](https://github.com/getsentry/sentry-python/pull/5223)
-
-- feat: Implement new Propagator.inject for OTLPIntegration by @sl0thentr0py in [#5221](https://github.com/getsentry/sentry-python/pull/5221)
-- feat: Add "K_REVISION" to environment variable release check (exposed by cloud run) by @rpradal in [#5222](https://github.com/getsentry/sentry-python/pull/5222)
+- feat(otlp): Implement new Propagator.inject for OTLPIntegration by @sl0thentr0py in [#5221](https://github.com/getsentry/sentry-python/pull/5221)
 
 ### Bug Fixes 🐛
 
