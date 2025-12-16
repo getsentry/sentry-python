@@ -55,7 +55,9 @@ def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
                         "attributes": otel_attributes_to_dict(log_json["attributes"]),
                         "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
                         "trace_id": log_json["trace_id"],
+                        "span_id": log_json["span_id"],
                     }  # type: Log
+
                     res.append(log)
     return res
 
@@ -142,6 +144,7 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
             "attributes",
             "time_unix_nano",
             "trace_id",
+            "span_id",
         }
 
         if record["severity_text"] in ["fatal", "error"]:
@@ -319,7 +322,9 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)
-    assert logs[0]["attributes"]["sentry.trace.parent_span_id"] == trx.span_id
+
+    assert "span_id" in logs[0]
+    assert logs[0]["span_id"] == trx.span_id
 
 
 @minimum_python_37
@@ -336,7 +341,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)
-    assert logs[0]["attributes"]["sentry.trace.parent_span_id"] == span.span_id
+    assert logs[0]["span_id"] == span.span_id
 
 
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
@@ -511,6 +516,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                     "level": "info",
                     "timestamp": mock.ANY,
                     "trace_id": mock.ANY,
+                    "span_id": mock.ANY,
                     "attributes": {
                         "sentry.environment": {
                             "type": "string",
@@ -535,10 +541,6 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                         "sentry.severity_text": {
                             "type": "string",
                             "value": "info",
-                        },
-                        "sentry.trace.parent_span_id": {
-                            "type": "string",
-                            "value": mock.ANY,
                         },
                         "server.address": {
                             "type": "string",
