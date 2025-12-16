@@ -45,6 +45,7 @@ if TYPE_CHECKING:
         Dict,
         Iterator,
         List,
+        Literal,
         NoReturn,
         Optional,
         ParamSpec,
@@ -2058,10 +2059,10 @@ def format_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
 
     if isinstance(val, list):
         if not val:
-            return {"value": val, "type": str}
+            return {"value": val, "type": "string[]"}
 
         # Only lists of elements of a single type are supported
-        list_types = {
+        list_types: 'dict[type, Literal["string[]", "integer[]", "double[]", "boolean[]"]]' = {
             str: "string[]",
             int: "integer[]",
             float: "double[]",
@@ -2072,4 +2073,5 @@ def format_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
         if ty in list_types and all(isinstance(v, ty) for v in val):
             return {"value": val, "type": list_types[ty]}
 
+    # Coerce to string if we don't know what to do with the value
     return {"value": safe_repr(val), "type": "string"}

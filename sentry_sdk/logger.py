@@ -1,10 +1,14 @@
 # NOTE: this is the logger sentry exposes to users, not some generic logger.
 import functools
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.utils import safe_repr, capture_internal_exceptions
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import Attributes, Log
+
 
 OTEL_RANGES = [
     # ((severity level range), severity text)
@@ -29,7 +33,8 @@ def _capture_log(
     severity_text: str, severity_number: int, template: str, **kwargs: "Any"
 ) -> None:
     body = template
-    attrs: "dict[str, str | bool | float | int]" = {}
+
+    attrs: "Attributes" = {}
     if "attributes" in kwargs:
         attrs.update(kwargs.pop("attributes"))
     for k, v in kwargs.items():
@@ -41,21 +46,6 @@ def _capture_log(
         with capture_internal_exceptions():
             body = template.format_map(_dict_default_key(kwargs))
 
-    attrs = {
-        k: (
-            v
-            if (
-                isinstance(v, str)
-                or isinstance(v, int)
-                or isinstance(v, bool)
-                or isinstance(v, float)
-            )
-            else safe_repr(v)
-        )
-        for (k, v) in attrs.items()
-    }
-
-    # noinspection PyProtectedMember
     sentry_sdk.get_current_scope()._capture_log(
         {
             "severity_text": severity_text,
@@ -65,7 +55,7 @@ def _capture_log(
             "time_unix_nano": time.time_ns(),
             "trace_id": None,
             "span_id": None,
-        },
+        }
     )
 
 
