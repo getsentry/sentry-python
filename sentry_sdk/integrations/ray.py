@@ -36,7 +36,7 @@ def _check_sentry_initialized() -> None:
     )
 
 
-def _insert_sentry_tracing_in_signature(func):
+def _insert_sentry_tracing_in_signature(func: "Callable[..., Any]") -> None:
     # Patching new_func signature to add the _sentry_tracing parameter to it
     # Ray later inspects the signature and finds the unexpected parameter otherwise
     signature = inspect.signature(func)
