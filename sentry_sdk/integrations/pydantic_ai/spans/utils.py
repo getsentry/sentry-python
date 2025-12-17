@@ -6,7 +6,7 @@ from sentry_sdk.consts import SPANDATA
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import Union, Dict, Any, List
     from pydantic_ai.usage import RequestUsage, RunUsage  # type: ignore
 
 

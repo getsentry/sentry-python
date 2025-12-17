@@ -1,5 +1,10 @@
+import base64
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import (
+    normalize_message_roles,
+    set_data_normalized,
+    truncate_and_annotate_messages,
+)
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import safe_serialize
 
@@ -29,6 +34,7 @@ try:
         UserPromptPart,
         TextPart,
         ThinkingPart,
+        BinaryContent,
     )
 except ImportError:
     # Fallback if these classes are not available
@@ -38,6 +44,7 @@ except ImportError:
     UserPromptPart = None
     TextPart = None
     ThinkingPart = None
+    BinaryContent = None
 
 
 def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
@@ -107,6 +114,16 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                             for item in part.content:
                                 if isinstance(item, str):
                                     content.append({"type": "text", "text": item})
+                                elif BinaryContent and isinstance(item, BinaryContent):
+                                    breakpoint()
+                                    content.append(
+                                        {
+                                            "type": "blob",
+                                            "modality": item.media_type.split("/")[0],
+                                            "mime_type": item.media_type,
+                                            "content": f"data:{item.media_type};base64,{base64.b64encode(item.data).decode('utf-8')}",
+                                        }
+                                    )
                                 else:
                                     content.append(safe_serialize(item))
                         else:
@@ -124,8 +141,13 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                         formatted_messages.append(message)
 
         if formatted_messages:
+            normalized_messages = normalize_message_roles(formatted_messages)
+            scope = sentry_sdk.get_current_scope()
+            messages_data = truncate_and_annotate_messages(
+                normalized_messages, span, scope
+            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, formatted_messages, unpack=False
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
     except Exception:
         # If we fail to format messages, just skip it
