@@ -4,7 +4,7 @@ import uuid
 import pytest
 
 import sentry_sdk
-from sentry_sdk._types import AnnotatedValue
+from sentry_sdk._types import AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
@@ -13,6 +13,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     truncate_messages_by_size,
     _find_truncation_index,
+    redact_blob_message_parts,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import safe_serialize
@@ -542,3 +543,106 @@ class TestClientAnnotation:
         assert isinstance(messages_value, AnnotatedValue)
         assert messages_value.metadata["len"] == stored_original_length
         assert len(messages_value.value) == len(truncated_messages)
+
+
+class TestRedactBlobMessageParts:
+    def test_redacts_single_blob_content(self):
+        """Test that blob content is redacted in a message with single blob part"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "text": "How many ponies do you see in the image?",
+                        "type": "text",
+                    },
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "mime_type": "image/jpeg",
+                        "content": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+                    },
+                ],
+            }
+        ]
+
+        result = redact_blob_message_parts(messages)
+
+        assert result == messages  # Returns the same list
+        assert (
+            messages[0]["content"][0]["text"]
+            == "How many ponies do you see in the image?"
+        )
+        assert messages[0]["content"][0]["type"] == "text"
+        assert messages[0]["content"][1]["type"] == "blob"
+        assert messages[0]["content"][1]["modality"] == "image"
+        assert messages[0]["content"][1]["mime_type"] == "image/jpeg"
+        assert messages[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+
+    def test_redacts_multiple_blob_parts(self):
+        """Test that multiple blob parts in a single message are all redacted"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"text": "Compare these images", "type": "text"},
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "mime_type": "image/jpeg",
+                        "content": "data:image/jpeg;base64,first_image",
+                    },
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "mime_type": "image/png",
+                        "content": "data:image/png;base64,second_image",
+                    },
+                ],
+            }
+        ]
+
+        result = redact_blob_message_parts(messages)
+
+        assert result == messages
+        assert messages[0]["content"][0]["text"] == "Compare these images"
+        assert messages[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        assert messages[0]["content"][2]["content"] == SENSITIVE_DATA_SUBSTITUTE
+
+    def test_redacts_blobs_in_multiple_messages(self):
+        """Test that blob parts are redacted across multiple messages"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"text": "First message", "type": "text"},
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "content": "data:image/jpeg;base64,first",
+                    },
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": "I see the image.",
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"text": "Second message", "type": "text"},
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "content": "data:image/jpeg;base64,second",
+                    },
+                ],
+            },
+        ]
+
+        result = redact_blob_message_parts(messages)
+
+        assert result == messages
+        assert messages[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        assert messages[1]["content"] == "I see the image."  # Unchanged
+        assert messages[2]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
