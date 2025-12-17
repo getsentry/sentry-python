@@ -905,6 +905,8 @@ class _Client(BaseClient):
         if telemetry is None:
             return
 
+        scope.apply_to_telemetry(telemetry)
+
         before_send_getter = {
             "log": lambda: get_before_send_log(self.options),
             "metric": lambda: get_before_send_metric(self.options),
@@ -917,8 +919,6 @@ class _Client(BaseClient):
 
         if telemetry is None:
             return
-
-        scope.apply_to_telemetry(telemetry)
 
         batcher: "Optional[Union[LogBatcher, MetricsBatcher]]" = {
             "log": self.log_batcher,
