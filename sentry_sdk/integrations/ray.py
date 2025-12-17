@@ -16,6 +16,7 @@ from sentry_sdk.utils import (
 
 try:
     import ray  # type: ignore[import-not-found]
+    from ray import remote
 except ImportError:
     raise DidNotEnable("Ray not installed.")
 
@@ -37,7 +38,7 @@ def _check_sentry_initialized() -> None:
 
 
 def _patch_ray_remote() -> None:
-    old_remote = ray.remote
+    old_remote = remote
 
     @functools.wraps(old_remote)
     def new_remote(
