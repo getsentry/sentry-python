@@ -1,24 +1,29 @@
 from functools import wraps
 
-import grpc
-from grpc import Channel, Server, intercept_channel
-from grpc.aio import Channel as AsyncChannel
-from grpc.aio import Server as AsyncServer
-
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import parse_version
+from sentry_sdk.integrations import DidNotEnable
 
 from .client import ClientInterceptor
 from .server import ServerInterceptor
-from .aio.server import ServerInterceptor as AsyncServerInterceptor
-from .aio.client import (
-    SentryUnaryUnaryClientInterceptor as AsyncUnaryUnaryClientInterceptor,
-)
-from .aio.client import (
-    SentryUnaryStreamClientInterceptor as AsyncUnaryStreamClientIntercetor,
-)
 
 from typing import TYPE_CHECKING, Any, Optional, Sequence
+
+try:
+    import grpc
+    from grpc import Channel, Server, intercept_channel
+    from grpc.aio import Channel as AsyncChannel
+    from grpc.aio import Server as AsyncServer
+
+    from .aio.server import ServerInterceptor as AsyncServerInterceptor
+    from .aio.client import (
+        SentryUnaryUnaryClientInterceptor as AsyncUnaryUnaryClientInterceptor,
+    )
+    from .aio.client import (
+        SentryUnaryStreamClientInterceptor as AsyncUnaryStreamClientIntercetor,
+    )
+except ImportError:
+    raise DidNotEnable("grpcio is not installed.")
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
