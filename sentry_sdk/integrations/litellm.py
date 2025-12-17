@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 try:
     import litellm  # type: ignore[import-not-found]
-    from litellm import input_callback, success_callback, failure_callback  # type: ignore[import-not-found]
+    from litellm import input_callback, success_callback, failure_callback
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
