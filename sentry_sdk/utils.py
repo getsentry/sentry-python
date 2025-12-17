@@ -2047,7 +2047,7 @@ def get_before_send_metric(
     )
 
 
-def format_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
+def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     if isinstance(val, bool):
         return {"value": val, "type": "boolean"}
     if isinstance(val, int):

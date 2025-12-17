@@ -4,7 +4,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Optional, List, Callable, TYPE_CHECKING, Any
 
-from sentry_sdk.utils import format_attribute, format_timestamp, safe_repr
+from sentry_sdk.utils import format_timestamp, safe_repr, serialize_attribute
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
@@ -127,7 +127,7 @@ class LogBatcher:
             "level": str(log["severity_text"]),
             "body": str(log["body"]),
             "attributes": {
-                k: format_attribute(v) for (k, v) in log["attributes"].items()
+                k: serialize_attribute(v) for (k, v) in log["attributes"].items()
             },
         }
 

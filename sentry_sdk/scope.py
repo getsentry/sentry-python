@@ -1625,11 +1625,11 @@ class Scope:
         options = self.get_client().options
 
         trace_context = self.get_trace_context()
-        trace_id = trace_context.get("span_id")
-        span_id = trace_context.get("span_id")
+        trace_id = trace_context.get("trace_id")
         if telemetry.get("trace_id") is None:
-            telemetry["trace_id"] = trace_id
-        if telemetry.get("span_id") is None:
+            telemetry["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
+        span_id = trace_context.get("span_id")
+        if telemetry.get("span_id") is None and span_id:
             telemetry["span_id"] = span_id
 
         self._apply_global_attributes_to_telemetry(telemetry, options)
