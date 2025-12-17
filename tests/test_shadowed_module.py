@@ -33,7 +33,6 @@ def pytest_generate_tests(metafunc):
                 "grpc",
                 "litellm",
                 "opentelemetry",
-                "pure_eval",
                 "ray",
                 "trytond",
                 "typer",
