@@ -43,6 +43,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
+    _convert_message_parts,
 )
 from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
 from sentry_sdk._types import AnnotatedValue
@@ -1507,6 +1508,77 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     # Verify no "ai" roles remain
     roles = [msg["role"] for msg in stored_messages]
     assert "ai" not in roles
+
+
+def test_convert_message_parts_image_url_to_blob():
+    """Test that OpenAI image_url message parts are correctly converted to blob format"""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "text": "How many ponies do you see in the image?",
+                    "type": "text",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+                        "detail": "high",
+                    },
+                },
+            ],
+        }
+    ]
+
+    converted = _convert_message_parts(messages)
+
+    assert len(converted) == 1
+    assert converted[0]["role"] == "user"
+    assert isinstance(converted[0]["content"], list)
+    assert len(converted[0]["content"]) == 2
+
+    # First item (text) should remain unchanged
+    assert converted[0]["content"][0] == {
+        "text": "How many ponies do you see in the image?",
+        "type": "text",
+    }
+
+    # Second item (image_url) should be converted to blob format
+    blob_item = converted[0]["content"][1]
+    assert blob_item["type"] == "blob"
+    assert blob_item["modality"] == "image"
+    assert blob_item["mime_type"] == "data:image/jpeg"
+    assert blob_item["content"] == "/9j/4AAQSkZJRg=="
+    # Verify the original image_url structure is replaced
+    assert "image_url" not in blob_item
+
+
+def test_convert_message_parts_image_url_to_uri():
+    """Test that OpenAI image_url with non-data URLs are converted to uri format"""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "https://example.com/image.jpg",
+                        "detail": "low",
+                    },
+                },
+            ],
+        }
+    ]
+
+    converted = _convert_message_parts(messages)
+
+    assert len(converted) == 1
+    uri_item = converted[0]["content"][0]
+    assert uri_item["type"] == "uri"
+    assert uri_item["uri"] == "https://example.com/image.jpg"
+    # Verify the original image_url structure is replaced
+    assert "image_url" not in uri_item
 
 
 def test_openai_message_truncation(sentry_init, capture_events):
