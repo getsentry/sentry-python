@@ -1186,19 +1186,18 @@ class Scope:
             return
 
         client = self.get_client()
-        if not has_logs_enabled(client.options) or log is None:
+        if not has_logs_enabled(client.options):
             return
 
-        scope = self._merge_scopes()
+        merged_scope = self._merge_scopes()
 
-        # If debug is enabled, log the log to the console
         debug = client.options.get("debug", False)
         if debug:
             logger.debug(
                 f"[Sentry Logs] [{log.get('severity_text')}] {log.get('body')}"
             )
 
-        client._capture_log(log, scope=scope)
+        client._capture_log(log, scope=merged_scope)
 
     def _capture_metric(self, metric: "Optional[Metric]") -> None:
         if metric is None:
@@ -1208,7 +1207,7 @@ class Scope:
         if not has_metrics_enabled(client.options):
             return
 
-        scope = self._merge_scopes()
+        merged_scope = self._merge_scopes()
 
         debug = client.options.get("debug", False)
         if debug:
@@ -1216,7 +1215,7 @@ class Scope:
                 f"[Sentry Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
             )
 
-        client._capture_metric(metric, scope=scope)
+        client._capture_metric(metric, scope=merged_scope)
 
     def capture_message(
         self,
