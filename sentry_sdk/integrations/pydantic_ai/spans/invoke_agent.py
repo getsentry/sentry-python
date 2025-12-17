@@ -1,5 +1,10 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
+from sentry_sdk.ai.utils import (
+    get_start_span_function,
+    normalize_message_roles,
+    set_data_normalized,
+    truncate_and_annotate_messages,
+)
 from sentry_sdk.consts import OP, SPANDATA
 
 from ..consts import SPAN_ORIGIN
@@ -102,8 +107,13 @@ def invoke_agent_span(
                     )
 
         if messages:
+            normalized_messages = normalize_message_roles(messages)
+            scope = sentry_sdk.get_current_scope()
+            messages_data = truncate_and_annotate_messages(
+                normalized_messages, span, scope
+            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
     return span
