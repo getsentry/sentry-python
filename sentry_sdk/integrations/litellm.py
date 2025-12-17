@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 try:
     import litellm  # type: ignore[import-not-found]
+    from litellm import get_llm_provider
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
@@ -45,7 +46,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     # Get key parameters
     full_model = kwargs.get("model", "")
     try:
-        model, provider, _, _ = litellm.get_llm_provider(full_model)
+        model, provider, _, _ = get_llm_provider(full_model)
     except Exception:
         model = full_model
         provider = "unknown"
