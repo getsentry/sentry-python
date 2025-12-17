@@ -8,7 +8,7 @@ try:
     from trytond.exceptions import TrytonException  # type: ignore
     from trytond.wsgi import app  # type: ignore
 except ImportError:
-    raise DidNotEnable("Trytond not installed.")
+    raise DidNotEnable("Trytond is not installed.")
 
 # TODO: trytond-worker, trytond-cron and trytond-admin intergations
 
