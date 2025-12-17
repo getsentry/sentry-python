@@ -189,7 +189,7 @@ def redact_blob_message_parts(
         content = message.get("content")
         if isinstance(content, list):
             for item in content:
-                if item.get("type") == "blob":
+                if isinstance(item, dict) and item.get("type") == "blob":
                     item["content"] = SENSITIVE_DATA_SUBSTITUTE
     return messages
 
