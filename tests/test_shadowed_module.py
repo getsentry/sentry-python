@@ -36,7 +36,6 @@ def pytest_generate_tests(metafunc):
                 "pure_eval",
                 "ray",
                 "trytond",
-                "typer",
             },
         )
 
