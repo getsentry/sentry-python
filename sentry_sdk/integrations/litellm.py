@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 
 try:
     import litellm  # type: ignore[import-not-found]
-    from litellm import input_callback, success_callback, failure_callback
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
@@ -279,14 +278,14 @@ class LiteLLMIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         """Set up LiteLLM callbacks for monitoring."""
-        litellm_input_callback = input_callback or []
-        if _input_callback not in litellm_input_callback:
-            litellm_input_callback.append(_input_callback)
+        litellm.input_callback = litellm.input_callback or []
+        if _input_callback not in litellm.input_callback:
+            litellm.input_callback.append(_input_callback)
 
-        litellm_success_callback = success_callback or []
-        if _success_callback not in litellm_success_callback:
-            litellm_success_callback.append(_success_callback)
+        litellm.success_callback = litellm.success_callback or []
+        if _success_callback not in litellm.success_callback:
+            litellm.success_callback.append(_success_callback)
 
-        litellm_failure_callback = failure_callback or []
-        if _failure_callback not in litellm_failure_callback:
-            litellm_failure_callback.append(_failure_callback)
+        litellm.failure_callback = litellm.failure_callback or []
+        if _failure_callback not in litellm.failure_callback:
+            litellm.failure_callback.append(_failure_callback)
