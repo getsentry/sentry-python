@@ -182,6 +182,9 @@ def redact_blob_message_parts(messages):
     """
 
     for message in messages:
+        if not isinstance(message, dict):
+            continue
+
         content = message.get("content")
         if isinstance(content, list):
             for item in content:
