@@ -115,7 +115,6 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                                 if isinstance(item, str):
                                     content.append({"type": "text", "text": item})
                                 elif BinaryContent and isinstance(item, BinaryContent):
-                                    breakpoint()
                                     content.append(
                                         {
                                             "type": "blob",
