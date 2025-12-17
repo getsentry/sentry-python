@@ -30,8 +30,9 @@ else:
 
 
 try:
-    import clickhouse_driver  # type: ignore[import-not-found]
-    from clickhouse_driver.client import Client
+    from clickhouse_driver import VERSION
+    from clickhouse_driver.client import Client  # type: ignore[import-not-found]
+    from clickhouse_driver.connection import Connection  # type: ignore[import-not-found]
 
 except ImportError:
     raise DidNotEnable("clickhouse-driver not installed.")
@@ -43,12 +44,10 @@ class ClickhouseDriverIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        _check_minimum_version(ClickhouseDriverIntegration, clickhouse_driver.VERSION)
+        _check_minimum_version(ClickhouseDriverIntegration, VERSION)
 
         # Every query is done using the Connection's `send_query` function
-        clickhouse_driver.connection.Connection.send_query = _wrap_start(
-            clickhouse_driver.connection.Connection.send_query
-        )
+        Connection.send_query = _wrap_start(Connection.send_query)
 
         # If the query contains parameters then the send_data function is used to send those parameters to clickhouse
         _wrap_send_data()
@@ -164,9 +163,7 @@ def _wrap_send_data() -> None:
     Client.send_data = _inner_send_data
 
 
-def _set_db_data(
-    span: "Span", connection: "clickhouse_driver.connection.Connection"
-) -> None:
+def _set_db_data(span: "Span", connection: "Connection") -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
     span.set_data(SPANDATA.SERVER_ADDRESS, connection.host)
     span.set_data(SPANDATA.SERVER_PORT, connection.port)
