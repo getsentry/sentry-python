@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 try:
     import litellm  # type: ignore[import-not-found]
-    from litellm import get_llm_provider
+    from litellm import input_callback, success_callback, failure_callback
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
@@ -46,7 +46,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     # Get key parameters
     full_model = kwargs.get("model", "")
     try:
-        model, provider, _, _ = get_llm_provider(full_model)
+        model, provider, _, _ = litellm.get_llm_provider(full_model)
     except Exception:
         model = full_model
         provider = "unknown"
@@ -279,14 +279,14 @@ class LiteLLMIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         """Set up LiteLLM callbacks for monitoring."""
-        litellm.input_callback = litellm.input_callback or []
-        if _input_callback not in litellm.input_callback:
-            litellm.input_callback.append(_input_callback)
+        litellm_input_callback = input_callback or []
+        if _input_callback not in litellm_input_callback:
+            litellm_input_callback.append(_input_callback)
 
-        litellm.success_callback = litellm.success_callback or []
-        if _success_callback not in litellm.success_callback:
-            litellm.success_callback.append(_success_callback)
+        litellm_success_callback = success_callback or []
+        if _success_callback not in litellm_success_callback:
+            litellm_success_callback.append(_success_callback)
 
-        litellm.failure_callback = litellm.failure_callback or []
-        if _failure_callback not in litellm.failure_callback:
-            litellm.failure_callback.append(_failure_callback)
+        litellm_failure_callback = failure_callback or []
+        if _failure_callback not in litellm_failure_callback:
+            litellm_failure_callback.append(_failure_callback)
