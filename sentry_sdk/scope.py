@@ -1461,7 +1461,7 @@ class Scope:
             )
 
     def _apply_global_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]", options: "dict[str, Any]"
+        self, telemetry: "Union[Log, Metric]"
     ) -> None:
         # TODO: Global stuff like this should just be retrieved at init time and
         # put onto the global scope's attributes and then applied to events
@@ -1472,6 +1472,8 @@ class Scope:
 
         attributes["sentry.sdk.name"] = SDK_INFO["name"]
         attributes["sentry.sdk.version"] = SDK_INFO["version"]
+
+        options = self.get_client().options
 
         server_name = options.get("server_name")
         if server_name is not None and SPANDATA.SERVER_ADDRESS not in attributes:
@@ -1611,8 +1613,6 @@ class Scope:
     def apply_to_telemetry(self, telemetry: "Union[Log, Metric]") -> None:
         # Attributes-based events and telemetry go through here (logs, metrics,
         # spansV2)
-        options = self.get_client().options
-
         trace_context = self.get_trace_context()
         trace_id = trace_context.get("trace_id")
         if telemetry.get("trace_id") is None:
@@ -1621,7 +1621,7 @@ class Scope:
         if telemetry.get("span_id") is None and span_id:
             telemetry["span_id"] = span_id
 
-        self._apply_global_attributes_to_telemetry(telemetry, options)
+        self._apply_global_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
 
     def update_from_scope(self, scope: "Scope") -> None:
