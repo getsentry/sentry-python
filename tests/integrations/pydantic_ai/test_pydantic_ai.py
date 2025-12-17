@@ -1,12 +1,17 @@
 import asyncio
+import json
 import pytest
+from unittest.mock import MagicMock
 
 from typing import Annotated
 from pydantic import Field
 
+import sentry_sdk
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
 from pydantic_ai import Agent
+from pydantic_ai.messages import BinaryContent, UserPromptPart
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
 
@@ -2604,3 +2609,128 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_events)
 
     # Should not crash
     assert transaction is not None
+
+
+def _get_messages_from_span(span_data):
+    """Helper to extract and parse messages from span data."""
+    messages_data = span_data["gen_ai.request.messages"]
+    return (
+        json.loads(messages_data) if isinstance(messages_data, str) else messages_data
+    )
+
+
+def _find_binary_content(messages_data, expected_modality, expected_mime_type):
+    """Helper to find and verify binary content in messages."""
+    for msg in messages_data:
+        if "content" not in msg:
+            continue
+        for content_item in msg["content"]:
+            if content_item.get("type") == "blob":
+                assert content_item["modality"] == expected_modality
+                assert content_item["mime_type"] == expected_mime_type
+                assert "content" in content_item
+                content_str = str(content_item["content"])
+                assert (
+                    f"data:{expected_mime_type};base64," in content_str
+                    or "[Filtered]" in content_str
+                )
+                return True
+    return False
+
+
+@pytest.mark.asyncio
+async def test_binary_content_encoding_image(sentry_init, capture_events):
+    """Test that BinaryContent with image data is properly encoded in messages."""
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        binary_content = BinaryContent(
+            data=b"fake_image_data_12345", media_type="image/png"
+        )
+        user_part = UserPromptPart(content=["Look at this image:", binary_content])
+        mock_msg = MagicMock()
+        mock_msg.parts = [user_part]
+        mock_msg.instructions = None
+
+        _set_input_messages(span, [mock_msg])
+        span.finish()
+
+    (event,) = events
+    span_data = event["spans"][0]["data"]
+    messages_data = _get_messages_from_span(span_data)
+    assert _find_binary_content(messages_data, "image", "image/png")
+
+
+@pytest.mark.asyncio
+async def test_binary_content_encoding_mixed_content(sentry_init, capture_events):
+    """Test that BinaryContent mixed with text content is properly handled."""
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        binary_content = BinaryContent(
+            data=b"fake_image_bytes", media_type="image/jpeg"
+        )
+        user_part = UserPromptPart(
+            content=["Here is an image:", binary_content, "What do you see?"]
+        )
+        mock_msg = MagicMock()
+        mock_msg.parts = [user_part]
+        mock_msg.instructions = None
+
+        _set_input_messages(span, [mock_msg])
+        span.finish()
+
+    (event,) = events
+    span_data = event["spans"][0]["data"]
+    messages_data = _get_messages_from_span(span_data)
+
+    # Verify both text and binary content are present
+    found_text = any(
+        content_item.get("type") == "text"
+        for msg in messages_data
+        if "content" in msg
+        for content_item in msg["content"]
+    )
+    assert found_text, "Text content should be found"
+    assert _find_binary_content(messages_data, "image", "image/jpeg")
+
+
+@pytest.mark.asyncio
+async def test_binary_content_in_agent_run(sentry_init, capture_events):
+    """Test that BinaryContent in actual agent run is properly captured in spans."""
+    agent = Agent("test", name="test_binary_agent")
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+    binary_content = BinaryContent(
+        data=b"fake_image_data_for_testing", media_type="image/png"
+    )
+    await agent.run(["Analyze this image:", binary_content])
+
+    (transaction,) = events
+    chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
+    assert len(chat_spans) >= 1
+
+    chat_span = chat_spans[0]
+    if "gen_ai.request.messages" in chat_span["data"]:
+        messages_str = str(chat_span["data"]["gen_ai.request.messages"])
+        assert any(keyword in messages_str for keyword in ["blob", "image", "base64"])
