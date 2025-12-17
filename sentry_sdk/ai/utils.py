@@ -143,8 +143,9 @@ def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> 
     return 0
 
 
-def redact_blob_message_parts(messages):
-    # type: (List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], int]
+def redact_blob_message_parts(
+    messages: "List[Dict[str, Any]]",
+) -> "List[Dict[str, Any]]":
     """
     Redact blob message parts from the messages, by removing the "content" key.
     e.g:
