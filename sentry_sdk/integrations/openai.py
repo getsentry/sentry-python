@@ -18,7 +18,7 @@ from sentry_sdk.utils import (
     safe_serialize,
 )
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Callable, AsyncIterator, Iterator
@@ -177,6 +177,68 @@ def _calculate_token_usage(
     )
 
 
+def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, Any]]":
+    """
+    Convert the message parts from OpenAI format to the `gen_ai.request.messages` format.
+    e.g:
+    {
+        "role": "user",
+        "content": [
+            {
+                "text": "How many ponies do you see in the image?",
+                "type": "text"
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": "data:image/jpeg;base64,...",
+                    "detail": "high"
+                }
+            }
+        ]
+    }
+    becomes:
+    {
+        "role": "user",
+        "content": [
+            {
+                "text": "How many ponies do you see in the image?",
+                "type": "text"
+            },
+            {
+                "type": "blob",
+                "modality": "image",
+                "mime_type": "image/jpeg",
+                "content": "data:image/jpeg;base64,..."
+            }
+        ]
+    }
+    """
+
+    def _map_item(item: "Dict[str, Any]") -> "Dict[str, Any]":
+        if item.get("type") == "image_url":
+            image_url = item.get("image_url") or {}
+            if image_url.get("url", "").startswith("data:"):
+                return {
+                    "type": "blob",
+                    "modality": "image",
+                    "mime_type": item["image_url"]["url"].split(";base64,")[0],
+                    "content": item["image_url"]["url"].split(";base64,")[1],
+                }
+            else:
+                return {
+                    "type": "uri",
+                    "uri": item["image_url"]["url"],
+                }
+        return item
+
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            message["content"] = [_map_item(item) for item in content]
+    return messages
+
+
 def _set_input_data(
     span: "Span",
     kwargs: "dict[str, Any]",
@@ -198,6 +260,8 @@ def _set_input_data(
         and integration.include_prompts
     ):
         normalized_messages = normalize_message_roles(messages)
+        normalized_messages = _convert_message_parts(normalized_messages)
+
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
         if messages_data is not None:
