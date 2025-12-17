@@ -53,8 +53,7 @@ except ImportError:
     gevent = None
 
 
-def _normalize_distribution_name(name):
-    # type: (str) -> str
+def _normalize_distribution_name(name: str) -> str:
     """Normalize distribution name according to PEP-0503.
 
     See:
