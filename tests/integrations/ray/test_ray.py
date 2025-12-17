@@ -87,7 +87,8 @@ def test_tracing_in_ray_tasks(task_options):
         }
     )
 
-    def example_task():
+    # RayIntegration must leave variadic keyword arguments at the end
+    def example_task(**kwargs):
         with sentry_sdk.start_span(op="task", name="example task step"):
             ...
 
