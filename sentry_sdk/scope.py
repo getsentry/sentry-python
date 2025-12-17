@@ -1474,15 +1474,15 @@ class Scope:
         attributes["sentry.sdk.version"] = SDK_INFO["version"]
 
         server_name = options.get("server_name")
-        if server_name is not None:
+        if server_name is not None and SPANDATA.SERVER_ADDRESS not in attributes:
             attributes[SPANDATA.SERVER_ADDRESS] = server_name
 
         environment = options.get("environment")
-        if environment is not None:
+        if environment is not None and "sentry.environment" not in attributes:
             attributes["sentry.environment"] = environment
 
         release = options.get("release")
-        if release is not None:
+        if release is not None and "sentry.release" not in attributes:
             attributes["sentry.release"] = release
 
     def _apply_user_attributes_to_telemetry(
