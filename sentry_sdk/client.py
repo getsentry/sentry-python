@@ -62,14 +62,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import (
-        Event,
-        Hint,
-        SDKInfo,
-        Log,
-        Metric,
-        EventDataCategory,
-    )
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric, EventDataCategory
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
