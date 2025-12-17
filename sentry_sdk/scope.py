@@ -1181,12 +1181,7 @@ class Scope:
 
         return event_id
 
-    def _capture_log(
-        self,
-        log: "Optional[Log]",
-        scope: "Optional[Scope]" = None,
-        **scope_kwargs: "Any",
-    ) -> None:
+    def _capture_log(self, log: "Optional[Log]") -> None:
         if log is None:
             return
 
@@ -1194,7 +1189,7 @@ class Scope:
         if not has_logs_enabled(client.options) or log is None:
             return
 
-        scope = self._merge_scopes(scope, scope_kwargs)
+        scope = self._merge_scopes()
 
         # If debug is enabled, log the log to the console
         debug = client.options.get("debug", False)
@@ -1205,12 +1200,7 @@ class Scope:
 
         client._capture_log(log, scope=scope)
 
-    def _capture_metric(
-        self,
-        metric: "Optional[Metric]",
-        scope: "Optional[Scope]" = None,
-        **scope_kwargs: "Any",
-    ) -> None:
+    def _capture_metric(self, metric: "Optional[Metric]") -> None:
         if metric is None:
             return
 
@@ -1218,7 +1208,7 @@ class Scope:
         if not has_metrics_enabled(client.options):
             return
 
-        scope = self._merge_scopes(scope, scope_kwargs)
+        scope = self._merge_scopes()
 
         debug = client.options.get("debug", False)
         if debug:
