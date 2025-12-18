@@ -548,3 +548,50 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                 }
             ]
         }
+
+
+def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
+    sentry_init(enable_logs=True)
+
+    envelopes = capture_envelopes()
+
+    global_scope = sentry_sdk.get_global_scope()
+    global_scope.set_attribute("global.attribute", "value")
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("current.attribute", "value")
+        python_logger = logging.Logger("test-logger")
+        python_logger.warning("Hello, world!")
+
+    python_logger.warning("Hello, world!")
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log1, log2) = logs
+
+    assert log1["attributes"]["global.attribute"] == "value"
+    assert log1["attributes"]["current.attribute"] == "value"
+
+    assert log2["attributes"]["temp.attribute"] == "value"
+    assert "current.attribute" not in log2["attributes"]
+
+
+def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes):
+    sentry_init(enable_logs=True)
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("durable.attribute", "value1")
+        scope.set_attribute("temp.attribute", "value1")
+        python_logger = logging.Logger("test-logger")
+        python_logger.warning("Hello, world!", attributes={"temp.attribute": "value2"})
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log,) = logs
+
+    assert log["attributes"]["durable.attribute"] == "value1"
+    assert log["attributes"]["temp.attribute"] == "value2"

@@ -46,6 +46,7 @@ from sentry_sdk.utils import (
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
+    format_attribute,
     logger,
     has_logs_enabled,
     has_metrics_enabled,
@@ -73,6 +74,8 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from sentry_sdk._types import (
+        Attributes,
+        AttributeValue,
         Breadcrumb,
         BreadcrumbHint,
         ErrorProcessor,
@@ -230,6 +233,7 @@ class Scope:
         "_type",
         "_last_event_id",
         "_flags",
+        "_attributes",
     )
 
     def __init__(
@@ -295,6 +299,8 @@ class Scope:
         rv._last_event_id = self._last_event_id
 
         rv._flags = deepcopy(self._flags)
+
+        rv._attributes = self._attributes.copy()
 
         return rv
 
@@ -683,6 +689,8 @@ class Scope:
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id: "Optional[str]" = None
         self._flags: "Optional[FlagBuffer]" = None
+
+        self._attributes: "Attributes" = {}
 
     @_attr_setter
     def level(self, value: "LogLevelStr") -> None:
@@ -1487,6 +1495,14 @@ class Scope:
         if release is not None and "sentry.release" not in attributes:
             attributes["sentry.release"] = release
 
+    def _apply_scope_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        attributes = telemetry["attributes"]
+
+        for attribute, value in self._attributes.items():
+            attributes[attribute] = value
+
     def _apply_user_attributes_to_telemetry(
         self, telemetry: "Union[Log, Metric]"
     ) -> None:
@@ -1622,6 +1638,7 @@ class Scope:
             telemetry["span_id"] = span_id
 
         self._apply_global_attributes_to_telemetry(telemetry)
+        self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
 
     def update_from_scope(self, scope: "Scope") -> None:
@@ -1668,6 +1685,8 @@ class Scope:
             else:
                 for flag in scope._flags.get():
                     self._flags.set(flag["flag"], flag["result"])
+        if scope._attributes:
+            self._attributes.update(scope._attributes)
 
     def update_from_kwargs(
         self,
@@ -1677,6 +1696,7 @@ class Scope:
         contexts: "Optional[Dict[str, Dict[str, Any]]]" = None,
         tags: "Optional[Dict[str, str]]" = None,
         fingerprint: "Optional[List[str]]" = None,
+        attributes: "Optional[Attributes]" = None,
     ) -> None:
         """Update the scope's attributes."""
         if level is not None:
@@ -1691,6 +1711,8 @@ class Scope:
             self._tags.update(tags)
         if fingerprint is not None:
             self._fingerprint = fingerprint
+        if attributes is not None:
+            self._attributes.update(attributes)
 
     def __repr__(self) -> str:
         return "<%s id=%s name=%s type=%s>" % (
@@ -1709,6 +1731,15 @@ class Scope:
             )
             self._flags = FlagBuffer(capacity=max_flags)
         return self._flags
+
+    def set_attribute(self, attribute: str, value: "AttributeValue") -> None:
+        self._attributes[attribute] = format_attribute(value)
+
+    def remove_attribute(self, attribute: str) -> None:
+        try:
+            del self._attributes[attribute]
+        except KeyError:
+            pass
 
 
 @contextmanager
