@@ -36,7 +36,7 @@ def _capture_log(
 
     attrs: "Attributes" = {}
 
-    if kwargs.get("attributes"):
+    if "attributes" in kwargs:
         attrs.update(kwargs.pop("attributes"))
 
     for k, v in kwargs.items():
