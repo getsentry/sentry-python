@@ -34,6 +34,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
             "<=0.23": ["pydantic<2"],
+            "py3.7": ["pydantic<1.10.25"],
         },
         "num_versions": 2,
     },
@@ -133,6 +134,7 @@ TEST_SUITE_CONFIG = {
             # deprecated argument.
             "<0.110.1": ["httpx<0.28.0"],
             "py3.6": ["aiocontextvars"],
+            "py3.7": ["pydantic<1.10.25"],
         },
     },
     "flask": {
