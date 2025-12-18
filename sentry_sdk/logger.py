@@ -37,17 +37,20 @@ def _capture_log(
     attrs: "Attributes" = {}
 
     if kwargs.get("attributes"):
-        for k, v in kwargs.pop("attributes").items():
-            attrs[k] = v if isinstance(v, (str, int, bool, float)) else safe_repr(v)
+        attrs.update(kwargs.pop("attributes"))
 
     for k, v in kwargs.items():
         attrs[f"sentry.message.parameter.{k}"] = v
+
     if kwargs:
         # only attach template if there are parameters
         attrs["sentry.message.template"] = template
 
         with capture_internal_exceptions():
             body = template.format_map(_dict_default_key(kwargs))
+
+    for k, v in attrs.items():
+        attrs[k] = v if isinstance(v, (str, int, bool, float)) else safe_repr(v)
 
     sentry_sdk.get_current_scope()._capture_log(
         {
