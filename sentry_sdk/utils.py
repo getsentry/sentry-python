@@ -2052,7 +2052,7 @@ def format_attribute(val: "Any") -> "AttributeValue":
     Turn unsupported attribute value types into an AttributeValue.
 
     We do this as soon as a user-provided attribute is set, to prevent spans,
-    logs, ßmetrics and similar from having live references to various ßobjects.
+    logs, metrics and similar from having live references to various objects.
 
     Note: This is not the final attribute value format. Before they're sent,
     they're serialized further into the actual format the protocol expects:
