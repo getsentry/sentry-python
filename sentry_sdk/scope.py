@@ -362,8 +362,29 @@ class Scope:
         global _global_scope
         if _global_scope is None:
             _global_scope = Scope(ty=ScopeType.GLOBAL)
+            _global_scope._set_global_attributes()
 
         return _global_scope
+
+    def _set_global_attributes(self) -> None:
+        from sentry_sdk.client import SDK_INFO
+
+        self.set_attribute("sentry.sdk.name", SDK_INFO["name"])
+        self.set_attribute("sentry.sdk.version", SDK_INFO["version"])
+
+        options = sentry_sdk.get_client().options
+
+        server_name = options.get("server_name")
+        if server_name:
+            self.set_attribute(SPANDATA.SERVER_ADDRESS, server_name)
+
+        environment = options.get("environment")
+        if environment:
+            self.set_attribute("sentry.environment", environment)
+
+        release = options.get("release")
+        if release:
+            self.set_attribute("sentry.release", release)
 
     @classmethod
     def last_event_id(cls) -> "Optional[str]":
@@ -1468,33 +1489,6 @@ class Scope:
                 {"values": flags}
             )
 
-    def _apply_global_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
-    ) -> None:
-        # TODO: Global stuff like this should just be retrieved at init time and
-        # put onto the global scope's attributes and then applied to events
-        # from there
-        from sentry_sdk.client import SDK_INFO
-
-        attributes = telemetry["attributes"]
-
-        attributes["sentry.sdk.name"] = SDK_INFO["name"]
-        attributes["sentry.sdk.version"] = SDK_INFO["version"]
-
-        options = self.get_client().options
-
-        server_name = options.get("server_name")
-        if server_name is not None and SPANDATA.SERVER_ADDRESS not in attributes:
-            attributes[SPANDATA.SERVER_ADDRESS] = server_name
-
-        environment = options.get("environment")
-        if environment is not None and "sentry.environment" not in attributes:
-            attributes["sentry.environment"] = environment
-
-        release = options.get("release")
-        if release is not None and "sentry.release" not in attributes:
-            attributes["sentry.release"] = release
-
     def _apply_scope_attributes_to_telemetry(
         self, telemetry: "Union[Log, Metric]"
     ) -> None:
@@ -1638,7 +1632,6 @@ class Scope:
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
-        self._apply_global_attributes_to_telemetry(telemetry)
 
     def update_from_scope(self, scope: "Scope") -> None:
         """Update the scope with another scope's data."""
