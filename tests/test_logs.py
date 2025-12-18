@@ -550,6 +550,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
         }
 
 
+@minimum_python_37
 def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
     sentry_init(enable_logs=True)
 
@@ -576,6 +577,7 @@ def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
     assert "current.attribute" not in log2["attributes"]
 
 
+@minimum_python_37
 def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes):
     sentry_init(enable_logs=True)
 
