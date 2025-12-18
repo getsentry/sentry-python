@@ -24,16 +24,7 @@ def _capture_metric(
 
     if attributes:
         for k, v in attributes.items():
-            attrs[k] = (
-                v
-                if (
-                    isinstance(v, str)
-                    or isinstance(v, int)
-                    or isinstance(v, bool)
-                    or isinstance(v, float)
-                )
-                else safe_repr(v)
-            )
+            attrs[k] = v if isinstance(v, (str, int, bool, float)) else safe_repr(v)
 
     metric: "Metric" = {
         "timestamp": time.time(),
