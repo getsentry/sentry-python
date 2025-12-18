@@ -29,7 +29,6 @@ def pytest_generate_tests(metafunc):
             # Temporarily skip some integrations
             submodule_names
             - {
-                "clickhouse_driver",
                 "grpc",
                 "litellm",
                 "opentelemetry",
