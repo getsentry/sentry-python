@@ -10,6 +10,10 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Attributes, Log
 
 
+if TYPE_CHECKING:
+    from sentry_sdk._types import Attributes, Log
+
+
 OTEL_RANGES = [
     # ((severity level range), severity text)
     # https://opentelemetry.io/docs/specs/otel/logs/data-model
