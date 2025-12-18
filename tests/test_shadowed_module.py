@@ -34,7 +34,6 @@ def pytest_generate_tests(metafunc):
                 "opentelemetry",
                 "pure_eval",
                 "ray",
-                "trytond",
                 "typer",
             },
         )
