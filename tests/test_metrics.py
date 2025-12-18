@@ -314,7 +314,7 @@ def test_metric_gets_attributes_from_scopes(sentry_init, capture_envelopes):
     assert metric1["attributes"]["global.attribute"] == "value"
     assert metric1["attributes"]["current.attribute"] == "value"
 
-    assert metric2["attributes"]["temp.attribute"] == "value"
+    assert metric2["attributes"]["global.attribute"] == "value"
     assert "current.attribute" not in metric2["attributes"]
 
 
@@ -326,7 +326,7 @@ def test_metric_attributes_override_scope_attributes(sentry_init, capture_envelo
     with sentry_sdk.new_scope() as scope:
         scope.set_attribute("durable.attribute", "value1")
         scope.set_attribute("temp.attribute", "value1")
-        sentry_sdk.metrics.count("test", 1)
+        sentry_sdk.metrics.count("test", 1, attributes={"temp.attribute": "value2"})
 
     get_client().flush()
 

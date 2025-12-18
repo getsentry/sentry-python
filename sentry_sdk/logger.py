@@ -37,7 +37,8 @@ def _capture_log(
     attributes: "Attributes" = {}
 
     if "attributes" in kwargs:
-        for attribute, value in kwargs["attributes"] or {}:
+        provided_attributes = kwargs.pop("attributes") or {}
+        for attribute, value in provided_attributes.items():
             attributes[attribute] = format_attribute(value)
 
     for k, v in kwargs.items():

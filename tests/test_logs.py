@@ -560,10 +560,9 @@ def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
 
     with sentry_sdk.new_scope() as scope:
         scope.set_attribute("current.attribute", "value")
-        python_logger = logging.Logger("test-logger")
-        python_logger.warning("Hello, world!")
+        sentry_sdk.logger.warning("Hello, world!")
 
-    python_logger.warning("Hello again!")
+    sentry_sdk.logger.warning("Hello again!")
 
     get_client().flush()
 
@@ -573,7 +572,7 @@ def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
     assert log1["attributes"]["global.attribute"] == "value"
     assert log1["attributes"]["current.attribute"] == "value"
 
-    assert log2["attributes"]["temp.attribute"] == "value"
+    assert log2["attributes"]["global.attribute"] == "value"
     assert "current.attribute" not in log2["attributes"]
 
 
@@ -585,8 +584,9 @@ def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes
     with sentry_sdk.new_scope() as scope:
         scope.set_attribute("durable.attribute", "value1")
         scope.set_attribute("temp.attribute", "value1")
-        python_logger = logging.Logger("test-logger")
-        python_logger.warning("Hello, world!", attributes={"temp.attribute": "value2"})
+        sentry_sdk.logger.warning(
+            "Hello, world!", attributes={"temp.attribute": "value2"}
+        )
 
     get_client().flush()
 
