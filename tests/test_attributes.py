@@ -57,8 +57,8 @@ def test_telemetry_precedence(sentry_init, capture_envelopes):
     isolation_scope.set_attribute("overwritten.attribute", "isolation")
 
     current_scope = sentry_sdk.get_current_scope()
-    current_scope.set_attribute("current_scope.attribute", "current_scope")
-    current_scope.set_attribute("overwritten.attribute", "current_scope")
+    current_scope.set_attribute("current.attribute", "current")
+    current_scope.set_attribute("overwritten.attribute", "current")
 
     sentry_sdk.metrics.count(
         "test",
