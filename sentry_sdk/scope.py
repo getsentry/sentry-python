@@ -11,7 +11,12 @@ from itertools import chain
 
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
+from sentry_sdk.consts import (
+    DEFAULT_MAX_BREADCRUMBS,
+    FALSE_VALUES,
+    INSTRUMENTER,
+    SPANDATA,
+)
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
@@ -42,6 +47,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     exc_info_from_error,
     logger,
+    has_logs_enabled,
+    has_metrics_enabled,
 )
 
 import typing
@@ -73,7 +80,9 @@ if TYPE_CHECKING:
         EventProcessor,
         ExcInfo,
         Hint,
+        Log,
         LogLevelStr,
+        Metric,
         SamplingContext,
         Type,
     )
@@ -1172,6 +1181,42 @@ class Scope:
 
         return event_id
 
+    def _capture_log(self, log: "Optional[Log]") -> None:
+        if log is None:
+            return
+
+        client = self.get_client()
+        if not has_logs_enabled(client.options):
+            return
+
+        merged_scope = self._merge_scopes()
+
+        debug = client.options.get("debug", False)
+        if debug:
+            logger.debug(
+                f"[Sentry Logs] [{log.get('severity_text')}] {log.get('body')}"
+            )
+
+        client._capture_log(log, scope=merged_scope)
+
+    def _capture_metric(self, metric: "Optional[Metric]") -> None:
+        if metric is None:
+            return
+
+        client = self.get_client()
+        if not has_metrics_enabled(client.options):
+            return
+
+        merged_scope = self._merge_scopes()
+
+        debug = client.options.get("debug", False)
+        if debug:
+            logger.debug(
+                f"[Sentry Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
+            )
+
+        client._capture_metric(metric, scope=merged_scope)
+
     def capture_message(
         self,
         message: str,
@@ -1415,6 +1460,49 @@ class Scope:
                 {"values": flags}
             )
 
+    def _apply_global_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        # TODO: Global stuff like this should just be retrieved at init time and
+        # put onto the global scope's attributes and then applied to events
+        # from there
+        from sentry_sdk.client import SDK_INFO
+
+        attributes = telemetry["attributes"]
+
+        attributes["sentry.sdk.name"] = SDK_INFO["name"]
+        attributes["sentry.sdk.version"] = SDK_INFO["version"]
+
+        options = self.get_client().options
+
+        server_name = options.get("server_name")
+        if server_name is not None and SPANDATA.SERVER_ADDRESS not in attributes:
+            attributes[SPANDATA.SERVER_ADDRESS] = server_name
+
+        environment = options.get("environment")
+        if environment is not None and "sentry.environment" not in attributes:
+            attributes["sentry.environment"] = environment
+
+        release = options.get("release")
+        if release is not None and "sentry.release" not in attributes:
+            attributes["sentry.release"] = release
+
+    def _apply_user_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        attributes = telemetry["attributes"]
+
+        if not should_send_default_pii() or self._user is None:
+            return
+
+        for attribute_name, user_attribute in (
+            ("user.id", "id"),
+            ("user.name", "username"),
+            ("user.email", "email"),
+        ):
+            if user_attribute in self._user and attribute_name not in attributes:
+                attributes[attribute_name] = self._user[user_attribute]
+
     def _drop(self, cause: "Any", ty: str) -> "Optional[Any]":
         logger.info("%s (%s) dropped event", ty, cause)
         return None
@@ -1520,6 +1608,21 @@ class Scope:
             return None
 
         return event
+
+    @_disable_capture
+    def apply_to_telemetry(self, telemetry: "Union[Log, Metric]") -> None:
+        # Attributes-based events and telemetry go through here (logs, metrics,
+        # spansV2)
+        trace_context = self.get_trace_context()
+        trace_id = trace_context.get("trace_id")
+        if telemetry.get("trace_id") is None:
+            telemetry["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
+        span_id = trace_context.get("span_id")
+        if telemetry.get("span_id") is None and span_id:
+            telemetry["span_id"] = span_id
+
+        self._apply_global_attributes_to_telemetry(telemetry)
+        self._apply_user_attributes_to_telemetry(telemetry)
 
     def update_from_scope(self, scope: "Scope") -> None:
         """Update the scope with another scope's data."""

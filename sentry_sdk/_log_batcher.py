@@ -4,7 +4,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Optional, List, Callable, TYPE_CHECKING, Any
 
-from sentry_sdk.utils import format_timestamp, safe_repr
+from sentry_sdk.utils import format_timestamp, safe_repr, serialize_attribute
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
@@ -115,17 +115,6 @@ class LogBatcher:
 
     @staticmethod
     def _log_to_transport_format(log: "Log") -> "Any":
-        def format_attribute(val: "int | float | str | bool") -> "Any":
-            if isinstance(val, bool):
-                return {"value": val, "type": "boolean"}
-            if isinstance(val, int):
-                return {"value": val, "type": "integer"}
-            if isinstance(val, float):
-                return {"value": val, "type": "double"}
-            if isinstance(val, str):
-                return {"value": val, "type": "string"}
-            return {"value": safe_repr(val), "type": "string"}
-
         if "sentry.severity_number" not in log["attributes"]:
             log["attributes"]["sentry.severity_number"] = log["severity_number"]
         if "sentry.severity_text" not in log["attributes"]:
@@ -138,7 +127,7 @@ class LogBatcher:
             "level": str(log["severity_text"]),
             "body": str(log["body"]),
             "attributes": {
-                k: format_attribute(v) for (k, v) in log["attributes"].items()
+                k: serialize_attribute(v) for (k, v) in log["attributes"].items()
             },
         }
 
