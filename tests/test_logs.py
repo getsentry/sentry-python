@@ -563,7 +563,7 @@ def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
         python_logger = logging.Logger("test-logger")
         python_logger.warning("Hello, world!")
 
-    python_logger.warning("Hello, world!")
+    python_logger.warning("Hello again!")
 
     get_client().flush()
 
