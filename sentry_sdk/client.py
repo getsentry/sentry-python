@@ -907,26 +907,26 @@ class _Client(BaseClient):
 
         scope.apply_to_telemetry(telemetry)
 
-        before_send_getter = {
-            "log": lambda: get_before_send_log(self.options),
-            "metric": lambda: get_before_send_metric(self.options),
-        }.get(ty)
+        before_send = None
+        if ty == "log":
+            before_send = get_before_send_log(self.options)
+        elif ty == "metric":
+            before_send = get_before_send_metric(self.options)  # type: ignore
 
-        if before_send_getter is not None:
-            before_send = before_send_getter()
-            if before_send is not None:
-                telemetry = before_send(telemetry, {})  # type: ignore[arg-type]
+        if before_send is not None:
+            telemetry = before_send(telemetry, {})  # type: ignore
 
         if telemetry is None:
             return
 
-        batcher: "Optional[Union[LogBatcher, MetricsBatcher]]" = {
-            "log": self.log_batcher,
-            "metric": self.metrics_batcher,
-        }.get(ty)
+        batcher = None
+        if ty == "log":
+            batcher = self.log_batcher
+        elif ty == "metric":
+            batcher = self.metrics_batcher  # type: ignore
 
-        if batcher:
-            batcher.add(telemetry)  # type: ignore[arg-type]
+        if batcher is not None:
+            batcher.add(telemetry)  # type: ignore
 
     def _capture_log(self, log: "Optional[Log]", scope: "Scope") -> None:
         self._capture_telemetry(log, "log", scope)
