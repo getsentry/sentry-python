@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+import sentry_sdk
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import (
