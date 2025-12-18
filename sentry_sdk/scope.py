@@ -1741,7 +1741,7 @@ class Scope:
         self._attributes[attribute] = format_attribute(value)
 
     def remove_attribute(self, attribute: str) -> None:
-        """Remove an attribute if set on the scope."""
+        """Remove an attribute if set on the scope. No-op if there is no such attribute."""
         try:
             del self._attributes[attribute]
         except KeyError:
