@@ -31,7 +31,6 @@ def pytest_generate_tests(metafunc):
             - {
                 "clickhouse_driver",
                 "litellm",
-                "opentelemetry",
                 "pure_eval",
                 "ray",
                 "typer",
