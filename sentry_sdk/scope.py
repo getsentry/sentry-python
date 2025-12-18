@@ -1732,9 +1732,16 @@ class Scope:
         return self._flags
 
     def set_attribute(self, attribute: str, value: "AttributeValue") -> None:
+        """
+        Set an attribute on the scope.
+
+        Any attributes-based telemetry (logs, metrics) captured while this scope
+        is active will inherit attributes set on the scope.
+        """
         self._attributes[attribute] = format_attribute(value)
 
     def remove_attribute(self, attribute: str) -> None:
+        """Remove an attribute if set on the scope."""
         try:
             del self._attributes[attribute]
         except KeyError:
