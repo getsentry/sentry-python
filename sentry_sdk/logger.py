@@ -35,8 +35,11 @@ def _capture_log(
     body = template
 
     attrs: "Attributes" = {}
-    if "attributes" in kwargs:
-        attrs.update(kwargs.pop("attributes"))
+
+    if kwargs.get("attributes"):
+        for k, v in kwargs.pop("attributes").items():
+            attrs[k] = v if isinstance(v, (str, int, bool, float)) else safe_repr(v)
+
     for k, v in kwargs.items():
         attrs[f"sentry.message.parameter.{k}"] = v
     if kwargs:
