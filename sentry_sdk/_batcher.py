@@ -2,18 +2,18 @@ import os
 import random
 import threading
 from datetime import datetime, timezone
-from typing import Optional, List, Callable, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar, Generic
 
 from sentry_sdk.utils import format_timestamp, safe_repr, serialize_attribute
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
-    from typing import TypeVar
+    from typing import Optional, Callable, Any
 
-    T = TypeVar("T")
+T = TypeVar("T")
 
 
-class Batcher:
+class Batcher(Generic[T]):
     MAX_BEFORE_FLUSH = 100
     MAX_BEFORE_DROP = 1_000
     FLUSH_WAIT_TIME = 5.0
@@ -26,7 +26,7 @@ class Batcher:
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
     ) -> None:
-        self._buffer: "List[T]" = []
+        self._buffer: "list[T]" = []
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True

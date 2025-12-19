@@ -1,14 +1,11 @@
-import os
-import random
-import threading
-from datetime import datetime, timezone
-from typing import Optional, List, Callable, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.utils import format_timestamp, safe_repr, serialize_attribute
+from sentry_sdk.utils import serialize_attribute
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
+    from typing import Any
     from sentry_sdk._types import Log
 
 
