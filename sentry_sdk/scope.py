@@ -489,7 +489,14 @@ class Scope:
             If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NonRecordingClient`.
 
         """
-        self.client = client if client is not None else NonRecordingClient()
+        if client is not None:
+            self.client = client
+            # We need a client to set the initial global attributes on the global
+            # scope since they mostly come from client options, so populate them
+            # as soon as a client is set
+            sentry_sdk.get_global_scope()._set_global_attributes()
+        else:
+            self.client = NonRecordingClient()
 
     def fork(self) -> "Scope":
         """
