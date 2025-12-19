@@ -349,9 +349,8 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
-    python_logger = logging.Logger("test-logger")
     for i in range(200):
-        python_logger.warning("log #%d", i)
+        sentry_sdk.logger.warning("log #%d", i)
 
     for _ in range(500):
         time.sleep(1.0 / 100.0)
@@ -368,8 +367,7 @@ def test_log_user_attributes(sentry_init, capture_envelopes):
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     envelopes = capture_envelopes()
 
-    python_logger = logging.Logger("test-logger")
-    python_logger.warning("Hello, world!")
+    sentry_sdk.logger.warning("Hello, world!")
 
     get_client().flush()
 
@@ -391,8 +389,7 @@ def test_log_no_user_attributes_if_no_pii(sentry_init, capture_envelopes):
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     envelopes = capture_envelopes()
 
-    python_logger = logging.Logger("test-logger")
-    python_logger.warning("Hello, world!")
+    sentry_sdk.logger.warning("Hello, world!")
 
     get_client().flush()
 
@@ -412,8 +409,7 @@ def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
-    python_logger = logging.Logger("test-logger")
-    python_logger.warning("log #%d", 1)
+    sentry_sdk.logger.warning("log")
 
     for _ in range(100):
         time.sleep(1.0 / 10.0)
