@@ -292,6 +292,51 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
         assert lost_event_call == ("queue_overflow", "trace_metric", 1)
 
 
+def test_metric_gets_attributes_from_scopes(sentry_init, capture_envelopes):
+    sentry_init()
+
+    envelopes = capture_envelopes()
+
+    global_scope = sentry_sdk.get_global_scope()
+    global_scope.set_attribute("global.attribute", "value")
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("current.attribute", "value")
+        sentry_sdk.metrics.count("test", 1)
+
+    sentry_sdk.metrics.count("test", 1)
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    (metric1, metric2) = metrics
+
+    assert metric1["attributes"]["global.attribute"] == "value"
+    assert metric1["attributes"]["current.attribute"] == "value"
+
+    assert metric2["attributes"]["global.attribute"] == "value"
+    assert "current.attribute" not in metric2["attributes"]
+
+
+def test_metric_attributes_override_scope_attributes(sentry_init, capture_envelopes):
+    sentry_init()
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("durable.attribute", "value1")
+        scope.set_attribute("temp.attribute", "value1")
+        sentry_sdk.metrics.count("test", 1, attributes={"temp.attribute": "value2"})
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    (metric,) = metrics
+
+    assert metric["attributes"]["durable.attribute"] == "value1"
+    assert metric["attributes"]["temp.attribute"] == "value2"
+
+
 def test_preserialization(sentry_init, capture_envelopes):
     """We don't store references to objects in attributes."""
     sentry_init()

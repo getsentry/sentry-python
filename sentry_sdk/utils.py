@@ -2047,7 +2047,25 @@ def get_before_send_metric(
     )
 
 
+def format_attribute(val: "Any") -> "AttributeValue":
+    """
+    Turn unsupported attribute value types into an AttributeValue.
+
+    We do this as soon as a user-provided attribute is set, to prevent spans,
+    logs, metrics and similar from having live references to various objects.
+
+    Note: This is not the final attribute value format. Before they're sent,
+    they're serialized further into the actual format the protocol expects:
+    https://develop.sentry.dev/sdk/telemetry/attributes/
+    """
+    if isinstance(val, (bool, int, float, str)):
+        return val
+
+    return safe_repr(val)
+
+
 def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
+    """Serialize attribute value to the transport format."""
     if isinstance(val, bool):
         return {"value": val, "type": "boolean"}
     if isinstance(val, int):
@@ -2057,5 +2075,6 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     if isinstance(val, str):
         return {"value": val, "type": "string"}
 
-    # Coerce to string if we don't know what to do with the value
+    # Coerce to string if we don't know what to do with the value. This should
+    # never happen as we pre-format early in format_attribute, but let's be safe.
     return {"value": safe_repr(val), "type": "string"}

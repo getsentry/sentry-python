@@ -4,7 +4,7 @@ import time
 from typing import Any, TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.utils import safe_repr, capture_internal_exceptions
+from sentry_sdk.utils import format_attribute, safe_repr, capture_internal_exceptions
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Attributes, Log
@@ -34,29 +34,28 @@ def _capture_log(
 ) -> None:
     body = template
 
-    attrs: "Attributes" = {}
+    attributes: "Attributes" = {}
 
     if "attributes" in kwargs:
-        attrs.update(kwargs.pop("attributes"))
+        provided_attributes = kwargs.pop("attributes") or {}
+        for attribute, value in provided_attributes.items():
+            attributes[attribute] = format_attribute(value)
 
     for k, v in kwargs.items():
-        attrs[f"sentry.message.parameter.{k}"] = v
+        attributes[f"sentry.message.parameter.{k}"] = format_attribute(v)
 
     if kwargs:
         # only attach template if there are parameters
-        attrs["sentry.message.template"] = template
+        attributes["sentry.message.template"] = format_attribute(template)
 
         with capture_internal_exceptions():
             body = template.format_map(_dict_default_key(kwargs))
-
-    for k, v in attrs.items():
-        attrs[k] = v if isinstance(v, (str, int, bool, float)) else safe_repr(v)
 
     sentry_sdk.get_current_scope()._capture_log(
         {
             "severity_text": severity_text,
             "severity_number": severity_number,
-            "attributes": attrs,
+            "attributes": attributes,
             "body": body,
             "time_unix_nano": time.time_ns(),
             "trace_id": None,
