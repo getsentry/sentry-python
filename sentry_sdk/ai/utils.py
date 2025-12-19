@@ -5,6 +5,8 @@ from copy import deepcopy
 from sys import getsizeof
 from typing import TYPE_CHECKING
 
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -141,6 +143,57 @@ def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> 
     return 0
 
 
+def redact_blob_message_parts(
+    messages: "List[Dict[str, Any]]",
+) -> "List[Dict[str, Any]]":
+    """
+    Redact blob message parts from the messages, by removing the "content" key.
+    e.g:
+    {
+        "role": "user",
+        "content": [
+            {
+                "text": "How many ponies do you see in the image?",
+                "type": "text"
+            },
+            {
+                "type": "blob",
+                "modality": "image",
+                "mime_type": "image/jpeg",
+                "content": "data:image/jpeg;base64,..."
+            }
+        ]
+    }
+    becomes:
+    {
+        "role": "user",
+        "content": [
+            {
+                "text": "How many ponies do you see in the image?",
+                "type": "text"
+            },
+            {
+                "type": "blob",
+                "modality": "image",
+                "mime_type": "image/jpeg",
+                "content": "[Filtered]"
+            }
+        ]
+    }
+    """
+
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+
+        content = message.get("content")
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "blob":
+                    item["content"] = SENSITIVE_DATA_SUBSTITUTE
+    return messages
+
+
 def truncate_messages_by_size(
     messages: "List[Dict[str, Any]]",
     max_bytes: int = MAX_GEN_AI_MESSAGE_BYTES,
@@ -185,6 +238,8 @@ def truncate_and_annotate_messages(
 ) -> "Optional[List[Dict[str, Any]]]":
     if not messages:
         return None
+
+    messages = redact_blob_message_parts(messages)
 
     truncated_messages, removed_count = truncate_messages_by_size(messages, max_bytes)
     if removed_count > 0:
