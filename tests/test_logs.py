@@ -350,7 +350,7 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     for i in range(200):
-        sentry_sdk.logger.warning("log #%d", i)
+        sentry_sdk.logger.warning("log")
 
     for _ in range(500):
         time.sleep(1.0 / 100.0)
