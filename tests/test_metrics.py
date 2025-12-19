@@ -1,6 +1,8 @@
 import json
 import sys
 from typing import List, Any, Mapping
+from unittest import mock
+
 import pytest
 
 import sentry_sdk
@@ -266,6 +268,61 @@ def test_metrics_experimental_before_send(sentry_init, capture_envelopes):
     assert len(metrics) == 1
     assert metrics[0]["name"] == "test.keep"
     assert before_metric_called
+
+
+def test_transport_format(sentry_init, capture_envelopes):
+    sentry_init(server_name="test-server", release="1.0.0")
+
+    envelopes = capture_envelopes()
+
+    sentry_sdk.metrics.count("test.counter", 1)
+
+    sentry_sdk.get_client().flush()
+
+    assert len(envelopes) == 1
+    assert len(envelopes[0].items) == 1
+    item = envelopes[0].items[0]
+
+    assert item.type == "trace_metric"
+    assert item.headers == {
+        "type": "trace_metric",
+        "item_count": 1,
+        "content_type": "application/vnd.sentry.items.trace-metric+json",
+    }
+    assert item.payload.json == {
+        "items": [
+            {
+                "name": "test.counter",
+                "type": "counter",
+                "value": 1,
+                "timestamp": mock.ANY,
+                "trace_id": mock.ANY,
+                "span_id": mock.ANY,
+                "attributes": {
+                    "sentry.environment": {
+                        "type": "string",
+                        "value": "production",
+                    },
+                    "sentry.release": {
+                        "type": "string",
+                        "value": "1.0.0",
+                    },
+                    "sentry.sdk.name": {
+                        "type": "string",
+                        "value": mock.ANY,
+                    },
+                    "sentry.sdk.version": {
+                        "type": "string",
+                        "value": VERSION,
+                    },
+                    "server.address": {
+                        "type": "string",
+                        "value": "test-server",
+                    },
+                },
+            }
+        ]
+    }
 
 
 def test_batcher_drops_metrics(sentry_init, monkeypatch):
