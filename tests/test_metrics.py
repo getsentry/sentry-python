@@ -290,3 +290,33 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
     assert len(lost_event_calls) == 5
     for lost_event_call in lost_event_calls:
         assert lost_event_call == ("queue_overflow", "trace_metric", 1)
+
+
+def test_preserialization(sentry_init, capture_envelopes):
+    """We don't store references to objects in attributes."""
+    sentry_init()
+
+    envelopes = capture_envelopes()
+
+    class Cat:
+        pass
+
+    instance = Cat()
+    dictionary = {"color": "tortoiseshell"}
+
+    sentry_sdk.metrics.count(
+        "test.counter",
+        1,
+        attributes={
+            "instance": instance,
+            "dictionary": dictionary,
+        },
+    )
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    (metric,) = metrics
+
+    assert isinstance(metric["attributes"]["instance"], str)
+    assert isinstance(metric["attributes"]["dictionary"], str)

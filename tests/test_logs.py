@@ -548,3 +548,32 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                 }
             ]
         }
+
+
+def test_preserialization(sentry_init, capture_envelopes):
+    """We don't store references to objects in attributes."""
+    sentry_init(enable_logs=True)
+
+    envelopes = capture_envelopes()
+
+    class Cat:
+        pass
+
+    instance = Cat()
+    dictionary = {"color": "tortoiseshell"}
+
+    sentry_sdk.logger.warning(
+        "Hello world!",
+        attributes={
+            "instance": instance,
+            "dictionary": dictionary,
+        },
+    )
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log,) = logs
+
+    assert isinstance(log["attributes"]["instance"], str)
+    assert isinstance(log["attributes"]["dictionary"], str)
