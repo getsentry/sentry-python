@@ -472,6 +472,69 @@ def test_logs_with_literal_braces(
 
 
 @minimum_python_37
+def test_transport_format(sentry_init, capture_envelopes):
+    sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
+
+    envelopes = capture_envelopes()
+
+    sentry_sdk.logger.warning("This is a log...")
+
+    sentry_sdk.get_client().flush()
+
+    assert len(envelopes) == 1
+    assert len(envelopes[0].items) == 1
+    item = envelopes[0].items[0]
+
+    assert item.type == "log"
+    assert item.headers == {
+        "type": "log",
+        "item_count": 1,
+        "content_type": "application/vnd.sentry.items.log+json",
+    }
+    assert item.payload.json == {
+        "items": [
+            {
+                "body": "This is a log...",
+                "level": "warn",
+                "timestamp": mock.ANY,
+                "trace_id": mock.ANY,
+                "span_id": mock.ANY,
+                "attributes": {
+                    "sentry.environment": {
+                        "type": "string",
+                        "value": "production",
+                    },
+                    "sentry.release": {
+                        "type": "string",
+                        "value": "1.0.0",
+                    },
+                    "sentry.sdk.name": {
+                        "type": "string",
+                        "value": mock.ANY,
+                    },
+                    "sentry.sdk.version": {
+                        "type": "string",
+                        "value": VERSION,
+                    },
+                    "sentry.severity_number": {
+                        "type": "integer",
+                        "value": 13,
+                    },
+                    "sentry.severity_text": {
+                        "type": "string",
+                        "value": "warn",
+                    },
+                    "server.address": {
+                        "type": "string",
+                        "value": "test-server",
+                    },
+                },
+            }
+        ]
+    }
+
+
+@minimum_python_37
 def test_batcher_drops_logs(sentry_init, monkeypatch):
     sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
     client = sentry_sdk.get_client()
