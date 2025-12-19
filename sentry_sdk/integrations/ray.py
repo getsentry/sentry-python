@@ -36,6 +36,26 @@ def _check_sentry_initialized() -> None:
     )
 
 
+def _insert_sentry_tracing_in_signature(func: "Callable[..., Any]") -> None:
+    # Patching new_func signature to add the _sentry_tracing parameter to it
+    # Ray later inspects the signature and finds the unexpected parameter otherwise
+    signature = inspect.signature(func)
+    params = list(signature.parameters.values())
+    sentry_tracing_param = inspect.Parameter(
+        "_sentry_tracing",
+        kind=inspect.Parameter.KEYWORD_ONLY,
+        default=None,
+    )
+
+    # Keyword only arguments are penultimate if function has variadic keyword arguments
+    if params and params[-1].kind is inspect.Parameter.VAR_KEYWORD:
+        params.insert(-1, sentry_tracing_param)
+    else:
+        params.append(sentry_tracing_param)
+
+    func.__signature__ = signature.replace(parameters=params)  # type: ignore[attr-defined]
+
+
 def _patch_ray_remote() -> None:
     old_remote = ray.remote
 
@@ -86,18 +106,7 @@ def _patch_ray_remote() -> None:
 
                     return result
 
-            # Patching new_func signature to add the _sentry_tracing parameter to it
-            # Ray later inspects the signature and finds the unexpected parameter otherwise
-            signature = inspect.signature(new_func)
-            params = list(signature.parameters.values())
-            params.append(
-                inspect.Parameter(
-                    "_sentry_tracing",
-                    kind=inspect.Parameter.KEYWORD_ONLY,
-                    default=None,
-                )
-            )
-            new_func.__signature__ = signature.replace(parameters=params)  # type: ignore[attr-defined]
+            _insert_sentry_tracing_in_signature(new_func)
 
             if f:
                 rv = old_remote(new_func)
