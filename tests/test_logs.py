@@ -597,3 +597,40 @@ def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes
 
     assert log["attributes"]["durable.attribute"] == "value1"
     assert log["attributes"]["temp.attribute"] == "value2"
+
+
+@minimum_python_37
+def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes):
+    """We don't surface references to objects in attributes."""
+
+    def before_send_log(log, _):
+        assert isinstance(log["attributes"]["instance"], str)
+        assert isinstance(log["attributes"]["dictionary"], str)
+
+        return log
+
+    sentry_init(enable_logs=True, before_send_log=before_send_log)
+
+    envelopes = capture_envelopes()
+
+    class Cat:
+        pass
+
+    instance = Cat()
+    dictionary = {"color": "tortoiseshell"}
+
+    sentry_sdk.logger.warning(
+        "Hello world!",
+        attributes={
+            "instance": instance,
+            "dictionary": dictionary,
+        },
+    )
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log,) = logs
+
+    assert isinstance(log["attributes"]["instance"], str)
+    assert isinstance(log["attributes"]["dictionary"], str)
