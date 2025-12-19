@@ -1497,6 +1497,13 @@ class Scope:
             if attribute not in telemetry["attributes"]:
                 telemetry["attributes"][attribute] = value
 
+    def _apply_scope_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        for attribute, value in self._attributes.items():
+            if attribute not in telemetry["attributes"]:
+                telemetry["attributes"][attribute] = value
+
     def _apply_user_attributes_to_telemetry(
         self, telemetry: "Union[Log, Metric]"
     ) -> None:
@@ -1633,6 +1640,7 @@ class Scope:
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
+        self._apply_global_attributes_to_telemetry(telemetry)
 
     def update_from_scope(self, scope: "Scope") -> None:
         """Update the scope with another scope's data."""
