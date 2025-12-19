@@ -117,3 +117,41 @@ def test_remove_attribute(sentry_init, capture_envelopes):
     (metric,) = metrics
 
     assert "some.attribute" not in metric["attributes"]
+
+
+def test_scope_attributes_preserialized(sentry_init, capture_envelopes):
+    def before_send_metric(metric, _):
+        # Scope attrs show up serialized in before_send
+        assert isinstance(metric["attributes"]["instance"], str)
+        assert isinstance(metric["attributes"]["dictionary"], str)
+
+        return metric
+
+    sentry_init(before_send_metric=before_send_metric)
+
+    envelopes = capture_envelopes()
+
+    class Cat:
+        pass
+
+    instance = Cat()
+    dictionary = {"color": "tortoiseshell"}
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("instance", instance)
+        scope.set_attribute("dictionary", dictionary)
+
+        # Scope attrs are stored preserialized
+        assert isinstance(scope._attributes["instance"], str)
+        assert isinstance(scope._attributes["dictionary"], str)
+
+        sentry_sdk.metrics.count("test", 1)
+
+    sentry_sdk.get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    (metric,) = metrics
+
+    # Attrs originally from the scope are serialized when sent
+    assert isinstance(metric["attributes"]["instance"], str)
+    assert isinstance(metric["attributes"]["dictionary"], str)
