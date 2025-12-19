@@ -38,7 +38,7 @@ class MetricsBatcher(Batcher):
 
         return res
 
-    def _report_lost(self):
+    def _record_lost(self):
         self._record_lost_func(
             reason="queue_overflow",
             data_category="trace_metric",

@@ -17,24 +17,6 @@ class LogBatcher(Batcher):
     TYPE = "log"
     CONTENT_TYPE = "application/vnd.sentry.items.log+json"
 
-    def _record_lost(self, item: "Log") -> None:
-        # Construct log envelope item without sending it to report lost bytes
-        log_item = Item(
-            type=self.TYPE,
-            content_type=self.CONTENT_TYPE,
-            headers={
-                "item_count": 1,
-            },
-            payload=PayloadRef(json={"items": [self._to_transport_format(item)]}),
-        )
-
-        self._record_lost_func(
-            reason="queue_overflow",
-            data_category="log_item",
-            item=log_item,
-            quantity=1,
-        )
-
     @staticmethod
     def _to_transport_format(item: "Log") -> "Any":
         if "sentry.severity_number" not in item["attributes"]:
@@ -54,3 +36,21 @@ class LogBatcher(Batcher):
         }
 
         return res
+
+    def _record_lost(self, item: "Log") -> None:
+        # Construct log envelope item without sending it to report lost bytes
+        log_item = Item(
+            type=self.TYPE,
+            content_type=self.CONTENT_TYPE,
+            headers={
+                "item_count": 1,
+            },
+            payload=PayloadRef(json={"items": [self._to_transport_format(item)]}),
+        )
+
+        self._record_lost_func(
+            reason="queue_overflow",
+            data_category="log_item",
+            item=log_item,
+            quantity=1,
+        )
