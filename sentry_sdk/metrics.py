@@ -7,7 +7,7 @@ import time
 from typing import Any, Optional, TYPE_CHECKING, Union
 
 import sentry_sdk
-from sentry_sdk.utils import safe_repr
+from sentry_sdk.utils import format_attribute, safe_repr
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Attributes, Metric, MetricType
@@ -24,7 +24,7 @@ def _capture_metric(
 
     if attributes:
         for k, v in attributes.items():
-            attrs[k] = v if isinstance(v, (str, int, bool, float)) else safe_repr(v)
+            attrs[k] = format_attribute(v)
 
     metric: "Metric" = {
         "timestamp": time.time(),
