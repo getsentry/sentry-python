@@ -342,6 +342,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
     assert logs[0]["span_id"] == span.span_id
 
 
+@minimum_python_37
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     """
     If you log >100 logs, it should automatically trigger a flush.
@@ -360,6 +361,7 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     raise AssertionError("200 logs were never flushed after five seconds")
 
 
+@minimum_python_37
 def test_log_user_attributes(sentry_init, capture_envelopes):
     """User attributes are sent if enable_logs is True and send_default_pii is True."""
     sentry_init(enable_logs=True, send_default_pii=True)
@@ -382,6 +384,7 @@ def test_log_user_attributes(sentry_init, capture_envelopes):
     }
 
 
+@minimum_python_37
 def test_log_no_user_attributes_if_no_pii(sentry_init, capture_envelopes):
     """User attributes are not if PII sending is off."""
     sentry_init(enable_logs=True, send_default_pii=False)
