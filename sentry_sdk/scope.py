@@ -366,7 +366,7 @@ class Scope:
 
         return _global_scope
 
-    def _set_global_attributes(self) -> None:
+    def set_global_attributes(self) -> None:
         from sentry_sdk.client import SDK_INFO
 
         self.set_attribute("sentry.sdk.name", SDK_INFO["name"])
@@ -493,7 +493,7 @@ class Scope:
             # We need a client to set the initial global attributes on the global
             # scope since they mostly come from client options, so populate them
             # as soon as a client is set
-            sentry_sdk.get_global_scope()._set_global_attributes()
+            sentry_sdk.get_global_scope().set_global_attributes()
         else:
             self.client = NonRecordingClient()
 
