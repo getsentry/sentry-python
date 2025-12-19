@@ -363,7 +363,6 @@ class Scope:
         global _global_scope
         if _global_scope is None:
             _global_scope = Scope(ty=ScopeType.GLOBAL)
-            _global_scope._set_global_attributes()
 
         return _global_scope
 
