@@ -600,9 +600,16 @@ def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes
 
 
 @minimum_python_37
-def test_preserialization(sentry_init, capture_envelopes):
-    """We don't store references to objects in attributes."""
-    sentry_init(enable_logs=True)
+def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes):
+    """We don't surface references to objects in attributes."""
+
+    def before_send_log(log, _):
+        assert isinstance(log["attributes"]["instance"], str)
+        assert isinstance(log["attributes"]["dictionary"], str)
+
+        return log
+
+    sentry_init(enable_logs=True, before_send_log=before_send_log)
 
     envelopes = capture_envelopes()
 

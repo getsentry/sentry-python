@@ -337,9 +337,16 @@ def test_metric_attributes_override_scope_attributes(sentry_init, capture_envelo
     assert metric["attributes"]["temp.attribute"] == "value2"
 
 
-def test_preserialization(sentry_init, capture_envelopes):
-    """We don't store references to objects in attributes."""
-    sentry_init()
+def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes):
+    """We don't surface references to objects in attributes."""
+
+    def before_send_metric(metric, _):
+        assert isinstance(metric["attributes"]["instance"], str)
+        assert isinstance(metric["attributes"]["dictionary"], str)
+
+        return metric
+
+    sentry_init(before_send_metric=before_send_metric)
 
     envelopes = capture_envelopes()
 
