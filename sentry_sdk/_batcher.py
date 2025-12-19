@@ -99,10 +99,6 @@ class Batcher(Generic[T]):
     def flush(self) -> None:
         self._flush()
 
-    @staticmethod
-    def _to_transport_format(item: "T") -> "Any":
-        pass
-
     def _add_to_envelope(self, envelope: "Envelope") -> None:
         envelope.add_item(
             Item(
@@ -121,9 +117,6 @@ class Batcher(Generic[T]):
             )
         )
 
-    def _record_lost(self, item: "T") -> None:
-        pass
-
     def _flush(self) -> "Optional[Envelope]":
         envelope = Envelope(
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
@@ -137,3 +130,10 @@ class Batcher(Generic[T]):
 
         self._capture_func(envelope)
         return envelope
+
+    def _record_lost(self, item: "T") -> None:
+        pass
+
+    @staticmethod
+    def _to_transport_format(item: "T") -> "Any":
+        pass
