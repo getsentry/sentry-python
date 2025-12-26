@@ -1,9 +1,14 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
+    # ruff-pre-commit is not using tool.ruff.include setting,
+    # so `files` need to be specified here.
+    # https://github.com/astral-sh/ruff-pre-commit/issues/71
 -   repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.10
     hooks:
     -   id: ruff-check
         args: [--fix]
+        files: ^(sentry_sdk/|tests/)
     -   id: ruff-format
+        files: ^(sentry_sdk/|tests/)
