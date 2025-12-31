@@ -100,11 +100,85 @@ def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str,
 
 
 def get_start_span_function() -> "Callable[..., Any]":
+    """
+    Determine whether to create a span or transaction for AI operations.
+
+    Checks in priority order:
+    1. MCP request context has sentry-trace headers: create transaction continuing the trace
+    2. Transaction exists in current scope: create child span
+    3. Otherwise: create new transaction
+
+    This ensures MCP tool calls properly continue distributed traces while maintaining
+    correct span hierarchies for local operations.
+    """
+    # Check for distributed trace headers in MCP request context for cross-service tracing
+    try:
+        from mcp.server.lowlevel.server import request_ctx  # type: ignore[import-not-found]
+
+        ctx = request_ctx.get()
+        if ctx and hasattr(ctx, "request") and ctx.request is not None:
+            request = ctx.request
+            if hasattr(request, "headers"):
+                sentry_trace = request.headers.get("sentry-trace")
+                if sentry_trace:
+                    return _create_transaction_from_mcp_headers
+    except (ImportError, LookupError):
+        # MCP not installed or no request context, fall through to normal logic
+        pass
+
+    # Normal logic: create span if transaction exists, otherwise create transaction
     current_span = sentry_sdk.get_current_span()
     transaction_exists = (
         current_span is not None and current_span.containing_transaction is not None
     )
     return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
+
+
+def _create_transaction_from_mcp_headers(
+    op: "Optional[str]" = None,
+    name: "Optional[str]" = None,
+    origin: str = "manual",
+    **kwargs: "Any",
+) -> "Any":
+    """
+    Create transaction continuing distributed trace from MCP request headers.
+
+    Extracts sentry-trace and baggage headers from MCP request context and uses
+    continue_trace() to create a transaction inheriting trace_id and parent_span_id.
+    Ensures MCP tool executions join the distributed trace while remaining transactions
+    for MCP Insights dashboard compatibility.
+    """
+    try:
+        from mcp.server.lowlevel.server import request_ctx  # type: ignore[import-not-found]
+
+        ctx = request_ctx.get()
+        if ctx and hasattr(ctx, "request") and ctx.request is not None:
+            request = ctx.request
+            if hasattr(request, "headers"):
+                headers = {}
+
+                # Extract trace propagation headers
+                sentry_trace = request.headers.get("sentry-trace")
+                baggage = request.headers.get("baggage")
+
+                if sentry_trace:
+                    headers["sentry-trace"] = sentry_trace
+                    if baggage:
+                        headers["baggage"] = baggage
+
+                    # Use continue_trace to create transaction inheriting trace context
+                    isolation_scope = sentry_sdk.get_isolation_scope()
+                    transaction = isolation_scope.continue_trace(
+                        environ_or_headers=headers, op=op, name=name, origin=origin
+                    )
+
+                    # Start transaction on scope so it becomes active
+                    return sentry_sdk.start_transaction(transaction=transaction)
+    except Exception as e:
+        logger.debug("Could not create transaction from MCP headers: %s", e)
+
+    # Fallback: create new transaction if headers unavailable
+    return sentry_sdk.start_transaction(op=op, name=name, origin=origin, **kwargs)
 
 
 def _truncate_single_message_content_if_present(
