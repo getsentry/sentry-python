@@ -1,3 +1,4 @@
+import base64
 import copy
 import inspect
 from functools import wraps
@@ -12,6 +13,7 @@ from typing import (
     Optional,
     Union,
     TypedDict,
+    Dict,
 )
 
 import sentry_sdk
@@ -19,6 +21,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     truncate_and_annotate_messages,
     normalize_message_roles,
+    redact_blob_message_parts,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
@@ -145,42 +148,321 @@ def get_model_name(model: "Union[str, Model]") -> str:
     return str(model)
 
 
-def extract_contents_text(contents: "ContentListUnion") -> "Optional[str]":
-    """Extract text from contents parameter which can have various formats."""
+def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, Any]]":
+    """Extract messages from contents parameter which can have various formats.
+
+    Returns a list of message dictionaries in the format:
+    - System: {"role": "system", "content": "string"}
+    - User/Assistant: {"role": "user"|"assistant", "content": [{"text": "...", "type": "text"}, ...]}
+    """
     if contents is None:
+        return []
+
+    messages = []
+
+    # Handle string case
+    if isinstance(contents, str):
+        return [{"role": "user", "content": contents}]
+
+    # Handle list case - process each item (non-recursive, flatten at top level)
+    if isinstance(contents, list):
+        for item in contents:
+            item_messages = extract_contents_messages(item)
+            messages.extend(item_messages)
+        return messages
+
+    # Handle dictionary case (ContentDict)
+    if isinstance(contents, dict):
+        role = contents.get("role", "user")
+        parts = contents.get("parts")
+
+        if parts:
+            content_parts = []
+            tool_messages = []
+
+            for part in parts:
+                part_result = _extract_part_content(part)
+                if part_result is None:
+                    continue
+
+                if isinstance(part_result, dict) and part_result.get("role") == "tool":
+                    # Tool message - add separately
+                    tool_messages.append(part_result)
+                else:
+                    # Regular content part
+                    content_parts.append(part_result)
+
+            # Add main message if we have content parts
+            if content_parts:
+                # Normalize role: "model" -> "assistant"
+                normalized_role = "assistant" if role == "model" else role or "user"
+                messages.append({"role": normalized_role, "content": content_parts})
+
+            # Add tool messages
+            messages.extend(tool_messages)
+        elif "text" in contents:
+            # Simple text in dict
+            messages.append(
+                {
+                    "role": role or "user",
+                    "content": [{"text": contents["text"], "type": "text"}],
+                }
+            )
+
+        return messages
+
+    # Handle Content object
+    if hasattr(contents, "parts") and contents.parts:
+        role = getattr(contents, "role", None) or "user"
+        content_parts = []
+        tool_messages = []
+
+        for part in contents.parts:
+            part_result = _extract_part_content(part)
+            if part_result is None:
+                continue
+
+            if isinstance(part_result, dict) and part_result.get("role") == "tool":
+                tool_messages.append(part_result)
+            else:
+                content_parts.append(part_result)
+
+        if content_parts:
+            normalized_role = "assistant" if role == "model" else role
+            messages.append({"role": normalized_role, "content": content_parts})
+
+        messages.extend(tool_messages)
+        return messages
+
+    # Handle Part object directly
+    part_result = _extract_part_content(contents)
+    if part_result:
+        if isinstance(part_result, dict) and part_result.get("role") == "tool":
+            return [part_result]
+        else:
+            return [{"role": "user", "content": [part_result]}]
+
+    # Handle PIL.Image.Image
+    try:
+        from PIL import Image as PILImage
+
+        if isinstance(contents, PILImage.Image):
+            blob_part = _extract_pil_image(contents)
+            if blob_part:
+                return [{"role": "user", "content": [blob_part]}]
+    except ImportError:
+        pass
+
+    # Handle File object
+    if hasattr(contents, "uri") and hasattr(contents, "mime_type"):
+        # File object
+        file_uri = getattr(contents, "uri", None)
+        mime_type = getattr(contents, "mime_type", None)
+        if file_uri and mime_type:
+            blob_part = {
+                "type": "blob",
+                "mime_type": mime_type,
+                "file_uri": file_uri,
+            }
+            return [{"role": "user", "content": [blob_part]}]
+
+    # Handle direct text attribute
+    if hasattr(contents, "text") and contents.text:
+        return [
+            {"role": "user", "content": [{"text": str(contents.text), "type": "text"}]}
+        ]
+
+    return []
+
+
+def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
+    """Extract content from a Part object or dict.
+
+    Returns:
+        - dict for content part (text/blob) or tool message
+        - None if part should be skipped
+    """
+    if part is None:
         return None
 
-    # Simple string case
-    if isinstance(contents, str):
-        return contents
+    # Handle dict Part
+    if isinstance(part, dict):
+        # Check for function_response first (tool message)
+        if "function_response" in part:
+            return _extract_tool_message_from_part(part)
 
-    # List of contents or parts
-    if isinstance(contents, list):
-        texts = []
-        for item in contents:
-            # Recursively extract text from each item
-            extracted = extract_contents_text(item)
-            if extracted:
-                texts.append(extracted)
-        return " ".join(texts) if texts else None
+        if "text" in part:
+            return {"text": part["text"], "type": "text"}
 
-    # Dictionary case
-    if isinstance(contents, dict):
-        if "text" in contents:
-            return contents["text"]
-        # Try to extract from parts if present in dict
-        if "parts" in contents:
-            return extract_contents_text(contents["parts"])
+        if "file_data" in part:
+            file_data = part["file_data"]
+            if isinstance(file_data, dict):
+                return {
+                    "type": "blob",
+                    "mime_type": file_data.get("mime_type"),
+                    "file_uri": file_data.get("file_uri"),
+                }
 
-    # Content object with parts - recurse into parts
-    if getattr(contents, "parts", None):
-        return extract_contents_text(contents.parts)
+        if "inline_data" in part:
+            inline_data = part["inline_data"]
+            if isinstance(inline_data, dict):
+                data = inline_data.get("data")
+                mime_type = inline_data.get("mime_type")
+                if data and mime_type:
+                    # Encode bytes to base64
+                    if isinstance(data, bytes):
+                        data_b64 = base64.b64encode(data).decode("utf-8")
+                        return {
+                            "type": "blob",
+                            "mime_type": mime_type,
+                            "content": f"data:{mime_type};base64,{data_b64}",
+                        }
 
-    # Direct text attribute
-    if hasattr(contents, "text"):
-        return contents.text
+        return None
+
+    # Handle Part object
+    # Check for function_response (tool message)
+    if hasattr(part, "function_response") and part.function_response:
+        return _extract_tool_message_from_part(part)
+
+    # Handle text
+    if hasattr(part, "text") and part.text:
+        return {"text": part.text, "type": "text"}
+
+    # Handle file_data
+    if hasattr(part, "file_data") and part.file_data:
+        file_data = part.file_data
+        file_uri = getattr(file_data, "file_uri", None)
+        mime_type = getattr(file_data, "mime_type", None)
+        if file_uri and mime_type:
+            return {
+                "type": "blob",
+                "mime_type": mime_type,
+                "file_uri": file_uri,
+            }
+
+    # Handle inline_data
+    if hasattr(part, "inline_data") and part.inline_data:
+        inline_data = part.inline_data
+        data = getattr(inline_data, "data", None)
+        mime_type = getattr(inline_data, "mime_type", None)
+        if data and mime_type:
+            # Encode bytes to base64
+            if isinstance(data, bytes):
+                data_b64 = base64.b64encode(data).decode("utf-8")
+                return {
+                    "type": "blob",
+                    "mime_type": mime_type,
+                    "content": f"data:{mime_type};base64,{data_b64}",
+                }
 
     return None
+
+
+def _extract_tool_message_from_part(part: "Any") -> "Optional[dict[str, Any]]":
+    """Extract tool message from a Part with function_response.
+
+    Returns:
+        {"role": "tool", "content": {"toolCallId": "...", "toolName": "...", "output": "..."}}
+        or None if not a valid tool message
+    """
+    function_response = None
+
+    if isinstance(part, dict):
+        function_response = part.get("function_response")
+    elif hasattr(part, "function_response"):
+        function_response = part.function_response
+
+    if not function_response:
+        return None
+
+    # Extract fields from function_response
+    tool_call_id = None
+    tool_name = None
+    output = None
+
+    if isinstance(function_response, dict):
+        tool_call_id = function_response.get("id")
+        tool_name = function_response.get("name")
+        response_dict = function_response.get("response", {})
+        # Prefer "output" key if present, otherwise use entire response
+        output = response_dict.get("output", response_dict)
+    else:
+        # FunctionResponse object
+        tool_call_id = getattr(function_response, "id", None)
+        tool_name = getattr(function_response, "name", None)
+        response_obj = getattr(function_response, "response", None)
+        if response_obj:
+            if isinstance(response_obj, dict):
+                output = response_obj.get("output", response_obj)
+            else:
+                output = response_obj
+
+    if not tool_name:
+        return None
+
+    return {
+        "role": "tool",
+        "content": {
+            "toolCallId": str(tool_call_id) if tool_call_id else None,
+            "toolName": str(tool_name),
+            "output": safe_serialize(output) if output is not None else None,
+        },
+    }
+
+
+def _extract_pil_image(image: "Any") -> "Optional[dict[str, Any]]":
+    """Extract blob part from PIL.Image.Image."""
+    try:
+        from PIL import Image as PILImage
+        import io
+
+        if not isinstance(image, PILImage.Image):
+            return None
+
+        # Get format, default to JPEG
+        format_str = image.format or "JPEG"
+        suffix = format_str.lower()
+        mime_type = f"image/{suffix}"
+
+        # Convert to bytes
+        bytes_io = io.BytesIO()
+        image.save(bytes_io, format=format_str)
+        image_bytes = bytes_io.getvalue()
+
+        # Encode to base64
+        data_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
+        return {
+            "type": "blob",
+            "mime_type": mime_type,
+            "content": f"data:{mime_type};base64,{data_b64}",
+        }
+    except Exception:
+        return None
+
+
+def extract_contents_text(contents: "ContentListUnion") -> "Optional[str]":
+    """Extract text from contents parameter which can have various formats.
+
+    This is a compatibility function that extracts text from messages.
+    For new code, use extract_contents_messages instead.
+    """
+    messages = extract_contents_messages(contents)
+    if not messages:
+        return None
+
+    texts = []
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, str):
+            texts.append(content)
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    texts.append(part.get("text", ""))
+
+    return " ".join(texts) if texts else None
 
 
 def _format_tools_for_span(
@@ -457,16 +739,32 @@ def set_span_data_for_request(
         if config and hasattr(config, "system_instruction"):
             system_instruction = config.system_instruction
             if system_instruction:
-                system_text = extract_contents_text(system_instruction)
-                if system_text:
-                    messages.append({"role": "system", "content": system_text})
+                system_messages = extract_contents_messages(system_instruction)
+                # System instruction should be a single system message
+                # Extract text from all messages and combine into one system message
+                system_texts = []
+                for msg in system_messages:
+                    content = msg.get("content")
+                    if isinstance(content, list):
+                        # Extract text from content parts
+                        for part in content:
+                            if isinstance(part, dict) and part.get("type") == "text":
+                                system_texts.append(part.get("text", ""))
+                    elif isinstance(content, str):
+                        system_texts.append(content)
 
-        # Add user message
-        contents_text = extract_contents_text(contents)
-        if contents_text:
-            messages.append({"role": "user", "content": contents_text})
+                if system_texts:
+                    messages.append(
+                        {"role": "system", "content": " ".join(system_texts)}
+                    )
+
+        # Extract messages from contents
+        contents_messages = extract_contents_messages(contents)
+        messages.extend(contents_messages)
 
         if messages:
+            # Redact blob message parts
+            messages = redact_blob_message_parts(messages)
             normalized_messages = normalize_message_roles(messages)
             scope = sentry_sdk.get_current_scope()
             messages_data = truncate_and_annotate_messages(

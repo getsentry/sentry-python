@@ -1,3 +1,4 @@
+import base64
 import json
 import pytest
 from unittest import mock
@@ -8,6 +9,7 @@ from google.genai import types as genai_types
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
+from sentry_sdk.integrations.google_genai.utils import extract_contents_messages
 
 
 @pytest.fixture
@@ -1417,3 +1419,324 @@ async def test_async_embed_content_span_origin(
     assert event["contexts"]["trace"]["origin"] == "manual"
     for span in event["spans"]:
         assert span["origin"] == "auto.ai.google_genai"
+
+
+# Tests for extract_contents_messages function
+def test_extract_contents_messages_none():
+    """Test extract_contents_messages with None input"""
+    result = extract_contents_messages(None)
+    assert result == []
+
+
+def test_extract_contents_messages_string():
+    """Test extract_contents_messages with string input"""
+    result = extract_contents_messages("Hello world")
+    assert result == [{"role": "user", "content": "Hello world"}]
+
+
+def test_extract_contents_messages_content_object():
+    """Test extract_contents_messages with Content object"""
+    content = genai_types.Content(
+        role="user", parts=[genai_types.Part(text="Test message")]
+    )
+    result = extract_contents_messages(content)
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Test message", "type": "text"}]
+
+
+def test_extract_contents_messages_content_object_model_role():
+    """Test extract_contents_messages with Content object having model role"""
+    content = genai_types.Content(
+        role="model", parts=[genai_types.Part(text="Assistant response")]
+    )
+    result = extract_contents_messages(content)
+    assert len(result) == 1
+    assert result[0]["role"] == "assistant"
+    assert result[0]["content"] == [{"text": "Assistant response", "type": "text"}]
+
+
+def test_extract_contents_messages_content_object_no_role():
+    """Test extract_contents_messages with Content object without role"""
+    content = genai_types.Content(parts=[genai_types.Part(text="No role message")])
+    result = extract_contents_messages(content)
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "No role message", "type": "text"}]
+
+
+def test_extract_contents_messages_part_object():
+    """Test extract_contents_messages with Part object"""
+    part = genai_types.Part(text="Direct part")
+    result = extract_contents_messages(part)
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Direct part", "type": "text"}]
+
+
+def test_extract_contents_messages_file_data():
+    """Test extract_contents_messages with file_data"""
+    file_data = genai_types.FileData(
+        file_uri="gs://bucket/file.jpg", mime_type="image/jpeg"
+    )
+    part = genai_types.Part(file_data=file_data)
+    content = genai_types.Content(parts=[part])
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 1
+    blob_part = result[0]["content"][0]
+    assert blob_part["type"] == "blob"
+    assert blob_part["mime_type"] == "image/jpeg"
+    assert blob_part["file_uri"] == "gs://bucket/file.jpg"
+
+
+def test_extract_contents_messages_inline_data():
+    """Test extract_contents_messages with inline_data (binary)"""
+    # Create inline data with bytes
+    image_bytes = b"fake_image_data"
+    blob = genai_types.Blob(data=image_bytes, mime_type="image/png")
+    part = genai_types.Part(inline_data=blob)
+    content = genai_types.Content(parts=[part])
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 1
+    blob_part = result[0]["content"][0]
+    assert blob_part["type"] == "blob"
+    assert blob_part["mime_type"] == "image/png"
+    assert "content" in blob_part
+    # Verify base64 encoding
+    expected_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    assert blob_part["content"] == f"data:image/png;base64,{expected_b64}"
+
+
+def test_extract_contents_messages_function_response():
+    """Test extract_contents_messages with function_response (tool message)"""
+    function_response = genai_types.FunctionResponse(
+        id="call_123", name="get_weather", response={"output": "sunny"}
+    )
+    part = genai_types.Part(function_response=function_response)
+    content = genai_types.Content(parts=[part])
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "tool"
+    assert result[0]["content"]["toolCallId"] == "call_123"
+    assert result[0]["content"]["toolName"] == "get_weather"
+    assert result[0]["content"]["output"] == '"sunny"'
+
+
+def test_extract_contents_messages_function_response_with_output_key():
+    """Test extract_contents_messages with function_response that has output key"""
+    function_response = genai_types.FunctionResponse(
+        id="call_456", name="get_time", response={"output": "3:00 PM", "error": None}
+    )
+    part = genai_types.Part(function_response=function_response)
+    content = genai_types.Content(parts=[part])
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "tool"
+    assert result[0]["content"]["toolCallId"] == "call_456"
+    assert result[0]["content"]["toolName"] == "get_time"
+    # Should prefer "output" key
+    assert result[0]["content"]["output"] == '"3:00 PM"'
+
+
+def test_extract_contents_messages_mixed_parts():
+    """Test extract_contents_messages with mixed content parts"""
+    content = genai_types.Content(
+        role="user",
+        parts=[
+            genai_types.Part(text="Text part"),
+            genai_types.Part(
+                file_data=genai_types.FileData(
+                    file_uri="gs://bucket/image.jpg", mime_type="image/jpeg"
+                )
+            ),
+        ],
+    )
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 2
+    assert result[0]["content"][0] == {"text": "Text part", "type": "text"}
+    assert result[0]["content"][1]["type"] == "blob"
+    assert result[0]["content"][1]["file_uri"] == "gs://bucket/image.jpg"
+
+
+def test_extract_contents_messages_list():
+    """Test extract_contents_messages with list input"""
+    contents = [
+        "First message",
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(text="Second message")]
+        ),
+    ]
+    result = extract_contents_messages(contents)
+
+    assert len(result) == 2
+    assert result[0] == {"role": "user", "content": "First message"}
+    assert result[1]["role"] == "user"
+    assert result[1]["content"] == [{"text": "Second message", "type": "text"}]
+
+
+def test_extract_contents_messages_dict_content():
+    """Test extract_contents_messages with dict (ContentDict)"""
+    content_dict = {"role": "user", "parts": [{"text": "Dict message"}]}
+    result = extract_contents_messages(content_dict)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Dict message", "type": "text"}]
+
+
+def test_extract_contents_messages_dict_with_text():
+    """Test extract_contents_messages with dict containing text key"""
+    content_dict = {"role": "user", "text": "Simple text"}
+    result = extract_contents_messages(content_dict)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Simple text", "type": "text"}]
+
+
+def test_extract_contents_messages_file_object():
+    """Test extract_contents_messages with File object"""
+    file_obj = genai_types.File(
+        name="files/123", uri="gs://bucket/file.pdf", mime_type="application/pdf"
+    )
+    result = extract_contents_messages(file_obj)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 1
+    blob_part = result[0]["content"][0]
+    assert blob_part["type"] == "blob"
+    assert blob_part["mime_type"] == "application/pdf"
+    assert blob_part["file_uri"] == "gs://bucket/file.pdf"
+
+
+@pytest.mark.skipif(
+    not hasattr(genai_types, "PIL_Image") or genai_types.PIL_Image is None,
+    reason="PIL not available",
+)
+def test_extract_contents_messages_pil_image():
+    """Test extract_contents_messages with PIL.Image.Image"""
+    try:
+        from PIL import Image as PILImage
+
+        # Create a simple test image
+        img = PILImage.new("RGB", (10, 10), color="red")
+        result = extract_contents_messages(img)
+
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+        assert len(result[0]["content"]) == 1
+        blob_part = result[0]["content"][0]
+        assert blob_part["type"] == "blob"
+        assert blob_part["mime_type"].startswith("image/")
+        assert "content" in blob_part
+        assert blob_part["content"].startswith("data:image/")
+    except ImportError:
+        pytest.skip("PIL not available")
+
+
+def test_extract_contents_messages_tool_and_text():
+    """Test extract_contents_messages with both tool message and text"""
+    content = genai_types.Content(
+        role="user",
+        parts=[
+            genai_types.Part(text="User question"),
+            genai_types.Part(
+                function_response=genai_types.FunctionResponse(
+                    id="call_789", name="search", response={"output": "results"}
+                )
+            ),
+        ],
+    )
+    result = extract_contents_messages(content)
+
+    # Should have two messages: one user message and one tool message
+    assert len(result) == 2
+    # First should be user message with text
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "User question", "type": "text"}]
+    # Second should be tool message
+    assert result[1]["role"] == "tool"
+    assert result[1]["content"]["toolCallId"] == "call_789"
+    assert result[1]["content"]["toolName"] == "search"
+
+
+def test_extract_contents_messages_empty_parts():
+    """Test extract_contents_messages with Content object with empty parts"""
+    content = genai_types.Content(role="user", parts=[])
+    result = extract_contents_messages(content)
+
+    assert result == []
+
+
+def test_extract_contents_messages_empty_list():
+    """Test extract_contents_messages with empty list"""
+    result = extract_contents_messages([])
+    assert result == []
+
+
+def test_extract_contents_messages_dict_inline_data():
+    """Test extract_contents_messages with dict containing inline_data"""
+    content_dict = {
+        "role": "user",
+        "parts": [{"inline_data": {"data": b"binary_data", "mime_type": "image/gif"}}],
+    }
+    result = extract_contents_messages(content_dict)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 1
+    blob_part = result[0]["content"][0]
+    assert blob_part["type"] == "blob"
+    assert blob_part["mime_type"] == "image/gif"
+    expected_b64 = base64.b64encode(b"binary_data").decode("utf-8")
+    assert blob_part["content"] == f"data:image/gif;base64,{expected_b64}"
+
+
+def test_extract_contents_messages_dict_function_response():
+    """Test extract_contents_messages with dict containing function_response"""
+    content_dict = {
+        "role": "user",
+        "parts": [
+            {
+                "function_response": {
+                    "id": "dict_call_1",
+                    "name": "dict_tool",
+                    "response": {"result": "success"},
+                }
+            }
+        ],
+    }
+    result = extract_contents_messages(content_dict)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "tool"
+    assert result[0]["content"]["toolCallId"] == "dict_call_1"
+    assert result[0]["content"]["toolName"] == "dict_tool"
+    assert result[0]["content"]["output"] == '{"result": "success"}'
+
+
+def test_extract_contents_messages_object_with_text_attribute():
+    """Test extract_contents_messages with object that has text attribute"""
+
+    class TextObject:
+        def __init__(self):
+            self.text = "Object text"
+
+    obj = TextObject()
+    result = extract_contents_messages(obj)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Object text", "type": "text"}]
