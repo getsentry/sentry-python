@@ -116,6 +116,124 @@ DATA_FIELDS = {
     "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
 }
 
+# Map LangChain content types to Sentry modalities
+LANGCHAIN_TYPE_TO_MODALITY = {
+    "image": "image",
+    "image_url": "image",
+    "audio": "audio",
+    "video": "video",
+    "file": "document",
+}
+
+
+def _transform_langchain_content_block(
+    content_block: "Dict[str, Any]",
+) -> "Dict[str, Any]":
+    """
+    Transform a LangChain content block to Sentry-compatible format.
+
+    Handles multimodal content (images, audio, video, documents) by converting them
+    to the standardized format:
+    - base64 encoded data -> type: "blob"
+    - URL references -> type: "uri"
+    - file_id references -> type: "file"
+    """
+    if not isinstance(content_block, dict):
+        return content_block
+
+    block_type = content_block.get("type")
+
+    # Handle standard multimodal content types (image, audio, video, file)
+    if block_type in ("image", "audio", "video", "file"):
+        modality = LANGCHAIN_TYPE_TO_MODALITY.get(block_type, block_type)
+        mime_type = content_block.get("mime_type", "")
+
+        # Check for base64 encoded content
+        if "base64" in content_block:
+            return {
+                "type": "blob",
+                "modality": modality,
+                "mime_type": mime_type,
+                "content": content_block.get("base64", ""),
+            }
+        # Check for URL reference
+        elif "url" in content_block:
+            return {
+                "type": "uri",
+                "modality": modality,
+                "mime_type": mime_type,
+                "uri": content_block.get("url", ""),
+            }
+        # Check for file_id reference
+        elif "file_id" in content_block:
+            return {
+                "type": "file",
+                "modality": modality,
+                "mime_type": mime_type,
+                "file_id": content_block.get("file_id", ""),
+            }
+
+    # Handle legacy image_url format (OpenAI style)
+    elif block_type == "image_url":
+        image_url_data = content_block.get("image_url", {})
+        if isinstance(image_url_data, dict):
+            url = image_url_data.get("url", "")
+        else:
+            url = str(image_url_data)
+
+        # Check if it's a data URI (base64 encoded)
+        if url.startswith("data:"):
+            # Parse data URI: data:mime_type;base64,content
+            try:
+                # Format: data:image/jpeg;base64,/9j/4AAQ...
+                header, content = url.split(",", 1)
+                mime_type = header.split(":")[1].split(";")[0] if ":" in header else ""
+                return {
+                    "type": "blob",
+                    "modality": "image",
+                    "mime_type": mime_type,
+                    "content": content,
+                }
+            except (ValueError, IndexError):
+                # If parsing fails, return as URI
+                return {
+                    "type": "uri",
+                    "modality": "image",
+                    "mime_type": "",
+                    "uri": url,
+                }
+        else:
+            # Regular URL
+            return {
+                "type": "uri",
+                "modality": "image",
+                "mime_type": "",
+                "uri": url,
+            }
+
+    # For text blocks and other types, return as-is
+    return content_block
+
+
+def _transform_langchain_message_content(content: "Any") -> "Any":
+    """
+    Transform LangChain message content, handling both string content and
+    list of content blocks.
+    """
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, (list, tuple)):
+        transformed = []
+        for block in content:
+            if isinstance(block, dict):
+                transformed.append(_transform_langchain_content_block(block))
+            else:
+                transformed.append(block)
+        return transformed
+
+    return content
+
 
 # Contextvar to track agent names in a stack for re-entrant agent support
 _agent_stack: "contextvars.ContextVar[Optional[List[Optional[str]]]]" = (
@@ -234,7 +352,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message: "BaseMessage") -> "Any":
-        parsed = {"role": message.type, "content": message.content}
+        # Transform content to handle multimodal data (images, audio, video, files)
+        transformed_content = _transform_langchain_message_content(message.content)
+        parsed = {"role": message.type, "content": transformed_content}
         parsed.update(message.additional_kwargs)
         return parsed
 

@@ -25,6 +25,8 @@ from sentry_sdk import start_transaction
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
+    _transform_langchain_content_block,
+    _transform_langchain_message_content,
 )
 
 try:
@@ -1747,3 +1749,243 @@ def test_langchain_response_model_extraction(
         assert llm_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == expected_model
     else:
         assert SPANDATA.GEN_AI_RESPONSE_MODEL not in llm_span.get("data", {})
+
+
+# Tests for multimodal content transformation functions
+
+
+class TestTransformLangchainContentBlock:
+    """Tests for _transform_langchain_content_block function."""
+
+    def test_transform_image_base64(self):
+        """Test transformation of base64-encoded image content."""
+        content_block = {
+            "type": "image",
+            "base64": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+            "mime_type": "image/jpeg",
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/jpeg",
+            "content": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+        }
+
+    def test_transform_image_url(self):
+        """Test transformation of URL-referenced image content."""
+        content_block = {
+            "type": "image",
+            "url": "https://example.com/image.jpg",
+            "mime_type": "image/jpeg",
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "uri",
+            "modality": "image",
+            "mime_type": "image/jpeg",
+            "uri": "https://example.com/image.jpg",
+        }
+
+    def test_transform_image_file_id(self):
+        """Test transformation of file_id-referenced image content."""
+        content_block = {
+            "type": "image",
+            "file_id": "file-abc123",
+            "mime_type": "image/png",
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "file",
+            "modality": "image",
+            "mime_type": "image/png",
+            "file_id": "file-abc123",
+        }
+
+    def test_transform_image_url_legacy_with_data_uri(self):
+        """Test transformation of legacy image_url format with data: URI (base64)."""
+        content_block = {
+            "type": "image_url",
+            "image_url": {"url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD"},
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/jpeg",
+            "content": "/9j/4AAQSkZJRgABAQAAAQABAAD",
+        }
+
+    def test_transform_image_url_legacy_with_http_url(self):
+        """Test transformation of legacy image_url format with HTTP URL."""
+        content_block = {
+            "type": "image_url",
+            "image_url": {"url": "https://example.com/image.png"},
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "uri",
+            "modality": "image",
+            "mime_type": "",
+            "uri": "https://example.com/image.png",
+        }
+
+    def test_transform_image_url_legacy_string_url(self):
+        """Test transformation of legacy image_url format with string URL."""
+        content_block = {
+            "type": "image_url",
+            "image_url": "https://example.com/image.gif",
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "uri",
+            "modality": "image",
+            "mime_type": "",
+            "uri": "https://example.com/image.gif",
+        }
+
+    def test_transform_image_url_legacy_data_uri_png(self):
+        """Test transformation of legacy image_url format with PNG data URI."""
+        content_block = {
+            "type": "image_url",
+            "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            },
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/png",
+            "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        }
+
+    def test_transform_missing_mime_type(self):
+        """Test transformation when mime_type is not provided."""
+        content_block = {
+            "type": "image",
+            "base64": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "",
+            "content": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+        }
+
+
+class TestTransformLangchainMessageContent:
+    """Tests for _transform_langchain_message_content function."""
+
+    def test_transform_string_content(self):
+        """Test that string content is returned unchanged."""
+        result = _transform_langchain_message_content("Hello, world!")
+        assert result == "Hello, world!"
+
+    def test_transform_list_with_text_blocks(self):
+        """Test transformation of list with text blocks (unchanged)."""
+        content = [
+            {"type": "text", "text": "First message"},
+            {"type": "text", "text": "Second message"},
+        ]
+        result = _transform_langchain_message_content(content)
+        assert result == content
+
+    def test_transform_list_with_image_blocks(self):
+        """Test transformation of list containing image blocks."""
+        content = [
+            {"type": "text", "text": "Check out this image:"},
+            {
+                "type": "image",
+                "base64": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+                "mime_type": "image/jpeg",
+            },
+        ]
+        result = _transform_langchain_message_content(content)
+        assert len(result) == 2
+        assert result[0] == {"type": "text", "text": "Check out this image:"}
+        assert result[1] == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/jpeg",
+            "content": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+        }
+
+    def test_transform_list_with_mixed_content(self):
+        """Test transformation of list with mixed content types."""
+        content = [
+            {"type": "text", "text": "Here are some files:"},
+            {
+                "type": "image",
+                "url": "https://example.com/image.jpg",
+                "mime_type": "image/jpeg",
+            },
+            {
+                "type": "file",
+                "file_id": "doc-123",
+                "mime_type": "application/pdf",
+            },
+            {"type": "audio", "base64": "audio_data...", "mime_type": "audio/mp3"},
+        ]
+        result = _transform_langchain_message_content(content)
+        assert len(result) == 4
+        assert result[0] == {"type": "text", "text": "Here are some files:"}
+        assert result[1] == {
+            "type": "uri",
+            "modality": "image",
+            "mime_type": "image/jpeg",
+            "uri": "https://example.com/image.jpg",
+        }
+        assert result[2] == {
+            "type": "file",
+            "modality": "document",
+            "mime_type": "application/pdf",
+            "file_id": "doc-123",
+        }
+        assert result[3] == {
+            "type": "blob",
+            "modality": "audio",
+            "mime_type": "audio/mp3",
+            "content": "audio_data...",
+        }
+
+    def test_transform_list_with_non_dict_items(self):
+        """Test transformation handles non-dict items in list."""
+        content = ["plain string", {"type": "text", "text": "dict text"}]
+        result = _transform_langchain_message_content(content)
+        assert result == ["plain string", {"type": "text", "text": "dict text"}]
+
+    def test_transform_tuple_content(self):
+        """Test transformation of tuple content."""
+        content = (
+            {"type": "text", "text": "Message"},
+            {"type": "image", "base64": "data...", "mime_type": "image/png"},
+        )
+        result = _transform_langchain_message_content(content)
+        assert len(result) == 2
+        assert result[1] == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/png",
+            "content": "data...",
+        }
+
+    def test_transform_list_with_legacy_image_url(self):
+        """Test transformation of list containing legacy image_url blocks."""
+        content = [
+            {"type": "text", "text": "Check this:"},
+            {
+                "type": "image_url",
+                "image_url": {"url": "data:image/jpeg;base64,/9j/4AAQ..."},
+            },
+        ]
+        result = _transform_langchain_message_content(content)
+        assert len(result) == 2
+        assert result[0] == {"type": "text", "text": "Check this:"}
+        assert result[1] == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/jpeg",
+            "content": "/9j/4AAQ...",
+        }
