@@ -120,6 +120,104 @@ def _collect_ai_data(
     return model, input_tokens, output_tokens, content_blocks
 
 
+def _transform_content_block(content_block: "dict[str, Any]") -> "dict[str, Any]":
+    """
+    Transform an Anthropic content block to a Sentry-compatible format.
+
+    Handles binary data (images, documents) by converting them to the standardized format:
+    - base64 encoded data -> type: "blob"
+    - URL references -> type: "uri"
+    - file_id references -> type: "file"
+    """
+    block_type = content_block.get("type")
+
+    # Handle image blocks
+    if block_type == "image":
+        source = content_block.get("source", {})
+        source_type = source.get("type")
+        media_type = source.get("media_type", "")
+
+        if source_type == "base64":
+            return {
+                "type": "blob",
+                "modality": "image",
+                "mime_type": media_type,
+                "content": source.get("data", ""),
+            }
+        elif source_type == "url":
+            return {
+                "type": "uri",
+                "modality": "image",
+                "mime_type": media_type,
+                "uri": source.get("url", ""),
+            }
+        elif source_type == "file":
+            return {
+                "type": "file",
+                "modality": "image",
+                "mime_type": media_type,
+                "file_id": source.get("file_id", ""),
+            }
+
+    # Handle document blocks (PDFs, etc.)
+    elif block_type == "document":
+        source = content_block.get("source", {})
+        source_type = source.get("type")
+        media_type = source.get("media_type", "")
+
+        if source_type == "base64":
+            return {
+                "type": "blob",
+                "modality": "document",
+                "mime_type": media_type,
+                "content": source.get("data", ""),
+            }
+        elif source_type == "url":
+            return {
+                "type": "uri",
+                "modality": "document",
+                "mime_type": media_type,
+                "uri": source.get("url", ""),
+            }
+        elif source_type == "file":
+            return {
+                "type": "file",
+                "modality": "document",
+                "mime_type": media_type,
+                "file_id": source.get("file_id", ""),
+            }
+        elif source_type == "text":
+            # Plain text documents - keep as is but mark the type
+            return {
+                "type": "text",
+                "text": source.get("data", ""),
+            }
+
+    # For text blocks and other types, return as-is
+    return content_block
+
+
+def _transform_message_content(
+    content: "Any",
+) -> "Any":
+    """
+    Transform message content, handling both string content and list of content blocks.
+    """
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, (list, tuple)):
+        transformed = []
+        for block in content:
+            if isinstance(block, dict):
+                transformed.append(_transform_content_block(block))
+            else:
+                transformed.append(block)
+        return transformed
+
+    return content
+
+
 def _set_input_data(
     span: "Span", kwargs: "dict[str, Any]", integration: "AnthropicIntegration"
 ) -> None:
@@ -164,19 +262,54 @@ def _set_input_data(
                 and "content" in message
                 and isinstance(message["content"], (list, tuple))
             ):
+                has_tool_result = False
+                transformed_content = []
                 for item in message["content"]:
-                    if item.get("type") == "tool_result":
+                    if isinstance(item, dict) and item.get("type") == "tool_result":
+                        has_tool_result = True
                         normalized_messages.append(
                             {
                                 "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
                                 "content": {  # type: ignore[dict-item]
                                     "tool_use_id": item.get("tool_use_id"),
-                                    "output": item.get("content"),
+                                    "output": _transform_message_content(
+                                        item.get("content")
+                                    ),
                                 },
                             }
                         )
+                    else:
+                        # Transform content blocks (images, documents, etc.)
+                        transformed_content.append(
+                            _transform_content_block(item)
+                            if isinstance(item, dict)
+                            else item
+                        )
+
+                # If there are non-tool-result items, add them as a message
+                if transformed_content and not has_tool_result:
+                    normalized_messages.append(
+                        {
+                            "role": message.get("role"),
+                            "content": transformed_content,
+                        }
+                    )
+                elif transformed_content and has_tool_result:
+                    # Mixed content: tool results + other content
+                    normalized_messages.append(
+                        {
+                            "role": message.get("role"),
+                            "content": transformed_content,
+                        }
+                    )
             else:
-                normalized_messages.append(message)
+                # Transform content for non-list messages or assistant messages
+                transformed_message = message.copy()
+                if "content" in transformed_message:
+                    transformed_message["content"] = _transform_message_content(
+                        transformed_message["content"]
+                    )
+                normalized_messages.append(transformed_message)
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
         scope = sentry_sdk.get_current_scope()

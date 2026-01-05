@@ -47,6 +47,8 @@ from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
     _set_output_data,
     _collect_ai_data,
+    _transform_content_block,
+    _transform_message_content,
 )
 from sentry_sdk.utils import package_version
 
@@ -1446,3 +1448,705 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
     assert stored_messages[0]["content"][1]["text"] == "Be concise and clear."
     assert stored_messages[1]["role"] == "user"
     assert stored_messages[1]["content"] == "Hello"
+
+
+# Tests for _transform_content_block helper function
+
+
+def test_transform_content_block_base64_image():
+    """Test that base64 encoded images are transformed to blob format."""
+    content_block = {
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": "image/jpeg",
+            "data": "base64encodeddata...",
+        },
+    }
+
+    result = _transform_content_block(content_block)
+
+    assert result == {
+        "type": "blob",
+        "modality": "image",
+        "mime_type": "image/jpeg",
+        "content": "base64encodeddata...",
+    }
+
+
+def test_transform_content_block_url_image():
+    """Test that URL-referenced images are transformed to uri format."""
+    content_block = {
+        "type": "image",
+        "source": {
+            "type": "url",
+            "url": "https://example.com/image.jpg",
+        },
+    }
+
+    result = _transform_content_block(content_block)
+
+    assert result == {
+        "type": "uri",
+        "modality": "image",
+        "mime_type": "",
+        "uri": "https://example.com/image.jpg",
+    }
+
+
+def test_transform_content_block_file_image():
+    """Test that file_id-referenced images are transformed to file format."""
+    content_block = {
+        "type": "image",
+        "source": {
+            "type": "file",
+            "file_id": "file_abc123",
+        },
+    }
+
+    result = _transform_content_block(content_block)
+
+    assert result == {
+        "type": "file",
+        "modality": "image",
+        "mime_type": "",
+        "file_id": "file_abc123",
+    }
+
+
+def test_transform_content_block_base64_document():
+    """Test that base64 encoded PDFs are transformed to blob format."""
+    content_block = {
+        "type": "document",
+        "source": {
+            "type": "base64",
+            "media_type": "application/pdf",
+            "data": "base64encodedpdfdata...",
+        },
+    }
+
+    result = _transform_content_block(content_block)
+
+    assert result == {
+        "type": "blob",
+        "modality": "document",
+        "mime_type": "application/pdf",
+        "content": "base64encodedpdfdata...",
+    }
+
+
+def test_transform_content_block_url_document():
+    """Test that URL-referenced documents are transformed to uri format."""
+    content_block = {
+        "type": "document",
+        "source": {
+            "type": "url",
+            "url": "https://example.com/document.pdf",
+        },
+    }
+
+    result = _transform_content_block(content_block)
+
+    assert result == {
+        "type": "uri",
+        "modality": "document",
+        "mime_type": "",
+        "uri": "https://example.com/document.pdf",
+    }
+
+
+def test_transform_content_block_file_document():
+    """Test that file_id-referenced documents are transformed to file format."""
+    content_block = {
+        "type": "document",
+        "source": {
+            "type": "file",
+            "file_id": "file_doc456",
+            "media_type": "application/pdf",
+        },
+    }
+
+    result = _transform_content_block(content_block)
+
+    assert result == {
+        "type": "file",
+        "modality": "document",
+        "mime_type": "application/pdf",
+        "file_id": "file_doc456",
+    }
+
+
+def test_transform_content_block_text_document():
+    """Test that plain text documents are transformed correctly."""
+    content_block = {
+        "type": "document",
+        "source": {
+            "type": "text",
+            "media_type": "text/plain",
+            "data": "This is plain text content.",
+        },
+    }
+
+    result = _transform_content_block(content_block)
+
+    assert result == {
+        "type": "text",
+        "text": "This is plain text content.",
+    }
+
+
+def test_transform_content_block_text_block():
+    """Test that regular text blocks are returned as-is."""
+    content_block = {
+        "type": "text",
+        "text": "Hello, world!",
+    }
+
+    result = _transform_content_block(content_block)
+
+    assert result == content_block
+
+
+def test_transform_message_content_string():
+    """Test that string content is returned as-is."""
+    result = _transform_message_content("Hello, world!")
+    assert result == "Hello, world!"
+
+
+def test_transform_message_content_list():
+    """Test that list content is transformed correctly."""
+    content = [
+        {"type": "text", "text": "Hello!"},
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": "base64data...",
+            },
+        },
+    ]
+
+    result = _transform_message_content(content)
+
+    assert len(result) == 2
+    assert result[0] == {"type": "text", "text": "Hello!"}
+    assert result[1] == {
+        "type": "blob",
+        "modality": "image",
+        "mime_type": "image/png",
+        "content": "base64data...",
+    }
+
+
+# Integration tests for binary data in messages
+
+
+def test_message_with_base64_image(sentry_init, capture_events):
+    """Test that messages with base64 images are properly captured."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What's in this image?"},
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": "base64encodeddatahere...",
+                    },
+                },
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+    assert len(stored_messages) == 1
+    assert stored_messages[0]["role"] == "user"
+    content = stored_messages[0]["content"]
+    assert len(content) == 2
+    assert content[0] == {"type": "text", "text": "What's in this image?"}
+    assert content[1] == {
+        "type": "blob",
+        "modality": "image",
+        "mime_type": "image/jpeg",
+        "content": "base64encodeddatahere...",
+    }
+
+
+def test_message_with_url_image(sentry_init, capture_events):
+    """Test that messages with URL-referenced images are properly captured."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Describe this image."},
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": "https://example.com/photo.png",
+                    },
+                },
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    content = stored_messages[0]["content"]
+    assert content[1] == {
+        "type": "uri",
+        "modality": "image",
+        "mime_type": "",
+        "uri": "https://example.com/photo.png",
+    }
+
+
+def test_message_with_file_image(sentry_init, capture_events):
+    """Test that messages with file_id-referenced images are properly captured."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What do you see?"},
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "file",
+                        "file_id": "file_img_12345",
+                        "media_type": "image/webp",
+                    },
+                },
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    content = stored_messages[0]["content"]
+    assert content[1] == {
+        "type": "file",
+        "modality": "image",
+        "mime_type": "image/webp",
+        "file_id": "file_img_12345",
+    }
+
+
+def test_message_with_base64_pdf(sentry_init, capture_events):
+    """Test that messages with base64-encoded PDF documents are properly captured."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Summarize this document."},
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": "JVBERi0xLjQKJeLj...base64pdfdata",
+                    },
+                },
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    content = stored_messages[0]["content"]
+    assert content[1] == {
+        "type": "blob",
+        "modality": "document",
+        "mime_type": "application/pdf",
+        "content": "JVBERi0xLjQKJeLj...base64pdfdata",
+    }
+
+
+def test_message_with_url_pdf(sentry_init, capture_events):
+    """Test that messages with URL-referenced PDF documents are properly captured."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What is in this PDF?"},
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "url",
+                        "url": "https://example.com/report.pdf",
+                    },
+                },
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    content = stored_messages[0]["content"]
+    assert content[1] == {
+        "type": "uri",
+        "modality": "document",
+        "mime_type": "",
+        "uri": "https://example.com/report.pdf",
+    }
+
+
+def test_message_with_file_document(sentry_init, capture_events):
+    """Test that messages with file_id-referenced documents are properly captured."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Analyze this document."},
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "file",
+                        "file_id": "file_doc_67890",
+                        "media_type": "application/pdf",
+                    },
+                },
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    content = stored_messages[0]["content"]
+    assert content[1] == {
+        "type": "file",
+        "modality": "document",
+        "mime_type": "application/pdf",
+        "file_id": "file_doc_67890",
+    }
+
+
+def test_message_with_mixed_content(sentry_init, capture_events):
+    """Test that messages with mixed content (text, images, documents) are properly captured."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Compare this image with the document."},
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": "iVBORw0KGgo...base64imagedata",
+                    },
+                },
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": "https://example.com/comparison.jpg",
+                    },
+                },
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "application/pdf",
+                        "data": "JVBERi0xLjQK...base64pdfdata",
+                    },
+                },
+                {"type": "text", "text": "Please provide a detailed analysis."},
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    content = stored_messages[0]["content"]
+
+    assert len(content) == 5
+    assert content[0] == {
+        "type": "text",
+        "text": "Compare this image with the document.",
+    }
+    assert content[1] == {
+        "type": "blob",
+        "modality": "image",
+        "mime_type": "image/png",
+        "content": "iVBORw0KGgo...base64imagedata",
+    }
+    assert content[2] == {
+        "type": "uri",
+        "modality": "image",
+        "mime_type": "",
+        "uri": "https://example.com/comparison.jpg",
+    }
+    assert content[3] == {
+        "type": "blob",
+        "modality": "document",
+        "mime_type": "application/pdf",
+        "content": "JVBERi0xLjQK...base64pdfdata",
+    }
+    assert content[4] == {
+        "type": "text",
+        "text": "Please provide a detailed analysis.",
+    }
+
+
+def test_message_with_multiple_images_different_formats(sentry_init, capture_events):
+    """Test that messages with multiple images of different source types are handled."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": "base64data1...",
+                    },
+                },
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": "https://example.com/img2.gif",
+                    },
+                },
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "file",
+                        "file_id": "file_img_789",
+                        "media_type": "image/webp",
+                    },
+                },
+                {"type": "text", "text": "Compare these three images."},
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    content = stored_messages[0]["content"]
+
+    assert len(content) == 4
+    assert content[0] == {
+        "type": "blob",
+        "modality": "image",
+        "mime_type": "image/jpeg",
+        "content": "base64data1...",
+    }
+    assert content[1] == {
+        "type": "uri",
+        "modality": "image",
+        "mime_type": "",
+        "uri": "https://example.com/img2.gif",
+    }
+    assert content[2] == {
+        "type": "file",
+        "modality": "image",
+        "mime_type": "image/webp",
+        "file_id": "file_img_789",
+    }
+    assert content[3] == {"type": "text", "text": "Compare these three images."}
+
+
+def test_binary_content_not_stored_when_pii_disabled(sentry_init, capture_events):
+    """Test that binary content is not stored when send_default_pii is False."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What's in this image?"},
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": "base64encodeddatahere...",
+                    },
+                },
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    # Messages should not be stored
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+
+
+def test_binary_content_not_stored_when_prompts_disabled(sentry_init, capture_events):
+    """Test that binary content is not stored when include_prompts is False."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What's in this image?"},
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": "base64encodeddatahere...",
+                    },
+                },
+            ],
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    # Messages should not be stored
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
