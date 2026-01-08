@@ -2,6 +2,7 @@ import sentry_sdk
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
     normalize_message_roles,
+    parse_data_uri,
     set_data_normalized,
     normalize_message_role,
     truncate_and_annotate_messages,
@@ -66,17 +67,15 @@ def _transform_openai_agents_content_part(
             url = content_part.get("image_url", "")
 
         if url.startswith("data:"):
-            # Parse data URI: data:image/jpeg;base64,/9j/4AAQ...
             try:
-                header, content = url.split(",", 1)
-                mime_type = header.split(":")[1].split(";")[0] if ":" in header else ""
+                mime_type, content = parse_data_uri(url)
                 return {
                     "type": "blob",
                     "modality": "image",
                     "mime_type": mime_type,
                     "content": content,
                 }
-            except (ValueError, IndexError):
+            except ValueError:
                 # If parsing fails, return as URI
                 return {
                     "type": "uri",

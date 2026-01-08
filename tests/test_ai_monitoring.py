@@ -13,6 +13,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     truncate_messages_by_size,
     _find_truncation_index,
+    parse_data_uri,
     redact_blob_message_parts,
 )
 from sentry_sdk.serializer import serialize
@@ -646,3 +647,69 @@ class TestRedactBlobMessageParts:
         assert messages[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
         assert messages[1]["content"] == "I see the image."  # Unchanged
         assert messages[2]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+
+
+class TestParseDataUri:
+    """Tests for the parse_data_uri utility function."""
+
+    def test_standard_base64_image(self):
+        """Test parsing a standard base64 encoded image data URI."""
+        url = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+        mime_type, content = parse_data_uri(url)
+        assert mime_type == "image/jpeg"
+        assert content == "/9j/4AAQSkZJRg=="
+
+    def test_png_image(self):
+        """Test parsing a PNG image data URI."""
+        url = "data:image/png;base64,iVBORw0KGgo="
+        mime_type, content = parse_data_uri(url)
+        assert mime_type == "image/png"
+        assert content == "iVBORw0KGgo="
+
+    def test_plain_text_without_base64(self):
+        """Test parsing a plain text data URI without base64 encoding."""
+        url = "data:text/plain,Hello%20World"
+        mime_type, content = parse_data_uri(url)
+        assert mime_type == "text/plain"
+        assert content == "Hello%20World"
+
+    def test_no_mime_type_with_base64(self):
+        """Test parsing a data URI with no mime type but base64 encoding."""
+        url = "data:;base64,SGVsbG8="
+        mime_type, content = parse_data_uri(url)
+        assert mime_type == ""
+        assert content == "SGVsbG8="
+
+    def test_no_mime_type_no_base64(self):
+        """Test parsing a minimal data URI."""
+        url = "data:,Hello"
+        mime_type, content = parse_data_uri(url)
+        assert mime_type == ""
+        assert content == "Hello"
+
+    def test_content_with_commas(self):
+        """Test that content with commas is handled correctly."""
+        url = "data:text/csv,a,b,c,d"
+        mime_type, content = parse_data_uri(url)
+        assert mime_type == "text/csv"
+        assert content == "a,b,c,d"
+
+    def test_missing_comma_raises_value_error(self):
+        """Test that a data URI without a comma raises ValueError."""
+        url = "data:image/jpeg"
+        with pytest.raises(ValueError, match="missing comma separator"):
+            parse_data_uri(url)
+
+    def test_empty_content(self):
+        """Test parsing a data URI with empty content."""
+        url = "data:text/plain,"
+        mime_type, content = parse_data_uri(url)
+        assert mime_type == "text/plain"
+        assert content == ""
+
+    def test_mime_type_with_charset(self):
+        """Test parsing a data URI with charset parameter."""
+        url = "data:text/html;charset=utf-8,<h1>Hello</h1>"
+        mime_type, content = parse_data_uri(url)
+        assert mime_type == "text/html"
+        assert content == "<h1>Hello</h1>"

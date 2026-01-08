@@ -6,6 +6,7 @@ from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     set_data_normalized,
     normalize_message_roles,
+    parse_data_uri,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
@@ -218,21 +219,33 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
     def _map_item(item: "Dict[str, Any]") -> "Dict[str, Any]":
         if item.get("type") == "image_url":
             image_url = item.get("image_url") or {}
-            if image_url.get("url", "").startswith("data:"):
-                return {
-                    "type": "blob",
-                    "modality": "image",
-                    "mime_type": item["image_url"]["url"].split(";base64,")[0],
-                    "content": item["image_url"]["url"].split(";base64,")[1],
-                }
+            url = image_url.get("url", "")
+            if url.startswith("data:"):
+                try:
+                    mime_type, content = parse_data_uri(url)
+                    return {
+                        "type": "blob",
+                        "modality": "image",
+                        "mime_type": mime_type,
+                        "content": content,
+                    }
+                except ValueError:
+                    # If parsing fails, return as URI
+                    return {
+                        "type": "uri",
+                        "modality": "image",
+                        "uri": url,
+                    }
             else:
                 return {
                     "type": "uri",
-                    "uri": item["image_url"]["url"],
+                    "uri": url,
                 }
         return item
 
     for message in messages:
+        if not isinstance(message, dict):
+            continue
         content = message.get("content")
         if isinstance(content, list):
             message["content"] = [_map_item(item) for item in content]

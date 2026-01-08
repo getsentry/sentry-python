@@ -1548,7 +1548,7 @@ def test_convert_message_parts_image_url_to_blob():
     blob_item = converted[0]["content"][1]
     assert blob_item["type"] == "blob"
     assert blob_item["modality"] == "image"
-    assert blob_item["mime_type"] == "data:image/jpeg"
+    assert blob_item["mime_type"] == "image/jpeg"
     assert blob_item["content"] == "/9j/4AAQSkZJRg=="
     # Verify the original image_url structure is replaced
     assert "image_url" not in blob_item
@@ -1579,6 +1579,34 @@ def test_convert_message_parts_image_url_to_uri():
     assert uri_item["uri"] == "https://example.com/image.jpg"
     # Verify the original image_url structure is replaced
     assert "image_url" not in uri_item
+
+
+def test_convert_message_parts_malformed_data_uri():
+    """Test that malformed data URIs are handled gracefully without crashing"""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        # Malformed: missing ;base64, and comma separator
+                        "url": "data:image/jpeg",
+                    },
+                },
+            ],
+        }
+    ]
+
+    # Should not raise an exception
+    converted = _convert_message_parts(messages)
+
+    assert len(converted) == 1
+    # Malformed data URI should fall back to uri type
+    item = converted[0]["content"][0]
+    assert item["type"] == "uri"
+    assert item["uri"] == "data:image/jpeg"
+    assert item["modality"] == "image"
 
 
 def test_openai_message_truncation(sentry_init, capture_events):
