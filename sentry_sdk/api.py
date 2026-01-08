@@ -542,6 +542,9 @@ def enable_integration(integration: Integration) -> None:
     once the event loop is running, but without having to set up the whole SDK
     anew.
 
+    Running this function with an integration that is already enabled will not
+    have any effect.
+
     :param integration: The integration to enable.
     :type integration: sentry_sdk.integrations.Integration
     """
