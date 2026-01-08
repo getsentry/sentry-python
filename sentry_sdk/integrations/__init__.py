@@ -282,10 +282,13 @@ def setup_integrations(
 
 def _enable_integration(integration: "Integration") -> "Optional[Integration]":
     with _installer_lock:
-        if integration.identifier in _installed_integrations:
-            return integration
-
         client = sentry_sdk.get_client()
+
+        if (
+            integration.identifier in _installed_integrations
+            and integration.identifier in client.integrations
+        ):
+            return client.integrations[integration.identifier]
 
         logger.debug(
             "Setting up previously not enabled integration %s", integration.identifier

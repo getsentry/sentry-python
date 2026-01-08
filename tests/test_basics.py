@@ -1005,13 +1005,15 @@ def test_enable_integration(sentry_init):
 def test_enable_enabled_integration(sentry_init):
     from sentry_sdk.integrations.gnu_backtrace import GnuBacktraceIntegration
 
-    sentry_init(integrations=[GnuBacktraceIntegration()])
+    integration = GnuBacktraceIntegration()
+    sentry_init(integrations=[integration])
 
     assert "gnu_backtrace" in get_client().integrations
 
     # Second call should not raise or cause issues
     sentry_sdk.enable_integration(GnuBacktraceIntegration())
     assert "gnu_backtrace" in get_client().integrations
+    assert get_client().integrations["gnu_backtrace"] == integration
 
 
 def test_enable_integration_twice(sentry_init):
@@ -1021,12 +1023,14 @@ def test_enable_integration_twice(sentry_init):
 
     assert "gnu_backtrace" not in get_client().integrations
 
-    sentry_sdk.enable_integration(GnuBacktraceIntegration())
+    integration = GnuBacktraceIntegration()
+    sentry_sdk.enable_integration(integration)
     assert "gnu_backtrace" in get_client().integrations
 
     # Second call should not raise or cause issues
     sentry_sdk.enable_integration(GnuBacktraceIntegration())
     assert "gnu_backtrace" in get_client().integrations
+    assert get_client().integrations["gnu_backtrace"] == integration
 
 
 def test_enable_integration_did_not_enable(sentry_init):
