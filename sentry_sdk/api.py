@@ -542,7 +542,7 @@ def enable_integration(integration: Integration) -> None:
     once the event loop is running, but without having to set up the whole SDK
     anew.
 
-    :param integration: The integration instance or class to enable.
+    :param integration: The integration to enable.
     :type integration: sentry_sdk.integrations.Integration
     """
     client = get_client()
