@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+import sentry_sdk
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import (
@@ -365,6 +366,26 @@ class Scope:
 
         return _global_scope
 
+    def set_global_attributes(self) -> None:
+        from sentry_sdk.client import SDK_INFO
+
+        self.set_attribute("sentry.sdk.name", SDK_INFO["name"])
+        self.set_attribute("sentry.sdk.version", SDK_INFO["version"])
+
+        options = sentry_sdk.get_client().options
+
+        server_name = options.get("server_name")
+        if server_name:
+            self.set_attribute(SPANDATA.SERVER_ADDRESS, server_name)
+
+        environment = options.get("environment")
+        if environment:
+            self.set_attribute("sentry.environment", environment)
+
+        release = options.get("release")
+        if release:
+            self.set_attribute("sentry.release", release)
+
     @classmethod
     def last_event_id(cls) -> "Optional[str]":
         """
@@ -467,7 +488,14 @@ class Scope:
             If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NonRecordingClient`.
 
         """
-        self.client = client if client is not None else NonRecordingClient()
+        if client is not None:
+            self.client = client
+            # We need a client to set the initial global attributes on the global
+            # scope since they mostly come from client options, so populate them
+            # as soon as a client is set
+            sentry_sdk.get_global_scope().set_global_attributes()
+        else:
+            self.client = NonRecordingClient()
 
     def fork(self) -> "Scope":
         """
@@ -1468,33 +1496,6 @@ class Scope:
                 {"values": flags}
             )
 
-    def _apply_global_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
-    ) -> None:
-        # TODO: Global stuff like this should just be retrieved at init time and
-        # put onto the global scope's attributes and then applied to events
-        # from there
-        from sentry_sdk.client import SDK_INFO
-
-        attributes = telemetry["attributes"]
-
-        attributes["sentry.sdk.name"] = SDK_INFO["name"]
-        attributes["sentry.sdk.version"] = SDK_INFO["version"]
-
-        options = self.get_client().options
-
-        server_name = options.get("server_name")
-        if server_name is not None and SPANDATA.SERVER_ADDRESS not in attributes:
-            attributes[SPANDATA.SERVER_ADDRESS] = server_name
-
-        environment = options.get("environment")
-        if environment is not None and "sentry.environment" not in attributes:
-            attributes["sentry.environment"] = environment
-
-        release = options.get("release")
-        if release is not None and "sentry.release" not in attributes:
-            attributes["sentry.release"] = release
-
     def _apply_scope_attributes_to_telemetry(
         self, telemetry: "Union[Log, Metric]"
     ) -> None:
@@ -1638,7 +1639,6 @@ class Scope:
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
-        self._apply_global_attributes_to_telemetry(telemetry)
 
     def update_from_scope(self, scope: "Scope") -> None:
         """Update the scope with another scope's data."""
