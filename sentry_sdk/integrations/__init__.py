@@ -296,6 +296,7 @@ def _enable_integration(integration: "Integration") -> "Optional[Integration]":
             integration.setup_once_with_options(client.options)
         except DidNotEnable as e:
             logger.debug("Did not enable integration %s: %s", integration.identifier, e)
+            return None
         else:
             _installed_integrations.add(integration.identifier)
             return integration
