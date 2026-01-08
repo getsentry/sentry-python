@@ -1002,6 +1002,89 @@ def test_enable_integration(sentry_init):
     assert "gnu_backtrace" in client.integrations
 
 
+def test_enable_enabled_integration(sentry_init):
+    from sentry_sdk.integrations.gnu_backtrace import GnuBacktraceIntegration
+
+    sentry_init(integrations=[GnuBacktraceIntegration()])
+
+    assert "gnu_backtrace" in get_client().integrations
+
+    # Second call should not raise or cause issues
+    sentry_sdk.enable_integration(GnuBacktraceIntegration())
+    assert "gnu_backtrace" in get_client().integrations
+
+
+def test_enable_integration_twice(sentry_init):
+    sentry_init()
+
+    from sentry_sdk.integrations.gnu_backtrace import GnuBacktraceIntegration
+
+    assert "gnu_backtrace" not in get_client().integrations
+
+    sentry_sdk.enable_integration(GnuBacktraceIntegration())
+    assert "gnu_backtrace" in get_client().integrations
+
+    # Second call should not raise or cause issues
+    sentry_sdk.enable_integration(GnuBacktraceIntegration())
+    assert "gnu_backtrace" in get_client().integrations
+
+
+def test_enable_integration_did_not_enable(sentry_init):
+    sentry_init()
+
+    class FailingIntegration(Integration):
+        identifier = "failing_test_integration"
+
+        @staticmethod
+        def setup_once():
+            raise DidNotEnable("This integration cannot be enabled")
+
+    sentry_sdk.enable_integration(FailingIntegration())
+
+    assert "failing_test_integration" not in get_client().integrations
+
+
+def test_enable_integration_setup_once_called(sentry_init):
+    sentry_init()
+
+    setup_called = []
+
+    class TrackingIntegration(Integration):
+        identifier = "tracking_test_integration"
+
+        @staticmethod
+        def setup_once():
+            setup_called.append(True)
+
+        def setup_once_with_options(self, options):
+            setup_called.append(True)
+
+    assert len(setup_called) == 0
+    sentry_sdk.enable_integration(TrackingIntegration())
+    assert len(setup_called) == 2
+    assert "tracking_test_integration" in get_client().integrations
+
+
+def test_enable_integration_setup_once_not_called_twice(sentry_init):
+    sentry_init()
+
+    setup_count = []
+
+    class CountingIntegration(Integration):
+        identifier = "counting_test_integration"
+
+        @staticmethod
+        def setup_once():
+            setup_count.append(1)
+
+    sentry_sdk.enable_integration(CountingIntegration())
+    assert len(setup_count) == 1
+
+    # Enable again - setup_once should NOT be called
+    sentry_sdk.enable_integration(CountingIntegration())
+    assert len(setup_count) == 1
+
+
 class TracingTestClass:
     @staticmethod
     def static(arg):
