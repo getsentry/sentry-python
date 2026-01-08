@@ -156,14 +156,14 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
         enable_asyncio_integration()
     ```
 
-    Any arguments provided will be passed to AsyncioIntegration() as-is.
+    Any arguments provided will be passed to AsyncioIntegration() as is.
 
     If AsyncioIntegration is already enabled (e.g. because it was provided in
     sentry_sdk.init(integrations=[...])), this function won't have any effect.
 
     If AsyncioIntegration was provided in
     sentry_sdk.init(disabled_integrations=[...]), this function will ignore that
-    and enable it.
+    and the integration will be enabled.
     """
     client = sentry_sdk.get_client()
     if not client.is_active():
