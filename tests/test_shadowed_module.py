@@ -29,12 +29,9 @@ def pytest_generate_tests(metafunc):
             # Temporarily skip some integrations
             submodule_names
             - {
-                "grpc",
                 "litellm",
-                "opentelemetry",
                 "pure_eval",
                 "ray",
-                "trytond",
                 "typer",
             },
         )

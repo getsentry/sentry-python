@@ -1,23 +1,4 @@
-from opentelemetry import trace
-from opentelemetry.context import (
-    Context,
-    get_current,
-    set_value,
-)
-from opentelemetry.propagators.textmap import (
-    CarrierT,
-    Getter,
-    Setter,
-    TextMapPropagator,
-    default_getter,
-    default_setter,
-)
-from opentelemetry.trace import (
-    NonRecordingSpan,
-    SpanContext,
-    TraceFlags,
-)
-
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -30,6 +11,29 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
 )
 from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
+
+try:
+    from opentelemetry import trace
+    from opentelemetry.context import (
+        Context,
+        get_current,
+        set_value,
+    )
+    from opentelemetry.propagators.textmap import (
+        CarrierT,
+        Getter,
+        Setter,
+        TextMapPropagator,
+        default_getter,
+        default_setter,
+    )
+    from opentelemetry.trace import (
+        NonRecordingSpan,
+        SpanContext,
+        TraceFlags,
+    )
+except ImportError:
+    raise DidNotEnable("opentelemetry not installed")
 
 from typing import TYPE_CHECKING
 

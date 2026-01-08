@@ -396,7 +396,7 @@ class SentryLogsHandler(_BaseHandler):
             attrs["logger.name"] = record.name
 
         # noinspection PyProtectedMember
-        client._capture_log(
+        sentry_sdk.get_current_scope()._capture_log(
             {
                 "severity_text": otel_severity_text,
                 "severity_number": otel_severity_number,
