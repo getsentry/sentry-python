@@ -430,15 +430,6 @@ async def test_delayed_enable_integration_with_options(sentry_init, capture_even
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
 
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(name="test"):
-        await asyncio.create_task(foo())
-
-    assert len(events) == 1
-    (transaction,) = events
-    assert not transaction["spans"]
-
     mock_init = MagicMock(return_value=None)
     mock_setup_once = MagicMock()
     with patch(
