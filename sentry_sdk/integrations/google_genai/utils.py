@@ -297,11 +297,14 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         if part.get("file_data"):
             file_data = part["file_data"]
             if isinstance(file_data, dict):
-                return {
-                    "type": "blob",
-                    "mime_type": file_data.get("mime_type"),
-                    "file_uri": file_data.get("file_uri"),
-                }
+                mime_type = file_data.get("mime_type")
+                file_uri = file_data.get("file_uri")
+                if mime_type and file_uri:
+                    return {
+                        "type": "blob",
+                        "mime_type": mime_type,
+                        "file_uri": file_uri,
+                    }
 
         if part.get("inline_data"):
             inline_data = part["inline_data"]
