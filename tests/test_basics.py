@@ -989,14 +989,17 @@ def test_enable_integration(sentry_init):
     sentry_init()
 
     client = get_client()
-    assert "asyncio" not in client.integrations
+    assert "gnu_backtrace" not in client.integrations
 
-    from sentry_sdk.integrations.asyncio import AsyncioIntegration
+    # Using gnu backtrace here because to test this properly it should be a
+    # non-auto-enabling integration that's also unlikely to become auto-enabling
+    # in the future
+    from sentry_sdk.integrations.gnu_backtrace import GnuBacktraceIntegration
 
-    sentry_sdk.enable_integration(AsyncioIntegration())
+    sentry_sdk.enable_integration(GnuBacktraceIntegration())
 
     client = get_client()
-    assert "asyncio" in client.integrations
+    assert "gnu_backtrace" in client.integrations
 
 
 class TracingTestClass:
