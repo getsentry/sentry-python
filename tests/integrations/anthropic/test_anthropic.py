@@ -1689,7 +1689,7 @@ def test_message_with_base64_image(sentry_init, capture_events):
         "type": "blob",
         "modality": "image",
         "mime_type": "image/jpeg",
-        "content": "base64encodeddatahere...",
+        "content": "[Filtered]",
     }
 
 
@@ -1823,7 +1823,7 @@ def test_message_with_base64_pdf(sentry_init, capture_events):
         "type": "blob",
         "modality": "document",
         "mime_type": "application/pdf",
-        "content": "JVBERi0xLjQKJeLj...base64pdfdata",
+        "content": "[Filtered]",
     }
 
 
@@ -1979,7 +1979,7 @@ def test_message_with_mixed_content(sentry_init, capture_events):
         "type": "blob",
         "modality": "image",
         "mime_type": "image/png",
-        "content": "iVBORw0KGgo...base64imagedata",
+        "content": "[Filtered]",
     }
     assert content[2] == {
         "type": "uri",
@@ -1991,7 +1991,7 @@ def test_message_with_mixed_content(sentry_init, capture_events):
         "type": "blob",
         "modality": "document",
         "mime_type": "application/pdf",
-        "content": "JVBERi0xLjQK...base64pdfdata",
+        "content": "[Filtered]",
     }
     assert content[4] == {
         "type": "text",
@@ -2057,7 +2057,7 @@ def test_message_with_multiple_images_different_formats(sentry_init, capture_eve
         "type": "blob",
         "modality": "image",
         "mime_type": "image/jpeg",
-        "content": "base64data1...",
+        "content": "[Filtered]",
     }
     assert content[1] == {
         "type": "uri",

@@ -262,40 +262,22 @@ def _set_input_data(
                 and "content" in message
                 and isinstance(message["content"], (list, tuple))
             ):
-                has_tool_result = False
                 transformed_content = []
                 for item in message["content"]:
+                    # Skip tool_result items - they can contain images/documents
+                    # with nested structures that are difficult to redact properly
                     if isinstance(item, dict) and item.get("type") == "tool_result":
-                        has_tool_result = True
-                        normalized_messages.append(
-                            {
-                                "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
-                                "content": {  # type: ignore[dict-item]
-                                    "tool_use_id": item.get("tool_use_id"),
-                                    "output": _transform_message_content(
-                                        item.get("content")
-                                    ),
-                                },
-                            }
-                        )
-                    else:
-                        # Transform content blocks (images, documents, etc.)
-                        transformed_content.append(
-                            _transform_content_block(item)
-                            if isinstance(item, dict)
-                            else item
-                        )
+                        continue
+
+                    # Transform content blocks (images, documents, etc.)
+                    transformed_content.append(
+                        _transform_content_block(item)
+                        if isinstance(item, dict)
+                        else item
+                    )
 
                 # If there are non-tool-result items, add them as a message
-                if transformed_content and not has_tool_result:
-                    normalized_messages.append(
-                        {
-                            "role": message.get("role"),
-                            "content": transformed_content,
-                        }
-                    )
-                elif transformed_content and has_tool_result:
-                    # Mixed content: tool results + other content
+                if transformed_content:
                     normalized_messages.append(
                         {
                             "role": message.get("role"),
