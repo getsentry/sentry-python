@@ -291,10 +291,10 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         if "function_response" in part:
             return _extract_tool_message_from_part(part)
 
-        if "text" in part:
+        if part.get("text"):
             return {"text": part["text"], "type": "text"}
 
-        if "file_data" in part:
+        if part.get("file_data"):
             file_data = part["file_data"]
             if isinstance(file_data, dict):
                 return {
@@ -303,7 +303,7 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
                     "file_uri": file_data.get("file_uri"),
                 }
 
-        if "inline_data" in part:
+        if part.get("inline_data"):
             inline_data = part["inline_data"]
             if isinstance(inline_data, dict):
                 data = inline_data.get("data")
@@ -384,7 +384,7 @@ def _extract_tool_message_from_part(part: "Any") -> "Optional[dict[str, Any]]":
     if isinstance(function_response, dict):
         tool_call_id = function_response.get("id")
         tool_name = function_response.get("name")
-        response_dict = function_response.get("response", {})
+        response_dict = function_response.get("response") or {}
         # Prefer "output" key if present, otherwise use entire response
         output = response_dict.get("output", response_dict)
     else:
@@ -763,8 +763,6 @@ def set_span_data_for_request(
         messages.extend(contents_messages)
 
         if messages:
-            # Redact blob message parts
-            messages = redact_blob_message_parts(messages)
             normalized_messages = normalize_message_roles(messages)
             scope = sentry_sdk.get_current_scope()
             messages_data = truncate_and_annotate_messages(
