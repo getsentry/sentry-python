@@ -1,3 +1,4 @@
+import copy
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -14,7 +15,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
+    from typing import Any, Dict, List
     from datetime import datetime
 
 try:
@@ -33,6 +34,74 @@ def _get_metadata_dict(kwargs: "Dict[str, Any]") -> "Dict[str, Any]":
         metadata = {}
         litellm_params["metadata"] = metadata
     return metadata
+
+
+def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, Any]]":
+    """
+    Convert the message parts from OpenAI format to the `gen_ai.request.messages` format.
+    e.g:
+    {
+        "role": "user",
+        "content": [
+            {
+                "text": "How many ponies do you see in the image?",
+                "type": "text"
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": "data:image/jpeg;base64,...",
+                    "detail": "high"
+                }
+            }
+        ]
+    }
+    becomes:
+    {
+        "role": "user",
+        "content": [
+            {
+                "text": "How many ponies do you see in the image?",
+                "type": "text"
+            },
+            {
+                "type": "blob",
+                "modality": "image",
+                "mime_type": "image/jpeg",
+                "content": "data:image/jpeg;base64,..."
+            }
+        ]
+    }
+    """
+    # Deep copy to avoid mutating original messages from kwargs
+    messages = copy.deepcopy(messages)
+
+    def _map_item(item: "Dict[str, Any]") -> "Dict[str, Any]":
+        if item.get("type") == "image_url":
+            image_url = item.get("image_url") or {}
+            url = image_url.get("url", "")
+            if url.startswith("data:") and ";base64," in url:
+                parts = url.split(";base64,", 1)
+                # Remove "data:" prefix (5 chars) to get proper MIME type
+                mime_type = parts[0][5:]
+                return {
+                    "type": "blob",
+                    "modality": "image",
+                    "mime_type": mime_type,
+                    "content": parts[1],
+                }
+            elif url:
+                return {
+                    "type": "uri",
+                    "uri": url,
+                }
+        return item
+
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            message["content"] = [_map_item(item) for item in content]
+    return messages
 
 
 def _input_callback(kwargs: "Dict[str, Any]") -> None:
@@ -101,6 +170,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             messages = kwargs.get("messages", [])
             if messages:
                 scope = sentry_sdk.get_current_scope()
+                messages = _convert_message_parts(messages)
                 messages_data = truncate_and_annotate_messages(messages, span, scope)
                 if messages_data is not None:
                     set_data_normalized(
