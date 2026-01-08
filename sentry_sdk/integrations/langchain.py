@@ -182,7 +182,7 @@ def _transform_langchain_content_block(
             url = str(image_url_data)
 
         # Check if it's a data URI (base64 encoded)
-        if url.startswith("data:"):
+        if url and url.startswith("data:"):
             # Parse data URI: data:mime_type;base64,content
             try:
                 # Format: data:image/jpeg;base64,/9j/4AAQ...
