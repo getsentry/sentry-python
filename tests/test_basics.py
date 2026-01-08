@@ -1089,6 +1089,18 @@ def test_enable_integration_setup_once_not_called_twice(sentry_init):
     assert len(setup_count) == 1
 
 
+def test_enable_integration_after_disabled(sentry_init):
+    from sentry_sdk.integrations.gnu_backtrace import GnuBacktraceIntegration
+
+    sentry_init(disabled_integrations=[GnuBacktraceIntegration])
+
+    assert "gnu_backtrace" not in get_client().integrations
+
+    sentry_sdk.enable_integration(GnuBacktraceIntegration())
+
+    assert "gnu_backtrace" in get_client().integrations
+
+
 class TracingTestClass:
     @staticmethod
     def static(arg):
