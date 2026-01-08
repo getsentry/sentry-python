@@ -280,9 +280,9 @@ def setup_integrations(
     return integrations
 
 
-def _enable_integration(integration: "Integration") -> None:
+def _enable_integration(integration: "Integration") -> "Optional[Integration]":
     if integration.identifier in _installed_integrations:
-        return
+        return integration
 
     client = sentry_sdk.get_client()
 
