@@ -546,7 +546,11 @@ def enable_integration(integration: Integration) -> None:
     :type integration: sentry_sdk.integrations.Integration
     """
     client = get_client()
+    if not client.is_active():
+        return
+
     integration = _enable_integration(integration)
     if integration is None:
         return
+
     client.integrations[integration.identifier] = integration
