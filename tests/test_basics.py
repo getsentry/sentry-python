@@ -985,7 +985,8 @@ def test_multiple_setup_integrations_calls():
     assert second_call_return == {NoOpIntegration.identifier: NoOpIntegration()}
 
 
-def test_enable_integration(sentry_init, reset_integrations):
+@pytest.mark.forked
+def test_enable_integration(sentry_init):
     sentry_init()
 
     client = get_client()
