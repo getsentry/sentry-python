@@ -18,23 +18,23 @@ class MetricsBatcher(Batcher["Metric"]):
     CONTENT_TYPE = "application/vnd.sentry.items.trace-metric+json"
 
     @staticmethod
-    def _to_transport_format(metric: "Metric") -> "Any":
+    def _to_transport_format(item: "Metric") -> "Any":
         res = {
-            "timestamp": metric["timestamp"],
-            "trace_id": metric["trace_id"],
-            "name": metric["name"],
-            "type": metric["type"],
-            "value": metric["value"],
+            "timestamp": item["timestamp"],
+            "trace_id": item["trace_id"],
+            "name": item["name"],
+            "type": item["type"],
+            "value": item["value"],
             "attributes": {
-                k: serialize_attribute(v) for (k, v) in metric["attributes"].items()
+                k: serialize_attribute(v) for (k, v) in item["attributes"].items()
             },
         }
 
-        if metric.get("span_id") is not None:
-            res["span_id"] = metric["span_id"]
+        if item.get("span_id") is not None:
+            res["span_id"] = item["span_id"]
 
-        if metric.get("unit") is not None:
-            res["unit"] = metric["unit"]
+        if item.get("unit") is not None:
+            res["unit"] = item["unit"]
 
         return res
 
