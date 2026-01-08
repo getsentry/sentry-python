@@ -3,6 +3,7 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
     normalize_message_roles,
+    normalize_message_role,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
@@ -10,7 +11,11 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data, _set_usage_data
+from ..utils import (
+    _set_agent_data,
+    _set_usage_data,
+    _transform_openai_agents_message_content,
+)
 
 from typing import TYPE_CHECKING
 
@@ -49,17 +54,40 @@ def invoke_agent_span(
 
         original_input = kwargs.get("original_input")
         if original_input is not None:
-            message = (
-                original_input
-                if isinstance(original_input, str)
-                else safe_serialize(original_input)
-            )
-            messages.append(
-                {
-                    "content": [{"text": message, "type": "text"}],
-                    "role": "user",
-                }
-            )
+            if isinstance(original_input, str):
+                # String input: wrap in text block
+                messages.append(
+                    {
+                        "content": [{"text": original_input, "type": "text"}],
+                        "role": "user",
+                    }
+                )
+            elif isinstance(original_input, list) and len(original_input) > 0:
+                # Check if list contains message objects (with type="message")
+                # or content parts (input_text, input_image, etc.)
+                first_item = original_input[0]
+                if isinstance(first_item, dict) and first_item.get("type") == "message":
+                    # List of message objects - process each individually
+                    for msg in original_input:
+                        if isinstance(msg, dict) and msg.get("type") == "message":
+                            role = normalize_message_role(msg.get("role", "user"))
+                            content = msg.get("content")
+                            transformed = _transform_openai_agents_message_content(
+                                content
+                            )
+                            if isinstance(transformed, str):
+                                transformed = [{"text": transformed, "type": "text"}]
+                            elif not isinstance(transformed, list):
+                                transformed = [
+                                    {"text": str(transformed), "type": "text"}
+                                ]
+                            messages.append({"content": transformed, "role": role})
+                else:
+                    # List of content parts - transform and wrap as user message
+                    content = _transform_openai_agents_message_content(original_input)
+                    if not isinstance(content, list):
+                        content = [{"text": str(content), "type": "text"}]
+                    messages.append({"content": content, "role": "user"})
 
         if len(messages) > 0:
             normalized_messages = normalize_message_roles(messages)

@@ -40,6 +40,39 @@ for target_role, source_roles in GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING.items():
         GEN_AI_MESSAGE_ROLE_MAPPING[source_role] = target_role
 
 
+def parse_data_uri(url):
+    # type: (str) -> Tuple[str, str]
+    """
+    Parse a data URI and return (mime_type, content).
+
+    Data URI format (RFC 2397): data:[<mediatype>][;base64],<data>
+
+    Examples:
+        data:image/jpeg;base64,/9j/4AAQ... → ("image/jpeg", "/9j/4AAQ...")
+        data:text/plain,Hello → ("text/plain", "Hello")
+        data:;base64,SGVsbG8= → ("", "SGVsbG8=")
+
+    Raises:
+        ValueError: If the URL is not a valid data URI (missing comma separator)
+    """
+    if "," not in url:
+        raise ValueError("Invalid data URI: missing comma separator")
+
+    header, content = url.split(",", 1)
+
+    # Extract mime type from header
+    # Format: "data:<mime>[;param1][;param2]..." e.g. "data:image/jpeg;base64"
+    # Remove "data:" prefix, then take everything before the first semicolon
+    if header.startswith("data:"):
+        mime_part = header[5:]  # Remove "data:" prefix
+    else:
+        mime_part = header
+
+    mime_type = mime_part.split(";")[0]
+
+    return mime_type, content
+
+
 def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
     # convert pydantic data (e.g. OpenAI v1+) to json compatible format
     if hasattr(data, "model_dump"):
