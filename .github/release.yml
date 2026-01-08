@@ -10,23 +10,28 @@ changelog:
         - "Changelog: Feature"
       commit_patterns:
         - "^feat\\b"
+      semver: minor
     - title: Bug Fixes 🐛
       labels:
         - "Changelog: Bugfix"
       commit_patterns:
         - "^(fix|bugfix)\\b"
+      semver: patch
     - title: Deprecations 🏗️
       labels:
         - "Changelog: Deprecation"
       commit_patterns:
         - "deprecat"  # deprecation, deprecated
+      semver: patch
     - title: Documentation 📚
       labels:
         - "Changelog: Docs"
       commit_patterns:
         - "^docs?\\b"
+      semver: patch
     - title: Internal Changes 🔧
       labels:
         - "Changelog: Internal"
       commit_patterns:
         - "^(build|ref|chore|ci|tests?)\\b"
+      semver: patch
