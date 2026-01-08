@@ -144,9 +144,6 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
     """
     Enable AsyncioIntegration with the provided options.
 
-    The options need to correspond to the options currently accepted by the
-    AsyncioIntegration() constructor.
-
     This is useful in scenarios where Sentry needs to be initialized before
     an event loop is set up, but you still want to instrument asyncio once there
     is an event loop. In that case, you can sentry_sdk.init() early on without
@@ -159,8 +156,10 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
         enable_asyncio_integration()
     ```
 
+    Any arguments provided will be passed to AsyncioIntegration() as-is.
+
     If AsyncioIntegration is already enabled (e.g. because it was provided in
-    sentry_sdk.init(integrations=[...])), this function will re-enable it.
+    sentry_sdk.init(integrations=[...])), this function won't have any effect.
 
     If AsyncioIntegration was provided in
     sentry_sdk.init(disabled_integrations=[...]), this function will ignore that

@@ -458,17 +458,17 @@ async def test_delayed_enable_integration_with_options(sentry_init, capture_even
 @minimum_python_38
 @pytest.mark.asyncio
 async def test_delayed_enable_enabled_integration(sentry_init):
-    sentry_init(integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
+    integration = AsyncioIntegration()
+    sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     assert "asyncio" in sentry_sdk.get_client().integrations
 
-    original_integration = sentry_sdk.get_client().integrations["asyncio"]
     enable_asyncio_integration()
 
     assert "asyncio" in sentry_sdk.get_client().integrations
 
-    # The new asyncio integration should override the old one
-    assert sentry_sdk.get_client().integrations["asyncio"] is not original_integration
+    # The new asyncio integration should not override the old one
+    assert sentry_sdk.get_client().integrations["asyncio"] == integration
 
 
 @minimum_python_38

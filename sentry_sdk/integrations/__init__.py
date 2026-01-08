@@ -285,6 +285,10 @@ def _enable_integration(integration: "Integration") -> "Optional[Integration]":
     client = sentry_sdk.get_client()
 
     with _installer_lock:
+        if identifier in client.integrations:
+            logger.debug("Integration already enabled: %s", identifier)
+            return None
+
         logger.debug("Setting up integration %s", identifier)
         _processed_integrations.add(identifier)
         try:
