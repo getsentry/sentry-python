@@ -286,16 +286,16 @@ def _enable_integration(integration: "Integration") -> "Optional[Integration]":
 
     with _installer_lock:
         logger.debug("Setting up integration %s", identifier)
+        _processed_integrations.add(identifier)
         try:
             type(integration).setup_once()
             integration.setup_once_with_options(client.options)
         except DidNotEnable as e:
             logger.debug("Did not enable integration %s: %s", identifier, e)
+            return None
         else:
             _installed_integrations.add(identifier)
             return integration
-
-        _processed_integrations.add(identifier)
 
 
 def _check_minimum_version(
