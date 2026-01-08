@@ -23,15 +23,13 @@ class SparkWorkerIntegration(Integration):
     identifier = "spark_worker"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         import pyspark.daemon as original_daemon
 
         original_daemon.worker_main = _sentry_worker_main
 
 
-def _capture_exception(exc_info):
-    # type: (ExcInfo) -> None
+def _capture_exception(exc_info: "ExcInfo") -> None:
     client = sentry_sdk.get_client()
 
     mechanism = {"type": "spark", "handled": False}
@@ -53,22 +51,20 @@ def _capture_exception(exc_info):
     if rv:
         rv.reverse()
         hint = event_hint_with_exc_info(exc_info)
-        event = {"level": "error", "exception": {"values": rv}}  # type: Event
+        event: "Event" = {"level": "error", "exception": {"values": rv}}
 
         _tag_task_context()
 
         sentry_sdk.capture_event(event, hint=hint)
 
 
-def _tag_task_context():
-    # type: () -> None
+def _tag_task_context() -> None:
     from pyspark.taskcontext import TaskContext
 
     scope = sentry_sdk.get_isolation_scope()
 
     @scope.add_event_processor
-    def process_event(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+    def process_event(event: "Event", hint: "Hint") -> "Optional[Event]":
         with capture_internal_exceptions():
             integration = sentry_sdk.get_client().get_integration(
                 SparkWorkerIntegration
@@ -103,8 +99,7 @@ def _tag_task_context():
         return event
 
 
-def _sentry_worker_main(*args, **kwargs):
-    # type: (*Optional[Any], **Optional[Any]) -> None
+def _sentry_worker_main(*args: "Optional[Any]", **kwargs: "Optional[Any]") -> None:
     import pyspark.worker as original_worker
 
     try:

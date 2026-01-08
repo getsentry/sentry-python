@@ -1,25 +1,29 @@
 from typing import Callable, Union, AsyncIterable, Any
 
-from grpc.aio import (
-    UnaryUnaryClientInterceptor,
-    UnaryStreamClientInterceptor,
-    ClientCallDetails,
-    UnaryUnaryCall,
-    UnaryStreamCall,
-    Metadata,
-)
-from google.protobuf.message import Message
-
 import sentry_sdk
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
+
+try:
+    from grpc.aio import (
+        UnaryUnaryClientInterceptor,
+        UnaryStreamClientInterceptor,
+        ClientCallDetails,
+        UnaryUnaryCall,
+        UnaryStreamCall,
+        Metadata,
+    )
+    from google.protobuf.message import Message
+except ImportError:
+    raise DidNotEnable("grpcio is not installed")
 
 
 class ClientInterceptor:
     @staticmethod
     def _update_client_call_details_metadata_from_scope(
-        client_call_details: ClientCallDetails,
-    ) -> ClientCallDetails:
+        client_call_details: "ClientCallDetails",
+    ) -> "ClientCallDetails":
         if client_call_details.metadata is None:
             client_call_details = client_call_details._replace(metadata=Metadata())
         elif not isinstance(client_call_details.metadata, Metadata):
@@ -39,10 +43,10 @@ class ClientInterceptor:
 class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInterceptor):  # type: ignore
     async def intercept_unary_unary(
         self,
-        continuation: Callable[[ClientCallDetails, Message], UnaryUnaryCall],
-        client_call_details: ClientCallDetails,
-        request: Message,
-    ) -> Union[UnaryUnaryCall, Message]:
+        continuation: "Callable[[ClientCallDetails, Message], UnaryUnaryCall]",
+        client_call_details: "ClientCallDetails",
+        request: "Message",
+    ) -> "Union[UnaryUnaryCall, Message]":
         method = client_call_details.method
 
         with sentry_sdk.start_span(
@@ -70,10 +74,10 @@ class SentryUnaryStreamClientInterceptor(
 ):
     async def intercept_unary_stream(
         self,
-        continuation: Callable[[ClientCallDetails, Message], UnaryStreamCall],
-        client_call_details: ClientCallDetails,
-        request: Message,
-    ) -> Union[AsyncIterable[Any], UnaryStreamCall]:
+        continuation: "Callable[[ClientCallDetails, Message], UnaryStreamCall]",
+        client_call_details: "ClientCallDetails",
+        request: "Message",
+    ) -> "Union[AsyncIterable[Any], UnaryStreamCall]":
         method = client_call_details.method
 
         with sentry_sdk.start_span(

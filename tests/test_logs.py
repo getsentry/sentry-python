@@ -18,8 +18,7 @@ minimum_python_37 = pytest.mark.skipif(
 )
 
 
-def otel_attributes_to_dict(otel_attrs):
-    # type: (Mapping[str, Any]) -> Mapping[str, Any]
+def otel_attributes_to_dict(otel_attrs: "Mapping[str, Any]") -> "Mapping[str, Any]":
     def _convert_attr(attr):
         # type: (Mapping[str, Union[str, float, bool]]) -> Any
         if attr["type"] == "boolean":
@@ -39,12 +38,12 @@ def otel_attributes_to_dict(otel_attrs):
 
 
 def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
-    res = []  # type: List[Log]
+    res: "List[Log]" = []
     for envelope in envelopes:
         for item in envelope.items:
             if item.type == "log":
                 for log_json in item.payload.json["items"]:
-                    log = {
+                    log: "Log" = {
                         "severity_text": log_json["attributes"]["sentry.severity_text"][
                             "value"
                         ],
@@ -55,7 +54,8 @@ def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
                         "attributes": otel_attributes_to_dict(log_json["attributes"]),
                         "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
                         "trace_id": log_json["trace_id"],
-                    }  # type: Log
+                        "span_id": log_json["span_id"],
+                    }
                     res.append(log)
     return res
 
@@ -142,6 +142,7 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
             "attributes",
             "time_unix_nano",
             "trace_id",
+            "span_id",
         }
 
         if record["severity_text"] in ["fatal", "error"]:
@@ -319,7 +320,9 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)
-    assert logs[0]["attributes"]["sentry.trace.parent_span_id"] == trx.span_id
+
+    assert "span_id" in logs[0]
+    assert logs[0]["span_id"] == trx.span_id
 
 
 @minimum_python_37
@@ -336,9 +339,10 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)
-    assert logs[0]["attributes"]["sentry.trace.parent_span_id"] == span.span_id
+    assert logs[0]["span_id"] == span.span_id
 
 
+@minimum_python_37
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     """
     If you log >100 logs, it should automatically trigger a flush.
@@ -346,9 +350,8 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
-    python_logger = logging.Logger("test-logger")
     for i in range(200):
-        python_logger.warning("log #%d", i)
+        sentry_sdk.logger.warning("log")
 
     for _ in range(500):
         time.sleep(1.0 / 100.0)
@@ -358,15 +361,15 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     raise AssertionError("200 logs were never flushed after five seconds")
 
 
+@minimum_python_37
 def test_log_user_attributes(sentry_init, capture_envelopes):
-    """User attributes are sent if enable_logs is True."""
-    sentry_init(enable_logs=True)
+    """User attributes are sent if enable_logs is True and send_default_pii is True."""
+    sentry_init(enable_logs=True, send_default_pii=True)
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     envelopes = capture_envelopes()
 
-    python_logger = logging.Logger("test-logger")
-    python_logger.warning("Hello, world!")
+    sentry_sdk.logger.warning("Hello, world!")
 
     get_client().flush()
 
@@ -382,6 +385,26 @@ def test_log_user_attributes(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
+def test_log_no_user_attributes_if_no_pii(sentry_init, capture_envelopes):
+    """User attributes are not if PII sending is off."""
+    sentry_init(enable_logs=True, send_default_pii=False)
+
+    sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
+    envelopes = capture_envelopes()
+
+    sentry_sdk.logger.warning("Hello, world!")
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log,) = logs
+
+    assert "user.id" not in log["attributes"]
+    assert "user.email" not in log["attributes"]
+    assert "user.name" not in log["attributes"]
+
+
+@minimum_python_37
 def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     """
     If you log a single log, it should automatically flush after 5 seconds, at most 10 seconds.
@@ -389,8 +412,7 @@ def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
-    python_logger = logging.Logger("test-logger")
-    python_logger.warning("log #%d", 1)
+    sentry_sdk.logger.warning("log")
 
     for _ in range(100):
         time.sleep(1.0 / 10.0)
@@ -450,6 +472,69 @@ def test_logs_with_literal_braces(
 
 
 @minimum_python_37
+def test_transport_format(sentry_init, capture_envelopes):
+    sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
+
+    envelopes = capture_envelopes()
+
+    sentry_sdk.logger.warning("This is a log...")
+
+    sentry_sdk.get_client().flush()
+
+    assert len(envelopes) == 1
+    assert len(envelopes[0].items) == 1
+    item = envelopes[0].items[0]
+
+    assert item.type == "log"
+    assert item.headers == {
+        "type": "log",
+        "item_count": 1,
+        "content_type": "application/vnd.sentry.items.log+json",
+    }
+    assert item.payload.json == {
+        "items": [
+            {
+                "body": "This is a log...",
+                "level": "warn",
+                "timestamp": mock.ANY,
+                "trace_id": mock.ANY,
+                "span_id": mock.ANY,
+                "attributes": {
+                    "sentry.environment": {
+                        "type": "string",
+                        "value": "production",
+                    },
+                    "sentry.release": {
+                        "type": "string",
+                        "value": "1.0.0",
+                    },
+                    "sentry.sdk.name": {
+                        "type": "string",
+                        "value": mock.ANY,
+                    },
+                    "sentry.sdk.version": {
+                        "type": "string",
+                        "value": VERSION,
+                    },
+                    "sentry.severity_number": {
+                        "type": "integer",
+                        "value": 13,
+                    },
+                    "sentry.severity_text": {
+                        "type": "string",
+                        "value": "warn",
+                    },
+                    "server.address": {
+                        "type": "string",
+                        "value": "test-server",
+                    },
+                },
+            }
+        ]
+    }
+
+
+@minimum_python_37
 def test_batcher_drops_logs(sentry_init, monkeypatch):
     sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
     client = sentry_sdk.get_client()
@@ -491,6 +576,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                     "level": "info",
                     "timestamp": mock.ANY,
                     "trace_id": mock.ANY,
+                    "span_id": mock.ANY,
                     "attributes": {
                         "sentry.environment": {
                             "type": "string",
@@ -516,10 +602,6 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                             "type": "string",
                             "value": "info",
                         },
-                        "sentry.trace.parent_span_id": {
-                            "type": "string",
-                            "value": mock.ANY,
-                        },
                         "server.address": {
                             "type": "string",
                             "value": "test-server",
@@ -528,3 +610,89 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                 }
             ]
         }
+
+
+@minimum_python_37
+def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
+    sentry_init(enable_logs=True)
+
+    envelopes = capture_envelopes()
+
+    global_scope = sentry_sdk.get_global_scope()
+    global_scope.set_attribute("global.attribute", "value")
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("current.attribute", "value")
+        sentry_sdk.logger.warning("Hello, world!")
+
+    sentry_sdk.logger.warning("Hello again!")
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log1, log2) = logs
+
+    assert log1["attributes"]["global.attribute"] == "value"
+    assert log1["attributes"]["current.attribute"] == "value"
+
+    assert log2["attributes"]["global.attribute"] == "value"
+    assert "current.attribute" not in log2["attributes"]
+
+
+@minimum_python_37
+def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes):
+    sentry_init(enable_logs=True)
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("durable.attribute", "value1")
+        scope.set_attribute("temp.attribute", "value1")
+        sentry_sdk.logger.warning(
+            "Hello, world!", attributes={"temp.attribute": "value2"}
+        )
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log,) = logs
+
+    assert log["attributes"]["durable.attribute"] == "value1"
+    assert log["attributes"]["temp.attribute"] == "value2"
+
+
+@minimum_python_37
+def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes):
+    """We don't surface references to objects in attributes."""
+
+    def before_send_log(log, _):
+        assert isinstance(log["attributes"]["instance"], str)
+        assert isinstance(log["attributes"]["dictionary"], str)
+
+        return log
+
+    sentry_init(enable_logs=True, before_send_log=before_send_log)
+
+    envelopes = capture_envelopes()
+
+    class Cat:
+        pass
+
+    instance = Cat()
+    dictionary = {"color": "tortoiseshell"}
+
+    sentry_sdk.logger.warning(
+        "Hello world!",
+        attributes={
+            "instance": instance,
+            "dictionary": dictionary,
+        },
+    )
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log,) = logs
+
+    assert isinstance(log["attributes"]["instance"], str)
+    assert isinstance(log["attributes"]["dictionary"], str)

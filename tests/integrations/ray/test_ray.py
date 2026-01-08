@@ -74,10 +74,29 @@ def read_error_from_log(job_id, ray_temp_dir):
     return error
 
 
+def example_task():
+    with sentry_sdk.start_span(op="task", name="example task step"):
+        ...
+
+    return sentry_sdk.get_client().transport.envelopes
+
+
+# RayIntegration must leave variadic keyword arguments at the end
+def example_task_with_kwargs(**kwargs):
+    with sentry_sdk.start_span(op="task", name="example task step"):
+        ...
+
+    return sentry_sdk.get_client().transport.envelopes
+
+
 @pytest.mark.parametrize(
     "task_options", [{}, {"num_cpus": 0, "memory": 1024 * 1024 * 10}]
 )
-def test_tracing_in_ray_tasks(task_options):
+@pytest.mark.parametrize(
+    "task",
+    [example_task, example_task_with_kwargs],
+)
+def test_tracing_in_ray_tasks(task_options, task):
     setup_sentry()
 
     ray.init(
@@ -87,21 +106,18 @@ def test_tracing_in_ray_tasks(task_options):
         }
     )
 
-    def example_task():
-        with sentry_sdk.start_span(op="task", name="example task step"):
-            ...
-
-        return sentry_sdk.get_client().transport.envelopes
-
     # Setup ray task, calling decorator directly instead of @,
     # to accommodate for test parametrization
     if task_options:
-        example_task = ray.remote(**task_options)(example_task)
+        example_task = ray.remote(**task_options)(task)
     else:
-        example_task = ray.remote(example_task)
+        example_task = ray.remote(task)
 
     # Function name shouldn't be overwritten by Sentry wrapper
-    assert example_task._function_name == "tests.integrations.ray.test_ray.example_task"
+    assert (
+        example_task._function_name
+        == f"tests.integrations.ray.test_ray.{task.__name__}"
+    )
 
     with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
         worker_envelopes = ray.get(example_task.remote())
@@ -115,17 +131,14 @@ def test_tracing_in_ray_tasks(task_options):
     worker_transaction = worker_envelope.get_transaction_event()
     assert (
         worker_transaction["transaction"]
-        == "tests.integrations.ray.test_ray.test_tracing_in_ray_tasks.<locals>.example_task"
+        == f"tests.integrations.ray.test_ray.{task.__name__}"
     )
     assert worker_transaction["transaction_info"] == {"source": "task"}
 
     (span,) = client_transaction["spans"]
     assert span["op"] == "queue.submit.ray"
     assert span["origin"] == "auto.queue.ray"
-    assert (
-        span["description"]
-        == "tests.integrations.ray.test_ray.test_tracing_in_ray_tasks.<locals>.example_task"
-    )
+    assert span["description"] == f"tests.integrations.ray.test_ray.{task.__name__}"
     assert span["parent_span_id"] == client_transaction["contexts"]["trace"]["span_id"]
     assert span["trace_id"] == client_transaction["contexts"]["trace"]["trace_id"]
 
@@ -183,7 +196,9 @@ def test_errors_in_ray_tasks():
             shutil.rmtree(ray_temp_dir, ignore_errors=True)
 
 
-def test_tracing_in_ray_actors():
+# Arbitrary keyword argument to test all decorator paths
+@pytest.mark.parametrize("remote_kwargs", [{}, {"namespace": "actors"}])
+def test_tracing_in_ray_actors(remote_kwargs):
     setup_sentry()
 
     ray.init(
@@ -194,16 +209,30 @@ def test_tracing_in_ray_actors():
     )
 
     # Setup ray actor
-    @ray.remote
-    class Counter:
-        def __init__(self):
-            self.n = 0
+    if remote_kwargs:
 
-        def increment(self):
-            with sentry_sdk.start_span(op="task", name="example actor execution"):
-                self.n += 1
+        @ray.remote(**remote_kwargs)
+        class Counter:
+            def __init__(self):
+                self.n = 0
 
-            return sentry_sdk.get_client().transport.envelopes
+            def increment(self):
+                with sentry_sdk.start_span(op="task", name="example actor execution"):
+                    self.n += 1
+
+                return sentry_sdk.get_client().transport.envelopes
+    else:
+
+        @ray.remote
+        class Counter:
+            def __init__(self):
+                self.n = 0
+
+            def increment(self):
+                with sentry_sdk.start_span(op="task", name="example actor execution"):
+                    self.n += 1
+
+                return sentry_sdk.get_client().transport.envelopes
 
     with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
         counter = Counter.remote()

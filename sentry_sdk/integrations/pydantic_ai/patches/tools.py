@@ -4,10 +4,7 @@ from sentry_sdk.integrations import DidNotEnable
 import sentry_sdk
 
 from ..spans import execute_tool_span, update_execute_tool_span
-from ..utils import (
-    _capture_exception,
-    get_current_agent,
-)
+from ..utils import _capture_exception, get_current_agent
 
 from typing import TYPE_CHECKING
 
@@ -23,12 +20,12 @@ except ImportError:
 
 try:
     from pydantic_ai._tool_manager import ToolManager  # type: ignore
+    from pydantic_ai.exceptions import ToolRetryError  # type: ignore
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
 
-def _patch_tool_execution():
-    # type: () -> None
+def _patch_tool_execution() -> None:
     """
     Patch ToolManager._call_tool to create execute_tool spans.
 
@@ -44,9 +41,9 @@ def _patch_tool_execution():
     original_call_tool = ToolManager._call_tool
 
     @wraps(original_call_tool)
-    async def wrapped_call_tool(self, call, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> Any
-
+    async def wrapped_call_tool(
+        self: "Any", call: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         # Extract tool info before calling original
         name = call.tool_name
         tool = self.tools.get(name) if self.tools else None
@@ -83,8 +80,21 @@ def _patch_tool_execution():
                         )
                         update_execute_tool_span(span, result)
                         return result
-                    except Exception as exc:
-                        _capture_exception(exc)
+                    except ToolRetryError as exc:
+                        # Avoid circular import due to multi-file integration structure
+                        from sentry_sdk.integrations.pydantic_ai import (
+                            PydanticAIIntegration,
+                        )
+
+                        integration = sentry_sdk.get_client().get_integration(
+                            PydanticAIIntegration
+                        )
+                        if (
+                            integration is None
+                            or not integration.handled_tool_call_exceptions
+                        ):
+                            raise exc from None
+                        _capture_exception(exc, handled=True)
                         raise exc from None
 
         # No span context - just call original

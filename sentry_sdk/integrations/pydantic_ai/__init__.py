@@ -19,20 +19,23 @@ class PydanticAIIntegration(Integration):
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (bool) -> None
+    def __init__(
+        self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
+    ) -> None:
         """
         Initialize the Pydantic AI integration.
 
         Args:
             include_prompts: Whether to include prompts and messages in span data.
                 Requires send_default_pii=True. Defaults to True.
+            handled_tool_exceptions: Capture tool call exceptions that Pydantic AI
+                internally prevents from bubbling up.
         """
         self.include_prompts = include_prompts
+        self.handled_tool_call_exceptions = handled_tool_call_exceptions
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         Set up the pydantic-ai integration.
 

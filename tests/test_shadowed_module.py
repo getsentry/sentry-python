@@ -30,12 +30,9 @@ def pytest_generate_tests(metafunc):
             submodule_names
             - {
                 "clickhouse_driver",
-                "grpc",
                 "litellm",
-                "opentelemetry",
                 "pure_eval",
                 "ray",
-                "trytond",
                 "typer",
             },
         )

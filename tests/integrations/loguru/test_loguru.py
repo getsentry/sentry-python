@@ -418,6 +418,9 @@ def test_logger_with_all_attributes(
 
     logs = envelopes_to_logs(envelopes)
 
+    assert "span_id" in logs[0]
+    assert isinstance(logs[0]["span_id"], str)
+
     attributes = logs[0]["attributes"]
 
     assert "process.pid" in attributes
@@ -457,10 +460,6 @@ def test_logger_with_all_attributes(
     del attributes["thread.name"]
 
     assert attributes.pop("sentry.sdk.name").startswith("sentry.python")
-
-    assert "sentry.trace.parent_span_id" in attributes
-    assert isinstance(attributes["sentry.trace.parent_span_id"], str)
-    del attributes["sentry.trace.parent_span_id"]
 
     # Assert on the remaining non-dynamic attributes.
     assert attributes == {

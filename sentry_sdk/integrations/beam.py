@@ -35,8 +35,7 @@ class BeamIntegration(Integration):
     identifier = "beam"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         from apache_beam.transforms.core import DoFn, ParDo  # type: ignore
 
         ignore_logger("root")
@@ -52,8 +51,9 @@ class BeamIntegration(Integration):
 
         old_init = ParDo.__init__
 
-        def sentry_init_pardo(self, fn, *args, **kwargs):
-            # type: (ParDo, Any, *Any, **Any) -> Any
+        def sentry_init_pardo(
+            self: "ParDo", fn: "Any", *args: "Any", **kwargs: "Any"
+        ) -> "Any":
             # Do not monkey patch init twice
             if not getattr(self, "_sentry_is_patched", False):
                 for func_name in function_patches:
@@ -79,14 +79,11 @@ class BeamIntegration(Integration):
         ParDo.__init__ = sentry_init_pardo
 
 
-def _wrap_inspect_call(cls, func_name):
-    # type: (Any, Any) -> Any
-
+def _wrap_inspect_call(cls: "Any", func_name: "Any") -> "Any":
     if not hasattr(cls, func_name):
         return None
 
-    def _inspect(self):
-        # type: (Any) -> Any
+    def _inspect(self: "Any") -> "Any":
         """
         Inspect function overrides the way Beam gets argspec.
         """
@@ -113,15 +110,13 @@ def _wrap_inspect_call(cls, func_name):
     return _inspect
 
 
-def _wrap_task_call(func):
-    # type: (F) -> F
+def _wrap_task_call(func: "F") -> "F":
     """
     Wrap task call with a try catch to get exceptions.
     """
 
     @wraps(func)
-    def _inner(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _inner(*args: "Any", **kwargs: "Any") -> "Any":
         try:
             gen = func(*args, **kwargs)
         except Exception:
@@ -136,8 +131,7 @@ def _wrap_task_call(func):
 
 
 @ensure_integration_enabled(BeamIntegration)
-def _capture_exception(exc_info):
-    # type: (ExcInfo) -> None
+def _capture_exception(exc_info: "ExcInfo") -> None:
     """
     Send Beam exception to Sentry.
     """
@@ -151,8 +145,7 @@ def _capture_exception(exc_info):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def raise_exception():
-    # type: () -> None
+def raise_exception() -> None:
     """
     Raise an exception.
     """
@@ -162,8 +155,7 @@ def raise_exception():
     reraise(*exc_info)
 
 
-def _wrap_generator_call(gen):
-    # type: (Iterator[T]) -> Iterator[T]
+def _wrap_generator_call(gen: "Iterator[T]") -> "Iterator[T]":
     """
     Wrap the generator to handle any failures.
     """

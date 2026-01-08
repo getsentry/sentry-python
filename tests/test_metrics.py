@@ -1,6 +1,8 @@
 import json
 import sys
 from typing import List, Any, Mapping
+from unittest import mock
+
 import pytest
 
 import sentry_sdk
@@ -10,14 +12,13 @@ from sentry_sdk.types import Metric
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
-def envelopes_to_metrics(envelopes):
-    # type: (List[Envelope]) -> List[Metric]
+def envelopes_to_metrics(envelopes: "List[Envelope]") -> "List[Metric]":
     res = []  # type: List[Metric]
     for envelope in envelopes:
         for item in envelope.items:
             if item.type == "trace_metric":
                 for metric_json in item.payload.json["items"]:
-                    metric = {
+                    metric: "Metric" = {
                         "timestamp": metric_json["timestamp"],
                         "trace_id": metric_json["trace_id"],
                         "span_id": metric_json.get("span_id"),
@@ -29,7 +30,7 @@ def envelopes_to_metrics(envelopes):
                             k: v["value"]
                             for (k, v) in metric_json["attributes"].items()
                         },
-                    }  # type: Metric
+                    }
                     res.append(metric)
     return res
 
@@ -117,7 +118,7 @@ def test_metrics_with_attributes(sentry_init, capture_envelopes):
 
 
 def test_metrics_with_user(sentry_init, capture_envelopes):
-    sentry_init()
+    sentry_init(send_default_pii=True)
     envelopes = capture_envelopes()
 
     sentry_sdk.set_user(
@@ -133,6 +134,25 @@ def test_metrics_with_user(sentry_init, capture_envelopes):
     assert metrics[0]["attributes"]["user.id"] == "user-123"
     assert metrics[0]["attributes"]["user.email"] == "test@example.com"
     assert metrics[0]["attributes"]["user.name"] == "testuser"
+
+
+def test_metrics_no_user_if_pii_off(sentry_init, capture_envelopes):
+    sentry_init(send_default_pii=False)
+    envelopes = capture_envelopes()
+
+    sentry_sdk.set_user(
+        {"id": "user-123", "email": "test@example.com", "username": "testuser"}
+    )
+    sentry_sdk.metrics.count("test.user.counter", 1)
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    assert len(metrics) == 1
+
+    assert "user.id" not in metrics[0]["attributes"]
+    assert "user.email" not in metrics[0]["attributes"]
+    assert "user.name" not in metrics[0]["attributes"]
 
 
 def test_metrics_with_span(sentry_init, capture_envelopes):
@@ -250,6 +270,61 @@ def test_metrics_experimental_before_send(sentry_init, capture_envelopes):
     assert before_metric_called
 
 
+def test_transport_format(sentry_init, capture_envelopes):
+    sentry_init(server_name="test-server", release="1.0.0")
+
+    envelopes = capture_envelopes()
+
+    sentry_sdk.metrics.count("test.counter", 1)
+
+    sentry_sdk.get_client().flush()
+
+    assert len(envelopes) == 1
+    assert len(envelopes[0].items) == 1
+    item = envelopes[0].items[0]
+
+    assert item.type == "trace_metric"
+    assert item.headers == {
+        "type": "trace_metric",
+        "item_count": 1,
+        "content_type": "application/vnd.sentry.items.trace-metric+json",
+    }
+    assert item.payload.json == {
+        "items": [
+            {
+                "name": "test.counter",
+                "type": "counter",
+                "value": 1,
+                "timestamp": mock.ANY,
+                "trace_id": mock.ANY,
+                "span_id": mock.ANY,
+                "attributes": {
+                    "sentry.environment": {
+                        "type": "string",
+                        "value": "production",
+                    },
+                    "sentry.release": {
+                        "type": "string",
+                        "value": "1.0.0",
+                    },
+                    "sentry.sdk.name": {
+                        "type": "string",
+                        "value": mock.ANY,
+                    },
+                    "sentry.sdk.version": {
+                        "type": "string",
+                        "value": VERSION,
+                    },
+                    "server.address": {
+                        "type": "string",
+                        "value": "test-server",
+                    },
+                },
+            }
+        ]
+    }
+
+
 def test_batcher_drops_metrics(sentry_init, monkeypatch):
     sentry_init()
     client = sentry_sdk.get_client()
@@ -272,3 +347,85 @@ def test_batcher_drops_metrics(sentry_init, monkeypatch):
     assert len(lost_event_calls) == 5
     for lost_event_call in lost_event_calls:
         assert lost_event_call == ("queue_overflow", "trace_metric", 1)
+
+
+def test_metric_gets_attributes_from_scopes(sentry_init, capture_envelopes):
+    sentry_init()
+
+    envelopes = capture_envelopes()
+
+    global_scope = sentry_sdk.get_global_scope()
+    global_scope.set_attribute("global.attribute", "value")
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("current.attribute", "value")
+        sentry_sdk.metrics.count("test", 1)
+
+    sentry_sdk.metrics.count("test", 1)
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    (metric1, metric2) = metrics
+
+    assert metric1["attributes"]["global.attribute"] == "value"
+    assert metric1["attributes"]["current.attribute"] == "value"
+
+    assert metric2["attributes"]["global.attribute"] == "value"
+    assert "current.attribute" not in metric2["attributes"]
+
+
+def test_metric_attributes_override_scope_attributes(sentry_init, capture_envelopes):
+    sentry_init()
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("durable.attribute", "value1")
+        scope.set_attribute("temp.attribute", "value1")
+        sentry_sdk.metrics.count("test", 1, attributes={"temp.attribute": "value2"})
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    (metric,) = metrics
+
+    assert metric["attributes"]["durable.attribute"] == "value1"
+    assert metric["attributes"]["temp.attribute"] == "value2"
+
+
+def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes):
+    """We don't surface references to objects in attributes."""
+
+    def before_send_metric(metric, _):
+        assert isinstance(metric["attributes"]["instance"], str)
+        assert isinstance(metric["attributes"]["dictionary"], str)
+
+        return metric
+
+    sentry_init(before_send_metric=before_send_metric)
+
+    envelopes = capture_envelopes()
+
+    class Cat:
+        pass
+
+    instance = Cat()
+    dictionary = {"color": "tortoiseshell"}
+
+    sentry_sdk.metrics.count(
+        "test.counter",
+        1,
+        attributes={
+            "instance": instance,
+            "dictionary": dictionary,
+        },
+    )
+
+    get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    (metric,) = metrics
+
+    assert isinstance(metric["attributes"]["instance"], str)
+    assert isinstance(metric["attributes"]["dictionary"], str)

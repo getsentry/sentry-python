@@ -1,24 +1,29 @@
 from functools import wraps
 
-import grpc
-from grpc import Channel, Server, intercept_channel
-from grpc.aio import Channel as AsyncChannel
-from grpc.aio import Server as AsyncServer
-
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import parse_version
+from sentry_sdk.integrations import DidNotEnable
 
 from .client import ClientInterceptor
 from .server import ServerInterceptor
-from .aio.server import ServerInterceptor as AsyncServerInterceptor
-from .aio.client import (
-    SentryUnaryUnaryClientInterceptor as AsyncUnaryUnaryClientInterceptor,
-)
-from .aio.client import (
-    SentryUnaryStreamClientInterceptor as AsyncUnaryStreamClientIntercetor,
-)
 
 from typing import TYPE_CHECKING, Any, Optional, Sequence
+
+try:
+    import grpc
+    from grpc import Channel, Server, intercept_channel
+    from grpc.aio import Channel as AsyncChannel
+    from grpc.aio import Server as AsyncServer
+
+    from .aio.server import ServerInterceptor as AsyncServerInterceptor
+    from .aio.client import (
+        SentryUnaryUnaryClientInterceptor as AsyncUnaryUnaryClientInterceptor,
+    )
+    from .aio.client import (
+        SentryUnaryStreamClientInterceptor as AsyncUnaryStreamClientIntercetor,
+    )
+except ImportError:
+    raise DidNotEnable("grpcio is not installed.")
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -45,11 +50,11 @@ P = ParamSpec("P")
 GRPC_VERSION = parse_version(grpc.__version__)
 
 
-def _wrap_channel_sync(func: Callable[P, Channel]) -> Callable[P, Channel]:
+def _wrap_channel_sync(func: "Callable[P, Channel]") -> "Callable[P, Channel]":
     "Wrapper for synchronous secure and insecure channel."
 
     @wraps(func)
-    def patched_channel(*args: Any, **kwargs: Any) -> Channel:
+    def patched_channel(*args: "Any", **kwargs: "Any") -> "Channel":
         channel = func(*args, **kwargs)
         if not ClientInterceptor._is_intercepted:
             ClientInterceptor._is_intercepted = True
@@ -60,11 +65,11 @@ def _wrap_channel_sync(func: Callable[P, Channel]) -> Callable[P, Channel]:
     return patched_channel
 
 
-def _wrap_intercept_channel(func: Callable[P, Channel]) -> Callable[P, Channel]:
+def _wrap_intercept_channel(func: "Callable[P, Channel]") -> "Callable[P, Channel]":
     @wraps(func)
     def patched_intercept_channel(
-        channel: Channel, *interceptors: grpc.ServerInterceptor
-    ) -> Channel:
+        channel: "Channel", *interceptors: "grpc.ServerInterceptor"
+    ) -> "Channel":
         if ClientInterceptor._is_intercepted:
             interceptors = tuple(
                 [
@@ -80,15 +85,17 @@ def _wrap_intercept_channel(func: Callable[P, Channel]) -> Callable[P, Channel]:
     return patched_intercept_channel  # type: ignore
 
 
-def _wrap_channel_async(func: Callable[P, AsyncChannel]) -> Callable[P, AsyncChannel]:
+def _wrap_channel_async(
+    func: "Callable[P, AsyncChannel]",
+) -> "Callable[P, AsyncChannel]":
     "Wrapper for asynchronous secure and insecure channel."
 
     @wraps(func)
     def patched_channel(  # type: ignore
-        *args: P.args,
-        interceptors: Optional[Sequence[grpc.aio.ClientInterceptor]] = None,
-        **kwargs: P.kwargs,
-    ) -> Channel:
+        *args: "P.args",
+        interceptors: "Optional[Sequence[grpc.aio.ClientInterceptor]]" = None,
+        **kwargs: "P.kwargs",
+    ) -> "Channel":
         sentry_interceptors = [
             AsyncUnaryUnaryClientInterceptor(),
             AsyncUnaryStreamClientIntercetor(),
@@ -99,15 +106,15 @@ def _wrap_channel_async(func: Callable[P, AsyncChannel]) -> Callable[P, AsyncCha
     return patched_channel  # type: ignore
 
 
-def _wrap_sync_server(func: Callable[P, Server]) -> Callable[P, Server]:
+def _wrap_sync_server(func: "Callable[P, Server]") -> "Callable[P, Server]":
     """Wrapper for synchronous server."""
 
     @wraps(func)
     def patched_server(  # type: ignore
-        *args: P.args,
-        interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None,
-        **kwargs: P.kwargs,
-    ) -> Server:
+        *args: "P.args",
+        interceptors: "Optional[Sequence[grpc.ServerInterceptor]]" = None,
+        **kwargs: "P.kwargs",
+    ) -> "Server":
         interceptors = [
             interceptor
             for interceptor in interceptors or []
@@ -120,20 +127,20 @@ def _wrap_sync_server(func: Callable[P, Server]) -> Callable[P, Server]:
     return patched_server  # type: ignore
 
 
-def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServer]:
+def _wrap_async_server(func: "Callable[P, AsyncServer]") -> "Callable[P, AsyncServer]":
     """Wrapper for asynchronous server."""
 
     @wraps(func)
     def patched_aio_server(  # type: ignore
-        *args: P.args,
-        interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None,
-        **kwargs: P.kwargs,
-    ) -> Server:
+        *args: "P.args",
+        interceptors: "Optional[Sequence[grpc.ServerInterceptor]]" = None,
+        **kwargs: "P.kwargs",
+    ) -> "Server":
         server_interceptor = AsyncServerInterceptor()
-        interceptors = [
+        interceptors: "Sequence[grpc.ServerInterceptor]" = [
             server_interceptor,
             *(interceptors or []),
-        ]  # type: Sequence[grpc.ServerInterceptor]
+        ]
 
         try:
             # We prefer interceptors as a list because of compatibility with

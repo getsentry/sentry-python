@@ -21,9 +21,7 @@ except (ImportError, SyntaxError):
     wrap_async_view = None  # type: ignore
 
 
-def patch_views():
-    # type: () -> None
-
+def patch_views() -> None:
     from django.core.handlers.base import BaseHandler
     from django.template.response import SimpleTemplateResponse
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -31,8 +29,7 @@ def patch_views():
     old_make_view_atomic = BaseHandler.make_view_atomic
     old_render = SimpleTemplateResponse.render
 
-    def sentry_patched_render(self):
-        # type: (SimpleTemplateResponse) -> Any
+    def sentry_patched_render(self: "SimpleTemplateResponse") -> "Any":
         with sentry_sdk.start_span(
             op=OP.VIEW_RESPONSE_RENDER,
             name="serialize response",
@@ -41,15 +38,16 @@ def patch_views():
             return old_render(self)
 
     @functools.wraps(old_make_view_atomic)
-    def sentry_patched_make_view_atomic(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_patched_make_view_atomic(
+        self: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         callback = old_make_view_atomic(self, *args, **kwargs)
 
         # XXX: The wrapper function is created for every request. Find more
         # efficient way to wrap views (or build a cache?)
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-        if integration is not None and integration.middleware_spans:
+        if integration is not None:
             is_async_view = (
                 iscoroutinefunction is not None
                 and wrap_async_view is not None
@@ -69,13 +67,11 @@ def patch_views():
     BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
 
 
-def _wrap_sync_view(callback):
-    # type: (Any) -> Any
+def _wrap_sync_view(callback: "Any") -> "Any":
     from sentry_sdk.integrations.django import DjangoIntegration
 
     @functools.wraps(callback)
-    def sentry_wrapped_callback(request, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_wrapped_callback(request: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         current_scope = sentry_sdk.get_current_scope()
         if current_scope.transaction is not None:
             current_scope.transaction.update_active_thread()
@@ -85,6 +81,10 @@ def _wrap_sync_view(callback):
         # this isn't necessary for async views since that runs on main
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
+
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+        if not integration or not integration.middleware_spans:
+            return callback(request, *args, **kwargs)
 
         with sentry_sdk.start_span(
             op=OP.VIEW_RENDER,

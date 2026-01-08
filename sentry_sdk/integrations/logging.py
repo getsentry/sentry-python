@@ -60,9 +60,8 @@ _IGNORED_LOGGERS = set(
 
 
 def ignore_logger(
-    name,  # type: str
-):
-    # type: (...) -> None
+    name: str,
+) -> None:
     """This disables recording (both in breadcrumbs and as events) calls to
     a logger of a specific name.  Among other uses, many of our integrations
     use this to prevent their actions being recorded as breadcrumbs. Exposed
@@ -78,11 +77,10 @@ class LoggingIntegration(Integration):
 
     def __init__(
         self,
-        level=DEFAULT_LEVEL,
-        event_level=DEFAULT_EVENT_LEVEL,
-        sentry_logs_level=DEFAULT_LEVEL,
-    ):
-        # type: (Optional[int], Optional[int], Optional[int]) -> None
+        level: "Optional[int]" = DEFAULT_LEVEL,
+        event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL,
+        sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
+    ) -> None:
         self._handler = None
         self._breadcrumb_handler = None
         self._sentry_logs_handler = None
@@ -96,8 +94,7 @@ class LoggingIntegration(Integration):
         if event_level is not None:
             self._handler = EventHandler(level=event_level)
 
-    def _handle_record(self, record):
-        # type: (LogRecord) -> None
+    def _handle_record(self, record: "LogRecord") -> None:
         if self._handler is not None and record.levelno >= self._handler.level:
             self._handler.handle(record)
 
@@ -114,12 +111,10 @@ class LoggingIntegration(Integration):
             self._sentry_logs_handler.handle(record)
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         old_callhandlers = logging.Logger.callHandlers
 
-        def sentry_patched_callhandlers(self, record):
-            # type: (Any, LogRecord) -> Any
+        def sentry_patched_callhandlers(self: "Any", record: "LogRecord") -> "Any":
             # keeping a local reference because the
             # global might be discarded on shutdown
             ignored_loggers = _IGNORED_LOGGERS
@@ -175,22 +170,19 @@ class _BaseHandler(logging.Handler):
         )
     )
 
-    def _can_record(self, record):
-        # type: (LogRecord) -> bool
+    def _can_record(self, record: "LogRecord") -> bool:
         """Prevents ignored loggers from recording"""
         for logger in _IGNORED_LOGGERS:
             if fnmatch(record.name.strip(), logger):
                 return False
         return True
 
-    def _logging_to_event_level(self, record):
-        # type: (LogRecord) -> str
+    def _logging_to_event_level(self, record: "LogRecord") -> str:
         return LOGGING_TO_EVENT_LEVEL.get(
             record.levelno, record.levelname.lower() if record.levelname else ""
         )
 
-    def _extra_from_record(self, record):
-        # type: (LogRecord) -> MutableMapping[str, object]
+    def _extra_from_record(self, record: "LogRecord") -> "MutableMapping[str, object]":
         return {
             k: v
             for k, v in vars(record).items()
@@ -206,14 +198,12 @@ class EventHandler(_BaseHandler):
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
 
-    def emit(self, record):
-        # type: (LogRecord) -> Any
+    def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
-    def _emit(self, record):
-        # type: (LogRecord) -> None
+    def _emit(self, record: "LogRecord") -> None:
         if not self._can_record(record):
             return
 
@@ -300,14 +290,12 @@ class BreadcrumbHandler(_BaseHandler):
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
 
-    def emit(self, record):
-        # type: (LogRecord) -> Any
+    def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
-    def _emit(self, record):
-        # type: (LogRecord) -> None
+    def _emit(self, record: "LogRecord") -> None:
         if not self._can_record(record):
             return
 
@@ -315,8 +303,7 @@ class BreadcrumbHandler(_BaseHandler):
             self._breadcrumb_from_record(record), hint={"log_record": record}
         )
 
-    def _breadcrumb_from_record(self, record):
-        # type: (LogRecord) -> Dict[str, Any]
+    def _breadcrumb_from_record(self, record: "LogRecord") -> "Dict[str, Any]":
         return {
             "type": "log",
             "level": self._logging_to_event_level(record),
@@ -334,8 +321,7 @@ class SentryLogsHandler(_BaseHandler):
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
 
-    def emit(self, record):
-        # type: (LogRecord) -> Any
+    def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
             self.format(record)
             if not self._can_record(record):
@@ -350,14 +336,15 @@ class SentryLogsHandler(_BaseHandler):
 
             self._capture_log_from_record(client, record)
 
-    def _capture_log_from_record(self, client, record):
-        # type: (BaseClient, LogRecord) -> None
+    def _capture_log_from_record(
+        self, client: "BaseClient", record: "LogRecord"
+    ) -> None:
         otel_severity_number, otel_severity_text = _log_level_to_otel(
             record.levelno, SEVERITY_TO_OTEL_SEVERITY
         )
         project_root = client.options["project_root"]
 
-        attrs = self._extra_from_record(record)  # type: Any
+        attrs: "Any" = self._extra_from_record(record)
         attrs["sentry.origin"] = "auto.log.stdlib"
 
         parameters_set = False
@@ -409,7 +396,7 @@ class SentryLogsHandler(_BaseHandler):
             attrs["logger.name"] = record.name
 
         # noinspection PyProtectedMember
-        client._capture_log(
+        sentry_sdk.get_current_scope()._capture_log(
             {
                 "severity_text": otel_severity_text,
                 "severity_number": otel_severity_number,
@@ -417,5 +404,6 @@ class SentryLogsHandler(_BaseHandler):
                 "attributes": attrs,
                 "time_unix_nano": int(record.created * 1e9),
                 "trace_id": None,
+                "span_id": None,
             },
         )

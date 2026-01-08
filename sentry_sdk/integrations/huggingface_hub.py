@@ -28,14 +28,13 @@ class HuggingfaceHubIntegration(Integration):
     identifier = "huggingface_hub"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (HuggingfaceHubIntegration, bool) -> None
+    def __init__(
+        self: "HuggingfaceHubIntegration", include_prompts: bool = True
+    ) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         # Other tasks that can be called: https://huggingface.co/docs/huggingface_hub/guides/inference#supported-providers-and-tasks
         huggingface_hub.inference._client.InferenceClient.text_generation = (
             _wrap_huggingface_task(
@@ -51,8 +50,7 @@ class HuggingfaceHubIntegration(Integration):
         )
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc: "Any") -> None:
     set_span_errored()
 
     event, hint = event_from_exception(
@@ -63,11 +61,9 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _wrap_huggingface_task(f, op):
-    # type: (Callable[..., Any], str) -> Callable[..., Any]
+def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., Any]":
     @wraps(f)
-    def new_huggingface_task(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def new_huggingface_task(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(HuggingfaceHubIntegration)
         if integration is None:
             return f(*args, **kwargs)
@@ -137,7 +133,7 @@ def _wrap_huggingface_task(f, op):
         # Output attributes
         finish_reason = None
         response_model = None
-        response_text_buffer: list[str] = []
+        response_text_buffer: "list[str]" = []
         tokens_used = 0
         tool_calls = None
         usage = None
@@ -229,10 +225,9 @@ def _wrap_huggingface_task(f, op):
 
             if kwargs.get("details", False):
                 # text-generation stream output
-                def new_details_iterator():
-                    # type: () -> Iterable[Any]
+                def new_details_iterator() -> "Iterable[Any]":
                     finish_reason = None
-                    response_text_buffer: list[str] = []
+                    response_text_buffer: "list[str]" = []
                     tokens_used = 0
 
                     with capture_internal_exceptions():
@@ -287,11 +282,10 @@ def _wrap_huggingface_task(f, op):
 
             else:
                 # chat-completion stream output
-                def new_iterator():
-                    # type: () -> Iterable[str]
+                def new_iterator() -> "Iterable[str]":
                     finish_reason = None
                     response_model = None
-                    response_text_buffer: list[str] = []
+                    response_text_buffer: "list[str]" = []
                     tool_calls = None
                     usage = None
 

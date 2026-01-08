@@ -92,14 +92,12 @@ if TYPE_CHECKING:
 
 if DJANGO_VERSION < (1, 10):
 
-    def is_authenticated(request_user):
-        # type: (Any) -> bool
+    def is_authenticated(request_user: "Any") -> bool:
         return request_user.is_authenticated()
 
 else:
 
-    def is_authenticated(request_user):
-        # type: (Any) -> bool
+    def is_authenticated(request_user: "Any") -> bool:
         return request_user.is_authenticated
 
 
@@ -111,7 +109,7 @@ class DjangoIntegration(Integration):
     Auto instrument a Django application.
 
     :param transaction_style: How to derive transaction names. Either `"function_name"` or `"url"`. Defaults to `"url"`.
-    :param middleware_spans: Whether to create spans for middleware. Defaults to `True`.
+    :param middleware_spans: Whether to create spans for middleware. Defaults to `False`.
     :param signals_spans: Whether to create spans for signals. Defaults to `True`.
     :param signals_denylist: A list of signals to ignore when creating spans.
     :param cache_spans: Whether to create spans for cache operations. Defaults to `False`.
@@ -125,19 +123,18 @@ class DjangoIntegration(Integration):
     middleware_spans = None
     signals_spans = None
     cache_spans = None
-    signals_denylist = []  # type: list[signals.Signal]
+    signals_denylist: "list[signals.Signal]" = []
 
     def __init__(
         self,
-        transaction_style="url",  # type: str
-        middleware_spans=True,  # type: bool
-        signals_spans=True,  # type: bool
-        cache_spans=False,  # type: bool
-        db_transaction_spans=False,  # type: bool
-        signals_denylist=None,  # type: Optional[list[signals.Signal]]
-        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
-    ):
-        # type: (...) -> None
+        transaction_style: str = "url",
+        middleware_spans: bool = False,
+        signals_spans: bool = True,
+        cache_spans: bool = False,
+        db_transaction_spans: bool = False,
+        signals_denylist: "Optional[list[signals.Signal]]" = None,
+        http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    ) -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -155,8 +152,7 @@ class DjangoIntegration(Integration):
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         _check_minimum_version(DjangoIntegration, DJANGO_VERSION)
 
         install_sql_hook()
@@ -171,8 +167,9 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         @ensure_integration_enabled(DjangoIntegration, old_app)
-        def sentry_patched_wsgi_handler(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
+        def sentry_patched_wsgi_handler(
+            self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
+        ) -> "_ScopedResponse":
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
             from django.conf import settings
@@ -202,8 +199,9 @@ class DjangoIntegration(Integration):
         signals.got_request_exception.connect(_got_request_exception)
 
         @add_global_event_processor
-        def process_django_templates(event, hint):
-            # type: (Event, Optional[Hint]) -> Optional[Event]
+        def process_django_templates(
+            event: "Event", hint: "Optional[Hint]"
+        ) -> "Optional[Event]":
             if hint is None:
                 return event
 
@@ -245,8 +243,9 @@ class DjangoIntegration(Integration):
             return event
 
         @add_global_repr_processor
-        def _django_queryset_repr(value, hint):
-            # type: (Any, Dict[str, Any]) -> Union[NotImplementedType, str]
+        def _django_queryset_repr(
+            value: "Any", hint: "Dict[str, Any]"
+        ) -> "Union[NotImplementedType, str]":
             try:
                 # Django 1.6 can fail to import `QuerySet` when Django settings
                 # have not yet been initialized.
@@ -283,8 +282,7 @@ _DRF_PATCHED = False
 _DRF_PATCH_LOCK = threading.Lock()
 
 
-def _patch_drf():
-    # type: () -> None
+def _patch_drf() -> None:
     """
     Patch Django Rest Framework for more/better request data. DRF's request
     type is a wrapper around Django's request type. The attribute we're
@@ -326,8 +324,9 @@ def _patch_drf():
             else:
                 old_drf_initial = APIView.initial
 
-                def sentry_patched_drf_initial(self, request, *args, **kwargs):
-                    # type: (APIView, Any, *Any, **Any) -> Any
+                def sentry_patched_drf_initial(
+                    self: "APIView", request: "Any", *args: "Any", **kwargs: "Any"
+                ) -> "Any":
                     with capture_internal_exceptions():
                         request._request._sentry_drf_request_backref = weakref.ref(
                             request
@@ -338,8 +337,7 @@ def _patch_drf():
                 APIView.initial = sentry_patched_drf_initial
 
 
-def _patch_channels():
-    # type: () -> None
+def _patch_channels() -> None:
     try:
         from channels.http import AsgiHandler  # type: ignore
     except ImportError:
@@ -363,8 +361,7 @@ def _patch_channels():
     patch_channels_asgi_handler_impl(AsgiHandler)
 
 
-def _patch_django_asgi_handler():
-    # type: () -> None
+def _patch_django_asgi_handler() -> None:
     try:
         from django.core.handlers.asgi import ASGIHandler
     except ImportError:
@@ -385,8 +382,9 @@ def _patch_django_asgi_handler():
     patch_django_asgi_handler_impl(ASGIHandler)
 
 
-def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (sentry_sdk.Scope, str, WSGIRequest) -> None
+def _set_transaction_name_and_source(
+    scope: "sentry_sdk.Scope", transaction_style: str, request: "WSGIRequest"
+) -> None:
     try:
         transaction_name = None
         if transaction_style == "function_name":
@@ -427,8 +425,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-def _before_get_response(request):
-    # type: (WSGIRequest) -> None
+def _before_get_response(request: "WSGIRequest") -> None:
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
     if integration is None:
         return
@@ -444,8 +441,9 @@ def _before_get_response(request):
     )
 
 
-def _attempt_resolve_again(request, scope, transaction_style):
-    # type: (WSGIRequest, sentry_sdk.Scope, str) -> None
+def _attempt_resolve_again(
+    request: "WSGIRequest", scope: "sentry_sdk.Scope", transaction_style: str
+) -> None:
     """
     Some django middlewares overwrite request.urlconf
     so we need to respect that contract,
@@ -457,8 +455,7 @@ def _attempt_resolve_again(request, scope, transaction_style):
     _set_transaction_name_and_source(scope, transaction_style, request)
 
 
-def _after_get_response(request):
-    # type: (WSGIRequest) -> None
+def _after_get_response(request: "WSGIRequest") -> None:
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
     if integration is None or integration.transaction_style != "url":
         return
@@ -467,8 +464,7 @@ def _after_get_response(request):
     _attempt_resolve_again(request, scope, integration.transaction_style)
 
 
-def _patch_get_response():
-    # type: () -> None
+def _patch_get_response() -> None:
     """
     patch get_response, because at that point we have the Django request object
     """
@@ -476,8 +472,9 @@ def _patch_get_response():
 
     old_get_response = BaseHandler.get_response
 
-    def sentry_patched_get_response(self, request):
-        # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
+    def sentry_patched_get_response(
+        self: "Any", request: "WSGIRequest"
+    ) -> "Union[HttpResponse, BaseException]":
         _before_get_response(request)
         rv = old_get_response(self, request)
         _after_get_response(request)
@@ -491,10 +488,10 @@ def _patch_get_response():
         patch_get_response_async(BaseHandler, _before_get_response)
 
 
-def _make_wsgi_request_event_processor(weak_request, integration):
-    # type: (Callable[[], WSGIRequest], DjangoIntegration) -> EventProcessor
-    def wsgi_request_event_processor(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+def _make_wsgi_request_event_processor(
+    weak_request: "Callable[[], WSGIRequest]", integration: "DjangoIntegration"
+) -> "EventProcessor":
+    def wsgi_request_event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -519,8 +516,7 @@ def _make_wsgi_request_event_processor(weak_request, integration):
     return wsgi_request_event_processor
 
 
-def _got_request_exception(request=None, **kwargs):
-    # type: (WSGIRequest, **Any) -> None
+def _got_request_exception(request: "WSGIRequest" = None, **kwargs: "Any") -> None:
     client = sentry_sdk.get_client()
     integration = client.get_integration(DjangoIntegration)
     if integration is None:
@@ -539,8 +535,7 @@ def _got_request_exception(request=None, **kwargs):
 
 
 class DjangoRequestExtractor(RequestExtractor):
-    def __init__(self, request):
-        # type: (Union[WSGIRequest, ASGIRequest]) -> None
+    def __init__(self, request: "Union[WSGIRequest, ASGIRequest]") -> None:
         try:
             drf_request = request._sentry_drf_request_backref()
             if drf_request is not None:
@@ -549,18 +544,16 @@ class DjangoRequestExtractor(RequestExtractor):
             pass
         self.request = request
 
-    def env(self):
-        # type: () -> Dict[str, str]
+    def env(self) -> "Dict[str, str]":
         return self.request.META
 
-    def cookies(self):
-        # type: () -> Dict[str, Union[str, AnnotatedValue]]
+    def cookies(self) -> "Dict[str, Union[str, AnnotatedValue]]":
         privacy_cookies = [
             django_settings.CSRF_COOKIE_NAME,
             django_settings.SESSION_COOKIE_NAME,
         ]
 
-        clean_cookies = {}  # type: Dict[str, Union[str, AnnotatedValue]]
+        clean_cookies: "Dict[str, Union[str, AnnotatedValue]]" = {}
         for key, val in self.request.COOKIES.items():
             if key in privacy_cookies:
                 clean_cookies[key] = SENSITIVE_DATA_SUBSTITUTE
@@ -569,32 +562,26 @@ class DjangoRequestExtractor(RequestExtractor):
 
         return clean_cookies
 
-    def raw_data(self):
-        # type: () -> bytes
+    def raw_data(self) -> bytes:
         return self.request.body
 
-    def form(self):
-        # type: () -> QueryDict
+    def form(self) -> "QueryDict":
         return self.request.POST
 
-    def files(self):
-        # type: () -> MultiValueDict
+    def files(self) -> "MultiValueDict":
         return self.request.FILES
 
-    def size_of_file(self, file):
-        # type: (Any) -> int
+    def size_of_file(self, file: "Any") -> int:
         return file.size
 
-    def parsed_body(self):
-        # type: () -> Optional[Dict[str, Any]]
+    def parsed_body(self) -> "Optional[Dict[str, Any]]":
         try:
             return self.request.data
         except Exception:
             return RequestExtractor.parsed_body(self)
 
 
-def _set_user_info(request, event):
-    # type: (WSGIRequest, Event) -> None
+def _set_user_info(request: "WSGIRequest", event: "Event") -> None:
     user_info = event.setdefault("user", {})
 
     user = getattr(request, "user", None)
@@ -618,8 +605,7 @@ def _set_user_info(request, event):
         pass
 
 
-def install_sql_hook():
-    # type: () -> None
+def install_sql_hook() -> None:
     """If installed this causes Django's queries to be captured."""
     try:
         from django.db.backends.utils import CursorWrapper
@@ -644,8 +630,9 @@ def install_sql_hook():
         return
 
     @ensure_integration_enabled(DjangoIntegration, real_execute)
-    def execute(self, sql, params=None):
-        # type: (CursorWrapper, Any, Optional[Any]) -> Any
+    def execute(
+        self: "CursorWrapper", sql: "Any", params: "Optional[Any]" = None
+    ) -> "Any":
         with record_sql_queries(
             cursor=self.cursor,
             query=sql,
@@ -663,8 +650,9 @@ def install_sql_hook():
         return result
 
     @ensure_integration_enabled(DjangoIntegration, real_executemany)
-    def executemany(self, sql, param_list):
-        # type: (CursorWrapper, Any, List[Any]) -> Any
+    def executemany(
+        self: "CursorWrapper", sql: "Any", param_list: "List[Any]"
+    ) -> "Any":
         with record_sql_queries(
             cursor=self.cursor,
             query=sql,
@@ -683,8 +671,7 @@ def install_sql_hook():
         return result
 
     @ensure_integration_enabled(DjangoIntegration, real_connect)
-    def connect(self):
-        # type: (BaseDatabaseWrapper) -> None
+    def connect(self: "BaseDatabaseWrapper") -> None:
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
@@ -696,8 +683,7 @@ def install_sql_hook():
             _set_db_data(span, self)
             return real_connect(self)
 
-    def _commit(self):
-        # type: (BaseDatabaseWrapper) -> None
+    def _commit(self: "BaseDatabaseWrapper") -> None:
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
 
         if integration is None or not integration.db_transaction_spans:
@@ -711,8 +697,7 @@ def install_sql_hook():
             _set_db_data(span, self, SPANNAME.DB_COMMIT)
             return real_commit(self)
 
-    def _rollback(self):
-        # type: (BaseDatabaseWrapper) -> None
+    def _rollback(self: "BaseDatabaseWrapper") -> None:
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
 
         if integration is None or not integration.db_transaction_spans:
@@ -734,8 +719,9 @@ def install_sql_hook():
     ignore_logger("django.db.backends")
 
 
-def _set_db_data(span, cursor_or_db, db_operation=None):
-    # type: (Span, Any, Optional[str]) -> None
+def _set_db_data(
+    span: "Span", cursor_or_db: "Any", db_operation: "Optional[str]" = None
+) -> None:
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
@@ -789,8 +775,7 @@ def _set_db_data(span, cursor_or_db, db_operation=None):
         span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
 
 
-def add_template_context_repr_sequence():
-    # type: () -> None
+def add_template_context_repr_sequence() -> None:
     try:
         from django.template.context import BaseContext
 
