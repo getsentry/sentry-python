@@ -993,7 +993,7 @@ def test_enable_integration(sentry_init):
 
     # Using gnu backtrace here because to test this properly it should be a
     # non-auto-enabling integration that's also unlikely to become auto-enabling
-    # in the future
+    # in the future. AsyncioIntegration would be nicer but it doesn't work in 3.6
     from sentry_sdk.integrations.gnu_backtrace import GnuBacktraceIntegration
 
     sentry_sdk.enable_integration(GnuBacktraceIntegration())
