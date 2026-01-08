@@ -9,7 +9,12 @@ import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
-from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
+from sentry_sdk.integrations.openai_agents.utils import (
+    _set_input_data,
+    safe_serialize,
+    _transform_openai_agents_content_part,
+    _transform_openai_agents_message_content,
+)
 from sentry_sdk.utils import parse_version
 
 import agents
@@ -1998,3 +2003,90 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
         assert len(parsed_messages) == 2
         assert "small message 4" in str(parsed_messages[0])
         assert "small message 5" in str(parsed_messages[1])
+
+
+def test_transform_image_url_to_blob():
+    """Test that OpenAI image_url with data URI is converted to blob format."""
+    content_part = {
+        "type": "image_url",
+        "image_url": {
+            "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD",
+            "detail": "high",
+        },
+    }
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {
+        "type": "blob",
+        "modality": "image",
+        "mime_type": "image/jpeg",
+        "content": "/9j/4AAQSkZJRgABAQAAAQABAAD",
+    }
+
+
+def test_transform_image_url_to_uri():
+    """Test that OpenAI image_url with HTTP URL is converted to uri format."""
+    content_part = {
+        "type": "image_url",
+        "image_url": {
+            "url": "https://example.com/image.jpg",
+            "detail": "low",
+        },
+    }
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {
+        "type": "uri",
+        "modality": "image",
+        "mime_type": "",
+        "uri": "https://example.com/image.jpg",
+    }
+
+
+def test_transform_message_content_with_image():
+    """Test that message content with image is properly transformed."""
+    content = [
+        {"type": "text", "text": "What is in this image?"},
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==",
+            },
+        },
+    ]
+    result = _transform_openai_agents_message_content(content)
+    assert len(result) == 2
+    assert result[0] == {"type": "text", "text": "What is in this image?"}
+    assert result[1] == {
+        "type": "blob",
+        "modality": "image",
+        "mime_type": "image/png",
+        "content": "iVBORw0KGgoAAAANSUhEUg==",
+    }
+
+
+def test_transform_input_image_to_blob():
+    """Test that OpenAI Agents SDK input_image format is converted to blob format."""
+    # OpenAI Agents SDK uses input_image type with image_url as a direct string
+    content_part = {
+        "type": "input_image",
+        "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==",
+    }
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {
+        "type": "blob",
+        "modality": "image",
+        "mime_type": "image/png",
+        "content": "iVBORw0KGgoAAAANSUhEUg==",
+    }
+
+
+def test_transform_input_text_to_text():
+    """Test that OpenAI Agents SDK input_text format is normalized to text format."""
+    content_part = {
+        "type": "input_text",
+        "text": "Hello, world!",
+    }
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {
+        "type": "text",
+        "text": "Hello, world!",
+    }

@@ -27,6 +27,126 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
+def _transform_openai_agents_content_part(
+    content_part: "dict[str, Any]",
+) -> "dict[str, Any]":
+    """
+    Transform an OpenAI Agents content part to Sentry-compatible format.
+
+    Handles multimodal content (images, audio, files) by converting them
+    to the standardized format:
+    - base64 encoded data -> type: "blob"
+    - URL references -> type: "uri"
+    - file_id references -> type: "file"
+    """
+    if not isinstance(content_part, dict):
+        return content_part
+
+    part_type = content_part.get("type")
+
+    # Handle input_text (OpenAI Agents SDK text format) -> normalize to standard text format
+    if part_type == "input_text":
+        return {
+            "type": "text",
+            "text": content_part.get("text", ""),
+        }
+
+    # Handle image_url (OpenAI vision format) and input_image (OpenAI Agents SDK format)
+    if part_type in ("image_url", "input_image"):
+        # Get URL from either format
+        if part_type == "image_url":
+            image_url = content_part.get("image_url", {})
+            url = (
+                image_url.get("url", "")
+                if isinstance(image_url, dict)
+                else str(image_url)
+            )
+        else:
+            # input_image format has image_url directly
+            url = content_part.get("image_url", "")
+
+        if url.startswith("data:"):
+            # Parse data URI: data:image/jpeg;base64,/9j/4AAQ...
+            try:
+                header, content = url.split(",", 1)
+                mime_type = header.split(":")[1].split(";")[0] if ":" in header else ""
+                return {
+                    "type": "blob",
+                    "modality": "image",
+                    "mime_type": mime_type,
+                    "content": content,
+                }
+            except (ValueError, IndexError):
+                # If parsing fails, return as URI
+                return {
+                    "type": "uri",
+                    "modality": "image",
+                    "mime_type": "",
+                    "uri": url,
+                }
+        else:
+            return {
+                "type": "uri",
+                "modality": "image",
+                "mime_type": "",
+                "uri": url,
+            }
+
+    # Handle input_audio (OpenAI audio input format)
+    if part_type == "input_audio":
+        input_audio = content_part.get("input_audio", {})
+        audio_format = input_audio.get("format", "")
+        mime_type = f"audio/{audio_format}" if audio_format else ""
+        return {
+            "type": "blob",
+            "modality": "audio",
+            "mime_type": mime_type,
+            "content": input_audio.get("data", ""),
+        }
+
+    # Handle image_file (Assistants API file-based images)
+    if part_type == "image_file":
+        image_file = content_part.get("image_file", {})
+        return {
+            "type": "file",
+            "modality": "image",
+            "mime_type": "",
+            "file_id": image_file.get("file_id", ""),
+        }
+
+    # Handle file (document attachments)
+    if part_type == "file":
+        file_data = content_part.get("file", {})
+        return {
+            "type": "file",
+            "modality": "document",
+            "mime_type": "",
+            "file_id": file_data.get("file_id", ""),
+        }
+
+    return content_part
+
+
+def _transform_openai_agents_message_content(content: "Any") -> "Any":
+    """
+    Transform OpenAI Agents message content, handling both string content and
+    list of content parts.
+    """
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, (list, tuple)):
+        transformed = []
+        for item in content:
+            if isinstance(item, dict):
+                transformed.append(_transform_openai_agents_content_part(item))
+            else:
+                transformed.append(item)
+        return transformed
+
+    return content
+
+
 def _capture_exception(exc: "Any") -> None:
     set_span_errored()
 
@@ -128,13 +248,15 @@ def _set_input_data(
         if "role" in message:
             normalized_role = normalize_message_role(message.get("role"))
             content = message.get("content")
+            # Transform content to handle multimodal data (images, audio, files)
+            transformed_content = _transform_openai_agents_message_content(content)
             request_messages.append(
                 {
                     "role": normalized_role,
                     "content": (
-                        [{"type": "text", "text": content}]
-                        if isinstance(content, str)
-                        else content
+                        [{"type": "text", "text": transformed_content}]
+                        if isinstance(transformed_content, str)
+                        else transformed_content
                     ),
                 }
             )
