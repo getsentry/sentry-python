@@ -991,7 +991,7 @@ def test_enable_integration(sentry_init):
     client = get_client()
     assert "asyncio" not in client.integrations
 
-    from sentry_sdk.integrations import AsyncioIntegration
+    from sentry_sdk.integrations.asyncio import AsyncioIntegration
 
     sentry_sdk.enable_integration(AsyncioIntegration())
 
