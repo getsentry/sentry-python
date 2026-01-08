@@ -805,7 +805,7 @@ def test_binary_content_encoding_image_url(sentry_init, capture_events):
     )
     assert blob_item is not None
     assert blob_item["modality"] == "image"
-    assert blob_item["mime_type"] == "data:image/png"
+    assert blob_item["mime_type"] == "image/png"
     assert IMAGE_B64 in blob_item["content"] or "[Filtered]" in str(
         blob_item["content"]
     )
@@ -912,5 +912,81 @@ def test_convert_message_parts_direct():
         item for item in converted[0]["content"] if item.get("type") == "blob"
     )
     assert blob_item["modality"] == "image"
-    assert blob_item["mime_type"] == "data:image/png"
+    assert blob_item["mime_type"] == "image/png"
     assert IMAGE_B64 in blob_item["content"]
+
+
+def test_convert_message_parts_does_not_mutate_original():
+    """Ensure _convert_message_parts does not mutate the original messages."""
+    original_url = IMAGE_DATA_URI
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": original_url},
+                },
+            ],
+        }
+    ]
+    _convert_message_parts(messages)
+    # Original should be unchanged
+    assert messages[0]["content"][0]["type"] == "image_url"
+    assert messages[0]["content"][0]["image_url"]["url"] == original_url
+
+
+def test_convert_message_parts_data_url_without_base64():
+    """Data URLs without ;base64, marker should be treated as regular URIs."""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": "data:image/png,rawdata"},
+                },
+            ],
+        }
+    ]
+    converted = _convert_message_parts(messages)
+    uri_item = converted[0]["content"][0]
+    # Should be converted to uri type, not blob (since no base64 encoding)
+    assert uri_item["type"] == "uri"
+    assert uri_item["uri"] == "data:image/png,rawdata"
+
+
+def test_convert_message_parts_image_url_none():
+    """image_url being None should not crash."""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": None,
+                },
+            ],
+        }
+    ]
+    converted = _convert_message_parts(messages)
+    # Should return item unchanged
+    assert converted[0]["content"][0]["type"] == "image_url"
+
+
+def test_convert_message_parts_image_url_missing_url():
+    """image_url missing the url key should not crash."""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"detail": "high"},
+                },
+            ],
+        }
+    ]
+    converted = _convert_message_parts(messages)
+    # Should return item unchanged
+    assert converted[0]["content"][0]["type"] == "image_url"

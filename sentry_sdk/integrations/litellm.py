@@ -1,3 +1,4 @@
+import copy
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -72,21 +73,27 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
         ]
     }
     """
+    # Deep copy to avoid mutating original messages from kwargs
+    messages = copy.deepcopy(messages)
 
     def _map_item(item: "Dict[str, Any]") -> "Dict[str, Any]":
         if item.get("type") == "image_url":
             image_url = item.get("image_url") or {}
-            if image_url.get("url", "").startswith("data:"):
+            url = image_url.get("url", "")
+            if url.startswith("data:") and ";base64," in url:
+                parts = url.split(";base64,", 1)
+                # Remove "data:" prefix (5 chars) to get proper MIME type
+                mime_type = parts[0][5:]
                 return {
                     "type": "blob",
                     "modality": "image",
-                    "mime_type": item["image_url"]["url"].split(";base64,")[0],
-                    "content": item["image_url"]["url"].split(";base64,")[1],
+                    "mime_type": mime_type,
+                    "content": parts[1],
                 }
-            else:
+            elif url:
                 return {
                     "type": "uri",
-                    "uri": item["image_url"]["url"],
+                    "uri": url,
                 }
         return item
 
