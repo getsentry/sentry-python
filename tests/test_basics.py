@@ -985,6 +985,20 @@ def test_multiple_setup_integrations_calls():
     assert second_call_return == {NoOpIntegration.identifier: NoOpIntegration()}
 
 
+def test_enable_integration(sentry_init):
+    sentry_init()
+
+    client = get_client()
+    assert "asyncio" not in client.integrations
+
+    from sentry_sdk.integrations import AsyncioIntegration
+
+    sentry_sdk.enable_integration(AsyncioIntegration())
+
+    client = get_client()
+    assert "asyncio" in client.integrations
+
+
 class TracingTestClass:
     @staticmethod
     def static(arg):

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from threading import Lock
 from typing import TYPE_CHECKING
 
+import sentry_sdk
 from sentry_sdk.utils import logger
 
 if TYPE_CHECKING:
@@ -277,6 +278,27 @@ def setup_integrations(
         logger.debug("Enabling integration %s", identifier)
 
     return integrations
+
+
+def _enable_integration(integration: "Integration") -> None:
+    if integration.identifier in _installed_integrations:
+        return
+
+    client = sentry_sdk.get_client()
+
+    with _installer_lock:
+        logger.debug(
+            "Setting up previously not enabled integration %s", integration.identifier
+        )
+        _processed_integrations.add(integration.identifier)
+        try:
+            type(integration).setup_once()
+            integration.setup_once_with_options(client.options)
+        except DidNotEnable as e:
+            logger.debug("Did not enable integration %s: %s", integration.identifier, e)
+        else:
+            _installed_integrations.add(integration.identifier)
+            return integration
 
 
 def _check_minimum_version(

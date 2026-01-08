@@ -4,6 +4,7 @@ from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
+from sentry_sdk.integrations import Integration, _enable_integration
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
@@ -57,6 +58,7 @@ __all__ = [
     "capture_message",
     "configure_scope",
     "continue_trace",
+    "enable_integration",
     "flush",
     "get_baggage",
     "get_client",
@@ -523,3 +525,28 @@ def update_current_span(
 
     if attributes is not None:
         current_span.update_data(attributes)
+
+
+def enable_integration(integration: Integration) -> None:
+    """
+    Enable an additional integration after sentry_sdk.init() has been called.
+
+    This should be used sparingly, only in situations where, for whatever reason,
+    it's not feasible to enable an integration during init().
+
+    Most integrations rely on being enabled before any actual user code is
+    executed, and this function doesn't change that. enable_integration should
+    still be called as early as possible.
+
+    One usecase for enable_integration is setting up the AsyncioIntegration only
+    once the event loop is running, but without having to set up the whole SDK
+    anew.
+
+    :param integration: The integration instance or class to enable.
+    :type integration: sentry_sdk.integrations.Integration
+    """
+    client = get_client()
+    integration = _enable_integration(integration)
+    if integration is None:
+        return
+    client.integrations[integration.identifier] = integration
