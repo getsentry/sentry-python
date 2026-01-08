@@ -3,7 +3,7 @@ import functools
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import Integration, DidNotEnable, _enable_integration
 from sentry_sdk.utils import event_from_exception, logger, reraise
 
 try:
@@ -138,3 +138,40 @@ class AsyncioIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         patch_asyncio()
+
+
+def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
+    """
+    Enable AsyncioIntegration with the provided options.
+
+    The options need to correspond to the options currently accepted by the
+    AsyncioIntegration() constructor.
+
+    This is useful in scenarios where Sentry needs to be initialized before
+    an event loop is set up, but you still want to instrument asyncio once there
+    is an event loop. In that case, you can sentry_sdk.init() early on without
+    the AsyncioIntegration and then, once the event loop has been set up, execute
+
+    ```python
+    from sentry_sdk.integrations.asyncio import enable_asyncio_integration
+
+    async def async_entrypoint():
+        enable_asyncio_integration()
+    ```
+
+    If AsyncioIntegration is already enabled (e.g. because it was provided in
+    sentry_sdk.init(integrations=[...])), this function will re-enable it.
+
+    If AsyncioIntegration was provided in
+    sentry_sdk.init(disabled_integrations=[...]), this function will ignore that
+    and enable it.
+    """
+    client = sentry_sdk.get_client()
+    if not client.is_active():
+        return
+
+    integration = _enable_integration(AsyncioIntegration(*args, **kwargs))
+    if integration is None:
+        return
+
+    client.integrations[integration.identifier] = integration

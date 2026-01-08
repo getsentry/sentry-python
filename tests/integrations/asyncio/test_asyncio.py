@@ -7,7 +7,11 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.asyncio import AsyncioIntegration, patch_asyncio
+from sentry_sdk.integrations.asyncio import (
+    AsyncioIntegration,
+    patch_asyncio,
+    enable_asyncio_integration,
+)
 
 try:
     from contextvars import Context, ContextVar
@@ -386,3 +390,113 @@ async def test_span_origin(
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.function.asyncio"
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_delayed_enable_integration(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    assert "asyncio" not in sentry_sdk.get_client().integrations
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert not transaction["spans"]
+
+    enable_asyncio_integration()
+
+    events = capture_events()
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert transaction["spans"]
+    assert transaction["spans"][0]["origin"] == "auto.function.asyncio"
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_delayed_enable_integration_with_options(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    assert "asyncio" not in sentry_sdk.get_client().integrations
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert not transaction["spans"]
+
+    mock_init = MagicMock(return_value=None)
+    mock_setup_once = MagicMock()
+    with patch(
+        "sentry_sdk.integrations.asyncio.AsyncioIntegration.__init__", mock_init
+    ):
+        with patch(
+            "sentry_sdk.integrations.asyncio.AsyncioIntegration.setup_once",
+            mock_setup_once,
+        ):
+            enable_asyncio_integration("arg", kwarg="kwarg")
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+    mock_init.assert_called_once_with("arg", kwarg="kwarg")
+    mock_setup_once.assert_called_once()
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_delayed_enable_enabled_integration(sentry_init):
+    sentry_init(integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+
+    original_integration = sentry_sdk.get_client().integrations["asyncio"]
+    enable_asyncio_integration()
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+
+    # The new asyncio integration should override the old one
+    assert sentry_sdk.get_client().integrations["asyncio"] is not original_integration
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_delayed_enable_integration_after_disabling(sentry_init, capture_events):
+    sentry_init(disabled_integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
+
+    assert "asyncio" not in sentry_sdk.get_client().integrations
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert not transaction["spans"]
+
+    enable_asyncio_integration()
+
+    events = capture_events()
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert transaction["spans"]
+    assert transaction["spans"][0]["origin"] == "auto.function.asyncio"
