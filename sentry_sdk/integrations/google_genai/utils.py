@@ -244,7 +244,7 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
 
     # Handle PIL.Image.Image
     try:
-        from PIL import Image as PILImage
+        from PIL import Image as PILImage  # type: ignore[import-not-found]
 
         if isinstance(contents, PILImage.Image):
             blob_part = _extract_pil_image(contents)
@@ -417,7 +417,7 @@ def _extract_tool_message_from_part(part: "Any") -> "Optional[dict[str, Any]]":
 def _extract_pil_image(image: "Any") -> "Optional[dict[str, Any]]":
     """Extract blob part from PIL.Image.Image."""
     try:
-        from PIL import Image as PILImage
+        from PIL import Image as PILImage  # type: ignore[import-not-found]
         import io
 
         if not isinstance(image, PILImage.Image):
