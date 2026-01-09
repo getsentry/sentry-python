@@ -26,17 +26,7 @@ def pytest_generate_tests(metafunc):
 
         metafunc.parametrize(
             "integration_submodule_name",
-            # Temporarily skip some integrations
-            submodule_names
-            - {
-                "clickhouse_driver",
-                "grpc",
-                "opentelemetry",
-                "pure_eval",
-                "ray",
-                "trytond",
-                "typer",
-            },
+            submodule_names,
         )
 
 
