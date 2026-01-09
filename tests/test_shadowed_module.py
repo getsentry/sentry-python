@@ -31,7 +31,6 @@ def pytest_generate_tests(metafunc):
             - {
                 "litellm",
                 "ray",
-                "typer",
             },
         )
 
