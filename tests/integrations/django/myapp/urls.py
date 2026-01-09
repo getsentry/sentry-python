@@ -110,6 +110,9 @@ urlpatterns = [
 ]
 
 # async views
+if views.async_mylogin is not None:
+    urlpatterns.append(path("async_mylogin", views.async_mylogin, name="async_mylogin"))
+
 if views.async_message is not None:
     urlpatterns.append(path("async_message", views.async_message, name="async_message"))
 
