@@ -30,7 +30,6 @@ def pytest_generate_tests(metafunc):
             submodule_names
             - {
                 "litellm",
-                "ray",
             },
         )
 
