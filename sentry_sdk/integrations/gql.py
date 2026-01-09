@@ -95,18 +95,23 @@ def _request_info_from_transport(
 def _patch_execute() -> None:
     real_execute = gql.Client.execute
 
+    # Maintain signature for backwards compatibility.
+    # gql.Client.execute() accepts a positional-only "request"
+    # parameter with version 4.0.0.
     @ensure_integration_enabled(GQLIntegration, real_execute)
     def sentry_patched_execute(
         self: "gql.Client",
-        document_or_request: "DocumentNode",
+        document: "DocumentNode",
         *args: "Any",
         **kwargs: "Any",
     ) -> "Any":
         scope = sentry_sdk.get_isolation_scope()
-        scope.add_event_processor(_make_gql_event_processor(self, document_or_request))
+        # document is a gql.GraphQLRequest with gql v4.0.0.
+        scope.add_event_processor(_make_gql_event_processor(self, document))
 
         try:
-            return real_execute(self, document_or_request, *args, **kwargs)
+            # document is a gql.GraphQLRequest with gql v4.0.0.
+            return real_execute(self, document, *args, **kwargs)
         except TransportQueryError as e:
             event, hint = event_from_exception(
                 e,
