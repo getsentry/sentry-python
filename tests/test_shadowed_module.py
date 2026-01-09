@@ -26,11 +26,7 @@ def pytest_generate_tests(metafunc):
 
         metafunc.parametrize(
             "integration_submodule_name",
-            # Temporarily skip some integrations
-            submodule_names
-            - {
-                "litellm",
-            },
+            submodule_names,
         )
 
 
