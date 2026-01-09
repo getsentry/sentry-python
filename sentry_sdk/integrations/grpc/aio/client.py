@@ -1,18 +1,22 @@
 from typing import Callable, Union, AsyncIterable, Any
 
-from grpc.aio import (
-    UnaryUnaryClientInterceptor,
-    UnaryStreamClientInterceptor,
-    ClientCallDetails,
-    UnaryUnaryCall,
-    UnaryStreamCall,
-    Metadata,
-)
-from google.protobuf.message import Message
-
 import sentry_sdk
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
+
+try:
+    from grpc.aio import (
+        UnaryUnaryClientInterceptor,
+        UnaryStreamClientInterceptor,
+        ClientCallDetails,
+        UnaryUnaryCall,
+        UnaryStreamCall,
+        Metadata,
+    )
+    from google.protobuf.message import Message
+except ImportError:
+    raise DidNotEnable("grpcio is not installed")
 
 
 class ClientInterceptor:

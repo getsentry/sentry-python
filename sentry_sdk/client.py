@@ -217,10 +217,10 @@ class BaseClient:
     def capture_event(self, *args: "Any", **kwargs: "Any") -> "Optional[str]":
         return None
 
-    def _capture_log(self, log: "Log") -> None:
+    def _capture_log(self, log: "Log", scope: "Scope") -> None:
         pass
 
-    def _capture_metric(self, metric: "Metric") -> None:
+    def _capture_metric(self, metric: "Metric", scope: "Scope") -> None:
         pass
 
     def capture_session(self, *args: "Any", **kwargs: "Any") -> None:
@@ -898,132 +898,41 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_log(self, log: "Optional[Log]") -> None:
-        if not has_logs_enabled(self.options) or log is None:
+    def _capture_telemetry(
+        self, telemetry: "Optional[Union[Log, Metric]]", ty: str, scope: "Scope"
+    ) -> None:
+        # Capture attributes-based telemetry (logs, metrics, spansV2)
+        if telemetry is None:
             return
 
-        current_scope = sentry_sdk.get_current_scope()
-        isolation_scope = sentry_sdk.get_isolation_scope()
+        scope.apply_to_telemetry(telemetry)
 
-        log["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
-        log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
+        before_send = None
+        if ty == "log":
+            before_send = get_before_send_log(self.options)
+        elif ty == "metric":
+            before_send = get_before_send_metric(self.options)  # type: ignore
 
-        server_name = self.options.get("server_name")
-        if server_name is not None and SPANDATA.SERVER_ADDRESS not in log["attributes"]:
-            log["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
+        if before_send is not None:
+            telemetry = before_send(telemetry, {})  # type: ignore
 
-        environment = self.options.get("environment")
-        if environment is not None and "sentry.environment" not in log["attributes"]:
-            log["attributes"]["sentry.environment"] = environment
-
-        release = self.options.get("release")
-        if release is not None and "sentry.release" not in log["attributes"]:
-            log["attributes"]["sentry.release"] = release
-
-        trace_context = current_scope.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        span_id = trace_context.get("span_id")
-
-        if trace_id is not None and log.get("trace_id") is None:
-            log["trace_id"] = trace_id
-
-        if span_id is not None and log.get("span_id") is None:
-            log["span_id"] = span_id
-
-        # The user, if present, is always set on the isolation scope.
-        if self.should_send_default_pii() and isolation_scope._user is not None:
-            for log_attribute, user_attribute in (
-                ("user.id", "id"),
-                ("user.name", "username"),
-                ("user.email", "email"),
-            ):
-                if (
-                    user_attribute in isolation_scope._user
-                    and log_attribute not in log["attributes"]
-                ):
-                    log["attributes"][log_attribute] = isolation_scope._user[
-                        user_attribute
-                    ]
-
-        # If debug is enabled, log the log to the console
-        debug = self.options.get("debug", False)
-        if debug:
-            logger.debug(
-                f"[Sentry Logs] [{log.get('severity_text')}] {log.get('body')}"
-            )
-
-        before_send_log = get_before_send_log(self.options)
-        if before_send_log is not None:
-            log = before_send_log(log, {})
-
-        if log is None:
+        if telemetry is None:
             return
 
-        if self.log_batcher:
-            self.log_batcher.add(log)
+        batcher = None
+        if ty == "log":
+            batcher = self.log_batcher
+        elif ty == "metric":
+            batcher = self.metrics_batcher  # type: ignore
 
-    def _capture_metric(self, metric: "Optional[Metric]") -> None:
-        if not has_metrics_enabled(self.options) or metric is None:
-            return
+        if batcher is not None:
+            batcher.add(telemetry)  # type: ignore
 
-        current_scope = sentry_sdk.get_current_scope()
-        isolation_scope = sentry_sdk.get_isolation_scope()
+    def _capture_log(self, log: "Optional[Log]", scope: "Scope") -> None:
+        self._capture_telemetry(log, "log", scope)
 
-        metric["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
-        metric["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
-
-        server_name = self.options.get("server_name")
-        if (
-            server_name is not None
-            and SPANDATA.SERVER_ADDRESS not in metric["attributes"]
-        ):
-            metric["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
-
-        environment = self.options.get("environment")
-        if environment is not None and "sentry.environment" not in metric["attributes"]:
-            metric["attributes"]["sentry.environment"] = environment
-
-        release = self.options.get("release")
-        if release is not None and "sentry.release" not in metric["attributes"]:
-            metric["attributes"]["sentry.release"] = release
-
-        trace_context = current_scope.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        span_id = trace_context.get("span_id")
-
-        metric["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
-        if span_id is not None:
-            metric["span_id"] = span_id
-
-        if self.should_send_default_pii() and isolation_scope._user is not None:
-            for metric_attribute, user_attribute in (
-                ("user.id", "id"),
-                ("user.name", "username"),
-                ("user.email", "email"),
-            ):
-                if (
-                    user_attribute in isolation_scope._user
-                    and metric_attribute not in metric["attributes"]
-                ):
-                    metric["attributes"][metric_attribute] = isolation_scope._user[
-                        user_attribute
-                    ]
-
-        debug = self.options.get("debug", False)
-        if debug:
-            logger.debug(
-                f"[Sentry Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
-            )
-
-        before_send_metric = get_before_send_metric(self.options)
-        if before_send_metric is not None:
-            metric = before_send_metric(metric, {})
-
-        if metric is None:
-            return
-
-        if self.metrics_batcher:
-            self.metrics_batcher.add(metric)
+    def _capture_metric(self, metric: "Optional[Metric]", scope: "Scope") -> None:
+        self._capture_telemetry(metric, "metric", scope)
 
     def capture_session(
         self,

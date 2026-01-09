@@ -84,9 +84,12 @@ class OpenAIIntegration(Integration):
             AsyncResponses.create = _wrap_async_responses_create(AsyncResponses.create)
 
     def count_tokens(self: "OpenAIIntegration", s: str) -> int:
-        if self.tiktoken_encoding is not None:
+        if self.tiktoken_encoding is None:
+            return 0
+        try:
             return len(self.tiktoken_encoding.encode_ordinary(s))
-        return 0
+        except Exception:
+            return 0
 
 
 def _capture_exception(exc: "Any", manual_span_cleanup: bool = True) -> None:
@@ -157,8 +160,8 @@ def _calculate_token_usage(
                 output_tokens += count_tokens(message)
         elif hasattr(response, "choices"):
             for choice in response.choices:
-                if hasattr(choice, "message"):
-                    output_tokens += count_tokens(choice.message)
+                if hasattr(choice, "message") and hasattr(choice.message, "content"):
+                    output_tokens += count_tokens(choice.message.content)
 
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
