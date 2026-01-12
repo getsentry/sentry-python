@@ -16,6 +16,7 @@ from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 import jsonschema
 
+from starlette.testclient import TestClient
 
 try:
     import gevent
@@ -590,6 +591,85 @@ def suppress_deprecation_warnings():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         yield
+
+
+@pytest.fixture()
+def json_rpc():
+    def inner(app, method: str, params, request_id: str | None = None):
+        if request_id is None:
+            request_id = "1"  # arbitrary
+
+        with TestClient(app) as client:
+            init_response = client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "initialize",
+                    "params": {
+                        "clientInfo": {"name": "test-client", "version": "1.0"},
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                    },
+                    "id": request_id,
+                },
+            )
+
+            session_id = init_response.headers["mcp-session-id"]
+
+            # Notification response is mandatory.
+            # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+            client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                    "mcp-session-id": session_id,
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "notifications/initialized",
+                    "params": {},
+                },
+            )
+
+            response = client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                    "mcp-session-id": session_id,
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": method,
+                    "params": params,
+                    "id": request_id,
+                },
+            )
+
+            return session_id, response
+
+    return inner
+
+
+@pytest.fixture()
+def select_transactions_with_mcp_spans():
+    def inner(events, method_name):
+        return [
+            transaction
+            for transaction in events
+            if transaction["type"] == "transaction"
+            and any(
+                span["data"].get("mcp.method.name") == method_name
+                for span in transaction.get("spans", [])
+            )
+        ]
+
+    return inner
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):
