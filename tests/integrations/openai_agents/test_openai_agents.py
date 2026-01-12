@@ -181,7 +181,6 @@ async def test_agent_invocation_span(
 
     (transaction,) = events
     spans = transaction["spans"]
-    print(spans)
     invoke_agent_span, ai_client_span = spans
 
     assert transaction["transaction"] == "test_agent workflow"
