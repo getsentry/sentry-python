@@ -280,14 +280,17 @@ def setup_integrations(
     return integrations
 
 
-def _enable_integration(integration: "Integration") -> "Optional[Integration]":
+def _enable_integration(integration: "Integration") -> None:
     identifier = integration.identifier
-    client = sentry_sdk.get_client()
 
     with _installer_lock:
+        client = sentry_sdk.get_client()
+        if not client.is_active():
+            return
+
         if identifier in client.integrations:
             logger.debug("Integration already enabled: %s", identifier)
-            return None
+            return
 
         logger.debug("Setting up integration %s", identifier)
         _processed_integrations.add(identifier)
@@ -296,10 +299,10 @@ def _enable_integration(integration: "Integration") -> "Optional[Integration]":
             integration.setup_once_with_options(client.options)
         except DidNotEnable as e:
             logger.debug("Did not enable integration %s: %s", identifier, e)
-            return None
-        else:
-            _installed_integrations.add(identifier)
-            return integration
+            return
+
+        _installed_integrations.add(identifier)
+        client.integrations[integration.identifier] = integration
 
 
 def _check_minimum_version(

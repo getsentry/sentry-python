@@ -165,12 +165,4 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
     sentry_sdk.init(disabled_integrations=[...]), this function will ignore that
     and the integration will be enabled.
     """
-    client = sentry_sdk.get_client()
-    if not client.is_active():
-        return
-
-    integration = _enable_integration(AsyncioIntegration(*args, **kwargs))
-    if integration is None:
-        return
-
-    client.integrations[integration.identifier] = integration
+    _enable_integration(AsyncioIntegration(*args, **kwargs))
