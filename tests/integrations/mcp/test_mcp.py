@@ -50,7 +50,7 @@ from sentry_sdk.integrations.mcp import MCPIntegration
 
 def json_rpc(app, method: str, params, request_id: str | None = None):
     if request_id is None:
-        request_id = "2"  # arbitrary
+        request_id = "1"  # arbitrary
 
     with TestClient(app) as client:
         init_response = client.post(
@@ -73,6 +73,22 @@ def json_rpc(app, method: str, params, request_id: str | None = None):
 
         session_id = init_response.headers["mcp-session-id"]
 
+        # Notification response is mandatory.
+        # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+        client.post(
+            "/mcp/",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+                "mcp-session-id": session_id,
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {},
+            },
+        )
+
         response = client.post(
             "/mcp/",
             headers={
@@ -89,6 +105,18 @@ def json_rpc(app, method: str, params, request_id: str | None = None):
         )
 
         return session_id, response
+
+
+def select_transactions_with_mcp_spans(events, method_name):
+    return [
+        transaction
+        for transaction in events
+        if transaction["type"] == "transaction"
+        and any(
+            span["data"].get("mcp.method.name") == method_name
+            for span in transaction.get("spans", [])
+        )
+    ]
 
 
 @pytest.fixture(autouse=True)
@@ -305,13 +333,9 @@ async def test_tool_handler_async(
     )
     assert not result.json()["result"]["isError"]
 
-    http_requests_in_mcp_session = [
-        transaction
-        for transaction in events
-        if "mcp-session-id" in transaction["request"]["headers"]
-    ]
-    assert len(http_requests_in_mcp_session) == 1
-    tx = http_requests_in_mcp_session[0]
+    transactions = select_transactions_with_mcp_spans(events, "tools/call")
+    assert len(transactions) == 1
+    tx = transactions[0]
 
     assert tx["type"] == "transaction"
     assert len(tx["spans"]) == 1
@@ -503,13 +527,9 @@ async def test_prompt_handler_async(
     )
     assert len(result.json()["result"]["messages"]) == 2
 
-    http_requests_in_mcp_session = [
-        transaction
-        for transaction in events
-        if "mcp-session-id" in transaction["request"]["headers"]
-    ]
-    assert len(http_requests_in_mcp_session) == 1
-    tx = http_requests_in_mcp_session[0]
+    transactions = select_transactions_with_mcp_spans(events, "prompts/get")
+    assert len(transactions) == 1
+    tx = transactions[0]
 
     assert tx["type"] == "transaction"
     assert len(tx["spans"]) == 1
@@ -637,13 +657,9 @@ async def test_resource_handler_async(sentry_init, capture_events):
         },
     )
 
-    http_requests_in_mcp_session = [
-        transaction
-        for transaction in events
-        if "mcp-session-id" in transaction["request"]["headers"]
-    ]
-    assert len(http_requests_in_mcp_session) == 1
-    tx = http_requests_in_mcp_session[0]
+    transactions = select_transactions_with_mcp_spans(events, "resources/read")
+    assert len(transactions) == 1
+    tx = transactions[0]
 
     assert result.json()["result"]["contents"][0]["text"] == json.dumps(
         {"data": "resource data"}
@@ -1123,13 +1139,9 @@ def test_streamable_http_transport_detection(sentry_init, capture_events):
     )
     assert not result.json()["result"]["isError"]
 
-    http_requests_in_mcp_session = [
-        transaction
-        for transaction in events
-        if "mcp-session-id" in transaction["request"]["headers"]
-    ]
-    assert len(http_requests_in_mcp_session) == 1
-    tx = http_requests_in_mcp_session[0]
+    transactions = select_transactions_with_mcp_spans(events, "tools/call")
+    assert len(transactions) == 1
+    tx = transactions[0]
 
     span = tx["spans"][0]
 
