@@ -36,7 +36,6 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from starlette.routing import Mount
 from starlette.applications import Starlette
-from starlette.testclient import TestClient
 
 try:
     from mcp.server.lowlevel.server import request_ctx
@@ -46,77 +45,6 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
-
-
-def json_rpc(app, method: str, params, request_id: str | None = None):
-    if request_id is None:
-        request_id = "1"  # arbitrary
-
-    with TestClient(app) as client:
-        init_response = client.post(
-            "/mcp/",
-            headers={
-                "Accept": "application/json, text/event-stream",
-                "Content-Type": "application/json",
-            },
-            json={
-                "jsonrpc": "2.0",
-                "method": "initialize",
-                "params": {
-                    "clientInfo": {"name": "test-client", "version": "1.0"},
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {},
-                },
-                "id": request_id,
-            },
-        )
-
-        session_id = init_response.headers["mcp-session-id"]
-
-        # Notification response is mandatory.
-        # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
-        client.post(
-            "/mcp/",
-            headers={
-                "Accept": "application/json, text/event-stream",
-                "Content-Type": "application/json",
-                "mcp-session-id": session_id,
-            },
-            json={
-                "jsonrpc": "2.0",
-                "method": "notifications/initialized",
-                "params": {},
-            },
-        )
-
-        response = client.post(
-            "/mcp/",
-            headers={
-                "Accept": "application/json, text/event-stream",
-                "Content-Type": "application/json",
-                "mcp-session-id": session_id,
-            },
-            json={
-                "jsonrpc": "2.0",
-                "method": method,
-                "params": params,
-                "id": request_id,
-            },
-        )
-
-        return session_id, response
-
-
-def select_transactions_with_mcp_spans(events, method_name):
-    return [
-        transaction
-        for transaction in events
-        if transaction["type"] == "transaction"
-        and any(
-            span["data"].get("mcp.method.name") == method_name
-            for span in transaction.get("spans", [])
-        )
-    ]
 
 
 @pytest.fixture(autouse=True)
@@ -287,7 +215,12 @@ def test_tool_handler_sync(
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_tool_handler_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    json_rpc,
+    select_transactions_with_mcp_spans,
 ):
     """Test that async tool handlers create proper spans"""
     sentry_init(
@@ -476,7 +409,12 @@ def test_prompt_handler_sync(
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_prompt_handler_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    json_rpc,
+    select_transactions_with_mcp_spans,
 ):
     """Test that async prompt handlers create proper spans"""
     sentry_init(
@@ -619,7 +557,12 @@ def test_resource_handler_sync(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_async(sentry_init, capture_events):
+async def test_resource_handler_async(
+    sentry_init,
+    capture_events,
+    json_rpc,
+    select_transactions_with_mcp_spans,
+):
     """Test that async resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1098,7 +1041,12 @@ def test_sse_transport_detection(sentry_init, capture_events):
     assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-sse-123"
 
 
-def test_streamable_http_transport_detection(sentry_init, capture_events):
+def test_streamable_http_transport_detection(
+    sentry_init,
+    capture_events,
+    json_rpc,
+    select_transactions_with_mcp_spans,
+):
     """Test that StreamableHTTP transport is correctly detected via header"""
     sentry_init(
         integrations=[MCPIntegration()],

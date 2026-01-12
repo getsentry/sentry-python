@@ -16,7 +16,10 @@ from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 import jsonschema
 
-from starlette.testclient import TestClient
+try:
+    from starlette.testclient import TestClient
+except ImportError:
+    TestClient = None
 
 try:
     import gevent
