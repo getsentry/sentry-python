@@ -182,6 +182,9 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
     # we patch the currently running event loop, and we keep the record of doing
     # that on the loop itself.
     logger.debug("Setting up integration asyncio")
+
     integration = AsyncioIntegration(*args, **kwargs)
     integration.setup_once()
-    client.integrations["asyncio"] = integration
+
+    if "asyncio" not in client.integrations:
+        client.integrations["asyncio"] = integration
