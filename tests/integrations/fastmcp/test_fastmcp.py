@@ -262,6 +262,7 @@ class MockHTTPRequest:
     def __init__(self, session_id=None, transport="http"):
         self.headers = {}
         self.query_params = {}
+        self.scope = {}
 
         if transport == "sse":
             # SSE transport uses query parameter
