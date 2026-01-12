@@ -21,7 +21,7 @@ from sentry_sdk.scope import should_send_default_pii
 try:
     from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
     from mcp.server.lowlevel.server import request_ctx  # type: ignore[import-not-found]
-    from mcp.server.streamable_http import StreamableHTTPServerTransport
+    from mcp.server.streamable_http import StreamableHTTPServerTransport  # type: ignore[import-not-found]
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
@@ -32,7 +32,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional
+    from typing import Any, Callable, Optional, Tuple
 
     from starlette.types import Receive, Scope, Send
 
@@ -63,7 +63,9 @@ class MCPIntegration(Integration):
             _patch_fastmcp()
 
 
-def _get_active_http_scopes():
+def _get_active_http_scopes() -> (
+    "Optional[Tuple[Optional[sentry_sdk.tracing.Scope], Optional[sentry_sdk.tracing.Scope]]]"
+):
     try:
         ctx = request_ctx.get()
     except LookupError:
