@@ -64,7 +64,7 @@ class MCPIntegration(Integration):
 
 
 def _get_active_http_scopes() -> (
-    "Optional[Tuple[Optional[sentry_sdk.tracing.Scope], Optional[sentry_sdk.tracing.Scope]]]"
+    "Optional[Tuple[Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope]]]"
 ):
     try:
         ctx = request_ctx.get()
@@ -655,12 +655,15 @@ def _patch_lowlevel_server() -> None:
     Server.read_resource = patched_read_resource
 
 
-def _patch_handle_request():
+def _patch_handle_request() -> None:
     original_handle_request = StreamableHTTPServerTransport.handle_request
 
     @wraps(original_handle_request)
     async def patched_handle_request(
-        self, scope: "Scope", receive: "Receive", send: "Send"
+        self: "StreamableHTTPServerTransport",
+        scope: "Scope",
+        receive: "Receive",
+        send: "Send",
     ) -> None:
         scope.setdefault("state", {})["sentry_sdk.isolation_scope"] = (
             sentry_sdk.get_isolation_scope()
