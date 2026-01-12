@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from threading import Lock
 from typing import TYPE_CHECKING
 
-import sentry_sdk
 from sentry_sdk.utils import logger
 
 if TYPE_CHECKING:

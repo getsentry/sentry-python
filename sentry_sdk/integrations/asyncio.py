@@ -164,9 +164,8 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
 
     Any arguments provided will be passed to AsyncioIntegration() as is.
 
-    If AsyncioIntegration is already enabled on the current client (e.g. because
-    it was provided in sentry_sdk.init(integrations=[...])), this function won't
-    have any effect.
+    If AsyncioIntegration has already patched the current event loop, this
+    function won't have any effect.
 
     If AsyncioIntegration was provided in
     sentry_sdk.init(disabled_integrations=[...]), this function will ignore that
@@ -176,6 +175,12 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
     if not client.is_active():
         return
 
+    # This function purposefully bypasses the integration machinery in
+    # integrations/__init__.py. _installed_integrations/_processed_integrations
+    # is used to prevent double patching the same module, but in the case of
+    # the AsyncioIntegration, we don't monkeypatch the standard library directly,
+    # we patch the currently running event loop, and we keep the record of doing
+    # that on the loop itself.
     logger.debug("Setting up integration asyncio")
     integration = AsyncioIntegration(*args, **kwargs)
     integration.setup_once()
