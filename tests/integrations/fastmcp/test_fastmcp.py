@@ -397,6 +397,10 @@ async def test_fastmcp_tool_async(
             "result": 42,
             "operation": "multiplication",
         }
+    elif isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION.startswith("0"):
+        assert result.json()["result"]["content"][0]["text"] == json.dumps(
+            {"result": 42, "operation": "multiplication"},
+        )
     else:
         assert result.json()["result"]["content"][0]["text"] == json.dumps(
             {"result": 42, "operation": "multiplication"},
@@ -1000,8 +1004,11 @@ def test_fastmcp_http_transport(
     )
 
     if isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION.startswith("2"):
-        print("structured")
         assert result.json()["result"]["structuredContent"] == {"processed": "TEST"}
+    elif isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION.startswith("0"):
+        assert result.json()["result"]["content"][0]["text"] == json.dumps(
+            {"processed": "TEST"},
+        )
     else:
         assert result.json()["result"]["content"][0]["text"] == json.dumps(
             {"processed": "TEST"},
