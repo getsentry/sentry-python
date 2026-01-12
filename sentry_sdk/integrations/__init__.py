@@ -292,16 +292,21 @@ def _enable_integration(integration: "Integration") -> None:
             logger.debug("Integration already enabled: %s", identifier)
             return
 
-        logger.debug("Setting up integration %s", identifier)
-        _processed_integrations.add(identifier)
-        try:
-            type(integration).setup_once()
-            integration.setup_once_with_options(client.options)
-        except DidNotEnable as e:
-            logger.debug("Did not enable integration %s: %s", identifier, e)
-            return
+        if identifier not in _installed_integrations or identifier == "asyncio":
+            # Asyncio is special because it patches the currently running event
+            # loop. _installed_integrations, on the other hand, prevents
+            # re-patching on the process level.
+            logger.debug("Setting up integration %s", identifier)
+            _processed_integrations.add(identifier)
+            try:
+                type(integration).setup_once()
+                integration.setup_once_with_options(client.options)
+            except DidNotEnable as e:
+                logger.debug("Did not enable integration %s: %s", identifier, e)
+                return
 
-        _installed_integrations.add(identifier)
+            _installed_integrations.add(identifier)
+
         client.integrations[integration.identifier] = integration
 
 

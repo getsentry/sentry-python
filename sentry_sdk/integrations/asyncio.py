@@ -147,7 +147,8 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
     This is useful in scenarios where Sentry needs to be initialized before
     an event loop is set up, but you still want to instrument asyncio once there
     is an event loop. In that case, you can sentry_sdk.init() early on without
-    the AsyncioIntegration and then, once the event loop has been set up, execute
+    the AsyncioIntegration and then, once the event loop has been set up,
+    execute:
 
     ```python
     from sentry_sdk.integrations.asyncio import enable_asyncio_integration
@@ -158,8 +159,9 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
 
     Any arguments provided will be passed to AsyncioIntegration() as is.
 
-    If AsyncioIntegration is already enabled (e.g. because it was provided in
-    sentry_sdk.init(integrations=[...])), this function won't have any effect.
+    If AsyncioIntegration is already enabled on the current client (e.g. because
+    it was provided in sentry_sdk.init(integrations=[...])), this function won't
+    have any effect.
 
     If AsyncioIntegration was provided in
     sentry_sdk.init(disabled_integrations=[...]), this function will ignore that
