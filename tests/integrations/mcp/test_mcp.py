@@ -331,7 +331,9 @@ async def test_tool_handler_async(
         },
         request_id="req-456",
     )
-    assert not result.json()["result"]["isError"]
+    assert result.json()["result"]["content"][0]["text"] == json.dumps(
+        {"status": "completed"}
+    )
 
     transactions = select_transactions_with_mcp_spans(events, "tools/call")
     assert len(transactions) == 1
@@ -657,13 +659,13 @@ async def test_resource_handler_async(sentry_init, capture_events):
         },
     )
 
-    transactions = select_transactions_with_mcp_spans(events, "resources/read")
-    assert len(transactions) == 1
-    tx = transactions[0]
-
     assert result.json()["result"]["contents"][0]["text"] == json.dumps(
         {"data": "resource data"}
     )
+
+    transactions = select_transactions_with_mcp_spans(events, "resources/read")
+    assert len(transactions) == 1
+    tx = transactions[0]
 
     assert tx["type"] == "transaction"
     assert len(tx["spans"]) == 1
@@ -1137,7 +1139,9 @@ def test_streamable_http_transport_detection(sentry_init, capture_events):
             "arguments": {},
         },
     )
-    assert not result.json()["result"]["isError"]
+    assert result.json()["result"]["content"][0]["text"] == json.dumps(
+        {"status": "success"}
+    )
 
     transactions = select_transactions_with_mcp_spans(events, "tools/call")
     assert len(transactions) == 1
