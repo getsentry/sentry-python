@@ -76,15 +76,14 @@ def _create_run_streamed_wrapper(
     Unlike run(), run_streamed() returns immediately with a RunResultStreaming object
     while execution continues in a background task. The workflow span must stay open
     throughout the streaming operation and close when streaming completes or is abandoned.
+
+    Note: We don't use isolation_scope() here because it uses context variables that
+    cannot span async boundaries (the __enter__ and __exit__ would be called from
+    different async contexts, causing ValueError).
     """
 
     @wraps(original_func)
     def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-        # Isolate each workflow so that when agents are run in asyncio tasks they
-        # don't touch each other's scopes
-        isolation_scope = sentry_sdk.isolation_scope()
-        isolation_scope.__enter__()
-
         # Clone agent because agent invocation spans are attached per run.
         agent = args[0].clone()
 
@@ -92,9 +91,8 @@ def _create_run_streamed_wrapper(
         workflow_span = agent_workflow_span(agent)
         workflow_span.__enter__()
 
-        # Store span and scope on agent for cleanup
+        # Store span on agent for cleanup
         agent._sentry_workflow_span = workflow_span
-        agent._sentry_isolation_scope = isolation_scope
 
         args = (agent, *args[1:])
 
@@ -104,34 +102,12 @@ def _create_run_streamed_wrapper(
         except Exception as exc:
             # If run_streamed itself fails (not the background task), clean up immediately
             workflow_span.__exit__(*sys.exc_info())
-            isolation_scope.__exit__(None, None, None)
             _capture_exception(exc)
             raise exc from None
 
-        # Wrap the result to ensure cleanup when streaming completes
-        original_aclose = getattr(run_result, "aclose", None)
-
-        async def wrapped_aclose() -> None:
-            """Close streaming result and clean up Sentry spans"""
-            try:
-                if original_aclose is not None:
-                    await original_aclose()
-            finally:
-                # End any remaining agent span
-                if hasattr(run_result, "context_wrapper"):
-                    end_invoke_agent_span(run_result.context_wrapper, agent)
-
-                # End workflow span
-                if hasattr(agent, "_sentry_workflow_span"):
-                    workflow_span.__exit__(None, None, None)
-                    delattr(agent, "_sentry_workflow_span")
-
-                # Exit isolation scope
-                if hasattr(agent, "_sentry_isolation_scope"):
-                    isolation_scope.__exit__(None, None, None)
-                    delattr(agent, "_sentry_isolation_scope")
-
-        run_result.aclose = wrapped_aclose
+        # Store references for cleanup
+        run_result._sentry_workflow_span = workflow_span
+        run_result._sentry_agent = agent
 
         return run_result
 

@@ -1,6 +1,7 @@
 import sys
 from functools import wraps
 
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import reraise
 from ..spans import (
@@ -148,6 +149,13 @@ def _patch_agent_run() -> None:
             if agent and context_wrapper and _has_active_agent_span(context_wrapper):
                 end_invoke_agent_span(context_wrapper, agent, final_output)
 
+            # For streaming: close the workflow span if it exists
+            # (For non-streaming, the workflow span is closed by the context manager in _create_run_wrapper)
+            if agent and hasattr(agent, "_sentry_workflow_span"):
+                workflow_span = agent._sentry_workflow_span
+                workflow_span.__exit__(None, None, None)
+                delattr(agent, "_sentry_workflow_span")
+
         return result
 
     @wraps(
@@ -158,10 +166,28 @@ def _patch_agent_run() -> None:
     async def patched_run_single_turn_streamed(
         cls: "agents.Runner", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        """Patched _run_single_turn_streamed that creates agent invocation spans for streaming"""
-        agent = kwargs.get("agent")
-        context_wrapper = kwargs.get("context_wrapper")
-        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
+        """Patched _run_single_turn_streamed that creates agent invocation spans for streaming.
+
+        Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
+        _run_single_turn_streamed uses positional arguments. The call signature is:
+        _run_single_turn_streamed(
+            streamed_result,              # args[0]
+            agent,                        # args[1]
+            hooks,                        # args[2]
+            context_wrapper,              # args[3]
+            run_config,                   # args[4]
+            should_run_agent_start_hooks, # args[5]
+            tool_use_tracker,             # args[6]
+            all_tools,                    # args[7]
+            server_conversation_tracker,  # args[8] (optional)
+        )
+        """
+        # Extract positional arguments (streaming version doesn't use keyword-only args)
+        agent = args[1] if len(args) > 1 else kwargs.get("agent")
+        context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
+        should_run_agent_start_hooks = (
+            args[5] if len(args) > 5 else kwargs.get("should_run_agent_start_hooks")
+        )
 
         span = getattr(context_wrapper, "_sentry_agent_span", None)
         # Start agent span when agent starts (but only once per agent)
@@ -172,7 +198,14 @@ def _patch_agent_run() -> None:
                 if current_agent and current_agent != agent:
                     end_invoke_agent_span(context_wrapper, current_agent)
 
-            span = _start_invoke_agent_span(context_wrapper, agent, kwargs)
+            # Build kwargs dict for span creation (for compatibility with _start_invoke_agent_span)
+            span_kwargs = {
+                "agent": agent,
+                "context_wrapper": context_wrapper,
+                "should_run_agent_start_hooks": should_run_agent_start_hooks,
+            }
+            span = _start_invoke_agent_span(context_wrapper, agent, span_kwargs)
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
             agent._sentry_agent_span = span
 
         # Call original streaming method
