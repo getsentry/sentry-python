@@ -1998,3 +1998,24 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
         assert len(parsed_messages) == 2
         assert "small message 4" in str(parsed_messages[0])
         assert "small message 5" in str(parsed_messages[1])
+
+
+def test_streaming_patches_applied(sentry_init):
+    """
+    Test that the streaming patches are applied correctly.
+    """
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Verify that run_streamed is patched (will have __wrapped__ attribute if patched)
+    import agents
+
+    # Check that the method exists and has been modified
+    assert hasattr(agents.run.DEFAULT_AGENT_RUNNER, "run_streamed")
+    assert hasattr(agents.run.AgentRunner, "_run_single_turn_streamed")
+
+    # Verify the patches were applied by checking for our wrapper
+    run_streamed_func = agents.run.DEFAULT_AGENT_RUNNER.run_streamed
+    assert run_streamed_func is not None

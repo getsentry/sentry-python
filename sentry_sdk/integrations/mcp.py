@@ -7,6 +7,7 @@ and resource handler execution, and captures errors that occur during execution.
 Supports the low-level `mcp.server.lowlevel.Server` API.
 """
 
+from contextlib import contextmanager
 import inspect
 from functools import wraps
 from typing import TYPE_CHECKING
@@ -352,6 +353,30 @@ def _prepare_handler_data(
     )
 
 
+@contextmanager
+def ensure_span(*args, **kwargs):
+    """Ensure a span is created for the current context."""
+
+    current_span = sentry_sdk.get_current_span()
+    transaction_exists = (
+        current_span is not None and current_span.containing_transaction is not None
+    )
+
+    if transaction_exists:
+        with sentry_sdk.start_span(*args, **kwargs) as span:
+            yield span
+    else:
+        with sentry_sdk.start_transaction(*args, **kwargs):
+            with sentry_sdk.start_span(*args, **kwargs) as span:
+                yield span
+    # with get_start_span_function()(
+    #     op=OP.MCP_SERVER,
+    #     name=span_name,
+    #     origin=MCPIntegration.origin,
+    # ) as span:
+    #     yield span
+
+
 async def _async_handler_wrapper(
     handler_type: str,
     func: "Callable[..., Any]",
@@ -382,7 +407,7 @@ async def _async_handler_wrapper(
     ) = _prepare_handler_data(handler_type, original_args, original_kwargs)
 
     # Start span and execute
-    with get_start_span_function()(
+    with ensure_span(
         op=OP.MCP_SERVER,
         name=span_name,
         origin=MCPIntegration.origin,
@@ -454,7 +479,7 @@ def _sync_handler_wrapper(
     ) = _prepare_handler_data(handler_type, original_args)
 
     # Start span and execute
-    with get_start_span_function()(
+    with ensure_span(
         op=OP.MCP_SERVER,
         name=span_name,
         origin=MCPIntegration.origin,

@@ -31,6 +31,7 @@ def _patch_agent_run() -> None:
 
     # Store original methods
     original_run_single_turn = agents.run.AgentRunner._run_single_turn
+    original_run_single_turn_streamed = agents.run.AgentRunner._run_single_turn_streamed
     original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
 
@@ -149,8 +150,48 @@ def _patch_agent_run() -> None:
 
         return result
 
+    @wraps(
+        original_run_single_turn_streamed.__func__
+        if hasattr(original_run_single_turn_streamed, "__func__")
+        else original_run_single_turn_streamed
+    )
+    async def patched_run_single_turn_streamed(
+        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        """Patched _run_single_turn_streamed that creates agent invocation spans for streaming"""
+        agent = kwargs.get("agent")
+        context_wrapper = kwargs.get("context_wrapper")
+        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
+
+        span = getattr(context_wrapper, "_sentry_agent_span", None)
+        # Start agent span when agent starts (but only once per agent)
+        if should_run_agent_start_hooks and agent and context_wrapper:
+            # End any existing span for a different agent
+            if _has_active_agent_span(context_wrapper):
+                current_agent = _get_current_agent(context_wrapper)
+                if current_agent and current_agent != agent:
+                    end_invoke_agent_span(context_wrapper, current_agent)
+
+            span = _start_invoke_agent_span(context_wrapper, agent, kwargs)
+            agent._sentry_agent_span = span
+
+        # Call original streaming method
+        try:
+            result = await original_run_single_turn_streamed(*args, **kwargs)
+        except Exception as exc:
+            if span is not None and span.timestamp is None:
+                _record_exception_on_span(span, exc)
+                end_invoke_agent_span(context_wrapper, agent)
+
+            reraise(*sys.exc_info())
+
+        return result
+
     # Apply patches
     agents.run.AgentRunner._run_single_turn = classmethod(patched_run_single_turn)
+    agents.run.AgentRunner._run_single_turn_streamed = classmethod(
+        patched_run_single_turn_streamed
+    )
     agents._run_impl.RunImpl.execute_handoffs = classmethod(patched_execute_handoffs)
     agents._run_impl.RunImpl.execute_final_output = classmethod(
         patched_execute_final_output
