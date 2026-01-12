@@ -34,7 +34,7 @@ except ImportError:
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional, Tuple
 
-    from starlette.types import Receive, Scope, Send
+    from starlette.types import Receive, Scope, Send  # type: ignore[import-not-found]
 
 
 class MCPIntegration(Integration):
