@@ -18,7 +18,9 @@ import jsonschema
 
 try:
     from starlette.testclient import TestClient
-except ImportError:
+    # Catch RuntimeError to prevent the following exception in aws_lambda tests.
+    # RuntimeError: The starlette.testclient module requires the httpx package to be installed.
+except (ImportError, RuntimeError):
     TestClient = None
 
 try:
