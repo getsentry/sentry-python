@@ -57,7 +57,7 @@ class ThreadingIntegration(Integration):
             import channels  # type: ignore[import-untyped]
 
             channels_version = channels.__version__
-        except ImportError:
+        except (ImportError, AttributeError):
             django_version = None
             channels_version = None
 
