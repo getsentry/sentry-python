@@ -661,7 +661,7 @@ def _patch_handle_request():
         self, scope: "Scope", receive: "Receive", send: "Send"
     ) -> None:
         scope.setdefault("state", {})["sentry_sdk.isolation_scope"] = (
-            sentry_sdk.get_current_scope()
+            sentry_sdk.get_isolation_scope()
         )
         scope.setdefault("state", {})["sentry_sdk.current_scope"] = (
             sentry_sdk.get_current_scope()
