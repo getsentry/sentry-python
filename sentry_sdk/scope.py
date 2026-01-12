@@ -100,6 +100,7 @@ if TYPE_CHECKING:
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
+    S = TypeVar("S", bound=Optional["Scope"])
 
 
 # Holds data that will be added to **all** events sent by this process.
@@ -1786,7 +1787,7 @@ def new_scope() -> "Generator[Scope, None, None]":
 
 
 @contextmanager
-def use_scope(scope: "Scope") -> "Generator[Scope, None, None]":
+def use_scope(scope: "S") -> "Generator[S, None, None]":
     """
     .. versionadded:: 2.0.0
 
@@ -1808,6 +1809,10 @@ def use_scope(scope: "Scope") -> "Generator[Scope, None, None]":
         sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
 
     """
+    if scope is None:
+        yield scope
+        return
+
     # set given scope as current scope
     token = _current_scope.set(scope)
 
@@ -1871,7 +1876,7 @@ def isolation_scope() -> "Generator[Scope, None, None]":
 
 
 @contextmanager
-def use_isolation_scope(isolation_scope: "Scope") -> "Generator[Scope, None, None]":
+def use_isolation_scope(isolation_scope: "S") -> "Generator[S, None, None]":
     """
     .. versionadded:: 2.0.0
 
@@ -1892,6 +1897,10 @@ def use_isolation_scope(isolation_scope: "Scope") -> "Generator[Scope, None, Non
         sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
 
     """
+    if isolation_scope is None:
+        yield isolation_scope
+        return
+
     # fork current scope
     current_scope = Scope.get_current_scope()
     forked_current_scope = current_scope.fork()

@@ -21,6 +21,7 @@ from sentry_sdk.scope import should_send_default_pii
 try:
     from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
     from mcp.server.lowlevel.server import request_ctx  # type: ignore[import-not-found]
+    from mcp.server.streamable_http import StreamableHTTPServerTransport
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
@@ -32,6 +33,8 @@ except ImportError:
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
+
+    from starlette.types import Receive, Scope, Send
 
 
 class MCPIntegration(Integration):
@@ -54,9 +57,30 @@ class MCPIntegration(Integration):
         Patches MCP server classes to instrument handler execution.
         """
         _patch_lowlevel_server()
+        _patch_handle_request()
 
         if FastMCP is not None:
             _patch_fastmcp()
+
+
+def _get_active_http_scopes():
+    try:
+        ctx = request_ctx.get()
+    except LookupError:
+        return None
+
+    if (
+        ctx is None
+        or not hasattr(ctx, "request")
+        or ctx.request is None
+        or "state" not in ctx.request.scope
+    ):
+        return None
+
+    return (
+        ctx.request.scope["state"].get("sentry_sdk.current_scope"),
+        ctx.request.scope["state"].get("sentry_sdk.isolation_scope"),
+    )
 
 
 def _get_request_context_data() -> "tuple[Optional[str], Optional[str], str]":
@@ -381,56 +405,67 @@ async def _async_handler_wrapper(
         result_data_key,
     ) = _prepare_handler_data(handler_type, original_args, original_kwargs)
 
+    scopes = _get_active_http_scopes()
+
+    if scopes is None:
+        current_scope = None
+        isolation_scope = None
+    else:
+        current_scope, isolation_scope = scopes
+
+    # Get request ID, session ID, and transport from context
+    request_id, session_id, mcp_transport = _get_request_context_data()
+
     # Start span and execute
-    with get_start_span_function()(
-        op=OP.MCP_SERVER,
-        name=span_name,
-        origin=MCPIntegration.origin,
-    ) as span:
-        # Get request ID, session ID, and transport from context
-        request_id, session_id, mcp_transport = _get_request_context_data()
+    with sentry_sdk.scope.use_isolation_scope(isolation_scope):
+        with sentry_sdk.scope.use_scope(current_scope):
+            with sentry_sdk.start_span(
+                op=OP.MCP_SERVER,
+                name=span_name,
+                origin=MCPIntegration.origin,
+            ) as span:
+                # Set input span data
+                _set_span_input_data(
+                    span,
+                    handler_name,
+                    span_data_key,
+                    mcp_method_name,
+                    arguments,
+                    request_id,
+                    session_id,
+                    mcp_transport,
+                )
 
-        # Set input span data
-        _set_span_input_data(
-            span,
-            handler_name,
-            span_data_key,
-            mcp_method_name,
-            arguments,
-            request_id,
-            session_id,
-            mcp_transport,
-        )
+                # For resources, extract and set protocol
+                if handler_type == "resource":
+                    if original_args:
+                        uri = original_args[0]
+                    else:
+                        uri = original_kwargs.get("uri")
 
-        # For resources, extract and set protocol
-        if handler_type == "resource":
-            if original_args:
-                uri = original_args[0]
-            else:
-                uri = original_kwargs.get("uri")
+                    protocol = None
+                    if hasattr(uri, "scheme"):
+                        protocol = uri.scheme
+                    elif handler_name and "://" in handler_name:
+                        protocol = handler_name.split("://")[0]
+                    if protocol:
+                        span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
 
-            protocol = None
-            if hasattr(uri, "scheme"):
-                protocol = uri.scheme
-            elif handler_name and "://" in handler_name:
-                protocol = handler_name.split("://")[0]
-            if protocol:
-                span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
+                try:
+                    # Execute the async handler
+                    if self is not None:
+                        original_args = (self, *original_args)
+                    result = await func(*original_args, **original_kwargs)
+                except Exception as e:
+                    # Set error flag for tools
+                    if handler_type == "tool":
+                        span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
+                    sentry_sdk.capture_exception(e)
+                    raise
 
-        try:
-            # Execute the async handler
-            if self is not None:
-                original_args = (self, *original_args)
-            result = await func(*original_args, **original_kwargs)
-        except Exception as e:
-            # Set error flag for tools
-            if handler_type == "tool":
-                span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
-            sentry_sdk.capture_exception(e)
-            raise
+                _set_span_output_data(span, result, result_data_key, handler_type)
 
-        _set_span_output_data(span, result, result_data_key, handler_type)
-        return result
+    return result
 
 
 def _sync_handler_wrapper(
@@ -616,6 +651,24 @@ def _patch_lowlevel_server() -> None:
         )(func)
 
     Server.read_resource = patched_read_resource
+
+
+def _patch_handle_request():
+    original_handle_request = StreamableHTTPServerTransport.handle_request
+
+    @wraps(original_handle_request)
+    async def patched_handle_request(
+        self, scope: "Scope", receive: "Receive", send: "Send"
+    ) -> None:
+        scope.setdefault("state", {})["sentry_sdk.isolation_scope"] = (
+            sentry_sdk.get_current_scope()
+        )
+        scope.setdefault("state", {})["sentry_sdk.current_scope"] = (
+            sentry_sdk.get_current_scope()
+        )
+        await original_handle_request(self, scope, receive, send)
+
+    StreamableHTTPServerTransport.handle_request = patched_handle_request
 
 
 def _patch_fastmcp() -> None:
