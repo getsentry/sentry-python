@@ -81,12 +81,14 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.fastapi.FastApiIntegration",
     "sentry_sdk.integrations.flask.FlaskIntegration",
     "sentry_sdk.integrations.gql.GQLIntegration",
+    "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration",
     "sentry_sdk.integrations.graphene.GrapheneIntegration",
     "sentry_sdk.integrations.httpx.HttpxIntegration",
     "sentry_sdk.integrations.huey.HueyIntegration",
     "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration",
     "sentry_sdk.integrations.langchain.LangchainIntegration",
     "sentry_sdk.integrations.langgraph.LanggraphIntegration",
+    "sentry_sdk.integrations.litellm.LiteLLMIntegration",
     "sentry_sdk.integrations.litestar.LitestarIntegration",
     "sentry_sdk.integrations.loguru.LoguruIntegration",
     "sentry_sdk.integrations.mcp.MCPIntegration",
@@ -166,6 +168,7 @@ _MIN_VERSIONS = {
 
 _INTEGRATION_DEACTIVATES = {
     "langchain": {"openai", "anthropic"},
+    "litellm": {"openai", "anthropic"},
     "openai_agents": {"openai"},
     "pydantic_ai": {"openai", "anthropic"},
 }
