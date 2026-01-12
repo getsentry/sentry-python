@@ -76,6 +76,7 @@ except ImportError:
     GetPromptRequest = None
     ReadResourceRequest = None
 
+from fastmcp import __version__ as FASTMCP_VERSION
 
 # Collect available FastMCP implementations for parametrization
 fastmcp_implementations = []
@@ -391,7 +392,7 @@ async def test_fastmcp_tool_async(
         request_id="req-456",
     )
 
-    if isinstance(mcp, StandaloneFastMCP):
+    if isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION.startswith("2"):
         assert result.json()["result"]["structuredContent"] == {
             "result": 42,
             "operation": "multiplication",
@@ -998,7 +999,7 @@ def test_fastmcp_http_transport(
         },
     )
 
-    if isinstance(mcp, StandaloneFastMCP):
+    if isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION.startswith("2"):
         print("structured")
         assert result.json()["result"]["structuredContent"] == {"processed": "TEST"}
     else:
