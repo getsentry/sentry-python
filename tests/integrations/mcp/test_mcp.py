@@ -277,7 +277,6 @@ async def test_tool_handler_async(
     )
 
     app = Starlette(
-        debug=True,
         routes=[
             Mount("/mcp", app=session_manager.handle_request),
         ],
@@ -471,7 +470,6 @@ async def test_prompt_handler_async(
     )
 
     app = Starlette(
-        debug=True,
         routes=[
             Mount("/mcp", app=session_manager.handle_request),
         ],
@@ -617,7 +615,6 @@ async def test_resource_handler_async(sentry_init, capture_events):
     )
 
     app = Starlette(
-        debug=True,
         routes=[
             Mount("/mcp", app=session_manager.handle_request),
         ],
@@ -1101,7 +1098,6 @@ def test_streamable_http_transport_detection(sentry_init, capture_events):
     )
 
     app = Starlette(
-        debug=True,
         routes=[
             Mount("/mcp", app=session_manager.handle_request),
         ],
