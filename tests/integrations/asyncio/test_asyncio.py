@@ -233,6 +233,7 @@ def test_patch_asyncio(mock_get_running_loop):
     Test that the patch_asyncio function will patch the task factory.
     """
     mock_loop = mock_get_running_loop.return_value
+    mock_loop.get_task_factory.return_value._is_sentry_task_factory = False
 
     patch_asyncio()
 
@@ -282,6 +283,7 @@ def test_sentry_task_factory_with_factory(mock_get_running_loop):
 
     # The original task factory will be mocked out here, let's retrieve the value for later
     orig_task_factory = mock_loop.get_task_factory.return_value
+    orig_task_factory._is_sentry_task_factory = False
 
     # Retieve sentry task factory (since it is an inner function within patch_asyncio)
     sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
@@ -344,6 +346,7 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
 
     # The original task factory will be mocked out here, let's retrieve the value for later
     orig_task_factory = mock_loop.get_task_factory.return_value
+    orig_task_factory._is_sentry_task_factory = False
 
     # Retieve sentry task factory (since it is an inner function within patch_asyncio)
     sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
@@ -448,18 +451,27 @@ async def test_delayed_enable_integration_with_options(sentry_init, capture_even
 
 @minimum_python_38
 @pytest.mark.asyncio
-async def test_delayed_enable_enabled_integration(sentry_init):
+async def test_delayed_enable_enabled_integration(sentry_init, uninstall_integration):
+    # Ensure asyncio integration is not already installed from previous tests
+    uninstall_integration("asyncio")
+
     integration = AsyncioIntegration()
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     assert "asyncio" in sentry_sdk.get_client().integrations
 
+    # Get the task factory after initial setup - it should be Sentry's
+    loop = asyncio.get_running_loop()
+    task_factory_before = loop.get_task_factory()
+    assert getattr(task_factory_before, "_is_sentry_task_factory", False) is True
+
     enable_asyncio_integration()
 
     assert "asyncio" in sentry_sdk.get_client().integrations
 
-    # The new asyncio integration should not override the old one
-    assert sentry_sdk.get_client().integrations["asyncio"] == integration
+    # The task factory should be the same (loop not re-patched)
+    task_factory_after = loop.get_task_factory()
+    assert task_factory_before is task_factory_after
 
 
 @minimum_python_38

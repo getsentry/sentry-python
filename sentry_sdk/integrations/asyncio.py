@@ -3,7 +3,7 @@ import functools
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import Integration, DidNotEnable, _enable_integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.utils import event_from_exception, logger, reraise
 
 try:
@@ -46,6 +46,10 @@ def patch_asyncio() -> None:
     try:
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
+
+        # Check if already patched
+        if getattr(orig_task_factory, "_is_sentry_task_factory", False):
+            return
 
         def _sentry_task_factory(
             loop: "asyncio.AbstractEventLoop",
@@ -102,6 +106,7 @@ def patch_asyncio() -> None:
 
             return task
 
+        _sentry_task_factory._is_sentry_task_factory = True  # type: ignore
         loop.set_task_factory(_sentry_task_factory)  # type: ignore
 
     except RuntimeError:
@@ -167,4 +172,11 @@ def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
     sentry_sdk.init(disabled_integrations=[...]), this function will ignore that
     and the integration will be enabled.
     """
-    _enable_integration(AsyncioIntegration(*args, **kwargs))
+    client = sentry_sdk.get_client()
+    if not client.is_active():
+        return
+
+    logger.debug("Setting up integration asyncio")
+    integration = AsyncioIntegration(*args, **kwargs)
+    integration.setup_once()
+    client.integrations["asyncio"] = integration
