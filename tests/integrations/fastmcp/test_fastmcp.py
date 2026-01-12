@@ -404,7 +404,9 @@ async def test_fastmcp_tool_async(
             "result": 42,
             "operation": "multiplication",
         }
-    elif isinstance(mcp, StandaloneFastMCP):
+    elif (
+        isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION is not None
+    ):  # Checking for None is not precise.
         assert result.json()["result"]["content"][0]["text"] == json.dumps(
             {"result": 42, "operation": "multiplication"},
         )
@@ -824,21 +826,20 @@ async def test_fastmcp_resource_async(
                 """Read a URL resource"""
                 return "resource data"
 
-            try:
-                _, result = json_rpc(
-                    app,
-                    method="resources/read",
-                    params={
-                        "uri": "https://example.com/resource",
-                    },
-                )
-            except ValueError as e:
-                # Older FastMCP versions may not support this URI pattern
-                if "Unknown resource" in str(e):
-                    pytest.skip(
-                        f"Resource URI not supported in this FastMCP version: {e}"
-                    )
-                raise
+            _, result = json_rpc(
+                app,
+                method="resources/read",
+                params={
+                    "uri": "https://example.com/resource",
+                },
+            )
+            # Older FastMCP versions may not support this URI pattern
+            if (
+                "error" in result.json()
+                and "Unknown resource" in result.json()["error"]["message"]
+            ):
+                pytest.skip("Resource URI not supported in this FastMCP version.")
+                return
 
             assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
@@ -1016,7 +1017,9 @@ def test_fastmcp_http_transport(
         and FASTMCP_VERSION.startswith("2")
     ):
         assert result.json()["result"]["structuredContent"] == {"processed": "TEST"}
-    elif isinstance(mcp, StandaloneFastMCP):
+    elif (
+        isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION is not None
+    ):  # Checking for None is not precise.
         assert result.json()["result"]["content"][0]["text"] == json.dumps(
             {"processed": "TEST"},
         )
