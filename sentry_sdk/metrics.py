@@ -1,8 +1,3 @@
-"""
-NOTE: This file contains experimental code that may be changed or removed at any
-time without prior notice.
-"""
-
 import time
 from typing import Any, Optional, TYPE_CHECKING, Union
 
