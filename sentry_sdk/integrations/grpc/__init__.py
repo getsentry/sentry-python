@@ -50,14 +50,29 @@ P = ParamSpec("P")
 GRPC_VERSION = parse_version(grpc.__version__)
 
 
+def _is_channel_intercepted(channel: "Channel") -> bool:
+    interceptor = getattr(channel, "_interceptor", None)
+    while interceptor is not None:
+        if isinstance(interceptor, ClientInterceptor):
+            return True
+
+        inner_channel = getattr(channel, "_channel", None)
+        if inner_channel is None:
+            return False
+
+        channel = inner_channel
+        interceptor = getattr(channel, "_interceptor", None)
+
+    return False
+
+
 def _wrap_channel_sync(func: "Callable[P, Channel]") -> "Callable[P, Channel]":
     "Wrapper for synchronous secure and insecure channel."
 
     @wraps(func)
     def patched_channel(*args: "Any", **kwargs: "Any") -> "Channel":
         channel = func(*args, **kwargs)
-        if not ClientInterceptor._is_intercepted:
-            ClientInterceptor._is_intercepted = True
+        if not _is_channel_intercepted(channel):
             return intercept_channel(channel, ClientInterceptor())
         else:
             return channel
@@ -70,7 +85,7 @@ def _wrap_intercept_channel(func: "Callable[P, Channel]") -> "Callable[P, Channe
     def patched_intercept_channel(
         channel: "Channel", *interceptors: "grpc.ServerInterceptor"
     ) -> "Channel":
-        if ClientInterceptor._is_intercepted:
+        if _is_channel_intercepted(channel):
             interceptors = tuple(
                 [
                     interceptor
