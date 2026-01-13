@@ -133,7 +133,7 @@ def _transform_content_block(content_block: "dict[str, Any]") -> "dict[str, Any]
 
     # Handle image blocks
     if block_type == "image":
-        source = content_block.get("source", {})
+        source = content_block.get("source") or {}
         source_type = source.get("type")
         media_type = source.get("media_type", "")
 
@@ -161,7 +161,7 @@ def _transform_content_block(content_block: "dict[str, Any]") -> "dict[str, Any]
 
     # Handle document blocks (PDFs, etc.)
     elif block_type == "document":
-        source = content_block.get("source", {})
+        source = content_block.get("source") or {}
         source_type = source.get("type")
         media_type = source.get("media_type", "")
 
