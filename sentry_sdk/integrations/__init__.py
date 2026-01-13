@@ -88,7 +88,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration",
     "sentry_sdk.integrations.langchain.LangchainIntegration",
     "sentry_sdk.integrations.langgraph.LanggraphIntegration",
-    "sentry_sdk.integrations.litellm.LiteLLMIntegration",
     "sentry_sdk.integrations.litestar.LitestarIntegration",
     "sentry_sdk.integrations.loguru.LoguruIntegration",
     "sentry_sdk.integrations.mcp.MCPIntegration",
@@ -168,7 +167,6 @@ _MIN_VERSIONS = {
 
 _INTEGRATION_DEACTIVATES = {
     "langchain": {"openai", "anthropic"},
-    "litellm": {"openai", "anthropic"},
     "openai_agents": {"openai"},
     "pydantic_ai": {"openai", "anthropic"},
 }
