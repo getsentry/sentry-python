@@ -90,7 +90,7 @@ def _patch_agent_run() -> None:
         """Patched _run_single_turn that creates agent invocation spans"""
         agent = kwargs.get("agent")
         context_wrapper = kwargs.get("context_wrapper")
-        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
+        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
 
         span = _maybe_start_agent_span(
             context_wrapper, agent, should_run_agent_start_hooks, kwargs
@@ -196,8 +196,10 @@ def _patch_agent_run() -> None:
         streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
         agent = args[1] if len(args) > 1 else kwargs.get("agent")
         context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
-        should_run_agent_start_hooks = (
-            args[5] if len(args) > 5 else kwargs.get("should_run_agent_start_hooks")
+        should_run_agent_start_hooks = bool(
+            args[5]
+            if len(args) > 5
+            else kwargs.get("should_run_agent_start_hooks", False)
         )
 
         # Build span kwargs with original_input from streamed_result for request messages
