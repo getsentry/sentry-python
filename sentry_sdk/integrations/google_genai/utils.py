@@ -394,12 +394,11 @@ def _extract_tool_message_from_part(part: "Any") -> "Optional[dict[str, Any]]":
         # FunctionResponse object
         tool_call_id = getattr(function_response, "id", None)
         tool_name = getattr(function_response, "name", None)
-        response_obj = getattr(function_response, "response", None)
-        if response_obj:
-            if isinstance(response_obj, dict):
-                output = response_obj.get("output", response_obj)
-            else:
-                output = response_obj
+        response_obj = getattr(function_response, "response", None) or {}
+        if isinstance(response_obj, dict):
+            output = response_obj.get("output", response_obj)
+        else:
+            output = response_obj
 
     if not tool_name:
         return None
@@ -417,7 +416,7 @@ def _extract_tool_message_from_part(part: "Any") -> "Optional[dict[str, Any]]":
 def _extract_pil_image(image: "Any") -> "Optional[dict[str, Any]]":
     """Extract blob part from PIL.Image.Image."""
     try:
-        from PIL import Image as PILImage  # type: ignore[import-not-found]
+        from PIL import Image as PILImage
         import io
 
         if not isinstance(image, PILImage.Image):
