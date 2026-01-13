@@ -44,43 +44,29 @@ def ai_client_span(
 
 def update_ai_client_span(
     span: "sentry_sdk.tracing.Span",
-    agent: "Agent",
-    get_response_kwargs: "dict[str, Any]",
-    result: "Any",
+    response: "Any",
     response_model: "Optional[str]" = None,
 ) -> None:
-    _set_usage_data(span, result.usage)
-    _set_output_data(span, result)
-    _create_mcp_execute_tool_spans(span, result)
-
-    # Set response model if captured from raw response
-    if response_model is not None:
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
-
-
-def update_ai_client_span_streaming(
-    span: "sentry_sdk.tracing.Span",
-    agent: "Agent",
-    response: "Any",
-) -> None:
     """
-    Update AI client span with data from a streaming response.
-    The streaming response has a different structure than the non-streaming response:
-    - response.usage contains usage data
-    - response.output contains output items (similar to result.output)
-    - response.model contains the response model
+    Update AI client span with response data.
+    Works for both streaming and non-streaming responses.
+
+    Args:
+        span: The span to update
+        response: The response object (ModelResponse for non-streaming, Response for streaming)
+        response_model: Optional response model string (used when captured from raw API response)
     """
+    # Set usage data if available
     if hasattr(response, "usage") and response.usage:
         _set_usage_data(span, response.usage)
 
-    # For streaming, set output data from the response
+    # Set output data and create MCP tool spans if available
     if hasattr(response, "output"):
         _set_output_data(span, response)
-
-    # Create MCP tool spans if applicable
-    if hasattr(response, "output"):
         _create_mcp_execute_tool_spans(span, response)
 
-    # Set response model
-    if hasattr(response, "model") and response.model:
+    # Set response model - prefer explicit response_model, fall back to response.model
+    if response_model is not None:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+    elif hasattr(response, "model") and response.model:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, str(response.model))

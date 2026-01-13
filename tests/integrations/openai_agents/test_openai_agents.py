@@ -2025,11 +2025,11 @@ async def test_streaming_span_update_captures_response_data(
     sentry_init, test_agent, mock_usage
 ):
     """
-    Test that update_ai_client_span_streaming correctly captures response text,
+    Test that update_ai_client_span correctly captures response text,
     usage data, and response model from a streaming response.
     """
     from sentry_sdk.integrations.openai_agents.spans.ai_client import (
-        update_ai_client_span_streaming,
+        update_ai_client_span,
     )
 
     sentry_init(
@@ -2058,9 +2058,9 @@ async def test_streaming_span_update_captures_response_data(
         )
     ]
 
-    # Test the update function directly
+    # Test the unified update function (works for both streaming and non-streaming)
     with start_span(op="gen_ai.chat", description="test chat") as span:
-        update_ai_client_span_streaming(span, test_agent, mock_streaming_response)
+        update_ai_client_span(span, mock_streaming_response)
 
         # Verify the span data was set correctly
         assert span._data["gen_ai.response.text"] == "Hello from streaming!"

@@ -3,23 +3,28 @@ from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 
-from ..spans import (
-    ai_client_span,
-    update_ai_client_span,
-    update_ai_client_span_streaming,
-)
+from ..spans import ai_client_span, update_ai_client_span
 from sentry_sdk.consts import SPANDATA
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
-
+    from typing import Any, Callable, Optional
 
 try:
     import agents
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
+
+
+def _set_response_model_on_agent_span(
+    agent: "agents.Agent", response_model: "Optional[str]"
+) -> None:
+    """Set the response model on the agent's invoke_agent span if available."""
+    if response_model:
+        agent_span = getattr(agent, "_sentry_agent_span", None)
+        if agent_span:
+            agent_span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
 
 def _create_get_model_wrapper(
@@ -65,19 +70,13 @@ def _create_get_model_wrapper(
             with ai_client_span(agent, kwargs) as span:
                 result = await original_get_response(*args, **kwargs)
 
-                # Get response model captured from _fetch_response
+                # Get response model captured from _fetch_response and clean up
                 response_model = getattr(agent, "_sentry_response_model", None)
                 if response_model:
-                    # Set response model on agent span
-                    agent_span = getattr(agent, "_sentry_agent_span", None)
-                    if agent_span:
-                        agent_span.set_data(
-                            SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
-                        )
-                    # Clean up after use
                     delattr(agent, "_sentry_response_model")
 
-                update_ai_client_span(span, agent, kwargs, result, response_model)
+                _set_response_model_on_agent_span(agent, response_model)
+                update_ai_client_span(span, result, response_model)
 
             return result
 
@@ -128,18 +127,14 @@ def _create_get_model_wrapper(
 
                     # Update span with response data (usage, output, model)
                     if streaming_response:
-                        update_ai_client_span_streaming(span, agent, streaming_response)
-                        # Also set response model on agent span
-                        if (
-                            hasattr(streaming_response, "model")
+                        response_model = (
+                            str(streaming_response.model)
+                            if hasattr(streaming_response, "model")
                             and streaming_response.model
-                        ):
-                            agent_span = getattr(agent, "_sentry_agent_span", None)
-                            if agent_span:
-                                agent_span.set_data(
-                                    SPANDATA.GEN_AI_RESPONSE_MODEL,
-                                    str(streaming_response.model),
-                                )
+                            else None
+                        )
+                        _set_response_model_on_agent_span(agent, response_model)
+                        update_ai_client_span(span, streaming_response)
 
             model.stream_response = wrapped_stream_response
 
