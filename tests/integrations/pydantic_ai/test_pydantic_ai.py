@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import Field
 
 import sentry_sdk
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
@@ -2632,7 +2633,7 @@ def _find_binary_content(messages_data, expected_modality, expected_mime_type):
                 content_str = str(content_item["content"])
                 assert (
                     f"data:{expected_mime_type};base64," in content_str
-                    or "[Filtered]" in content_str
+                    or BLOB_DATA_SUBSTITUTE in content_str
                 )
                 return True
     return False
