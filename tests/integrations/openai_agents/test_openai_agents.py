@@ -748,14 +748,12 @@ async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
     hosted_tool = HostedMCPTool(
         tool_config={
             "type": "mcp",
-            "server_label": "...",
-            "server_url": "...",
-            "require_approval": "never",
+            "server_label": "test_server",
+            "server_url": "http://example.com/",
             "headers": {
                 "baggage": "custom=data",
             },
         },
-        on_approval_request=None,
     )
 
     client = AsyncOpenAI(api_key="z")
