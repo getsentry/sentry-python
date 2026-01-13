@@ -3,7 +3,11 @@ from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 
-from ..spans import ai_client_span, update_ai_client_span
+from ..spans import (
+    ai_client_span,
+    update_ai_client_span,
+    update_ai_client_span_streaming,
+)
 from sentry_sdk.consts import SPANDATA
 
 from typing import TYPE_CHECKING
@@ -37,15 +41,19 @@ def _create_get_model_wrapper(
         # because we only patch its direct methods, all underlying data can remain unchanged.
         model = copy.copy(original_get_model(agent, run_config))
 
-        # Wrap _fetch_response if it exists (for OpenAI models) to capture raw response model
+        # Capture the request model name for spans (agent.model can be None when using defaults)
+        request_model_name = model.model if hasattr(model, "model") else str(model)
+        agent._sentry_request_model = request_model_name
+
+        # Wrap _fetch_response if it exists (for OpenAI models) to capture response model
         if hasattr(model, "_fetch_response"):
             original_fetch_response = model._fetch_response
 
             @wraps(original_fetch_response)
             async def wrapped_fetch_response(*args: "Any", **kwargs: "Any") -> "Any":
                 response = await original_fetch_response(*args, **kwargs)
-                if hasattr(response, "model"):
-                    agent._sentry_raw_response_model = str(response.model)
+                if hasattr(response, "model") and response.model:
+                    agent._sentry_response_model = str(response.model)
                 return response
 
             model._fetch_response = wrapped_fetch_response
@@ -57,15 +65,17 @@ def _create_get_model_wrapper(
             with ai_client_span(agent, kwargs) as span:
                 result = await original_get_response(*args, **kwargs)
 
-                response_model = getattr(agent, "_sentry_raw_response_model", None)
+                # Get response model captured from _fetch_response
+                response_model = getattr(agent, "_sentry_response_model", None)
                 if response_model:
+                    # Set response model on agent span
                     agent_span = getattr(agent, "_sentry_agent_span", None)
                     if agent_span:
                         agent_span.set_data(
                             SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
                         )
-
-                    delattr(agent, "_sentry_raw_response_model")
+                    # Clean up after use
+                    delattr(agent, "_sentry_response_model")
 
                 update_ai_client_span(span, agent, kwargs, result, response_model)
 
@@ -109,18 +119,27 @@ def _create_get_model_wrapper(
                 with ai_client_span(agent, span_kwargs) as span:
                     span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
+                    streaming_response = None
                     async for event in original_stream_response(*args, **kwargs):
+                        # Capture the full response from ResponseCompletedEvent
+                        if hasattr(event, "response"):
+                            streaming_response = event.response
                         yield event
 
-                    # Get response model if captured
-                    response_model = getattr(agent, "_sentry_raw_response_model", None)
-                    if response_model:
-                        agent_span = getattr(agent, "_sentry_agent_span", None)
-                        if agent_span:
-                            agent_span.set_data(
-                                SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
-                            )
-                        delattr(agent, "_sentry_raw_response_model")
+                    # Update span with response data (usage, output, model)
+                    if streaming_response:
+                        update_ai_client_span_streaming(span, agent, streaming_response)
+                        # Also set response model on agent span
+                        if (
+                            hasattr(streaming_response, "model")
+                            and streaming_response.model
+                        ):
+                            agent_span = getattr(agent, "_sentry_agent_span", None)
+                            if agent_span:
+                                agent_span.set_data(
+                                    SPANDATA.GEN_AI_RESPONSE_MODEL,
+                                    str(streaming_response.model),
+                                )
 
             model.stream_response = wrapped_stream_response
 

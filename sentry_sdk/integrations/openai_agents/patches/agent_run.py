@@ -183,6 +183,7 @@ def _patch_agent_run() -> None:
         )
         """
         # Extract positional arguments (streaming version doesn't use keyword-only args)
+        streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
         agent = args[1] if len(args) > 1 else kwargs.get("agent")
         context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
         should_run_agent_start_hooks = (
@@ -199,11 +200,15 @@ def _patch_agent_run() -> None:
                     end_invoke_agent_span(context_wrapper, current_agent)
 
             # Build kwargs dict for span creation (for compatibility with _start_invoke_agent_span)
+            # Include original_input from streamed_result for request messages
             span_kwargs = {
                 "agent": agent,
                 "context_wrapper": context_wrapper,
                 "should_run_agent_start_hooks": should_run_agent_start_hooks,
             }
+            if streamed_result and hasattr(streamed_result, "input"):
+                span_kwargs["original_input"] = streamed_result.input
+
             span = _start_invoke_agent_span(context_wrapper, agent, span_kwargs)
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
             agent._sentry_agent_span = span
