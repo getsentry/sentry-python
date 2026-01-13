@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 try:
     import typer
+    from typer.main import except_hook
 except ImportError:
     raise DidNotEnable("Typer not installed")
 
@@ -31,7 +32,7 @@ class TyperIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        typer.main.except_hook = _make_excepthook(typer.main.except_hook)  # type: ignore
+        typer.main.except_hook = _make_excepthook(except_hook)  # type: ignore
 
 
 def _make_excepthook(old_excepthook: "Excepthook") -> "Excepthook":

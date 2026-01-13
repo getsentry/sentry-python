@@ -9,9 +9,15 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+import sentry_sdk
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
+from sentry_sdk.consts import (
+    DEFAULT_MAX_BREADCRUMBS,
+    FALSE_VALUES,
+    INSTRUMENTER,
+    SPANDATA,
+)
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
@@ -41,7 +47,10 @@ from sentry_sdk.utils import (
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
+    format_attribute,
     logger,
+    has_logs_enabled,
+    has_metrics_enabled,
 )
 
 import typing
@@ -66,6 +75,8 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from sentry_sdk._types import (
+        Attributes,
+        AttributeValue,
         Breadcrumb,
         BreadcrumbHint,
         ErrorProcessor,
@@ -73,7 +84,9 @@ if TYPE_CHECKING:
         EventProcessor,
         ExcInfo,
         Hint,
+        Log,
         LogLevelStr,
+        Metric,
         SamplingContext,
         Type,
     )
@@ -221,6 +234,7 @@ class Scope:
         "_type",
         "_last_event_id",
         "_flags",
+        "_attributes",
     )
 
     def __init__(
@@ -287,6 +301,8 @@ class Scope:
 
         rv._flags = deepcopy(self._flags)
 
+        rv._attributes = self._attributes.copy()
+
         return rv
 
     @classmethod
@@ -349,6 +365,26 @@ class Scope:
             _global_scope = Scope(ty=ScopeType.GLOBAL)
 
         return _global_scope
+
+    def set_global_attributes(self) -> None:
+        from sentry_sdk.client import SDK_INFO
+
+        self.set_attribute("sentry.sdk.name", SDK_INFO["name"])
+        self.set_attribute("sentry.sdk.version", SDK_INFO["version"])
+
+        options = sentry_sdk.get_client().options
+
+        server_name = options.get("server_name")
+        if server_name:
+            self.set_attribute(SPANDATA.SERVER_ADDRESS, server_name)
+
+        environment = options.get("environment")
+        if environment:
+            self.set_attribute("sentry.environment", environment)
+
+        release = options.get("release")
+        if release:
+            self.set_attribute("sentry.release", release)
 
     @classmethod
     def last_event_id(cls) -> "Optional[str]":
@@ -452,7 +488,14 @@ class Scope:
             If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NonRecordingClient`.
 
         """
-        self.client = client if client is not None else NonRecordingClient()
+        if client is not None:
+            self.client = client
+            # We need a client to set the initial global attributes on the global
+            # scope since they mostly come from client options, so populate them
+            # as soon as a client is set
+            sentry_sdk.get_global_scope().set_global_attributes()
+        else:
+            self.client = NonRecordingClient()
 
     def fork(self) -> "Scope":
         """
@@ -674,6 +717,8 @@ class Scope:
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id: "Optional[str]" = None
         self._flags: "Optional[FlagBuffer]" = None
+
+        self._attributes: "Attributes" = {}
 
     @_attr_setter
     def level(self, value: "LogLevelStr") -> None:
@@ -1172,6 +1217,42 @@ class Scope:
 
         return event_id
 
+    def _capture_log(self, log: "Optional[Log]") -> None:
+        if log is None:
+            return
+
+        client = self.get_client()
+        if not has_logs_enabled(client.options):
+            return
+
+        merged_scope = self._merge_scopes()
+
+        debug = client.options.get("debug", False)
+        if debug:
+            logger.debug(
+                f"[Sentry Logs] [{log.get('severity_text')}] {log.get('body')}"
+            )
+
+        client._capture_log(log, scope=merged_scope)
+
+    def _capture_metric(self, metric: "Optional[Metric]") -> None:
+        if metric is None:
+            return
+
+        client = self.get_client()
+        if not has_metrics_enabled(client.options):
+            return
+
+        merged_scope = self._merge_scopes()
+
+        debug = client.options.get("debug", False)
+        if debug:
+            logger.debug(
+                f"[Sentry Metrics] [{metric.get('type')}] {metric.get('name')}: {metric.get('value')}"
+            )
+
+        client._capture_metric(metric, scope=merged_scope)
+
     def capture_message(
         self,
         message: str,
@@ -1415,6 +1496,29 @@ class Scope:
                 {"values": flags}
             )
 
+    def _apply_scope_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        for attribute, value in self._attributes.items():
+            if attribute not in telemetry["attributes"]:
+                telemetry["attributes"][attribute] = value
+
+    def _apply_user_attributes_to_telemetry(
+        self, telemetry: "Union[Log, Metric]"
+    ) -> None:
+        attributes = telemetry["attributes"]
+
+        if not should_send_default_pii() or self._user is None:
+            return
+
+        for attribute_name, user_attribute in (
+            ("user.id", "id"),
+            ("user.name", "username"),
+            ("user.email", "email"),
+        ):
+            if user_attribute in self._user and attribute_name not in attributes:
+                attributes[attribute_name] = self._user[user_attribute]
+
     def _drop(self, cause: "Any", ty: str) -> "Optional[Any]":
         logger.info("%s (%s) dropped event", ty, cause)
         return None
@@ -1521,6 +1625,21 @@ class Scope:
 
         return event
 
+    @_disable_capture
+    def apply_to_telemetry(self, telemetry: "Union[Log, Metric]") -> None:
+        # Attributes-based events and telemetry go through here (logs, metrics,
+        # spansV2)
+        trace_context = self.get_trace_context()
+        trace_id = trace_context.get("trace_id")
+        if telemetry.get("trace_id") is None:
+            telemetry["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
+        span_id = trace_context.get("span_id")
+        if telemetry.get("span_id") is None and span_id:
+            telemetry["span_id"] = span_id
+
+        self._apply_scope_attributes_to_telemetry(telemetry)
+        self._apply_user_attributes_to_telemetry(telemetry)
+
     def update_from_scope(self, scope: "Scope") -> None:
         """Update the scope with another scope's data."""
         if scope._level is not None:
@@ -1565,6 +1684,8 @@ class Scope:
             else:
                 for flag in scope._flags.get():
                     self._flags.set(flag["flag"], flag["result"])
+        if scope._attributes:
+            self._attributes.update(scope._attributes)
 
     def update_from_kwargs(
         self,
@@ -1574,6 +1695,7 @@ class Scope:
         contexts: "Optional[Dict[str, Dict[str, Any]]]" = None,
         tags: "Optional[Dict[str, str]]" = None,
         fingerprint: "Optional[List[str]]" = None,
+        attributes: "Optional[Attributes]" = None,
     ) -> None:
         """Update the scope's attributes."""
         if level is not None:
@@ -1588,6 +1710,8 @@ class Scope:
             self._tags.update(tags)
         if fingerprint is not None:
             self._fingerprint = fingerprint
+        if attributes is not None:
+            self._attributes.update(attributes)
 
     def __repr__(self) -> str:
         return "<%s id=%s name=%s type=%s>" % (
@@ -1606,6 +1730,22 @@ class Scope:
             )
             self._flags = FlagBuffer(capacity=max_flags)
         return self._flags
+
+    def set_attribute(self, attribute: str, value: "AttributeValue") -> None:
+        """
+        Set an attribute on the scope.
+
+        Any attributes-based telemetry (logs, metrics) captured while this scope
+        is active will inherit attributes set on the scope.
+        """
+        self._attributes[attribute] = format_attribute(value)
+
+    def remove_attribute(self, attribute: str) -> None:
+        """Remove an attribute if set on the scope. No-op if there is no such attribute."""
+        try:
+            del self._attributes[attribute]
+        except KeyError:
+            pass
 
 
 @contextmanager

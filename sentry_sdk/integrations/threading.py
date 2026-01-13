@@ -54,11 +54,14 @@ class ThreadingIntegration(Integration):
 
         try:
             from django import VERSION as django_version  # noqa: N811
+        except ImportError:
+            django_version = None
+
+        try:
             import channels  # type: ignore[import-untyped]
 
             channels_version = channels.__version__
-        except ImportError:
-            django_version = None
+        except (ImportError, AttributeError):
             channels_version = None
 
         is_async_emulated_with_threads = (

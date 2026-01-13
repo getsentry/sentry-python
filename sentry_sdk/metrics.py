@@ -7,10 +7,10 @@ import time
 from typing import Any, Optional, TYPE_CHECKING, Union
 
 import sentry_sdk
-from sentry_sdk.utils import safe_repr
+from sentry_sdk.utils import format_attribute, safe_repr
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Metric, MetricType
+    from sentry_sdk._types import Attributes, Metric, MetricType
 
 
 def _capture_metric(
@@ -18,23 +18,13 @@ def _capture_metric(
     metric_type: "MetricType",
     value: float,
     unit: "Optional[str]" = None,
-    attributes: "Optional[dict[str, Any]]" = None,
+    attributes: "Optional[Attributes]" = None,
 ) -> None:
-    client = sentry_sdk.get_client()
+    attrs: "Attributes" = {}
 
-    attrs: "dict[str, Union[str, bool, float, int]]" = {}
     if attributes:
         for k, v in attributes.items():
-            attrs[k] = (
-                v
-                if (
-                    isinstance(v, str)
-                    or isinstance(v, int)
-                    or isinstance(v, bool)
-                    or isinstance(v, float)
-                )
-                else safe_repr(v)
-            )
+            attrs[k] = format_attribute(v)
 
     metric: "Metric" = {
         "timestamp": time.time(),
@@ -47,7 +37,7 @@ def _capture_metric(
         "attributes": attrs,
     }
 
-    client._capture_metric(metric)
+    sentry_sdk.get_current_scope()._capture_metric(metric)
 
 
 def count(
