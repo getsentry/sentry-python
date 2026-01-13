@@ -566,10 +566,15 @@ def test_litellm_specific_parameters(sentry_init, capture_events):
     assert span["data"]["gen_ai.litellm.custom_llm_provider"] == "custom_provider"
 
 
-def test_no_integration(sentry_init, capture_events):
+def test_no_integration(
+    sentry_init, capture_events, reset_integrations, uninstall_integration
+):
     """Test that when integration is not enabled, callbacks don't break."""
+    # Reset integrations since LiteLLM is now auto-enabled and we need to test
+    # the behavior when it's explicitly disabled
     sentry_init(
         traces_sample_rate=1.0,
+        disabled_integrations=[LiteLLMIntegration],
     )
     events = capture_events()
 
@@ -596,6 +601,9 @@ def test_no_integration(sentry_init, capture_events):
     # Should still have the transaction, but no child spans since integration is off
     assert event["type"] == "transaction"
     assert len(event.get("spans", [])) == 0
+
+    # Clean up: uninstall litellm so subsequent tests can re-install it
+    uninstall_integration("litellm")
 
 
 def test_response_without_usage(sentry_init, capture_events):
