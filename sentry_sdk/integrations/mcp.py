@@ -421,7 +421,7 @@ async def _async_handler_wrapper(
     # Start span and execute
     with sentry_sdk.scope.use_isolation_scope(isolation_scope):
         with sentry_sdk.scope.use_scope(current_scope):
-            with sentry_sdk.start_span(
+            with get_start_span_function()(
                 op=OP.MCP_SERVER,
                 name=span_name,
                 origin=MCPIntegration.origin,
