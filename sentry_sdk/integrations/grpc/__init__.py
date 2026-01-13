@@ -60,7 +60,8 @@ def _is_channel_intercepted(channel: "Channel") -> bool:
         if inner_channel is None:
             return False
 
-        interceptor = getattr(inner_channel, "_interceptor", None)
+        channel = inner_channel
+        interceptor = getattr(channel, "_interceptor", None)
 
     return False
 
