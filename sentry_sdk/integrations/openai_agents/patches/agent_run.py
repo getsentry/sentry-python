@@ -163,7 +163,7 @@ def _patch_agent_run() -> None:
             # (For non-streaming, the workflow span is closed by the context manager in _create_run_wrapper)
             if agent and hasattr(agent, "_sentry_workflow_span"):
                 workflow_span = agent._sentry_workflow_span
-                workflow_span.__exit__(None, None, None)
+                workflow_span.__exit__(*sys.exc_info())
                 delattr(agent, "_sentry_workflow_span")
 
         return result

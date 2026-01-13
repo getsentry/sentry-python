@@ -92,6 +92,11 @@ def _create_get_model_wrapper(
                 Wrap stream_response to create an AI client span for streaming.
                 stream_response is an async generator, so we yield events within the span.
 
+                Note: We use explicit try/finally instead of a context manager because
+                if the consumer abandons the stream (breaks early, network error, etc.),
+                the context manager's __exit__ may not be called. With try/finally,
+                cleanup happens even when GeneratorExit is thrown.
+
                 Note: stream_response is called with positional args unlike get_response
                 which uses keyword args. The signature is:
                     stream_response(
@@ -108,6 +113,8 @@ def _create_get_model_wrapper(
                         prompt,
                     )
                 """
+                import sys
+
                 # Build kwargs dict from positional args for span data capture
                 span_kwargs = dict(kwargs)
                 if len(args) > 0:
@@ -115,10 +122,12 @@ def _create_get_model_wrapper(
                 if len(args) > 1:
                     span_kwargs["input"] = args[1]
 
-                with ai_client_span(agent, span_kwargs) as span:
-                    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+                span = ai_client_span(agent, span_kwargs)
+                span.__enter__()
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-                    streaming_response = None
+                streaming_response = None
+                try:
                     async for event in original_stream_response(*args, **kwargs):
                         # Capture the full response from ResponseCompletedEvent
                         if hasattr(event, "response"):
@@ -135,6 +144,8 @@ def _create_get_model_wrapper(
                         )
                         _set_response_model_on_agent_span(agent, response_model)
                         update_ai_client_span(span, streaming_response)
+                finally:
+                    span.__exit__(*sys.exc_info())
 
             model.stream_response = wrapped_stream_response
 

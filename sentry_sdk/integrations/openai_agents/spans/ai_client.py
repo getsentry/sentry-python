@@ -61,7 +61,7 @@ def update_ai_client_span(
         _set_usage_data(span, response.usage)
 
     # Set output data and create MCP tool spans if available
-    if hasattr(response, "output"):
+    if hasattr(response, "output") and response.output:
         _set_output_data(span, response)
         _create_mcp_execute_tool_spans(span, response)
 
