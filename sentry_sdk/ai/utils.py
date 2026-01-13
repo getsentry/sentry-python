@@ -5,7 +5,7 @@ from copy import deepcopy
 from sys import getsizeof
 from typing import TYPE_CHECKING
 
-from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple
