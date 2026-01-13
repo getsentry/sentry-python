@@ -4,7 +4,11 @@ import uuid
 import pytest
 
 import sentry_sdk
-from sentry_sdk._types import AnnotatedValue
+from sentry_sdk._types import (
+    AnnotatedValue,
+    SENSITIVE_DATA_SUBSTITUTE,
+    BLOB_DATA_SUBSTITUTE,
+)
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
@@ -13,6 +17,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     truncate_messages_by_size,
     _find_truncation_index,
+    redact_blob_message_parts,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import safe_serialize
@@ -425,6 +430,49 @@ class TestTruncateAndAnnotateMessages:
         assert isinstance(result, list)
         assert result[0] == large_messages[-len(result)]
 
+    def test_preserves_original_messages_with_blobs(self):
+        """Test that truncate_and_annotate_messages doesn't mutate the original messages"""
+
+        class MockSpan:
+            def __init__(self):
+                self.span_id = "test_span_id"
+                self.data = {}
+
+            def set_data(self, key, value):
+                self.data[key] = value
+
+        class MockScope:
+            def __init__(self):
+                self._gen_ai_original_message_count = {}
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"text": "What's in this image?", "type": "text"},
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "content": "data:image/jpeg;base64,original_content",
+                    },
+                ],
+            }
+        ]
+
+        original_blob_content = messages[0]["content"][1]["content"]
+
+        span = MockSpan()
+        scope = MockScope()
+
+        # This should NOT mutate the original messages
+        result = truncate_and_annotate_messages(messages, span, scope)
+
+        # Verify original is unchanged
+        assert messages[0]["content"][1]["content"] == original_blob_content
+
+        # Verify result has redacted content
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+
 
 class TestClientAnnotation:
     def test_client_wraps_truncated_messages_in_annotated_value(self, large_messages):
@@ -542,3 +590,170 @@ class TestClientAnnotation:
         assert isinstance(messages_value, AnnotatedValue)
         assert messages_value.metadata["len"] == stored_original_length
         assert len(messages_value.value) == len(truncated_messages)
+
+
+class TestRedactBlobMessageParts:
+    def test_redacts_single_blob_content(self):
+        """Test that blob content is redacted without mutating original messages"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "text": "How many ponies do you see in the image?",
+                        "type": "text",
+                    },
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "mime_type": "image/jpeg",
+                        "content": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+                    },
+                ],
+            }
+        ]
+
+        # Save original blob content for comparison
+        original_blob_content = messages[0]["content"][1]["content"]
+
+        result = redact_blob_message_parts(messages)
+
+        # Original messages should be UNCHANGED
+        assert messages[0]["content"][1]["content"] == original_blob_content
+
+        # Result should have redacted content
+        assert (
+            result[0]["content"][0]["text"]
+            == "How many ponies do you see in the image?"
+        )
+        assert result[0]["content"][0]["type"] == "text"
+        assert result[0]["content"][1]["type"] == "blob"
+        assert result[0]["content"][1]["modality"] == "image"
+        assert result[0]["content"][1]["mime_type"] == "image/jpeg"
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+
+    def test_redacts_multiple_blob_parts(self):
+        """Test that multiple blob parts are redacted without mutation"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"text": "Compare these images", "type": "text"},
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "mime_type": "image/jpeg",
+                        "content": "data:image/jpeg;base64,first_image",
+                    },
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "mime_type": "image/png",
+                        "content": "data:image/png;base64,second_image",
+                    },
+                ],
+            }
+        ]
+
+        original_first = messages[0]["content"][1]["content"]
+        original_second = messages[0]["content"][2]["content"]
+
+        result = redact_blob_message_parts(messages)
+
+        # Original should be unchanged
+        assert messages[0]["content"][1]["content"] == original_first
+        assert messages[0]["content"][2]["content"] == original_second
+
+        # Result should be redacted
+        assert result[0]["content"][0]["text"] == "Compare these images"
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+        assert result[0]["content"][2]["content"] == BLOB_DATA_SUBSTITUTE
+
+    def test_redacts_blobs_in_multiple_messages(self):
+        """Test that blob parts are redacted across multiple messages without mutation"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"text": "First message", "type": "text"},
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "content": "data:image/jpeg;base64,first",
+                    },
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": "I see the image.",
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"text": "Second message", "type": "text"},
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "content": "data:image/jpeg;base64,second",
+                    },
+                ],
+            },
+        ]
+
+        original_first = messages[0]["content"][1]["content"]
+        original_second = messages[2]["content"][1]["content"]
+
+        result = redact_blob_message_parts(messages)
+
+        # Original should be unchanged
+        assert messages[0]["content"][1]["content"] == original_first
+        assert messages[2]["content"][1]["content"] == original_second
+
+        # Result should be redacted
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+        assert result[1]["content"] == "I see the image."  # Unchanged
+        assert result[2]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+
+    def test_no_blobs_returns_original_list(self):
+        """Test that messages without blobs are returned as-is (performance optimization)"""
+        messages = [
+            {"role": "user", "content": "Simple text message"},
+            {"role": "assistant", "content": "Simple response"},
+        ]
+
+        result = redact_blob_message_parts(messages)
+
+        # Should return the same list object when no blobs present
+        assert result is messages
+
+    def test_handles_non_dict_messages(self):
+        """Test that non-dict messages are handled gracefully"""
+        messages = [
+            "string message",
+            {"role": "user", "content": "text"},
+            None,
+            123,
+        ]
+
+        result = redact_blob_message_parts(messages)
+
+        # Should return same list since no blobs
+        assert result is messages
+
+    def test_handles_non_dict_content_items(self):
+        """Test that non-dict content items in arrays are handled"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    "string item",
+                    {"text": "text item", "type": "text"},
+                    None,
+                ],
+            }
+        ]
+
+        result = redact_blob_message_parts(messages)
+
+        # Should return same list since no blobs
+        assert result is messages
