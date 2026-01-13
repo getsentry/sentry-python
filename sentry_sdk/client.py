@@ -188,6 +188,7 @@ class BaseClient:
         self.monitor: "Optional[Monitor]" = None
         self.log_batcher: "Optional[LogBatcher]" = None
         self.metrics_batcher: "Optional[MetricsBatcher]" = None
+        self.integrations: "dict[str, Integration]" = {}
 
     def __getstate__(self, *args: "Any", **kwargs: "Any") -> "Any":
         return {"options": {}}
