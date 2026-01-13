@@ -2,21 +2,9 @@ from datetime import datetime, timezone
 from time import time
 from typing import TYPE_CHECKING, cast
 
-from opentelemetry.context import get_value
-from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
-from opentelemetry.semconv.trace import SpanAttributes
-from opentelemetry.trace import (
-    format_span_id,
-    format_trace_id,
-    get_current_span,
-    SpanKind,
-)
-from opentelemetry.trace.span import (
-    INVALID_SPAN_ID,
-    INVALID_TRACE_ID,
-)
 from sentry_sdk import get_client, start_transaction
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -25,6 +13,23 @@ from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
 
 from urllib3.util import parse_url as urlparse
+
+try:
+    from opentelemetry.context import get_value
+    from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
+    from opentelemetry.semconv.trace import SpanAttributes
+    from opentelemetry.trace import (
+        format_span_id,
+        format_trace_id,
+        get_current_span,
+        SpanKind,
+    )
+    from opentelemetry.trace.span import (
+        INVALID_SPAN_ID,
+        INVALID_TRACE_ID,
+    )
+except ImportError:
+    raise DidNotEnable("opentelemetry not installed")
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
