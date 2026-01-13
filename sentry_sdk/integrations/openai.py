@@ -220,6 +220,9 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
     """
 
     def _map_item(item: "Dict[str, Any]") -> "Dict[str, Any]":
+        if not isinstance(item, dict):
+            return item
+
         if item.get("type") == "image_url":
             image_url = item.get("image_url") or {}
             url = image_url.get("url", "")
@@ -242,6 +245,7 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
             else:
                 return {
                     "type": "uri",
+                    "modality": "image",
                     "uri": url,
                 }
         return item
