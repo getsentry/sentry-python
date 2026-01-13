@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.49.0
+
+### New Features ✨
+
+- feat(api): Add `Scope.set_attribute` by @sentrivana in [#5256](https://github.com/getsentry/sentry-python/pull/5256)
+
+### Bug Fixes 🐛
+
+- fix(grpc): Gate third-party imports by @alexander-alderman-webb in [#5246](https://github.com/getsentry/sentry-python/pull/5246)
+- fix(opentelemetry): Gate third-party imports by @alexander-alderman-webb in [#5247](https://github.com/getsentry/sentry-python/pull/5247)
+- fix(ray): Keep variadic kwargs last in signatures by @alexander-alderman-webb in [#5244](https://github.com/getsentry/sentry-python/pull/5244)
+- fix(trytond): Gate third-party imports by @alexander-alderman-webb in [#5245](https://github.com/getsentry/sentry-python/pull/5245)
+- Fix openai count_tokens by @sl0thentr0py in [#5281](https://github.com/getsentry/sentry-python/pull/5281)
+
+### Documentation 📚
+
+- docs: Fix typo in comment by @sentrivana in [#5280](https://github.com/getsentry/sentry-python/pull/5280)
+- docs: Fix `middleware_spans` docstring by @sentrivana in [#5279](https://github.com/getsentry/sentry-python/pull/5279)
+
+### Internal Changes 🔧
+
+- ref(scope): Set global attrs on global scope by @sentrivana in [#5259](https://github.com/getsentry/sentry-python/pull/5259)
+- chore: Ignore type migration for scripts/ and tests/ in blame by @alexander-alderman-webb in [#5284](https://github.com/getsentry/sentry-python/pull/5284)
+- ref: Properly override parent func by @sentrivana in [#5283](https://github.com/getsentry/sentry-python/pull/5283)
+- ci: Allow to use Craft's new auto-versioning by @sentrivana in [#5218](https://github.com/getsentry/sentry-python/pull/5218)
+- ref: Deduplicate batchers by @sentrivana in [#5263](https://github.com/getsentry/sentry-python/pull/5263)
+- tests: Add dedicated transport format test for metrics, logs by @sentrivana in [#5264](https://github.com/getsentry/sentry-python/pull/5264)
+- ci: 🤖 Update test matrix with new releases (01/05) by @github-actions in [#5273](https://github.com/getsentry/sentry-python/pull/5273)
+- tests: General logs tests should use Sentry logs API by @sentrivana in [#5262](https://github.com/getsentry/sentry-python/pull/5262)
+- tests: Test preserialization of attributes by @sentrivana in [#5260](https://github.com/getsentry/sentry-python/pull/5260)
+- ci: Unpin Pydantic 1.x version in tests by @alexander-alderman-webb in [#5261](https://github.com/getsentry/sentry-python/pull/5261)
+- ref: Make logs, metrics go via scope by @sentrivana in [#5213](https://github.com/getsentry/sentry-python/pull/5213)
+- ci: Fix failing arq, fastapi tests on 3.7; update test matrix by @sentrivana in [#5258](https://github.com/getsentry/sentry-python/pull/5258)
+
 ## 2.48.0
 
 Middleware spans are now disabled by default in Django, Starlette and FastAPI integrations. Set the `middleware_spans` integration-level

@@ -15,12 +15,12 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint
 
 try:
-    import executing
+    from executing import Source
 except ImportError:
     raise DidNotEnable("executing is not installed")
 
 try:
-    import pure_eval
+    from pure_eval import Evaluator
 except ImportError:
     raise DidNotEnable("pure_eval is not installed")
 
@@ -81,7 +81,7 @@ class PureEvalIntegration(Integration):
 
 
 def pure_eval_frame(frame: "FrameType") -> "Dict[str, Any]":
-    source = executing.Source.for_frame(frame)
+    source = Source.for_frame(frame)
     if not source.tree:
         return {}
 
@@ -98,7 +98,7 @@ def pure_eval_frame(frame: "FrameType") -> "Dict[str, Any]":
         if isinstance(scope, (ast.FunctionDef, ast.ClassDef, ast.Module)):
             break
 
-    evaluator = pure_eval.Evaluator.from_frame(frame)
+    evaluator = Evaluator.from_frame(frame)
     expressions = evaluator.interesting_expressions_grouped(scope)
 
     def closeness(expression: "Tuple[List[Any], Any]") -> "Tuple[int, int]":
