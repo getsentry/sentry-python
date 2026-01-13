@@ -5,7 +5,7 @@ from copy import deepcopy
 from sys import getsizeof
 from typing import TYPE_CHECKING
 
-from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -180,7 +180,12 @@ def redact_blob_message_parts(
     messages: "List[Dict[str, Any]]",
 ) -> "List[Dict[str, Any]]":
     """
-    Redact blob message parts from the messages, by removing the "content" key.
+    Redact blob message parts from the messages by replacing blob content with "[Filtered]".
+
+    This function creates a deep copy of messages that contain blob content to avoid
+    mutating the original message dictionaries. Messages without blob content are
+    returned as-is to minimize copying overhead.
+
     e.g:
     {
         "role": "user",
@@ -215,7 +220,29 @@ def redact_blob_message_parts(
     }
     """
 
+    # First pass: check if any message contains blob content
+    has_blobs = False
     for message in messages:
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "blob":
+                    has_blobs = True
+                    break
+        if has_blobs:
+            break
+
+    # If no blobs found, return original messages to avoid unnecessary copying
+    if not has_blobs:
+        return messages
+
+    # Deep copy messages to avoid mutating the original
+    messages_copy = deepcopy(messages)
+
+    # Second pass: redact blob content in the copy
+    for message in messages_copy:
         if not isinstance(message, dict):
             continue
 
@@ -223,8 +250,9 @@ def redact_blob_message_parts(
         if isinstance(content, list):
             for item in content:
                 if isinstance(item, dict) and item.get("type") == "blob":
-                    item["content"] = SENSITIVE_DATA_SUBSTITUTE
-    return messages
+                    item["content"] = BLOB_DATA_SUBSTITUTE
+
+    return messages_copy
 
 
 def truncate_messages_by_size(

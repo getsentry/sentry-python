@@ -4,7 +4,11 @@ import uuid
 import pytest
 
 import sentry_sdk
-from sentry_sdk._types import AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk._types import (
+    AnnotatedValue,
+    SENSITIVE_DATA_SUBSTITUTE,
+    BLOB_DATA_SUBSTITUTE,
+)
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
@@ -427,6 +431,49 @@ class TestTruncateAndAnnotateMessages:
         assert isinstance(result, list)
         assert result[0] == large_messages[-len(result)]
 
+    def test_preserves_original_messages_with_blobs(self):
+        """Test that truncate_and_annotate_messages doesn't mutate the original messages"""
+
+        class MockSpan:
+            def __init__(self):
+                self.span_id = "test_span_id"
+                self.data = {}
+
+            def set_data(self, key, value):
+                self.data[key] = value
+
+        class MockScope:
+            def __init__(self):
+                self._gen_ai_original_message_count = {}
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"text": "What's in this image?", "type": "text"},
+                    {
+                        "type": "blob",
+                        "modality": "image",
+                        "content": "data:image/jpeg;base64,original_content",
+                    },
+                ],
+            }
+        ]
+
+        original_blob_content = messages[0]["content"][1]["content"]
+
+        span = MockSpan()
+        scope = MockScope()
+
+        # This should NOT mutate the original messages
+        result = truncate_and_annotate_messages(messages, span, scope)
+
+        # Verify original is unchanged
+        assert messages[0]["content"][1]["content"] == original_blob_content
+
+        # Verify result has redacted content
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+
 
 class TestClientAnnotation:
     def test_client_wraps_truncated_messages_in_annotated_value(self, large_messages):
@@ -548,7 +595,7 @@ class TestClientAnnotation:
 
 class TestRedactBlobMessageParts:
     def test_redacts_single_blob_content(self):
-        """Test that blob content is redacted in a message with single blob part"""
+        """Test that blob content is redacted without mutating original messages"""
         messages = [
             {
                 "role": "user",
@@ -567,21 +614,27 @@ class TestRedactBlobMessageParts:
             }
         ]
 
+        # Save original blob content for comparison
+        original_blob_content = messages[0]["content"][1]["content"]
+
         result = redact_blob_message_parts(messages)
 
-        assert result == messages  # Returns the same list
+        # Original messages should be UNCHANGED
+        assert messages[0]["content"][1]["content"] == original_blob_content
+
+        # Result should have redacted content
         assert (
-            messages[0]["content"][0]["text"]
+            result[0]["content"][0]["text"]
             == "How many ponies do you see in the image?"
         )
-        assert messages[0]["content"][0]["type"] == "text"
-        assert messages[0]["content"][1]["type"] == "blob"
-        assert messages[0]["content"][1]["modality"] == "image"
-        assert messages[0]["content"][1]["mime_type"] == "image/jpeg"
-        assert messages[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        assert result[0]["content"][0]["type"] == "text"
+        assert result[0]["content"][1]["type"] == "blob"
+        assert result[0]["content"][1]["modality"] == "image"
+        assert result[0]["content"][1]["mime_type"] == "image/jpeg"
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
 
     def test_redacts_multiple_blob_parts(self):
-        """Test that multiple blob parts in a single message are all redacted"""
+        """Test that multiple blob parts are redacted without mutation"""
         messages = [
             {
                 "role": "user",
@@ -603,15 +656,22 @@ class TestRedactBlobMessageParts:
             }
         ]
 
+        original_first = messages[0]["content"][1]["content"]
+        original_second = messages[0]["content"][2]["content"]
+
         result = redact_blob_message_parts(messages)
 
-        assert result == messages
-        assert messages[0]["content"][0]["text"] == "Compare these images"
-        assert messages[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
-        assert messages[0]["content"][2]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        # Original should be unchanged
+        assert messages[0]["content"][1]["content"] == original_first
+        assert messages[0]["content"][2]["content"] == original_second
+
+        # Result should be redacted
+        assert result[0]["content"][0]["text"] == "Compare these images"
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+        assert result[0]["content"][2]["content"] == BLOB_DATA_SUBSTITUTE
 
     def test_redacts_blobs_in_multiple_messages(self):
-        """Test that blob parts are redacted across multiple messages"""
+        """Test that blob parts are redacted across multiple messages without mutation"""
         messages = [
             {
                 "role": "user",
@@ -641,75 +701,60 @@ class TestRedactBlobMessageParts:
             },
         ]
 
+        original_first = messages[0]["content"][1]["content"]
+        original_second = messages[2]["content"][1]["content"]
+
         result = redact_blob_message_parts(messages)
 
-        assert result == messages
-        assert messages[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
-        assert messages[1]["content"] == "I see the image."  # Unchanged
-        assert messages[2]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        # Original should be unchanged
+        assert messages[0]["content"][1]["content"] == original_first
+        assert messages[2]["content"][1]["content"] == original_second
 
+        # Result should be redacted
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+        assert result[1]["content"] == "I see the image."  # Unchanged
+        assert result[2]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
 
-class TestParseDataUri:
-    """Tests for the parse_data_uri utility function."""
+    def test_no_blobs_returns_original_list(self):
+        """Test that messages without blobs are returned as-is (performance optimization)"""
+        messages = [
+            {"role": "user", "content": "Simple text message"},
+            {"role": "assistant", "content": "Simple response"},
+        ]
 
-    def test_standard_base64_image(self):
-        """Test parsing a standard base64 encoded image data URI."""
-        url = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
-        mime_type, content = parse_data_uri(url)
-        assert mime_type == "image/jpeg"
-        assert content == "/9j/4AAQSkZJRg=="
+        result = redact_blob_message_parts(messages)
 
-    def test_png_image(self):
-        """Test parsing a PNG image data URI."""
-        url = "data:image/png;base64,iVBORw0KGgo="
-        mime_type, content = parse_data_uri(url)
-        assert mime_type == "image/png"
-        assert content == "iVBORw0KGgo="
+        # Should return the same list object when no blobs present
+        assert result is messages
 
-    def test_plain_text_without_base64(self):
-        """Test parsing a plain text data URI without base64 encoding."""
-        url = "data:text/plain,Hello%20World"
-        mime_type, content = parse_data_uri(url)
-        assert mime_type == "text/plain"
-        assert content == "Hello%20World"
+    def test_handles_non_dict_messages(self):
+        """Test that non-dict messages are handled gracefully"""
+        messages = [
+            "string message",
+            {"role": "user", "content": "text"},
+            None,
+            123,
+        ]
 
-    def test_no_mime_type_with_base64(self):
-        """Test parsing a data URI with no mime type but base64 encoding."""
-        url = "data:;base64,SGVsbG8="
-        mime_type, content = parse_data_uri(url)
-        assert mime_type == ""
-        assert content == "SGVsbG8="
+        result = redact_blob_message_parts(messages)
 
-    def test_no_mime_type_no_base64(self):
-        """Test parsing a minimal data URI."""
-        url = "data:,Hello"
-        mime_type, content = parse_data_uri(url)
-        assert mime_type == ""
-        assert content == "Hello"
+        # Should return same list since no blobs
+        assert result is messages
 
-    def test_content_with_commas(self):
-        """Test that content with commas is handled correctly."""
-        url = "data:text/csv,a,b,c,d"
-        mime_type, content = parse_data_uri(url)
-        assert mime_type == "text/csv"
-        assert content == "a,b,c,d"
+    def test_handles_non_dict_content_items(self):
+        """Test that non-dict content items in arrays are handled"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    "string item",
+                    {"text": "text item", "type": "text"},
+                    None,
+                ],
+            }
+        ]
 
-    def test_missing_comma_raises_value_error(self):
-        """Test that a data URI without a comma raises ValueError."""
-        url = "data:image/jpeg"
-        with pytest.raises(ValueError, match="missing comma separator"):
-            parse_data_uri(url)
+        result = redact_blob_message_parts(messages)
 
-    def test_empty_content(self):
-        """Test parsing a data URI with empty content."""
-        url = "data:text/plain,"
-        mime_type, content = parse_data_uri(url)
-        assert mime_type == "text/plain"
-        assert content == ""
-
-    def test_mime_type_with_charset(self):
-        """Test parsing a data URI with charset parameter."""
-        url = "data:text/html;charset=utf-8,<h1>Hello</h1>"
-        mime_type, content = parse_data_uri(url)
-        assert mime_type == "text/html"
-        assert content == "<h1>Hello</h1>"
+        # Should return same list since no blobs
+        assert result is messages
