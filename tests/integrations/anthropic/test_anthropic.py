@@ -42,6 +42,7 @@ except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
 from sentry_sdk import start_transaction, start_span
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
@@ -1689,7 +1690,7 @@ def test_message_with_base64_image(sentry_init, capture_events):
         "type": "blob",
         "modality": "image",
         "mime_type": "image/jpeg",
-        "content": "[Filtered]",
+        "content": BLOB_DATA_SUBSTITUTE,
     }
 
 
@@ -1823,7 +1824,7 @@ def test_message_with_base64_pdf(sentry_init, capture_events):
         "type": "blob",
         "modality": "document",
         "mime_type": "application/pdf",
-        "content": "[Filtered]",
+        "content": BLOB_DATA_SUBSTITUTE,
     }
 
 
@@ -1979,7 +1980,7 @@ def test_message_with_mixed_content(sentry_init, capture_events):
         "type": "blob",
         "modality": "image",
         "mime_type": "image/png",
-        "content": "[Filtered]",
+        "content": BLOB_DATA_SUBSTITUTE,
     }
     assert content[2] == {
         "type": "uri",
@@ -1991,7 +1992,7 @@ def test_message_with_mixed_content(sentry_init, capture_events):
         "type": "blob",
         "modality": "document",
         "mime_type": "application/pdf",
-        "content": "[Filtered]",
+        "content": BLOB_DATA_SUBSTITUTE,
     }
     assert content[4] == {
         "type": "text",
@@ -2057,7 +2058,7 @@ def test_message_with_multiple_images_different_formats(sentry_init, capture_eve
         "type": "blob",
         "modality": "image",
         "mime_type": "image/jpeg",
-        "content": "[Filtered]",
+        "content": BLOB_DATA_SUBSTITUTE,
     }
     assert content[1] == {
         "type": "uri",
