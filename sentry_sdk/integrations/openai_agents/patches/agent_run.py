@@ -46,14 +46,8 @@ def _patch_agent_run() -> None:
         """Get the current agent from context wrapper"""
         return getattr(context_wrapper, "_sentry_current_agent", None)
 
-    def _close_workflow_span_on_error(agent: "Optional[agents.Agent]") -> None:
-        """
-        Close the workflow span on error for streaming executions.
-
-        This ensures the workflow span is properly closed when an exception
-        occurs in _run_single_turn_streamed or execute_handoffs, preventing
-        resource leaks and ensuring accurate telemetry.
-        """
+    def _close_streaming_workflow_span(agent: "Optional[agents.Agent]") -> None:
+        """Close the workflow span for streaming executions if it exists."""
         if agent and hasattr(agent, "_sentry_workflow_span"):
             workflow_span = agent._sentry_workflow_span
             workflow_span.__exit__(*sys.exc_info())
@@ -143,7 +137,7 @@ def _patch_agent_run() -> None:
         try:
             result = await original_execute_handoffs(*args, **kwargs)
         except Exception:
-            _close_workflow_span_on_error(agent)
+            _close_streaming_workflow_span(agent)
             raise
         finally:
             # End span for current agent after handoff processing is complete
@@ -166,17 +160,13 @@ def _patch_agent_run() -> None:
         context_wrapper = kwargs.get("context_wrapper")
         final_output = kwargs.get("final_output")
 
-        # Call original method with all parameters
         try:
             result = await original_execute_final_output(*args, **kwargs)
         finally:
-            # End span for current agent after final output processing is complete
             if agent and context_wrapper and _has_active_agent_span(context_wrapper):
                 end_invoke_agent_span(context_wrapper, agent, final_output)
-
-            # For streaming: close the workflow span if it exists
-            # (For non-streaming, the workflow span is closed by the context manager in _create_run_wrapper)
-            _close_workflow_span_on_error(agent)
+            # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
+            _close_streaming_workflow_span(agent)
 
         return result
 
@@ -204,7 +194,6 @@ def _patch_agent_run() -> None:
             server_conversation_tracker,  # args[8] (optional)
         )
         """
-        # Extract positional arguments (streaming version doesn't use keyword-only args)
         streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
         agent = args[1] if len(args) > 1 else kwargs.get("agent")
         context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
@@ -214,7 +203,6 @@ def _patch_agent_run() -> None:
             else kwargs.get("should_run_agent_start_hooks", False)
         )
 
-        # Build span kwargs with original_input from streamed_result for request messages
         span_kwargs: "dict[str, Any]" = {}
         if streamed_result and hasattr(streamed_result, "input"):
             span_kwargs["original_input"] = streamed_result.input
@@ -233,7 +221,7 @@ def _patch_agent_run() -> None:
             if span is not None and span.timestamp is None:
                 _record_exception_on_span(span, exc)
                 end_invoke_agent_span(context_wrapper, agent)
-            _close_workflow_span_on_error(agent)
+            _close_streaming_workflow_span(agent)
             reraise(*sys.exc_info())
 
         return result

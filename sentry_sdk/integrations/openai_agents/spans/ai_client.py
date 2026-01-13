@@ -47,25 +47,14 @@ def update_ai_client_span(
     response: "Any",
     response_model: "Optional[str]" = None,
 ) -> None:
-    """
-    Update AI client span with response data.
-    Works for both streaming and non-streaming responses.
-
-    Args:
-        span: The span to update
-        response: The response object (ModelResponse for non-streaming, Response for streaming)
-        response_model: Optional response model string (used when captured from raw API response)
-    """
-    # Set usage data if available
+    """Update AI client span with response data (works for streaming and non-streaming)."""
     if hasattr(response, "usage") and response.usage:
         _set_usage_data(span, response.usage)
 
-    # Set output data and create MCP tool spans if available
     if hasattr(response, "output") and response.output:
         _set_output_data(span, response)
         _create_mcp_execute_tool_spans(span, response)
 
-    # Set response model - prefer explicit response_model, fall back to response.model
     if response_model is not None:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
     elif hasattr(response, "model") and response.model:

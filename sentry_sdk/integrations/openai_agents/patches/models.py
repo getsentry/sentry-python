@@ -1,4 +1,5 @@
 import copy
+import sys
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
@@ -88,34 +89,8 @@ def _create_get_model_wrapper(
 
             @wraps(original_stream_response)
             async def wrapped_stream_response(*args: "Any", **kwargs: "Any") -> "Any":
-                """
-                Wrap stream_response to create an AI client span for streaming.
-                stream_response is an async generator, so we yield events within the span.
-
-                Note: We use explicit try/finally instead of a context manager because
-                if the consumer abandons the stream (breaks early, network error, etc.),
-                the context manager's __exit__ may not be called. With try/finally,
-                cleanup happens even when GeneratorExit is thrown.
-
-                Note: stream_response is called with positional args unlike get_response
-                which uses keyword args. The signature is:
-                    stream_response(
-                        system_instructions,  # args[0]
-                        input,                # args[1]
-                        model_settings,       # args[2]
-                        tools,                # args[3]
-                        output_schema,        # args[4]
-                        handoffs,             # args[5]
-                        tracing,              # args[6]
-                        *,
-                        previous_response_id,
-                        conversation_id,
-                        prompt,
-                    )
-                """
-                import sys
-
-                # Build kwargs dict from positional args for span data capture
+                # Uses explicit try/finally instead of context manager to ensure cleanup
+                # even if the consumer abandons the stream (GeneratorExit).
                 span_kwargs = dict(kwargs)
                 if len(args) > 0:
                     span_kwargs["system_instructions"] = args[0]
