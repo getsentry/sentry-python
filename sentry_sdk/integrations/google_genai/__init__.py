@@ -45,12 +45,6 @@ class GoogleGenAIIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        from sentry_sdk.integrations import _check_minimum_version
-        from sentry_sdk.utils import package_version
-
-        version = package_version("google-genai")
-        _check_minimum_version(GoogleGenAIIntegration, version, package="google-genai")
-
         # Patch sync methods
         Models.generate_content = _wrap_generate_content(Models.generate_content)
         Models.generate_content_stream = _wrap_generate_content_stream(
