@@ -8,6 +8,7 @@ from unittest.mock import Mock
 from sentry_sdk import start_span, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
+from sentry_sdk.integrations.grpc.client import ClientInterceptor
 from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
@@ -248,6 +249,42 @@ def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
     _tear_down(server=server)
 
     assert MockClientInterceptor.call_counter == 1
+
+    events.write_file.close()
+    events.read_event()
+    local_transaction = events.read_event()
+    span = local_transaction["spans"][0]
+
+    assert len(local_transaction["spans"]) == 1
+    assert span["op"] == OP.GRPC_CLIENT
+    assert (
+        span["description"]
+        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+    )
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary unary",
+            "method": "/grpc_test_server.gRPCTestService/TestServe",
+            "code": "OK",
+        }
+    )
+
+
+@pytest.mark.forked
+def test_prevent_dual_client_interceptor(sentry_init, capture_events_forksafe):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+
+    server, channel = _set_up()
+
+    # Intercept the channel
+    channel = grpc.intercept_channel(channel, ClientInterceptor())
+    stub = gRPCTestServiceStub(channel)
+
+    with start_transaction():
+        stub.TestServe(gRPCTestMessage(text="test"))
+
+    _tear_down(server=server)
 
     events.write_file.close()
     events.read_event()
