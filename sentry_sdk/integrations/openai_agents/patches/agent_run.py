@@ -46,6 +46,19 @@ def _patch_agent_run() -> None:
         """Get the current agent from context wrapper"""
         return getattr(context_wrapper, "_sentry_current_agent", None)
 
+    def _close_workflow_span_on_error(agent: "Optional[agents.Agent]") -> None:
+        """
+        Close the workflow span on error for streaming executions.
+
+        This ensures the workflow span is properly closed when an exception
+        occurs in _run_single_turn_streamed or execute_handoffs, preventing
+        resource leaks and ensuring accurate telemetry.
+        """
+        if agent and hasattr(agent, "_sentry_workflow_span"):
+            workflow_span = agent._sentry_workflow_span
+            workflow_span.__exit__(*sys.exc_info())
+            delattr(agent, "_sentry_workflow_span")
+
     def _maybe_start_agent_span(
         context_wrapper: "agents.RunContextWrapper",
         agent: "agents.Agent",
@@ -129,7 +142,9 @@ def _patch_agent_run() -> None:
         # Call original method with all parameters
         try:
             result = await original_execute_handoffs(*args, **kwargs)
-
+        except Exception:
+            _close_workflow_span_on_error(agent)
+            raise
         finally:
             # End span for current agent after handoff processing is complete
             if agent and context_wrapper and _has_active_agent_span(context_wrapper):
@@ -161,10 +176,7 @@ def _patch_agent_run() -> None:
 
             # For streaming: close the workflow span if it exists
             # (For non-streaming, the workflow span is closed by the context manager in _create_run_wrapper)
-            if agent and hasattr(agent, "_sentry_workflow_span"):
-                workflow_span = agent._sentry_workflow_span
-                workflow_span.__exit__(*sys.exc_info())
-                delattr(agent, "_sentry_workflow_span")
+            _close_workflow_span_on_error(agent)
 
         return result
 
@@ -221,6 +233,7 @@ def _patch_agent_run() -> None:
             if span is not None and span.timestamp is None:
                 _record_exception_on_span(span, exc)
                 end_invoke_agent_span(context_wrapper, agent)
+            _close_workflow_span_on_error(agent)
             reraise(*sys.exc_info())
 
         return result
