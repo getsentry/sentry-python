@@ -2,6 +2,7 @@ import sys
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import agent_workflow_span, end_invoke_agent_span
@@ -33,7 +34,13 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
         with sentry_sdk.isolation_scope():
             # Clone agent because agent invocation spans are attached per run.
             agent = args[0].clone()
-            with agent_workflow_span(agent):
+
+            # Capture conversation_id from kwargs if provided
+            conversation_id = kwargs.get("conversation_id")
+            if conversation_id:
+                agent._sentry_conversation_id = conversation_id
+
+            with agent_workflow_span(agent) as workflow_span:
                 args = (agent, *args[1:])
                 try:
                     run_result = await original_func(*args, **kwargs)
@@ -53,15 +60,32 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
                             _record_exception_on_span(invoke_agent_span, exc)
                             end_invoke_agent_span(context_wrapper, agent)
 
+                    # Set conversation ID on workflow span (prefer explicit conversation_id)
+                    conv_id = getattr(agent, "_sentry_conversation_id", None)
+                    if conv_id:
+                        workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+
                     raise exc from None
                 except Exception as exc:
                     # Invoke agent span is not finished in this case.
                     # This is much less likely to occur than other cases because
                     # AgentRunner.run() is "just" a while loop around _run_single_turn.
                     _capture_exception(exc)
+
+                    # Set conversation ID on workflow span
+                    conv_id = getattr(agent, "_sentry_conversation_id", None)
+                    if conv_id:
+                        workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+
                     raise exc from None
 
                 end_invoke_agent_span(run_result.context_wrapper, agent)
+
+                # Set conversation ID on workflow span
+                conv_id = getattr(agent, "_sentry_conversation_id", None)
+                if conv_id:
+                    workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+
                 return run_result
 
     return wrapper
@@ -86,6 +110,11 @@ def _create_run_streamed_wrapper(
     def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
         # Clone agent because agent invocation spans are attached per run.
         agent = args[0].clone()
+
+        # Capture conversation_id from kwargs if provided
+        conversation_id = kwargs.get("conversation_id")
+        if conversation_id:
+            agent._sentry_conversation_id = conversation_id
 
         # Start workflow span immediately (before run_streamed returns)
         workflow_span = agent_workflow_span(agent)

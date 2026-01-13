@@ -77,7 +77,7 @@ def _create_get_model_wrapper(
                     delattr(agent, "_sentry_response_model")
 
                 _set_response_model_on_agent_span(agent, response_model)
-                update_ai_client_span(span, result, response_model)
+                update_ai_client_span(span, result, response_model, agent)
 
             return result
 
@@ -117,8 +117,9 @@ def _create_get_model_wrapper(
                             and streaming_response.model
                             else None
                         )
+
                         _set_response_model_on_agent_span(agent, response_model)
-                        update_ai_client_span(span, streaming_response)
+                        update_ai_client_span(span, streaming_response, agent=agent)
                 finally:
                     span.__exit__(*sys.exc_info())
 
