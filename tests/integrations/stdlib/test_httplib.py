@@ -671,21 +671,23 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
     assert span["description"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
 
 
-def test_proxy_https_tunnel(sentry_init, capture_events):
+@pytest.mark.parametrize("tunnel_port", [8080, None])
+def test_proxy_http_tunnel(sentry_init, capture_events, tunnel_port):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
     with start_transaction(name="test_transaction"):
         conn = HTTPConnection("localhost", PROXY_PORT)
-        conn.set_tunnel("api.example.com", 443)
+        conn.set_tunnel("api.example.com", tunnel_port)
         conn.request("GET", "/foo")
         conn.getresponse()
 
     (event,) = events
     (span,) = event["spans"]
 
-    assert span["description"] == "GET https://api.example.com/foo"
-    assert span["data"]["url"] == "https://api.example.com/foo"
+    port_modifier = f":{tunnel_port}" if tunnel_port else ""
+    assert span["description"] == f"GET http://api.example.com{port_modifier}/foo"
+    assert span["data"]["url"] == f"http://api.example.com{port_modifier}/foo"
     assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
     assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
     assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
