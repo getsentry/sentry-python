@@ -22,6 +22,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.integrations.litellm import (
     LiteLLMIntegration,
     _convert_message_parts,
@@ -806,8 +807,9 @@ def test_binary_content_encoding_image_url(sentry_init, capture_events):
     assert blob_item is not None
     assert blob_item["modality"] == "image"
     assert blob_item["mime_type"] == "image/png"
-    assert IMAGE_B64 in blob_item["content"] or "[Filtered]" in str(
-        blob_item["content"]
+    assert (
+        IMAGE_B64 in blob_item["content"]
+        or blob_item["content"] == BLOB_DATA_SUBSTITUTE
     )
 
 

@@ -78,6 +78,8 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
     messages = copy.deepcopy(messages)
 
     def _map_item(item: "Dict[str, Any]") -> "Dict[str, Any]":
+        if not isinstance(item, dict):
+            return item
         if item.get("type") == "image_url":
             image_url = item.get("image_url") or {}
             url = image_url.get("url", "")
@@ -99,6 +101,8 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
         return item
 
     for message in messages:
+        if not isinstance(message, dict):
+            continue
         content = message.get("content")
         if isinstance(content, list):
             message["content"] = [_map_item(item) for item in content]
