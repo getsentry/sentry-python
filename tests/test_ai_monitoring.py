@@ -4,7 +4,11 @@ import uuid
 import pytest
 
 import sentry_sdk
-from sentry_sdk._types import AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk._types import (
+    AnnotatedValue,
+    SENSITIVE_DATA_SUBSTITUTE,
+    BLOB_DATA_SUBSTITUTE,
+)
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
@@ -467,7 +471,7 @@ class TestTruncateAndAnnotateMessages:
         assert messages[0]["content"][1]["content"] == original_blob_content
 
         # Verify result has redacted content
-        assert result[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
 
 
 class TestClientAnnotation:
@@ -626,7 +630,7 @@ class TestRedactBlobMessageParts:
         assert result[0]["content"][1]["type"] == "blob"
         assert result[0]["content"][1]["modality"] == "image"
         assert result[0]["content"][1]["mime_type"] == "image/jpeg"
-        assert result[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
 
     def test_redacts_multiple_blob_parts(self):
         """Test that multiple blob parts are redacted without mutation"""
@@ -662,8 +666,8 @@ class TestRedactBlobMessageParts:
 
         # Result should be redacted
         assert result[0]["content"][0]["text"] == "Compare these images"
-        assert result[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
-        assert result[0]["content"][2]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+        assert result[0]["content"][2]["content"] == BLOB_DATA_SUBSTITUTE
 
     def test_redacts_blobs_in_multiple_messages(self):
         """Test that blob parts are redacted across multiple messages without mutation"""
@@ -706,9 +710,9 @@ class TestRedactBlobMessageParts:
         assert messages[2]["content"][1]["content"] == original_second
 
         # Result should be redacted
-        assert result[0]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        assert result[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
         assert result[1]["content"] == "I see the image."  # Unchanged
-        assert result[2]["content"][1]["content"] == SENSITIVE_DATA_SUBSTITUTE
+        assert result[2]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
 
     def test_no_blobs_returns_original_list(self):
         """Test that messages without blobs are returned as-is (performance optimization)"""
