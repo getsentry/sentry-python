@@ -10,7 +10,7 @@ from .patches import (
 
 try:
     # "agents" is too generic. If someone has an agents.py file in their project
-    # or another package that's importable via "agents", no ImportError would not
+    # or another package that's importable via "agents", no ImportError would
     # be thrown and the integration would enable itself even if openai-agents is
     # not installed. That's why we're adding the second, more specific import
     # after it, even if we don't use it.
