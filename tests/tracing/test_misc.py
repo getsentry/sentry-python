@@ -37,6 +37,26 @@ def test_span_trimming(sentry_init, capture_events):
     assert "dropped_spans" not in event
 
 
+def test_span_trimming_produces_client_report(
+    sentry_init, capture_events, capture_record_lost_event_calls
+):
+    sentry_init(traces_sample_rate=1.0, _experiments={"max_spans": 3})
+    events = capture_events()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    with start_transaction(name="hi"):
+        for i in range(10):
+            with start_span(op="foo{}".format(i)):
+                pass
+
+    (event,) = events
+
+    assert len(event["spans"]) == 3
+
+    # 7 spans were dropped (10 total - 3 kept = 7 dropped)
+    assert ("buffer_overflow", "span", None, 7) in record_lost_event_calls
+
+
 def test_span_data_scrubbing_and_trimming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, _experiments={"max_spans": 3})
     events = capture_events()
