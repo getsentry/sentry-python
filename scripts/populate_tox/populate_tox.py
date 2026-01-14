@@ -504,6 +504,9 @@ def pick_python_versions_to_test(
     - a free-threaded wheel is distributed; and
     - the SDK supports free-threading.
     """
+    if not python_versions:
+        return []
+
     filtered_python_versions = {
         python_versions[0],
     }
@@ -545,7 +548,8 @@ def _parse_python_versions_from_classifiers(classifiers: list[str]) -> list[Vers
 
     if python_versions:
         python_versions.sort()
-        return python_versions
+
+    return python_versions
 
 
 def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Version]]:
@@ -578,6 +582,14 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
 
     if requires_python:
         return SpecifierSet(requires_python)
+
+    # If we haven't found neither specific 3.x classifiers nor a requires_python,
+    # check if there is a generic "Python 3" classifier and if so, assume the
+    # package supports all Python versions the SDK does. If this is not the case
+    # in reality, add the actual constraints manually to config.py.
+    for classifier in classifiers:
+        if CLASSIFIER_PREFIX + "3" in classifiers:
+            return SpecifierSet(f">={MIN_PYTHON_VERSION}")
 
     return []
 
