@@ -1874,6 +1874,92 @@ class TestTransformLangchainContentBlock:
             "content": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
         }
 
+    def test_transform_anthropic_source_base64(self):
+        """Test transformation of Anthropic-style image with base64 source."""
+        content_block = {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": "iVBORw0KGgoAAAANSUhEUgAAAAE...",
+            },
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/png",
+            "content": "iVBORw0KGgoAAAANSUhEUgAAAAE...",
+        }
+
+    def test_transform_anthropic_source_url(self):
+        """Test transformation of Anthropic-style image with URL source."""
+        content_block = {
+            "type": "image",
+            "source": {
+                "type": "url",
+                "media_type": "image/jpeg",
+                "url": "https://example.com/image.jpg",
+            },
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "uri",
+            "modality": "image",
+            "mime_type": "image/jpeg",
+            "uri": "https://example.com/image.jpg",
+        }
+
+    def test_transform_anthropic_source_without_media_type(self):
+        """Test transformation of Anthropic-style image without media_type falls back to mime_type."""
+        content_block = {
+            "type": "image",
+            "mime_type": "image/webp",
+            "source": {
+                "type": "base64",
+                "data": "UklGRh4AAABXRUJQVlA4IBIAAAAwAQCdASoBAAEAAQAcJYgCdAEO",
+            },
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/webp",
+            "content": "UklGRh4AAABXRUJQVlA4IBIAAAAwAQCdASoBAAEAAQAcJYgCdAEO",
+        }
+
+    def test_transform_google_inline_data(self):
+        """Test transformation of Google-style inline_data format."""
+        content_block = {
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+            }
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": "image/jpeg",
+            "content": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+        }
+
+    def test_transform_google_file_data(self):
+        """Test transformation of Google-style file_data format."""
+        content_block = {
+            "file_data": {
+                "mime_type": "image/png",
+                "file_uri": "gs://bucket/path/to/image.png",
+            }
+        }
+        result = _transform_langchain_content_block(content_block)
+        assert result == {
+            "type": "uri",
+            "modality": "image",
+            "mime_type": "image/png",
+            "uri": "gs://bucket/path/to/image.png",
+        }
+
 
 class TestTransformLangchainMessageContent:
     """Tests for _transform_langchain_message_content function."""

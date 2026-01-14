@@ -137,6 +137,12 @@ def _transform_langchain_content_block(
     - base64 encoded data -> type: "blob"
     - URL references -> type: "uri"
     - file_id references -> type: "file"
+
+    Supports multiple content block formats:
+    - LangChain standard: type + base64/url/file_id fields
+    - OpenAI legacy: image_url with nested url field
+    - Anthropic: type + source dict with type/media_type/data or url
+    - Google: inline_data or file_data dicts
     """
     if not isinstance(content_block, dict):
         return content_block
@@ -172,6 +178,27 @@ def _transform_langchain_content_block(
                 "mime_type": mime_type,
                 "file_id": content_block.get("file_id", ""),
             }
+        # Handle Anthropic-style format with nested "source" dict
+        elif "source" in content_block:
+            source = content_block.get("source", {})
+            if isinstance(source, dict):
+                source_type = source.get("type")
+                media_type = source.get("media_type", "") or mime_type
+
+                if source_type == "base64":
+                    return {
+                        "type": "blob",
+                        "modality": modality,
+                        "mime_type": media_type,
+                        "content": source.get("data", ""),
+                    }
+                elif source_type == "url":
+                    return {
+                        "type": "uri",
+                        "modality": modality,
+                        "mime_type": media_type,
+                        "uri": source.get("url", ""),
+                    }
 
     # Handle legacy image_url format (OpenAI style)
     elif block_type == "image_url":
@@ -209,6 +236,28 @@ def _transform_langchain_content_block(
                 "modality": "image",
                 "mime_type": "",
                 "uri": url,
+            }
+
+    # Handle Google-style inline_data format
+    if "inline_data" in content_block:
+        inline_data = content_block.get("inline_data", {})
+        if isinstance(inline_data, dict):
+            return {
+                "type": "blob",
+                "modality": "image",
+                "mime_type": inline_data.get("mime_type", ""),
+                "content": inline_data.get("data", ""),
+            }
+
+    # Handle Google-style file_data format
+    if "file_data" in content_block:
+        file_data = content_block.get("file_data", {})
+        if isinstance(file_data, dict):
+            return {
+                "type": "uri",
+                "modality": "image",
+                "mime_type": file_data.get("mime_type", ""),
+                "uri": file_data.get("file_uri", ""),
             }
 
     # For text blocks and other types, return as-is
