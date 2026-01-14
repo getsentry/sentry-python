@@ -532,7 +532,19 @@ class _Client(BaseClient):
                     "event_processor", data_category="span", quantity=spans_delta
                 )
 
-            dropped_spans: int = event.pop("_dropped_spans", 0) + spans_delta
+            span_recorder_dropped_spans: int = event.pop("_dropped_spans", 0)
+            if (
+                is_transaction
+                and span_recorder_dropped_spans > 0
+                and self.transport is not None
+            ):
+                self.transport.record_lost_event(
+                    "buffer_overflow",
+                    data_category="span",
+                    quantity=span_recorder_dropped_spans,
+                )
+
+            dropped_spans: int = span_recorder_dropped_spans + spans_delta
             if dropped_spans > 0:
                 previous_total_spans = spans_before + dropped_spans
             if scope._n_breadcrumbs_truncated > 0:
