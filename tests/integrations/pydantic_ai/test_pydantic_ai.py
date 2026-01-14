@@ -2629,12 +2629,7 @@ def _find_binary_content(messages_data, expected_modality, expected_mime_type):
             if content_item.get("type") == "blob":
                 assert content_item["modality"] == expected_modality
                 assert content_item["mime_type"] == expected_mime_type
-                assert "content" in content_item
-                content_str = str(content_item["content"])
-                assert (
-                    f"data:{expected_mime_type};base64," in content_str
-                    or BLOB_DATA_SUBSTITUTE in content_str
-                )
+                assert content_item["content"] == BLOB_DATA_SUBSTITUTE
                 return True
     return False
 

@@ -1,5 +1,5 @@
-import base64
 import sentry_sdk
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
@@ -120,7 +120,7 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                                             "type": "blob",
                                             "modality": item.media_type.split("/")[0],
                                             "mime_type": item.media_type,
-                                            "content": f"data:{item.media_type};base64,{base64.b64encode(item.data).decode('utf-8')}",
+                                            "content": BLOB_DATA_SUBSTITUTE,
                                         }
                                     )
                                 else:
