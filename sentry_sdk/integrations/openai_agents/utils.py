@@ -56,7 +56,7 @@ def _transform_openai_agents_content_part(
     if part_type in ("image_url", "input_image"):
         # Get URL from either format
         if part_type == "image_url":
-            image_url = content_part.get("image_url", {})
+            image_url = content_part.get("image_url") or {}
             url = (
                 image_url.get("url", "")
                 if isinstance(image_url, dict)
@@ -64,7 +64,7 @@ def _transform_openai_agents_content_part(
             )
         else:
             # input_image format has image_url directly
-            url = content_part.get("image_url", "")
+            url = content_part.get("image_url") or ""
 
         if url.startswith("data:"):
             try:
@@ -93,35 +93,44 @@ def _transform_openai_agents_content_part(
 
     # Handle input_audio (OpenAI audio input format)
     if part_type == "input_audio":
-        input_audio = content_part.get("input_audio", {})
-        audio_format = input_audio.get("format", "")
-        mime_type = f"audio/{audio_format}" if audio_format else ""
-        return {
-            "type": "blob",
-            "modality": "audio",
-            "mime_type": mime_type,
-            "content": input_audio.get("data", ""),
-        }
+        input_audio = content_part.get("input_audio") or {}
+        if isinstance(input_audio, dict):
+            audio_format = input_audio.get("format", "")
+            mime_type = f"audio/{audio_format}" if audio_format else ""
+            return {
+                "type": "blob",
+                "modality": "audio",
+                "mime_type": mime_type,
+                "content": input_audio.get("data", ""),
+            }
+        else:
+            return content_part
 
     # Handle image_file (Assistants API file-based images)
     if part_type == "image_file":
-        image_file = content_part.get("image_file", {})
-        return {
-            "type": "file",
-            "modality": "image",
-            "mime_type": "",
-            "file_id": image_file.get("file_id", ""),
-        }
+        image_file = content_part.get("image_file") or {}
+        if isinstance(image_file, dict):
+            return {
+                "type": "file",
+                "modality": "image",
+                "mime_type": "",
+                "file_id": image_file.get("file_id", ""),
+            }
+        else:
+            return content_part
 
     # Handle file (document attachments)
     if part_type == "file":
-        file_data = content_part.get("file", {})
-        return {
-            "type": "file",
-            "modality": "document",
-            "mime_type": "",
-            "file_id": file_data.get("file_id", ""),
-        }
+        file_data = content_part.get("file") or {}
+        if isinstance(file_data, dict):
+            return {
+                "type": "file",
+                "modality": "document",
+                "mime_type": "",
+                "file_id": file_data.get("file_id", ""),
+            }
+        else:
+            return content_part
 
     return content_part
 

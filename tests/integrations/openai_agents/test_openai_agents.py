@@ -2005,6 +2005,78 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
         assert "small message 5" in str(parsed_messages[1])
 
 
+def test_transform_does_not_modify_original():
+    """Test that transformation does not modify the original content."""
+    import copy
+
+    content_part = {
+        "type": "image_url",
+        "image_url": {
+            "url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD",
+            "detail": "high",
+        },
+    }
+    original = copy.deepcopy(content_part)
+    _transform_openai_agents_content_part(content_part)
+    assert content_part == original, "Original content_part should not be modified"
+
+    content = [
+        {"type": "text", "text": "What is in this image?"},
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==",
+            },
+        },
+    ]
+    original_content = copy.deepcopy(content)
+    _transform_openai_agents_message_content(content)
+    assert content == original_content, "Original content list should not be modified"
+
+
+def test_transform_handles_none_values():
+    """Test that transformation handles None values gracefully without crashing."""
+    # input_image with image_url explicitly set to None - should not crash
+    content_part = {"type": "input_image", "image_url": None}
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {"type": "uri", "modality": "image", "mime_type": "", "uri": ""}
+
+    # image_url with nested dict set to None - should not crash
+    content_part = {"type": "image_url", "image_url": None}
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {"type": "uri", "modality": "image", "mime_type": "", "uri": ""}
+
+    # input_audio with None value - gracefully returns empty blob
+    content_part = {"type": "input_audio", "input_audio": None}
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {
+        "type": "blob",
+        "modality": "audio",
+        "mime_type": "",
+        "content": "",
+    }
+
+    # image_file with None value - gracefully returns empty file reference
+    content_part = {"type": "image_file", "image_file": None}
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {
+        "type": "file",
+        "modality": "image",
+        "mime_type": "",
+        "file_id": "",
+    }
+
+    # file with None value - gracefully returns empty file reference
+    content_part = {"type": "file", "file": None}
+    result = _transform_openai_agents_content_part(content_part)
+    assert result == {
+        "type": "file",
+        "modality": "document",
+        "mime_type": "",
+        "file_id": "",
+    }
+
+
 def test_transform_image_url_to_blob():
     """Test that OpenAI image_url with data URI is converted to blob format."""
     content_part = {
