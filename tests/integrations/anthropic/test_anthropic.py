@@ -853,10 +853,11 @@ def test_collect_ai_data_with_input_json_delta():
     output_tokens = 20
     content_blocks = []
 
-    model, new_input_tokens, new_output_tokens, new_content_blocks = _collect_ai_data(
-        event, model, input_tokens, output_tokens, content_blocks
+    model, new_input_tokens, new_output_tokens, _, _, new_content_blocks = (
+        _collect_ai_data(
+            event, model, input_tokens, output_tokens, 0, 0, content_blocks
+        )
     )
-
     assert model is None
     assert new_input_tokens == input_tokens
     assert new_output_tokens == output_tokens
@@ -884,6 +885,8 @@ def test_set_output_data_with_input_json_delta(sentry_init):
             model="",
             input_tokens=10,
             output_tokens=20,
+            cache_read_input_tokens=0,
+            cache_write_input_tokens=0,
             content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
         )
 
@@ -2154,3 +2157,83 @@ def test_binary_content_not_stored_when_prompts_disabled(sentry_init, capture_ev
 
     # Messages should not be stored
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+
+
+def test_cache_tokens_nonstreaming(sentry_init, capture_events):
+    """Test cache read/write tokens are tracked for non-streaming responses."""
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client = Anthropic(api_key="z")
+
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="id",
+            model="claude-3-5-sonnet-20241022",
+            role="assistant",
+            content=[TextBlock(type="text", text="Response")],
+            type="message",
+            usage=Usage(
+                input_tokens=100,
+                output_tokens=50,
+                cache_read_input_tokens=80,
+                cache_creation_input_tokens=20,
+            ),
+        )
+    )
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-3-5-sonnet-20241022",
+        )
+
+    (span,) = events[0]["spans"]
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+def test_cache_tokens_streaming(sentry_init, capture_events):
+    """Test cache tokens are tracked for streaming responses."""
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            type="message_start",
+            message=Message(
+                id="id",
+                model="claude-3-5-sonnet-20241022",
+                role="assistant",
+                content=[],
+                type="message",
+                usage=Usage(
+                    input_tokens=100,
+                    output_tokens=0,
+                    cache_read_input_tokens=80,
+                    cache_creation_input_tokens=20,
+                ),
+            ),
+        ),
+        MessageDeltaEvent(
+            type="message_delta",
+            delta=Delta(stop_reason="end_turn"),
+            usage=MessageDeltaUsage(output_tokens=10),
+        ),
+    ]
+
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    with start_transaction(name="anthropic"):
+        for _ in client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-3-5-sonnet-20241022",
+            stream=True,
+        ):
+            pass
+
+    (span,) = events[0]["spans"]
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
