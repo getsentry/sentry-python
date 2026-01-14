@@ -35,7 +35,7 @@ jobs:
       - name: Run Python SDK Tests
         uses: getsentry/testing-ai-sdk-integrations@1c6853a3a46ff1217248bf2b61e3ca5c4fcafdca
         env:
-          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           language: py
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
