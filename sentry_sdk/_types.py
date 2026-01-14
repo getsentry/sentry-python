@@ -217,9 +217,7 @@ if TYPE_CHECKING:
     Hint = Dict[str, Any]
 
     AttributeValue = (
-        str | bool | float | int
-        # TODO: relay support coming soon for
-        # | list[str] | list[bool] | list[float] | list[int]
+        str | bool | float | int | list[str] | list[bool] | list[float] | list[int]
     )
     Attributes = dict[str, AttributeValue]
 
@@ -232,11 +230,10 @@ if TYPE_CHECKING:
                 "boolean",
                 "double",
                 "integer",
-                # TODO: relay support coming soon for:
-                # "string[]",
-                # "boolean[]",
-                # "double[]",
-                # "integer[]",
+                "string[]",
+                "boolean[]",
+                "double[]",
+                "integer[]",
             ],
             "value": AttributeValue,
         },
