@@ -12,6 +12,7 @@ from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
     get_start_span_function,
     normalize_message_roles,
+    parse_data_uri,
     set_data_normalized,
     truncate_and_annotate_messages,
 )
@@ -199,6 +200,26 @@ def _transform_langchain_content_block(
                         "mime_type": media_type,
                         "uri": source.get("url", ""),
                     }
+        # Handle Google-style inline_data format with standard type
+        elif "inline_data" in content_block:
+            inline_data = content_block.get("inline_data", {})
+            if isinstance(inline_data, dict):
+                return {
+                    "type": "blob",
+                    "modality": modality,
+                    "mime_type": inline_data.get("mime_type", "") or mime_type,
+                    "content": inline_data.get("data", ""),
+                }
+        # Handle Google-style file_data format with standard type
+        elif "file_data" in content_block:
+            file_data = content_block.get("file_data", {})
+            if isinstance(file_data, dict):
+                return {
+                    "type": "uri",
+                    "modality": modality,
+                    "mime_type": file_data.get("mime_type", "") or mime_type,
+                    "uri": file_data.get("file_uri", ""),
+                }
 
     # Handle legacy image_url format (OpenAI style)
     elif block_type == "image_url":
@@ -210,18 +231,15 @@ def _transform_langchain_content_block(
 
         # Check if it's a data URI (base64 encoded)
         if url and url.startswith("data:"):
-            # Parse data URI: data:mime_type;base64,content
             try:
-                # Format: data:image/jpeg;base64,/9j/4AAQ...
-                header, content = url.split(",", 1)
-                mime_type = header.split(":")[1].split(";")[0] if ":" in header else ""
+                mime_type, content = parse_data_uri(url)
                 return {
                     "type": "blob",
                     "modality": "image",
                     "mime_type": mime_type,
                     "content": content,
                 }
-            except (ValueError, IndexError):
+            except ValueError:
                 # If parsing fails, return as URI
                 return {
                     "type": "uri",
