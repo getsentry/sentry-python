@@ -40,8 +40,7 @@ for target_role, source_roles in GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING.items():
         GEN_AI_MESSAGE_ROLE_MAPPING[source_role] = target_role
 
 
-def parse_data_uri(url):
-    # type: (str) -> Tuple[str, str]
+def parse_data_uri(url: str) -> "Tuple[str, str]":
     """
     Parse a data URI and return (mime_type, content).
 
