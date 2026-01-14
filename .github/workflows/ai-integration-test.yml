@@ -7,7 +7,7 @@ on:
     - cron: '23 3 * * 1-5'
 
 jobs:
-  update-tox:
+  ai-integration-tests:
     name: AI integration tests
     runs-on: ubuntu-latest
     environment: "AI Integrations Tests"
