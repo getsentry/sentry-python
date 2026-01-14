@@ -6,6 +6,7 @@ from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
+    parse_data_uri,
     set_data_normalized,
     truncate_and_annotate_messages,
 )
@@ -83,17 +84,18 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
         if item.get("type") == "image_url":
             image_url = item.get("image_url") or {}
             url = image_url.get("url", "")
-            if url.startswith("data:") and ";base64," in url:
-                parts = url.split(";base64,", 1)
-                # Remove "data:" prefix (5 chars) to get proper MIME type
-                mime_type = parts[0][5:]
-                return {
-                    "type": "blob",
-                    "modality": "image",
-                    "mime_type": mime_type,
-                    "content": parts[1],
-                }
-            elif url:
+            if url.startswith("data:"):
+                try:
+                    mime_type, content = parse_data_uri(url)
+                    return {
+                        "type": "blob",
+                        "modality": "image",
+                        "mime_type": mime_type,
+                        "content": content,
+                    }
+                except ValueError:
+                    pass
+            if url:
                 return {
                     "type": "uri",
                     "uri": url,
