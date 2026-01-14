@@ -504,6 +504,9 @@ def pick_python_versions_to_test(
     - a free-threaded wheel is distributed; and
     - the SDK supports free-threading.
     """
+    if not python_versions:
+        return []
+
     filtered_python_versions = {
         python_versions[0],
     }
