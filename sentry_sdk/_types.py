@@ -256,6 +256,7 @@ if TYPE_CHECKING:
     )
 
     MetricType = Literal["counter", "gauge", "distribution"]
+    MetricUnit = Union[DurationUnit, InformationUnit, str]
 
     Metric = TypedDict(
         "Metric",
@@ -266,7 +267,7 @@ if TYPE_CHECKING:
             "name": str,
             "type": MetricType,
             "value": float,
-            "unit": Optional[str],
+            "unit": Optional[MetricUnit],
             "attributes": Attributes,
         },
     )
