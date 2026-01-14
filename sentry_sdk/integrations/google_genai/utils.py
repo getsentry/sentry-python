@@ -383,14 +383,16 @@ def _extract_tool_message_from_part(part: "Any") -> "Optional[dict[str, Any]]":
     if isinstance(function_response, dict):
         tool_call_id = function_response.get("id")
         tool_name = function_response.get("name")
-        response_dict = function_response.get("response") or {}
+        response_dict = function_response.get("response", {})
         # Prefer "output" key if present, otherwise use entire response
         output = response_dict.get("output", response_dict)
     else:
         # FunctionResponse object
         tool_call_id = getattr(function_response, "id", None)
         tool_name = getattr(function_response, "name", None)
-        response_obj = getattr(function_response, "response", None) or {}
+        response_obj = getattr(function_response, "response", None)
+        if response_obj is None:
+            response_obj = {}
         if isinstance(response_obj, dict):
             output = response_obj.get("output", response_obj)
         else:
