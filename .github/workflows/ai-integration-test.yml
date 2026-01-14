@@ -10,7 +10,7 @@ jobs:
   update-tox:
     name: AI integration tests
     runs-on: ubuntu-latest
-    environment: testing
+    environment: "AI Integrations Tests"
     timeout-minutes: 10
 
     permissions:
