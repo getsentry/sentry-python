@@ -1,8 +1,8 @@
-import base64
 import copy
 import inspect
 from functools import wraps
 from .consts import ORIGIN, TOOL_ATTRIBUTES_MAP, GEN_AI_SYSTEM
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from typing import (
     cast,
     TYPE_CHECKING,
@@ -312,13 +312,11 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
                 data = inline_data.get("data")
                 mime_type = inline_data.get("mime_type")
                 if data and mime_type:
-                    # Encode bytes to base64
                     if isinstance(data, bytes):
-                        data_b64 = base64.b64encode(data).decode("utf-8")
                         return {
                             "type": "blob",
                             "mime_type": mime_type,
-                            "content": f"data:{mime_type};base64,{data_b64}",
+                            "content": BLOB_DATA_SUBSTITUTE,
                         }
 
         return None
@@ -350,13 +348,11 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         data = getattr(inline_data, "data", None)
         mime_type = getattr(inline_data, "mime_type", None)
         if data and mime_type:
-            # Encode bytes to base64
             if isinstance(data, bytes):
-                data_b64 = base64.b64encode(data).decode("utf-8")
                 return {
                     "type": "blob",
                     "mime_type": mime_type,
-                    "content": f"data:{mime_type};base64,{data_b64}",
+                    "content": BLOB_DATA_SUBSTITUTE,
                 }
 
     return None
@@ -417,7 +413,6 @@ def _extract_pil_image(image: "Any") -> "Optional[dict[str, Any]]":
     """Extract blob part from PIL.Image.Image."""
     try:
         from PIL import Image as PILImage
-        import io
 
         if not isinstance(image, PILImage.Image):
             return None
@@ -427,18 +422,10 @@ def _extract_pil_image(image: "Any") -> "Optional[dict[str, Any]]":
         suffix = format_str.lower()
         mime_type = f"image/{suffix}"
 
-        # Convert to bytes
-        bytes_io = io.BytesIO()
-        image.save(bytes_io, format=format_str)
-        image_bytes = bytes_io.getvalue()
-
-        # Encode to base64
-        data_b64 = base64.b64encode(image_bytes).decode("utf-8")
-
         return {
             "type": "blob",
             "mime_type": mime_type,
-            "content": f"data:{mime_type};base64,{data_b64}",
+            "content": BLOB_DATA_SUBSTITUTE,
         }
     except Exception:
         return None

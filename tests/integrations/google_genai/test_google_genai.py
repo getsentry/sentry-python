@@ -1,4 +1,3 @@
-import base64
 import json
 import pytest
 from unittest import mock
@@ -7,6 +6,7 @@ from google import genai
 from google.genai import types as genai_types
 
 from sentry_sdk import start_transaction
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
 from sentry_sdk.integrations.google_genai.utils import extract_contents_messages
@@ -1507,10 +1507,7 @@ def test_extract_contents_messages_inline_data():
     blob_part = result[0]["content"][0]
     assert blob_part["type"] == "blob"
     assert blob_part["mime_type"] == "image/png"
-    assert "content" in blob_part
-    # Verify base64 encoding
-    expected_b64 = base64.b64encode(image_bytes).decode("utf-8")
-    assert blob_part["content"] == f"data:image/png;base64,{expected_b64}"
+    assert blob_part["content"] == BLOB_DATA_SUBSTITUTE
 
 
 def test_extract_contents_messages_function_response():
@@ -1700,8 +1697,7 @@ def test_extract_contents_messages_dict_inline_data():
     blob_part = result[0]["content"][0]
     assert blob_part["type"] == "blob"
     assert blob_part["mime_type"] == "image/gif"
-    expected_b64 = base64.b64encode(b"binary_data").decode("utf-8")
-    assert blob_part["content"] == f"data:image/gif;base64,{expected_b64}"
+    assert blob_part["content"] == BLOB_DATA_SUBSTITUTE
 
 
 def test_extract_contents_messages_dict_function_response():
