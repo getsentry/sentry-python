@@ -50,12 +50,6 @@ def _patch_agent_run() -> None:
         """Close the workflow span for streaming executions if it exists."""
         if agent and hasattr(agent, "_sentry_workflow_span"):
             workflow_span = agent._sentry_workflow_span
-
-            # Set conversation ID on workflow span
-            conv_id = getattr(agent, "_sentry_conversation_id", None)
-            if conv_id:
-                workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
-
             workflow_span.__exit__(*sys.exc_info())
             delattr(agent, "_sentry_workflow_span")
 
