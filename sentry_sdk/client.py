@@ -188,6 +188,7 @@ class BaseClient:
         self.monitor: "Optional[Monitor]" = None
         self.log_batcher: "Optional[LogBatcher]" = None
         self.metrics_batcher: "Optional[MetricsBatcher]" = None
+        self.integrations: "dict[str, Integration]" = {}
 
     def __getstate__(self, *args: "Any", **kwargs: "Any") -> "Any":
         return {"options": {}}
@@ -526,12 +527,21 @@ class _Client(BaseClient):
             spans_delta = spans_before - len(
                 cast(List[Dict[str, object]], event.get("spans", []))
             )
-            if is_transaction and spans_delta > 0 and self.transport is not None:
-                self.transport.record_lost_event(
-                    "event_processor", data_category="span", quantity=spans_delta
-                )
+            span_recorder_dropped_spans: int = event.pop("_dropped_spans", 0)
 
-            dropped_spans: int = event.pop("_dropped_spans", 0) + spans_delta
+            if is_transaction and self.transport is not None:
+                if spans_delta > 0:
+                    self.transport.record_lost_event(
+                        "event_processor", data_category="span", quantity=spans_delta
+                    )
+                if span_recorder_dropped_spans > 0:
+                    self.transport.record_lost_event(
+                        "buffer_overflow",
+                        data_category="span",
+                        quantity=span_recorder_dropped_spans,
+                    )
+
+            dropped_spans: int = span_recorder_dropped_spans + spans_delta
             if dropped_spans > 0:
                 previous_total_spans = spans_before + dropped_spans
             if scope._n_breadcrumbs_truncated > 0:
