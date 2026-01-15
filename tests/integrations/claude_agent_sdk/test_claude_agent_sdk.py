@@ -12,6 +12,11 @@ from sentry_sdk.integrations.claude_agent_sdk import (
     _set_span_output_data,
     _extract_text_from_message,
     _extract_tool_calls,
+    _start_invoke_agent_span,
+    _end_invoke_agent_span,
+    _create_execute_tool_span,
+    _process_tool_executions,
+    AGENT_NAME,
 )
 
 
@@ -24,9 +29,18 @@ class MockTextBlock:
 
 @dataclass
 class MockToolUseBlock:
+    id: str
     name: str
     input: dict
     type: str = "tool_use"
+
+
+@dataclass
+class MockToolResultBlock:
+    tool_use_id: str
+    content: Optional[str] = None
+    is_error: bool = False
+    type: str = "tool_result"
 
 
 @dataclass
@@ -122,7 +136,7 @@ def test_extract_tool_calls():
         message = MockAssistantMessage(
             content=[
                 MockTextBlock(text="Let me help."),
-                MockToolUseBlock(name="Read", input={"path": "/test.txt"}),
+                MockToolUseBlock(id="tool-1", name="Read", input={"path": "/test.txt"}),
             ],
             model="test-model",
         )
@@ -307,7 +321,7 @@ def test_set_span_output_data_with_tool_calls(sentry_init):
             assistant_with_tool = MockAssistantMessage(
                 content=[
                     MockTextBlock(text="Let me read that."),
-                    MockToolUseBlock(name="Read", input={"path": "/test.txt"}),
+                    MockToolUseBlock(id="tool-1", name="Read", input={"path": "/test.txt"}),
                 ],
                 model="claude-sonnet-4-5-20250929",
             )
@@ -550,3 +564,302 @@ def test_empty_messages_list(sentry_init):
         # Should not crash and should not have response data
         assert SPANDATA.GEN_AI_RESPONSE_MODEL not in span._data
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span._data
+
+
+# Tests for invoke_agent spans
+def test_start_invoke_agent_span_basic(sentry_init):
+    """Test starting an invoke_agent span with basic data."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with start_transaction(name="test"):
+        integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        span = _start_invoke_agent_span("Hello", None, integration)
+
+        try:
+            assert span.op == OP.GEN_AI_INVOKE_AGENT
+            assert span.description == f"invoke_agent {AGENT_NAME}"
+            assert span._data[SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+            assert span._data[SPANDATA.GEN_AI_AGENT_NAME] == AGENT_NAME
+            assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-agent-sdk-python"
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data
+        finally:
+            span.__exit__(None, None, None)
+
+
+def test_start_invoke_agent_span_with_system_prompt(sentry_init):
+    """Test invoke_agent span includes system prompt in messages."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with start_transaction(name="test"):
+        integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        options = MockClaudeAgentOptions(system_prompt="You are helpful.")
+        span = _start_invoke_agent_span("Hello", options, integration)
+
+        try:
+            messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
+            assert len(messages) == 2
+            assert messages[0]["role"] == "system"
+            assert messages[0]["content"] == "You are helpful."
+            assert messages[1]["role"] == "user"
+            assert messages[1]["content"] == "Hello"
+        finally:
+            span.__exit__(None, None, None)
+
+
+def test_start_invoke_agent_span_pii_disabled(sentry_init):
+    """Test invoke_agent span doesn't include messages when PII disabled."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+
+    with start_transaction(name="test"):
+        integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        span = _start_invoke_agent_span("Hello", None, integration)
+
+        try:
+            assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-agent-sdk-python"
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span._data
+        finally:
+            span.__exit__(None, None, None)
+
+
+def test_end_invoke_agent_span_aggregates_data(sentry_init):
+    """Test that end_invoke_agent_span aggregates data from messages."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ResultMessage=MockResultMessage,
+        TextBlock=MockTextBlock,
+    ):
+        with start_transaction(name="test"):
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
+            span = _start_invoke_agent_span("Hello", None, integration)
+
+            messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
+            _end_invoke_agent_span(span, messages, integration)
+
+            # Check that usage data is set
+            assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+            assert span._data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+            assert span._data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "claude-sonnet-4-5-20250929"
+
+
+# Tests for execute_tool spans
+def test_create_execute_tool_span_basic(sentry_init):
+    """Test creating an execute_tool span."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        ToolUseBlock=MockToolUseBlock,
+        ToolResultBlock=MockToolResultBlock,
+    ):
+        with start_transaction(name="test"):
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
+            tool_use = MockToolUseBlock(id="tool-1", name="Read", input={"path": "/test.txt"})
+
+            span = _create_execute_tool_span(tool_use, None, integration)
+            span.finish()
+
+            assert span.op == OP.GEN_AI_EXECUTE_TOOL
+            assert span.description == "execute_tool Read"
+            assert span._data[SPANDATA.GEN_AI_OPERATION_NAME] == "execute_tool"
+            assert span._data[SPANDATA.GEN_AI_TOOL_NAME] == "Read"
+            assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-agent-sdk-python"
+
+
+def test_create_execute_tool_span_with_result(sentry_init):
+    """Test execute_tool span includes tool result when available."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        ToolUseBlock=MockToolUseBlock,
+        ToolResultBlock=MockToolResultBlock,
+    ):
+        with start_transaction(name="test"):
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
+            tool_use = MockToolUseBlock(id="tool-1", name="Read", input={"path": "/test.txt"})
+            tool_result = MockToolResultBlock(tool_use_id="tool-1", content="file contents here")
+
+            span = _create_execute_tool_span(tool_use, tool_result, integration)
+            span.finish()
+
+            # Tool input is stored as JSON string
+            tool_input = span._data[SPANDATA.GEN_AI_TOOL_INPUT]
+            if isinstance(tool_input, str):
+                tool_input = json.loads(tool_input)
+            assert tool_input == {"path": "/test.txt"}
+            assert span._data[SPANDATA.GEN_AI_TOOL_OUTPUT] == "file contents here"
+
+
+def test_create_execute_tool_span_with_error(sentry_init):
+    """Test execute_tool span sets error status when tool fails."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        ToolUseBlock=MockToolUseBlock,
+        ToolResultBlock=MockToolResultBlock,
+    ):
+        with start_transaction(name="test"):
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
+            tool_use = MockToolUseBlock(id="tool-1", name="Read", input={"path": "/nonexistent.txt"})
+            tool_result = MockToolResultBlock(
+                tool_use_id="tool-1",
+                content="Error: file not found",
+                is_error=True,
+            )
+
+            span = _create_execute_tool_span(tool_use, tool_result, integration)
+            span.finish()
+
+            assert span.status == "internal_error"
+
+
+def test_create_execute_tool_span_pii_disabled(sentry_init):
+    """Test execute_tool span doesn't include input/output when PII disabled."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        ToolUseBlock=MockToolUseBlock,
+        ToolResultBlock=MockToolResultBlock,
+    ):
+        with start_transaction(name="test"):
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
+            tool_use = MockToolUseBlock(id="tool-1", name="Read", input={"path": "/test.txt"})
+            tool_result = MockToolResultBlock(tool_use_id="tool-1", content="file contents")
+
+            span = _create_execute_tool_span(tool_use, tool_result, integration)
+            span.finish()
+
+            assert span._data[SPANDATA.GEN_AI_TOOL_NAME] == "Read"
+            assert SPANDATA.GEN_AI_TOOL_INPUT not in span._data
+            assert SPANDATA.GEN_AI_TOOL_OUTPUT not in span._data
+
+
+def test_process_tool_executions_matches_tool_use_and_result(sentry_init):
+    """Test that process_tool_executions matches tool uses with their results."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ToolUseBlock=MockToolUseBlock,
+        ToolResultBlock=MockToolResultBlock,
+    ):
+        with start_transaction(name="test"):
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
+
+            # Create messages with tool use and corresponding result
+            assistant_msg = MockAssistantMessage(
+                content=[
+                    MockTextBlock(text="Let me read that."),
+                    MockToolUseBlock(id="tool-123", name="Read", input={"path": "/test.txt"}),
+                    MockToolResultBlock(tool_use_id="tool-123", content="file contents"),
+                ],
+                model="test-model",
+            )
+
+            spans = _process_tool_executions([assistant_msg], integration)
+
+            assert len(spans) == 1
+            assert spans[0].description == "execute_tool Read"
+
+
+def test_process_tool_executions_multiple_tools(sentry_init):
+    """Test processing multiple tool executions."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ToolUseBlock=MockToolUseBlock,
+        ToolResultBlock=MockToolResultBlock,
+    ):
+        with start_transaction(name="test"):
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
+
+            assistant_msg = MockAssistantMessage(
+                content=[
+                    MockToolUseBlock(id="tool-1", name="Read", input={"path": "/a.txt"}),
+                    MockToolUseBlock(id="tool-2", name="Write", input={"path": "/b.txt", "content": "x"}),
+                    MockToolResultBlock(tool_use_id="tool-1", content="content a"),
+                    MockToolResultBlock(tool_use_id="tool-2", content="written"),
+                ],
+                model="test-model",
+            )
+
+            spans = _process_tool_executions([assistant_msg], integration)
+
+            assert len(spans) == 2
+            tool_descriptions = {s.description for s in spans}
+            assert "execute_tool Read" in tool_descriptions
+            assert "execute_tool Write" in tool_descriptions
+
+
+def test_process_tool_executions_no_tools(sentry_init):
+    """Test that no spans are created when there are no tool uses."""
+    sentry_init(
+        integrations=[ClaudeAgentSDKIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        TextBlock=MockTextBlock,
+    ):
+        with start_transaction(name="test"):
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
+
+            assistant_msg = MockAssistantMessage(
+                content=[MockTextBlock(text="Just a text response.")],
+                model="test-model",
+            )
+
+            spans = _process_tool_executions([assistant_msg], integration)
+
+            assert len(spans) == 0
