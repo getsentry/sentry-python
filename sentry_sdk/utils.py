@@ -2074,11 +2074,11 @@ def format_attribute(val: "Any") -> "AttributeValue":
         return []
     elif isinstance(val, list):
         ty = type(val[0])
-        if ty in list_types and all(isinstance(v, ty) for v in val):
+        if ty in list_types and all(type(v) is ty for v in val):
             return copy.deepcopy(val)
     elif isinstance(val, tuple):
         ty = type(val[0])
-        if ty in list_types and all(isinstance(v, ty) for v in val):
+        if ty in list_types and all(type(v) is ty for v in val):
             return list(val)
 
     return safe_repr(val)
