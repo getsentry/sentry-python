@@ -1,30 +1,3 @@
-"""
-Sentry integration for Claude Agent SDK (claude-agent-sdk).
-
-This integration instruments the Claude Agent SDK to capture AI-related
-telemetry data, including prompts, responses, token usage, and cost information.
-
-The integration supports:
-- query() function for one-shot queries
-- ClaudeSDKClient for interactive sessions
-
-Span hierarchy:
-- invoke_agent: Wraps the entire agent invocation (query or client session)
-  - gen_ai.chat: Individual LLM interactions within the agent invocation
-  - execute_tool: Tool executions detected in the message stream
-
-Usage:
-    import sentry_sdk
-    from sentry_sdk.integrations.claude_agent_sdk import ClaudeAgentSDKIntegration
-
-    sentry_sdk.init(
-        dsn="...",
-        integrations=[ClaudeAgentSDKIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,  # Required to capture prompts/responses
-    )
-"""
-
 from functools import wraps
 from typing import TYPE_CHECKING
 
