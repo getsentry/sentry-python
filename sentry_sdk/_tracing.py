@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
     get_current_thread_meta,
+    is_valid_sample_rate,
     logger,
     nanosecond_time,
     should_be_treated_as_error,
@@ -22,7 +23,7 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
-    from sentry_sdk._types import Attributes, AttributeValue
+    from sentry_sdk._types import Attributes, AttributeValue, SamplingContext
     from sentry_sdk.scope import Scope
 
 
@@ -312,8 +313,7 @@ class StreamedSpan:
 
     @property
     def dynamic_sampling_context(self) -> str:
-        # TODO
-        return self.segment.get_baggage().dynamic_sampling_context()
+        return self.segment._get_baggage().dynamic_sampling_context()
 
     def _update_active_thread(self) -> None:
         thread_id, thread_name = get_current_thread_meta()
@@ -351,3 +351,81 @@ class StreamedSpan:
             self._baggage = Baggage.populate_from_segment(self)
 
         return self._baggage
+
+    def _set_initial_sampling_decision(
+        self, sampling_context: "SamplingContext"
+    ) -> None:
+        """
+        Sets the segment's sampling decision, according to the following
+        precedence rules:
+
+        1. If `traces_sampler` is defined, its decision will be used. It can
+        choose to keep or ignore any parent sampling decision, or use the
+        sampling context data to make its own decision or to choose a sample
+        rate for the transaction.
+
+        2. If `traces_sampler` is not defined, but there's a parent sampling
+        decision, the parent sampling decision will be used.
+
+        3. If `traces_sampler` is not defined and there's no parent sampling
+        decision, `traces_sample_rate` will be used.
+        """
+        client = sentry_sdk.get_client()
+
+        # nothing to do if tracing is disabled
+        if not has_tracing_enabled(client.options):
+            self.sampled = False
+            return
+
+        if not self.is_segment():
+            return
+
+        traces_sampler_defined = callable(client.options.get("traces_sampler"))
+
+        # We would have bailed already if neither `traces_sampler` nor
+        # `traces_sample_rate` were defined, so one of these should work; prefer
+        # the hook if so
+        if traces_sampler_defined:
+            sample_rate = client.options["traces_sampler"](sampling_context)
+        else:
+            if sampling_context["parent_sampled"] is not None:
+                sample_rate = sampling_context["parent_sampled"]
+            else:
+                sample_rate = client.options["traces_sample_rate"]
+
+        # Since this is coming from the user (or from a function provided by the
+        # user), who knows what we might get. (The only valid values are
+        # booleans or numbers between 0 and 1.)
+        if not is_valid_sample_rate(sample_rate, source="Tracing"):
+            logger.warning(
+                f"[Tracing] Discarding {self._name} because of invalid sample rate."
+            )
+            self.sampled = False
+            return
+
+        self.sample_rate = float(sample_rate)
+
+        if client.monitor:
+            self.sample_rate /= 2**client.monitor.downsample_factor
+
+        # if the function returned 0 (or false), or if `traces_sample_rate` is
+        # 0, it's a sign the transaction should be dropped
+        if not self.sample_rate:
+            if traces_sampler_defined:
+                reason = "traces_sampler returned 0 or False"
+            else:
+                reason = "traces_sample_rate is set to 0"
+
+            logger.debug(f"[Tracing] Discarding {self._name} because {reason}")
+            self.sampled = False
+            return
+
+        # Now we roll the dice.
+        self.sampled = self._sample_rand < self.sample_rate
+
+        if self.sampled:
+            logger.debug(f"[Tracing] Starting {self.name}")
+        else:
+            logger.debug(
+                f"[Tracing] Discarding {self.name} because it's not included in the random sample (sampling rate = {self.sample_rate})"
+            )

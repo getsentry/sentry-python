@@ -10,7 +10,7 @@ from sentry_sdk.utils import serialize_attribute, safe_repr
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
-    from sentry_sdk.trace import SpanStatus, StreamedSpan
+    from sentry_sdk._tracing import SpanStatus, StreamedSpan
 
 
 class SpanBatcher(Batcher["Span"]):
@@ -87,8 +87,7 @@ class SpanBatcher(Batcher["Span"]):
 
         return res
 
-    def _flush(self):
-        # type: (...) -> Optional[Envelope]
+    def _flush(self) -> Optional[Envelope]:
         from sentry_sdk.utils import format_timestamp
 
         with self._lock:
@@ -97,8 +96,7 @@ class SpanBatcher(Batcher["Span"]):
 
             for trace_id, spans in self._span_buffer.items():
                 if spans:
-                    trace_context = spans[0].get_trace_context()
-                    dsc = trace_context.get("dynamic_sampling_context")
+                    dsc = spans[0].dynamic_sampling_context()
                     # XXX[span-first]: empty dsc?
 
                     envelope = Envelope(
