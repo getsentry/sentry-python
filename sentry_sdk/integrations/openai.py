@@ -1,3 +1,4 @@
+import sys
 from functools import wraps
 
 import sentry_sdk
@@ -16,6 +17,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     safe_serialize,
+    reraise,
 )
 
 from typing import TYPE_CHECKING
@@ -483,8 +485,10 @@ def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]
             try:
                 result = f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
-                raise e from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
@@ -515,8 +519,10 @@ def _wrap_async_chat_completion_create(f: "Callable[..., Any]") -> "Callable[...
             try:
                 result = await f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
-                raise e from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
@@ -569,8 +575,10 @@ def _wrap_embeddings_create(f: "Any") -> "Any":
             try:
                 result = f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e, manual_span_cleanup=False)
-                raise e from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e, manual_span_cleanup=False)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
@@ -600,8 +608,10 @@ def _wrap_async_embeddings_create(f: "Any") -> "Any":
             try:
                 result = await f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e, manual_span_cleanup=False)
-                raise e from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e, manual_span_cleanup=False)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
@@ -655,8 +665,10 @@ def _wrap_responses_create(f: "Any") -> "Any":
             try:
                 result = f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
-                raise e from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
@@ -686,8 +698,10 @@ def _wrap_async_responses_create(f: "Any") -> "Any":
             try:
                 result = await f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
-                raise e from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
