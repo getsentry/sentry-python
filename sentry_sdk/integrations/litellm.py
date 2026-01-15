@@ -8,7 +8,7 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
     truncate_and_annotate_messages,
-    transform_message_content,
+    transform_openai_content_part,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -41,7 +41,7 @@ def _get_metadata_dict(kwargs: "Dict[str, Any]") -> "Dict[str, Any]":
 def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, Any]]":
     """
     Convert the message parts from OpenAI format to the `gen_ai.request.messages` format
-    using the shared transform_message_content function.
+    using the OpenAI-specific transformer (LiteLLM uses OpenAI's message format).
 
     Deep copies messages to avoid mutating original kwargs.
     """
@@ -51,8 +51,17 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
     for message in messages:
         if not isinstance(message, dict):
             continue
-        if "content" in message:
-            message["content"] = transform_message_content(message["content"])
+        content = message.get("content")
+        if isinstance(content, (list, tuple)):
+            transformed = []
+            for item in content:
+                if isinstance(item, dict):
+                    result = transform_openai_content_part(item)
+                    # If transformation succeeded, use the result; otherwise keep original
+                    transformed.append(result if result is not None else item)
+                else:
+                    transformed.append(item)
+            message["content"] = transformed
     return messages
 
 

@@ -939,7 +939,7 @@ def test_convert_message_parts_does_not_mutate_original():
 
 
 def test_convert_message_parts_data_url_without_base64():
-    """Data URLs without ;base64, marker should be treated as regular URIs."""
+    """Data URLs without ;base64, marker are still inline data and should be blobs."""
     messages = [
         {
             "role": "user",
@@ -952,10 +952,12 @@ def test_convert_message_parts_data_url_without_base64():
         }
     ]
     converted = _convert_message_parts(messages)
-    uri_item = converted[0]["content"][0]
-    # Should be converted to uri type, not blob (since no base64 encoding)
-    assert uri_item["type"] == "uri"
-    assert uri_item["uri"] == "data:image/png,rawdata"
+    blob_item = converted[0]["content"][0]
+    # Data URIs (with or without base64 encoding) contain inline data and should be blobs
+    assert blob_item["type"] == "blob"
+    assert blob_item["modality"] == "image"
+    assert blob_item["mime_type"] == "image/png"
+    assert blob_item["content"] == "rawdata"
 
 
 def test_convert_message_parts_image_url_none():
