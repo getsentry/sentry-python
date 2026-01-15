@@ -4,7 +4,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA, SPANSTATUS
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled, has_tracing_enabled
@@ -35,6 +35,8 @@ TODO[span-first] / notes
 - dropped spans are not migrated
 - recheck transaction.finish <-> Streamedspan.end
 - profile not part of the event, how to send?
+- maybe: use getters/setter OR properties but not both
+- add size-based flushing to buffer(s)
 
 Notes:
 - removed ability to provide a start_timestamp
@@ -50,8 +52,12 @@ def start_span(
     return sentry_sdk.get_current_scope().start_streamed_span()
 
 
-BAGGAGE_HEADER_NAME = "baggage"
-SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+class SpanStatus(str, Enum):
+    OK = "ok"
+    ERROR = "error"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 # Segment source, see
@@ -72,6 +78,7 @@ class SegmentSource(str, Enum):
 LOW_QUALITY_SEGMENT_SOURCES = [
     SegmentSource.URL,
 ]
+
 
 SOURCE_FOR_STYLE = {
     "endpoint": SegmentSource.COMPONENT,
@@ -119,10 +126,10 @@ class StreamedSpan:
         self,
         name: str,
         trace_id: str,
-        attributes: Optional[Attributes] = None,
-        parent_span_id: Optional[str] = None,
-        segment: Optional[Span] = None,
-        scope: Optional[Scope] = None,
+        attributes: "Optional[Attributes]" = None,
+        parent_span_id: "Optional[str]" = None,
+        segment: "Optional[Span]" = None,
+        scope: "Optional[Scope]" = None,
     ) -> None:
         self._name: str = name
         self._attributes: "Attributes" = attributes
@@ -142,7 +149,7 @@ class StreamedSpan:
 
         self._timestamp: "Optional[datetime]" = None
         self._span_id: "Optional[str]" = None
-        self._status: SPANSTATUS = SPANSTATUS.OK
+        self._status: SpanStatus = SpanStatus.OK
         self._sampled: "Optional[bool]" = None
         self._scope: "Optional[Scope]" = scope  # TODO[span-first] when are we starting a span with a specific scope? is this needed?
         self._flags: dict[str, bool] = {}
@@ -182,7 +189,7 @@ class StreamedSpan:
                 self._continuous_profile.stop()
 
         if value is not None and should_be_treated_as_error(ty, value):
-            self.set_status(SPANSTATUS.INTERNAL_ERROR)
+            self.set_status(SpanStatus.ERROR)
 
         with capture_internal_exceptions():
             scope, old_span = self._context_manager_state
@@ -252,17 +259,17 @@ class StreamedSpan:
             client._capture_span(self)
         return
 
-    def get_attributes(self) -> Attributes:
+    def get_attributes(self) -> "Attributes":
         return self._attributes
 
-    def set_attribute(self, key: str, value: AttributeValue) -> None:
+    def set_attribute(self, key: str, value: "AttributeValue") -> None:
         self._attributes[key] = format_attribute(value)
 
-    def set_attributes(self, attributes: Attributes) -> None:
+    def set_attributes(self, attributes: "Attributes") -> None:
         for key, value in attributes.items():
             self.set_attribute(key, value)
 
-    def set_status(self, status: SPANSTATUS) -> None:
+    def set_status(self, status: SpanStatus) -> None:
         self._status = status
 
     def get_name(self) -> str:
@@ -317,6 +324,6 @@ class StreamedSpan:
         self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
 
         if http_status >= 400:
-            self.set_status(SPANSTATUS.ERROR)
+            self.set_status(SpanStatus.ERROR)
         else:
-            self.set_status(SPANSTATUS.OK)
+            self.set_status(SpanStatus.OK)

@@ -294,8 +294,6 @@ if TYPE_CHECKING:
         },
     )
 
-    TraceLifecycleMode = Literal["static", "stream"]
-
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]
 

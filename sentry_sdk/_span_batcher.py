@@ -10,7 +10,7 @@ from sentry_sdk.utils import serialize_attribute, safe_repr
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
-    from sentry_sdk.trace import Span
+    from sentry_sdk.trace import SpanStatus, StreamedSpan
 
 
 class SpanBatcher(Batcher["Span"]):
@@ -32,7 +32,7 @@ class SpanBatcher(Batcher["Span"]):
         # by trace_id, so that we can then send the buckets each in its own
         # envelope.
         # trace_id -> span buffer
-        self._span_buffer: dict[str, list["Span"]] = defaultdict(list)
+        self._span_buffer: dict[str, list["StreamedSpan"]] = defaultdict(list)
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
@@ -47,7 +47,7 @@ class SpanBatcher(Batcher["Span"]):
         # caller is responsible for locking before checking this
         return sum(len(buffer) for buffer in self._span_buffer.values())
 
-    def add(self, span: Span) -> None:
+    def add(self, span: "StreamedSpan") -> None:
         if not self._ensure_thread() or self._flusher is None:
             return None
 
@@ -66,23 +66,19 @@ class SpanBatcher(Batcher["Span"]):
                 self._flush_event.set()
 
     @staticmethod
-    def _to_transport_format(item: "Span") -> "Any":
-        is_segment = item.containing_transaction == item
-
+    def _to_transport_format(item: "StreamedSpan") -> "Any":
         res = {
             "trace_id": item.trace_id,
             "span_id": item.span_id,
-            "name": item.name if is_segment else item.description,
-            "status": SPANSTATUS.OK
-            if item.status == SPANSTATUS.OK
-            else SPANSTATUS.INTERNAL_ERROR,
-            "is_segment": is_segment,
-            "start_timestamp": item.start_timestamp.timestamp(),  # TODO[span-first]
-            "end_timestamp": item.timestamp.timestamp(),
+            "name": item.get_name(),
+            "status": item._status,
+            "is_segment": item.is_segment(),
+            "start_timestamp": item._start_timestamp.timestamp(),  # TODO[span-first]
+            "end_timestamp": item._timestamp.timestamp(),
         }
 
-        if item.parent_span_id:
-            res["parent_span_id"] = item.parent_span_id
+        if item._parent_span_id:
+            res["parent_span_id"] = item._parent_span_id
 
         if item._attributes:
             res["attributes"] = {
