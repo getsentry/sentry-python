@@ -1,7 +1,9 @@
+import sys
 from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import invoke_agent_span, update_invoke_agent_span
 from ..utils import _capture_exception, pop_agent, push_agent
@@ -121,8 +123,10 @@ def _create_run_wrapper(
 
                     return result
                 except Exception as exc:
-                    _capture_exception(exc)
-                    raise exc from None
+                    exc_info = sys.exc_info()
+                    with capture_internal_exceptions():
+                        _capture_exception(exc)
+                    reraise(*exc_info)
                 finally:
                     # Pop agent from contextvar stack
                     pop_agent()
@@ -177,8 +181,10 @@ def _create_streaming_events_wrapper(
             async for event in original_func(self, *args, **kwargs):
                 yield event
         except Exception as exc:
-            _capture_exception(exc)
-            raise exc from None
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+            reraise(*exc_info)
 
     return wrapper
 
