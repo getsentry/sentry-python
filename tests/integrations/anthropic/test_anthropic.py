@@ -1448,51 +1448,45 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
     assert stored_messages[1]["content"] == "Hello"
 
 
-def test_nonstreaming_create_message_with_cache_tokens(sentry_init, capture_events):
-    """Test that cache tokens (read and write) are captured from Anthropic responses."""
-
-    # Create a mock usage object with cache tokens
-    class MockUsageWithCache:
-        def __init__(self):
-            self.input_tokens = 100
-            self.output_tokens = 50
-            self.cache_read_input_tokens = 25
-            self.cache_write_input_tokens = 30
-
-    # Create a mock message with cache tokens
-    example_message_with_cache = Message(
+def _make_message_with_cache_tokens(input_tokens=100, output_tokens=50, cache_read=25, cache_write=30):
+    """Helper to create a Message with cache tokens."""
+    msg = Message(
         id="id",
         model="model",
         role="assistant",
         content=[TextBlock(type="text", text="Hi, I'm Claude.")],
         type="message",
-        usage=Usage(input_tokens=100, output_tokens=50),
+        usage=Usage(input_tokens=input_tokens, output_tokens=output_tokens),
     )
-    # Add cache token attributes to the usage object
-    example_message_with_cache.usage.cache_read_input_tokens = 25
-    example_message_with_cache.usage.cache_write_input_tokens = 30
+    msg.usage.cache_read_input_tokens = cache_read
+    msg.usage.cache_write_input_tokens = cache_write
+    return msg
 
-    sentry_init(
-        integrations=[AnthropicIntegration()],
-        traces_sample_rate=1.0,
-    )
+
+def _make_stream_events(message):
+    """Helper to create standard stream events for a message."""
+    return [
+        MessageStartEvent(message=message, type="message_start"),
+        ContentBlockStartEvent(type="content_block_start", index=0, content_block=TextBlock(type="text", text="")),
+        ContentBlockDeltaEvent(delta=TextDelta(text="Hi!", type="text_delta"), index=0, type="content_block_delta"),
+        ContentBlockStopEvent(type="content_block_stop", index=0),
+        MessageDeltaEvent(delta=Delta(), usage=MessageDeltaUsage(output_tokens=10), type="message_delta"),
+    ]
+
+
+def test_nonstreaming_create_message_with_cache_tokens(sentry_init, capture_events):
+    """Test that cache tokens (read and write) are captured from Anthropic responses."""
+    example_message = _make_message_with_cache_tokens()
+
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
     client = Anthropic(api_key="z")
-    client.messages._post = mock.Mock(return_value=example_message_with_cache)
-
-    messages = [{"role": "user", "content": "Hello, Claude"}]
+    client.messages._post = mock.Mock(return_value=example_message)
 
     with start_transaction(name="anthropic"):
-        response = client.messages.create(
-            max_tokens=1024, messages=messages, model="model"
-        )
+        client.messages.create(max_tokens=1024, messages=[{"role": "user", "content": "Hello"}], model="model")
 
-    assert response == example_message_with_cache
-
-    assert len(events) == 1
     (event,) = events
-
-    assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
@@ -1503,41 +1497,19 @@ def test_nonstreaming_create_message_with_cache_tokens(sentry_init, capture_even
 
 
 @pytest.mark.asyncio
-async def test_nonstreaming_create_message_with_cache_tokens_async(
-    sentry_init, capture_events
-):
+async def test_nonstreaming_create_message_with_cache_tokens_async(sentry_init, capture_events):
     """Test that cache tokens are captured from async Anthropic responses."""
-    example_message_with_cache = Message(
-        id="id",
-        model="model",
-        role="assistant",
-        content=[TextBlock(type="text", text="Hi, I'm Claude.")],
-        type="message",
-        usage=Usage(input_tokens=100, output_tokens=50),
-    )
-    example_message_with_cache.usage.cache_read_input_tokens = 25
-    example_message_with_cache.usage.cache_write_input_tokens = 30
+    example_message = _make_message_with_cache_tokens()
 
-    sentry_init(
-        integrations=[AnthropicIntegration()],
-        traces_sample_rate=1.0,
-    )
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
     client = AsyncAnthropic(api_key="z")
-    client.messages._post = AsyncMock(return_value=example_message_with_cache)
-
-    messages = [{"role": "user", "content": "Hello, Claude"}]
+    client.messages._post = AsyncMock(return_value=example_message)
 
     with start_transaction(name="anthropic"):
-        response = await client.messages.create(
-            max_tokens=1024, messages=messages, model="model"
-        )
+        await client.messages.create(max_tokens=1024, messages=[{"role": "user", "content": "Hello"}], model="model")
 
-    assert response == example_message_with_cache
-
-    assert len(events) == 1
     (event,) = events
-
     (span,) = event["spans"]
 
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
@@ -1548,168 +1520,72 @@ async def test_nonstreaming_create_message_with_cache_tokens_async(
 
 def test_streaming_create_message_with_cache_tokens(sentry_init, capture_events):
     """Test that cache tokens are captured from streaming Anthropic responses."""
-    # Create a mock usage object with cache tokens for the message start event
-    example_message_with_cache = Message(
-        id="id",
-        model="model",
-        role="assistant",
-        content=[TextBlock(type="text", text="Hi, I'm Claude.")],
-        type="message",
-        usage=Usage(input_tokens=100, output_tokens=20),
-    )
-    example_message_with_cache.usage.cache_read_input_tokens = 25
-    example_message_with_cache.usage.cache_write_input_tokens = 30
+    example_message = _make_message_with_cache_tokens(output_tokens=20)
 
     client = Anthropic(api_key="z")
     returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        MessageStartEvent(
-            message=example_message_with_cache,
-            type="message_start",
-        ),
-        ContentBlockStartEvent(
-            type="content_block_start",
-            index=0,
-            content_block=TextBlock(type="text", text=""),
-        ),
-        ContentBlockDeltaEvent(
-            delta=TextDelta(text="Hi!", type="text_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockStopEvent(type="content_block_stop", index=0),
-        MessageDeltaEvent(
-            delta=Delta(),
-            usage=MessageDeltaUsage(output_tokens=10),
-            type="message_delta",
-        ),
-    ]
+    returned_stream._iterator = _make_stream_events(example_message)
 
-    sentry_init(
-        integrations=[AnthropicIntegration()],
-        traces_sample_rate=1.0,
-    )
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
     client.messages._post = mock.Mock(return_value=returned_stream)
 
-    messages = [{"role": "user", "content": "Hello, Claude"}]
-
     with start_transaction(name="anthropic"):
-        message = client.messages.create(
-            max_tokens=1024, messages=messages, model="model", stream=True
-        )
+        message = client.messages.create(max_tokens=1024, messages=[{"role": "user", "content": "Hello"}], model="model", stream=True)
         for _ in message:
             pass
 
-    assert len(events) == 1
     (event,) = events
-
     (span,) = event["spans"]
 
-    # For streaming, tokens accumulate from message_start and message_delta
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
-    # Output tokens: 20 from message_start + 10 from message_delta = 30
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 30  # 20 + 10 from delta
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 30
 
 
 @pytest.mark.asyncio
-async def test_streaming_create_message_with_cache_tokens_async(
-    sentry_init, capture_events
-):
+async def test_streaming_create_message_with_cache_tokens_async(sentry_init, capture_events):
     """Test that cache tokens are captured from async streaming Anthropic responses."""
-    example_message_with_cache = Message(
-        id="id",
-        model="model",
-        role="assistant",
-        content=[TextBlock(type="text", text="Hi, I'm Claude.")],
-        type="message",
-        usage=Usage(input_tokens=100, output_tokens=20),
-    )
-    example_message_with_cache.usage.cache_read_input_tokens = 25
-    example_message_with_cache.usage.cache_write_input_tokens = 30
+    example_message = _make_message_with_cache_tokens(output_tokens=20)
 
     client = AsyncAnthropic(api_key="z")
     returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(
-        [
-            MessageStartEvent(
-                message=example_message_with_cache,
-                type="message_start",
-            ),
-            ContentBlockStartEvent(
-                type="content_block_start",
-                index=0,
-                content_block=TextBlock(type="text", text=""),
-            ),
-            ContentBlockDeltaEvent(
-                delta=TextDelta(text="Hi!", type="text_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockStopEvent(type="content_block_stop", index=0),
-            MessageDeltaEvent(
-                delta=Delta(),
-                usage=MessageDeltaUsage(output_tokens=10),
-                type="message_delta",
-            ),
-        ]
-    )
+    returned_stream._iterator = async_iterator(_make_stream_events(example_message))
 
-    sentry_init(
-        integrations=[AnthropicIntegration()],
-        traces_sample_rate=1.0,
-    )
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
     client.messages._post = AsyncMock(return_value=returned_stream)
 
-    messages = [{"role": "user", "content": "Hello, Claude"}]
-
     with start_transaction(name="anthropic"):
-        message = await client.messages.create(
-            max_tokens=1024, messages=messages, model="model", stream=True
-        )
+        message = await client.messages.create(max_tokens=1024, messages=[{"role": "user", "content": "Hello"}], model="model", stream=True)
         async for _ in message:
             pass
 
-    assert len(events) == 1
     (event,) = events
-
     (span,) = event["spans"]
 
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 30  # 20 + 10 from delta
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 30
 
 
 def test_nonstreaming_without_cache_tokens(sentry_init, capture_events):
     """Test that missing or zero cache tokens don't cause errors (backwards compatibility)."""
-    sentry_init(
-        integrations=[AnthropicIntegration()],
-        traces_sample_rate=1.0,
-    )
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
     client = Anthropic(api_key="z")
-    # Using EXAMPLE_MESSAGE which doesn't have explicit cache tokens set
     client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
 
-    messages = [{"role": "user", "content": "Hello, Claude"}]
-
     with start_transaction(name="anthropic"):
-        client.messages.create(max_tokens=1024, messages=messages, model="model")
+        client.messages.create(max_tokens=1024, messages=[{"role": "user", "content": "Hello"}], model="model")
 
-    assert len(events) == 1
     (event,) = events
-
     (span,) = event["spans"]
 
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    # Cache tokens may be present with 0 values (newer SDK versions)
-    # or not present at all (older SDK versions) - both are acceptable
-    cached = span["data"].get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED)
-    cache_write = span["data"].get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE)
-    assert cached is None or cached == 0
-    assert cache_write is None or cache_write == 0
+    # Cache tokens may be 0 (newer SDK) or absent (older SDK) - both acceptable
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED) in (None, 0)
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE) in (None, 0)

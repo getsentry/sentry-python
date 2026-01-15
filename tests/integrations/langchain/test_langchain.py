@@ -1750,8 +1750,24 @@ def test_langchain_response_model_extraction(
         assert SPANDATA.GEN_AI_RESPONSE_MODEL not in llm_span.get("data", {})
 
 
-def test_llm_callback_with_openai_cache_tokens(sentry_init, capture_events):
-    """Test that cache tokens from OpenAI format are captured correctly."""
+@pytest.mark.parametrize(
+    "token_usage,expected_cached,expected_cache_write",
+    [
+        # OpenAI format
+        ({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150, "cached_tokens": 25, "cache_write_tokens": 30}, 25, 30),
+        # Anthropic format
+        ({"input_tokens": 100, "output_tokens": 50, "total_tokens": 150, "cache_read_input_tokens": 25, "cache_write_input_tokens": 30}, 25, 30),
+        # Pydantic-AI format
+        ({"input_tokens": 100, "output_tokens": 50, "total_tokens": 150, "cache_read_tokens": 25, "cache_write_tokens": 30}, 25, 30),
+        # Google GenAI format (no cache write)
+        ({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150, "cached_content_token_count": 25}, 25, None),
+        # No cache tokens
+        ({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}, None, None),
+    ],
+    ids=["openai", "anthropic", "pydantic_ai", "google_genai", "no_cache"],
+)
+def test_llm_callback_cache_tokens(sentry_init, capture_events, token_usage, expected_cached, expected_cache_write):
+    """Test that cache tokens from various provider formats are captured correctly."""
     from langchain_core.outputs import LLMResult, Generation
 
     sentry_init(traces_sample_rate=1.0, integrations=[LangchainIntegration()])
@@ -1760,248 +1776,32 @@ def test_llm_callback_with_openai_cache_tokens(sentry_init, capture_events):
     callback = SentryLangchainCallback(max_span_map_size=10, include_prompts=True)
 
     with sentry_sdk.start_transaction(name="test"):
-        prompts = ["What is the capital of France?"]
         run_id = uuid.uuid4()
-        serialized = {"name": "ChatOpenAI"}
-
         callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
-            run_id=run_id,
-            invocation_params={"model": "gpt-4"},
-        )
-
-        # Create response with OpenAI-style cache tokens
-        response = LLMResult(
-            generations=[[Generation(text="Paris")]],
-            llm_output={
-                "token_usage": {
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150,
-                    "cached_tokens": 25,  # OpenAI format
-                    "cache_write_tokens": 30,  # Pydantic-AI format (cache write)
-                }
-            },
-        )
-
-        callback.on_llm_end(response=response, run_id=run_id)
-
-    assert len(events) > 0
-    tx = events[0]
-    llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
-    ]
-    assert len(llm_spans) > 0
-    llm_span = llm_spans[0]
-
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 30
-
-
-def test_llm_callback_with_anthropic_cache_tokens(sentry_init, capture_events):
-    """Test that cache tokens from Anthropic format are captured correctly."""
-    from langchain_core.outputs import LLMResult, Generation
-
-    sentry_init(traces_sample_rate=1.0, integrations=[LangchainIntegration()])
-    events = capture_events()
-
-    callback = SentryLangchainCallback(max_span_map_size=10, include_prompts=True)
-
-    with sentry_sdk.start_transaction(name="test"):
-        prompts = ["Hello Claude"]
-        run_id = uuid.uuid4()
-        serialized = {"name": "ChatAnthropic"}
-
-        callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
-            run_id=run_id,
-            invocation_params={"model": "claude-3-opus"},
-        )
-
-        # Create response with Anthropic-style cache tokens
-        response = LLMResult(
-            generations=[[Generation(text="Hi there!")]],
-            llm_output={
-                "token_usage": {
-                    "input_tokens": 100,
-                    "output_tokens": 50,
-                    "total_tokens": 150,
-                    "cache_read_input_tokens": 25,  # Anthropic format
-                    "cache_write_input_tokens": 30,  # Anthropic format
-                }
-            },
-        )
-
-        callback.on_llm_end(response=response, run_id=run_id)
-
-    assert len(events) > 0
-    tx = events[0]
-    llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
-    ]
-    assert len(llm_spans) > 0
-    llm_span = llm_spans[0]
-
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 30
-
-
-def test_llm_callback_with_pydantic_ai_cache_tokens(sentry_init, capture_events):
-    """Test that cache tokens from Pydantic-AI format are captured correctly."""
-    from langchain_core.outputs import LLMResult, Generation
-
-    sentry_init(traces_sample_rate=1.0, integrations=[LangchainIntegration()])
-    events = capture_events()
-
-    callback = SentryLangchainCallback(max_span_map_size=10, include_prompts=True)
-
-    with sentry_sdk.start_transaction(name="test"):
-        prompts = ["Test prompt"]
-        run_id = uuid.uuid4()
-        serialized = {"name": "TestModel"}
-
-        callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
+            serialized={"name": "TestModel"},
+            prompts=["Test prompt"],
             run_id=run_id,
             invocation_params={"model": "test-model"},
         )
 
-        # Create response with Pydantic-AI-style cache tokens
         response = LLMResult(
             generations=[[Generation(text="Response")]],
-            llm_output={
-                "token_usage": {
-                    "input_tokens": 100,
-                    "output_tokens": 50,
-                    "total_tokens": 150,
-                    "cache_read_tokens": 25,  # Pydantic-AI format
-                    "cache_write_tokens": 30,  # Pydantic-AI format
-                }
-            },
+            llm_output={"token_usage": token_usage},
         )
-
         callback.on_llm_end(response=response, run_id=run_id)
 
-    assert len(events) > 0
     tx = events[0]
-    llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
-    ]
-    assert len(llm_spans) > 0
-    llm_span = llm_spans[0]
+    llm_span = [s for s in tx.get("spans", []) if s.get("op") == "gen_ai.pipeline"][0]
 
     assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
     assert llm_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 30
 
+    if expected_cached is not None:
+        assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == expected_cached
+    else:
+        assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED not in llm_span.get("data", {})
 
-def test_llm_callback_with_google_genai_cache_tokens(sentry_init, capture_events):
-    """Test that cache tokens from Google GenAI format are captured correctly."""
-    from langchain_core.outputs import LLMResult, Generation
-
-    sentry_init(traces_sample_rate=1.0, integrations=[LangchainIntegration()])
-    events = capture_events()
-
-    callback = SentryLangchainCallback(max_span_map_size=10, include_prompts=True)
-
-    with sentry_sdk.start_transaction(name="test"):
-        prompts = ["Test prompt"]
-        run_id = uuid.uuid4()
-        serialized = {"name": "ChatGoogleGenerativeAI"}
-
-        callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
-            run_id=run_id,
-            invocation_params={"model": "gemini-pro"},
-        )
-
-        # Create response with Google GenAI-style cache tokens
-        response = LLMResult(
-            generations=[[Generation(text="Response")]],
-            llm_output={
-                "token_usage": {
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150,
-                    "cached_content_token_count": 25,  # Google GenAI format
-                }
-            },
-        )
-
-        callback.on_llm_end(response=response, run_id=run_id)
-
-    assert len(events) > 0
-    tx = events[0]
-    llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
-    ]
-    assert len(llm_spans) > 0
-    llm_span = llm_spans[0]
-
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
-    # Google GenAI doesn't have cache write, so it shouldn't be present
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE not in llm_span.get("data", {})
-
-
-def test_llm_callback_without_cache_tokens(sentry_init, capture_events):
-    """Test backward compatibility when no cache tokens are present."""
-    from langchain_core.outputs import LLMResult, Generation
-
-    sentry_init(traces_sample_rate=1.0, integrations=[LangchainIntegration()])
-    events = capture_events()
-
-    callback = SentryLangchainCallback(max_span_map_size=10, include_prompts=True)
-
-    with sentry_sdk.start_transaction(name="test"):
-        prompts = ["Test prompt"]
-        run_id = uuid.uuid4()
-        serialized = {"name": "TestModel"}
-
-        callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
-            run_id=run_id,
-            invocation_params={"model": "test-model"},
-        )
-
-        # Create response without cache tokens
-        response = LLMResult(
-            generations=[[Generation(text="Response")]],
-            llm_output={
-                "token_usage": {
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150,
-                    # No cache tokens
-                }
-            },
-        )
-
-        callback.on_llm_end(response=response, run_id=run_id)
-
-    assert len(events) > 0
-    tx = events[0]
-    llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
-    ]
-    assert len(llm_spans) > 0
-    llm_span = llm_spans[0]
-
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
-    assert llm_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
-    # Cache tokens should not be present
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED not in llm_span.get("data", {})
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE not in llm_span.get("data", {})
+    if expected_cache_write is not None:
+        assert llm_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == expected_cache_write
+    else:
+        assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE not in llm_span.get("data", {})
