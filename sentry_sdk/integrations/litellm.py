@@ -84,7 +84,7 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
         if item.get("type") == "image_url":
             image_url = item.get("image_url") or {}
             url = image_url.get("url", "")
-            if url.startswith("data:"):
+            if url.startswith("data:") and ";base64," in url:
                 try:
                     mime_type, content = parse_data_uri(url)
                     return {
