@@ -91,6 +91,9 @@ def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
             cache_read_input_tokens = usage.cache_read_input_tokens
         if hasattr(usage, "cache_write_input_tokens") and isinstance(usage.cache_write_input_tokens, int):
             cache_write_input_tokens = usage.cache_write_input_tokens
+        # Anthropic API also uses cache_creation_input_tokens (newer field name)
+        if hasattr(usage, "cache_creation_input_tokens") and isinstance(usage.cache_creation_input_tokens, int):
+            cache_write_input_tokens = usage.cache_creation_input_tokens
 
     return input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens
 
@@ -117,6 +120,9 @@ def _collect_ai_data(
                     cache_read_input_tokens += usage.cache_read_input_tokens
                 if hasattr(usage, "cache_write_input_tokens") and isinstance(usage.cache_write_input_tokens, int):
                     cache_write_input_tokens += usage.cache_write_input_tokens
+                # Anthropic API also uses cache_creation_input_tokens (newer field name)
+                if hasattr(usage, "cache_creation_input_tokens") and isinstance(usage.cache_creation_input_tokens, int):
+                    cache_write_input_tokens += usage.cache_creation_input_tokens
                 model = event.message.model or model
             elif event.type == "content_block_start":
                 pass
