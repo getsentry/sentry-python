@@ -217,7 +217,18 @@ if TYPE_CHECKING:
     Hint = Dict[str, Any]
 
     AttributeValue = (
-        str | bool | float | int | list[str] | list[bool] | list[float] | list[int]
+        str
+        | bool
+        | float
+        | int
+        | list[str]
+        | list[bool]
+        | list[float]
+        | list[int]
+        | tuple[str, ...]
+        | tuple[bool, ...]
+        | tuple[float, ...]
+        | tuple[int, ...]
     )
     Attributes = dict[str, AttributeValue]
 
