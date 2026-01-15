@@ -394,12 +394,70 @@ def test_metric_attributes_override_scope_attributes(sentry_init, capture_envelo
     assert metric["attributes"]["temp.attribute"] == "value2"
 
 
+def test_log_array_attributes(sentry_init, capture_envelopes):
+    """Test homogeneous list and tuple attributes, and fallback for inhomogeneous collections."""
+
+    sentry_init()
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("string_list.attribute", ["value1", "value2"])
+        scope.set_attribute("int_tuple.attribute", (3, 2, 1, 4))
+        scope.set_attribute("inhomogeneous_tuple.attribute", (3, 2.0, 1, 4))  # type: ignore[arg-type]
+
+        sentry_sdk.metrics.count(
+            "test",
+            1,
+            attributes={
+                "float_list.attribute": [3.0, 3.5, 4.2],
+                "bool_tuple.attribute": (False, False, True),
+                "inhomogeneous_list.attribute": [3.2, True, None],
+            },
+        )
+
+    get_client().flush()
+
+    assert len(envelopes) == 1
+    assert len(envelopes[0].items) == 1
+    item = envelopes[0].items[0]
+    serialized_attributes = item.payload.json["items"][0]["attributes"]
+
+    assert serialized_attributes["string_list.attribute"] == {
+        "value": ["value1", "value2"],
+        "type": "string[]",
+    }
+    assert serialized_attributes["int_tuple.attribute"] == {
+        "value": [3, 2, 1, 4],
+        "type": "integer[]",
+    }
+    assert serialized_attributes["inhomogeneous_tuple.attribute"] == {
+        "value": "(3, 2.0, 1, 4)",
+        "type": "string",
+    }
+
+    assert serialized_attributes["float_list.attribute"] == {
+        "value": [3.0, 3.5, 4.2],
+        "type": "double[]",
+    }
+    assert serialized_attributes["bool_tuple.attribute"] == {
+        "value": [False, False, True],
+        "type": "boolean[]",
+    }
+    assert serialized_attributes["inhomogeneous_list.attribute"] == {
+        "value": "[3.2, True, None]",
+        "type": "string",
+    }
+
+
 def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes):
-    """We don't surface references to objects in attributes."""
+    """We don't surface user-held references to objects in attributes."""
 
     def before_send_metric(metric, _):
         assert isinstance(metric["attributes"]["instance"], str)
         assert isinstance(metric["attributes"]["dictionary"], str)
+        assert isinstance(metric["attributes"]["inhomogeneous_list"], str)
+        assert isinstance(metric["attributes"]["inhomogeneous_tuple"], str)
 
         return metric
 
@@ -419,6 +477,8 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes)
         attributes={
             "instance": instance,
             "dictionary": dictionary,
+            "inhomogeneous_list": [3.2, True, None],
+            "inhomogeneous_tuple": (3, 2.0, 1, 4),
         },
     )
 
@@ -429,3 +489,29 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes)
 
     assert isinstance(metric["attributes"]["instance"], str)
     assert isinstance(metric["attributes"]["dictionary"], str)
+
+
+def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
+    """We don't surface user-held references to objects in attributes."""
+
+    strings = ["value1", "value2"]
+    ints = (3, 2, 1, 4)
+
+    def before_send_metric(metric, _):
+        assert metric["attributes"]["string_list"] is not strings
+        assert metric["attributes"]["int_tuple"] is not ints
+
+        return metric
+
+    sentry_init(before_send_metric=before_send_metric)
+
+    sentry_sdk.metrics.count(
+        "test.counter",
+        1,
+        attributes={
+            "string_list": strings,
+            "int_tuple": ints,
+        },
+    )
+
+    get_client().flush()
