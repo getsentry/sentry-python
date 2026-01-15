@@ -11,7 +11,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     truncate_and_annotate_messages,
     get_start_span_function,
-    transform_content_part,
+    transform_anthropic_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
@@ -127,7 +127,7 @@ def _transform_anthropic_content_block(
     content_block: "dict[str, Any]",
 ) -> "dict[str, Any]":
     """
-    Transform an Anthropic content block using the shared transform_content_part function,
+    Transform an Anthropic content block using the Anthropic-specific transformer,
     with special handling for Anthropic's text-type documents.
     """
     # Handle Anthropic's text-type documents specially (not covered by shared function)
@@ -139,8 +139,8 @@ def _transform_anthropic_content_block(
                 "text": source.get("data", ""),
             }
 
-    # Use shared transformation for standard formats
-    result = transform_content_part(content_block)
+    # Use Anthropic-specific transformation
+    result = transform_anthropic_content_part(content_block)
     return result if result is not None else content_block
 
 
