@@ -4,6 +4,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_messages,
+    get_modality_from_mime_type,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import safe_serialize
@@ -118,7 +119,9 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                                     content.append(
                                         {
                                             "type": "blob",
-                                            "modality": item.media_type.split("/")[0],
+                                            "modality": get_modality_from_mime_type(
+                                                item.media_type
+                                            ),
                                             "mime_type": item.media_type,
                                             "content": BLOB_DATA_SUBSTITUTE,
                                         }
