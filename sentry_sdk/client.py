@@ -11,6 +11,7 @@ import warnings
 import sentry_sdk
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk._metrics_batcher import MetricsBatcher
+from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.utils import (
     AnnotatedValue,
     ContextVar,
@@ -31,6 +32,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
     SPANDATA,
@@ -67,6 +69,7 @@ if TYPE_CHECKING:
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
+    from sentry_sdk.trace import StreamedSpan
     from sentry_sdk.transport import Transport, Item
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher
@@ -188,6 +191,7 @@ class BaseClient:
         self.monitor: "Optional[Monitor]" = None
         self.log_batcher: "Optional[LogBatcher]" = None
         self.metrics_batcher: "Optional[MetricsBatcher]" = None
+        self.span_batcher: "Optional[SpanBatcher]" = None
         self.integrations: "dict[str, Integration]" = {}
 
     def __getstate__(self, *args: "Any", **kwargs: "Any") -> "Any":
@@ -397,6 +401,12 @@ class _Client(BaseClient):
                 self.metrics_batcher = MetricsBatcher(
                     capture_func=_capture_envelope,
                     record_lost_func=_record_lost_event,
+                )
+
+            self.span_batcher = None
+            if has_span_streaming_enabled(self.options):
+                self.span_batcher = SpanBatcher(
+                    capture_func=_capture_envelope, record_lost_func=_record_lost_event
                 )
 
             max_request_body_size = ("always", "never", "small", "medium")
@@ -909,7 +919,10 @@ class _Client(BaseClient):
         return return_value
 
     def _capture_telemetry(
-        self, telemetry: "Optional[Union[Log, Metric]]", ty: str, scope: "Scope"
+        self,
+        telemetry: "Optional[Union[Log, Metric, StreamedSpan]]",
+        ty: str,
+        scope: "Scope",
     ) -> None:
         # Capture attributes-based telemetry (logs, metrics, spansV2)
         if telemetry is None:
@@ -921,7 +934,7 @@ class _Client(BaseClient):
         if ty == "log":
             before_send = get_before_send_log(self.options)
         elif ty == "metric":
-            before_send = get_before_send_metric(self.options)  # type: ignore
+            before_send = get_before_send_metric(self.options)
 
         if before_send is not None:
             telemetry = before_send(telemetry, {})  # type: ignore
@@ -933,7 +946,9 @@ class _Client(BaseClient):
         if ty == "log":
             batcher = self.log_batcher
         elif ty == "metric":
-            batcher = self.metrics_batcher  # type: ignore
+            batcher = self.metrics_batcher
+        elif ty == "span":
+            batcher = self.span_batcher
 
         if batcher is not None:
             batcher.add(telemetry)  # type: ignore
@@ -943,6 +958,9 @@ class _Client(BaseClient):
 
     def _capture_metric(self, metric: "Optional[Metric]", scope: "Scope") -> None:
         self._capture_telemetry(metric, "metric", scope)
+
+    def _capture_span(self, span: "Optional[StreamedSpan]", scope: "Scope") -> None:
+        self._capture_telemetry(span, "span", scope)
 
     def capture_session(
         self,

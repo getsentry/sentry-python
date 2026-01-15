@@ -32,6 +32,7 @@ from sentry_sdk.tracing_utils import (
     normalize_incoming_data,
     PropagationContext,
 )
+from sentry_sdk.trace import StreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -1147,6 +1148,40 @@ class Scope:
 
             return span
 
+    def start_streamed_span(
+        self,
+        name: str,
+        attributes: "Optional[Attributes]" = None,
+        parent_span: "Optional[StreamedSpan]" = None,
+    ) -> "StreamedSpan":
+        # TODO: rename to start_span once we drop the old API
+        with new_scope():
+            if parent_span is None:
+                # get current span or transaction
+                parent_span = self.span or self.get_isolation_scope().span
+
+            if parent_span is None:
+                # New spans get the `trace_id` from the scope
+                propagation_context = self.get_active_propagation_context()
+                span = StreamedSpan(
+                    name=name,
+                    attributes=attributes,
+                    trace_id=propagation_context.trace_id,
+                    scope=self,
+                )
+            else:
+                # Children take propagation context from the parent span
+                span = StreamedSpan(
+                    name=name,
+                    attributes=attributes,
+                    trace_id=parent_span.trace_id,
+                    parent_span_id=parent_span.span_id,
+                    segment=parent_span.segment,
+                    scope=self,
+                )
+
+            return span
+
     def continue_trace(
         self,
         environ_or_headers: "Dict[str, Any]",
@@ -1179,6 +1214,9 @@ class Scope:
             same_process_as_parent=False,
             **optional_kwargs,
         )
+
+    def set_propagation_context(self, environ_or_headers: "dict[str, Any]") -> None:
+        self.generate_propagation_context(environ_or_headers)
 
     def capture_event(
         self,
