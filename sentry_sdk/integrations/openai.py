@@ -8,7 +8,7 @@ from sentry_sdk.ai.utils import (
     extract_response_output,
     set_data_normalized,
     normalize_message_roles,
-    transform_message_content,
+    transform_openai_content_part,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
@@ -205,10 +205,20 @@ def _set_input_data(
         and integration.include_prompts
     ):
         normalized_messages = normalize_message_roles(messages)
-        # Transform content parts to standardized format
+        # Transform content parts to standardized format using OpenAI-specific transformer
         for message in normalized_messages:
             if isinstance(message, dict) and "content" in message:
-                message["content"] = transform_message_content(message["content"])
+                content = message["content"]
+                if isinstance(content, (list, tuple)):
+                    transformed = []
+                    for item in content:
+                        if isinstance(item, dict):
+                            result = transform_openai_content_part(item)
+                            # If transformation succeeded, use the result; otherwise keep original
+                            transformed.append(result if result is not None else item)
+                        else:
+                            transformed.append(item)
+                    message["content"] = transformed
 
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
