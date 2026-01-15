@@ -22,7 +22,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     normalize_message_roles,
     redact_blob_message_parts,
-    transform_content_part,
+    transform_google_content_part,
     get_modality_from_mime_type,
 )
 from sentry_sdk.consts import OP, SPANDATA
@@ -296,8 +296,8 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         if part.get("text"):
             return {"text": part["text"], "type": "text"}
 
-        # Try using shared transform_content_part for Google dict formats (inline_data, file_data)
-        result = transform_content_part(part)
+        # Try using Google-specific transform for dict formats (inline_data, file_data)
+        result = transform_google_content_part(part)
         if result is not None:
             # For inline_data with bytes data, substitute the content
             if "inline_data" in part:
