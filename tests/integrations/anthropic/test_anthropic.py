@@ -48,9 +48,9 @@ from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
     _set_output_data,
     _collect_ai_data,
-    _transform_content_block,
-    _transform_message_content,
+    _transform_anthropic_content_block,
 )
+from sentry_sdk.ai.utils import transform_content_part, transform_message_content
 from sentry_sdk.utils import package_version
 
 
@@ -1451,10 +1451,10 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
     assert stored_messages[1]["content"] == "Hello"
 
 
-# Tests for _transform_content_block helper function
+# Tests for transform_content_part (shared) and _transform_anthropic_content_block helper functions
 
 
-def test_transform_content_block_base64_image():
+def test_transform_content_part_anthropic_base64_image():
     """Test that base64 encoded images are transformed to blob format."""
     content_block = {
         "type": "image",
@@ -1465,7 +1465,7 @@ def test_transform_content_block_base64_image():
         },
     }
 
-    result = _transform_content_block(content_block)
+    result = transform_content_part(content_block)
 
     assert result == {
         "type": "blob",
@@ -1475,7 +1475,7 @@ def test_transform_content_block_base64_image():
     }
 
 
-def test_transform_content_block_url_image():
+def test_transform_content_part_anthropic_url_image():
     """Test that URL-referenced images are transformed to uri format."""
     content_block = {
         "type": "image",
@@ -1485,7 +1485,7 @@ def test_transform_content_block_url_image():
         },
     }
 
-    result = _transform_content_block(content_block)
+    result = transform_content_part(content_block)
 
     assert result == {
         "type": "uri",
@@ -1495,7 +1495,7 @@ def test_transform_content_block_url_image():
     }
 
 
-def test_transform_content_block_file_image():
+def test_transform_content_part_anthropic_file_image():
     """Test that file_id-referenced images are transformed to file format."""
     content_block = {
         "type": "image",
@@ -1505,7 +1505,7 @@ def test_transform_content_block_file_image():
         },
     }
 
-    result = _transform_content_block(content_block)
+    result = transform_content_part(content_block)
 
     assert result == {
         "type": "file",
@@ -1515,7 +1515,7 @@ def test_transform_content_block_file_image():
     }
 
 
-def test_transform_content_block_base64_document():
+def test_transform_content_part_anthropic_base64_document():
     """Test that base64 encoded PDFs are transformed to blob format."""
     content_block = {
         "type": "document",
@@ -1526,7 +1526,7 @@ def test_transform_content_block_base64_document():
         },
     }
 
-    result = _transform_content_block(content_block)
+    result = transform_content_part(content_block)
 
     assert result == {
         "type": "blob",
@@ -1536,7 +1536,7 @@ def test_transform_content_block_base64_document():
     }
 
 
-def test_transform_content_block_url_document():
+def test_transform_content_part_anthropic_url_document():
     """Test that URL-referenced documents are transformed to uri format."""
     content_block = {
         "type": "document",
@@ -1546,7 +1546,7 @@ def test_transform_content_block_url_document():
         },
     }
 
-    result = _transform_content_block(content_block)
+    result = transform_content_part(content_block)
 
     assert result == {
         "type": "uri",
@@ -1556,7 +1556,7 @@ def test_transform_content_block_url_document():
     }
 
 
-def test_transform_content_block_file_document():
+def test_transform_content_part_anthropic_file_document():
     """Test that file_id-referenced documents are transformed to file format."""
     content_block = {
         "type": "document",
@@ -1567,7 +1567,7 @@ def test_transform_content_block_file_document():
         },
     }
 
-    result = _transform_content_block(content_block)
+    result = transform_content_part(content_block)
 
     assert result == {
         "type": "file",
@@ -1577,8 +1577,8 @@ def test_transform_content_block_file_document():
     }
 
 
-def test_transform_content_block_text_document():
-    """Test that plain text documents are transformed correctly."""
+def test_transform_anthropic_content_block_text_document():
+    """Test that plain text documents are transformed correctly (Anthropic-specific)."""
     content_block = {
         "type": "document",
         "source": {
@@ -1588,7 +1588,8 @@ def test_transform_content_block_text_document():
         },
     }
 
-    result = _transform_content_block(content_block)
+    # Use Anthropic-specific helper for text-type documents
+    result = _transform_anthropic_content_block(content_block)
 
     assert result == {
         "type": "text",
@@ -1596,26 +1597,27 @@ def test_transform_content_block_text_document():
     }
 
 
-def test_transform_content_block_text_block():
-    """Test that regular text blocks are returned as-is."""
+def test_transform_content_part_text_block():
+    """Test that regular text blocks return None (not transformed)."""
     content_block = {
         "type": "text",
         "text": "Hello, world!",
     }
 
-    result = _transform_content_block(content_block)
+    # Shared transform_content_part returns None for text blocks
+    result = transform_content_part(content_block)
 
-    assert result == content_block
+    assert result is None
 
 
 def test_transform_message_content_string():
     """Test that string content is returned as-is."""
-    result = _transform_message_content("Hello, world!")
+    result = transform_message_content("Hello, world!")
     assert result == "Hello, world!"
 
 
-def test_transform_message_content_list():
-    """Test that list content is transformed correctly."""
+def test_transform_message_content_list_anthropic():
+    """Test that list content with Anthropic format is transformed correctly."""
     content = [
         {"type": "text", "text": "Hello!"},
         {
@@ -1628,9 +1630,10 @@ def test_transform_message_content_list():
         },
     ]
 
-    result = _transform_message_content(content)
+    result = transform_message_content(content)
 
     assert len(result) == 2
+    # Text block stays as-is (transform returns None, keeps original)
     assert result[0] == {"type": "text", "text": "Hello!"}
     assert result[1] == {
         "type": "blob",

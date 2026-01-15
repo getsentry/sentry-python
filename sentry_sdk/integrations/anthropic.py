@@ -11,6 +11,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     truncate_and_annotate_messages,
     get_start_span_function,
+    transform_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
@@ -122,102 +123,25 @@ def _collect_ai_data(
     return model, input_tokens, output_tokens, content_blocks
 
 
-def _transform_content_block(content_block: "dict[str, Any]") -> "dict[str, Any]":
+def _transform_anthropic_content_block(
+    content_block: "dict[str, Any]",
+) -> "dict[str, Any]":
     """
-    Transform an Anthropic content block to a Sentry-compatible format.
-
-    Handles binary data (images, documents) by converting them to the standardized format:
-    - base64 encoded data -> type: "blob"
-    - URL references -> type: "uri"
-    - file_id references -> type: "file"
+    Transform an Anthropic content block using the shared transform_content_part function,
+    with special handling for Anthropic's text-type documents.
     """
-    block_type = content_block.get("type")
-
-    # Handle image blocks
-    if block_type == "image":
-        source = content_block.get("source") or {}
-        source_type = source.get("type")
-        media_type = source.get("media_type", "")
-
-        if source_type == "base64":
-            return {
-                "type": "blob",
-                "modality": "image",
-                "mime_type": media_type,
-                "content": source.get("data", ""),
-            }
-        elif source_type == "url":
-            return {
-                "type": "uri",
-                "modality": "image",
-                "mime_type": media_type,
-                "uri": source.get("url", ""),
-            }
-        elif source_type == "file":
-            return {
-                "type": "file",
-                "modality": "image",
-                "mime_type": media_type,
-                "file_id": source.get("file_id", ""),
-            }
-
-    # Handle document blocks (PDFs, etc.)
-    elif block_type == "document":
-        source = content_block.get("source") or {}
-        source_type = source.get("type")
-        media_type = source.get("media_type", "")
-
-        if source_type == "base64":
-            return {
-                "type": "blob",
-                "modality": "document",
-                "mime_type": media_type,
-                "content": source.get("data", ""),
-            }
-        elif source_type == "url":
-            return {
-                "type": "uri",
-                "modality": "document",
-                "mime_type": media_type,
-                "uri": source.get("url", ""),
-            }
-        elif source_type == "file":
-            return {
-                "type": "file",
-                "modality": "document",
-                "mime_type": media_type,
-                "file_id": source.get("file_id", ""),
-            }
-        elif source_type == "text":
-            # Plain text documents - keep as is but mark the type
+    # Handle Anthropic's text-type documents specially (not covered by shared function)
+    if content_block.get("type") == "document":
+        source = content_block.get("source")
+        if isinstance(source, dict) and source.get("type") == "text":
             return {
                 "type": "text",
                 "text": source.get("data", ""),
             }
 
-    # For text blocks and other types, return as-is
-    return content_block
-
-
-def _transform_message_content(
-    content: "Any",
-) -> "Any":
-    """
-    Transform message content, handling both string content and list of content blocks.
-    """
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, (list, tuple)):
-        transformed = []
-        for block in content:
-            if isinstance(block, dict):
-                transformed.append(_transform_content_block(block))
-            else:
-                transformed.append(block)
-        return transformed
-
-    return content
+    # Use shared transformation for standard formats
+    result = transform_content_part(content_block)
+    return result if result is not None else content_block
 
 
 def _set_input_data(
@@ -273,7 +197,7 @@ def _set_input_data(
 
                     # Transform content blocks (images, documents, etc.)
                     transformed_content.append(
-                        _transform_content_block(item)
+                        _transform_anthropic_content_block(item)
                         if isinstance(item, dict)
                         else item
                     )
@@ -290,9 +214,14 @@ def _set_input_data(
                 # Transform content for non-list messages or assistant messages
                 transformed_message = message.copy()
                 if "content" in transformed_message:
-                    transformed_message["content"] = _transform_message_content(
-                        transformed_message["content"]
-                    )
+                    content = transformed_message["content"]
+                    if isinstance(content, (list, tuple)):
+                        transformed_message["content"] = [
+                            _transform_anthropic_content_block(item)
+                            if isinstance(item, dict)
+                            else item
+                            for item in content
+                        ]
                 normalized_messages.append(transformed_message)
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
