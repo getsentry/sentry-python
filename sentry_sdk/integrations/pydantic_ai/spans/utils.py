@@ -33,3 +33,10 @@ def _set_usage_data(
 
     if hasattr(usage, "total_tokens") and usage.total_tokens is not None:
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
+
+    # Cache tokens (read and write)
+    if hasattr(usage, "cache_read_tokens") and usage.cache_read_tokens is not None:
+        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, usage.cache_read_tokens)
+
+    if hasattr(usage, "cache_write_tokens") and usage.cache_write_tokens is not None:
+        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE, usage.cache_write_tokens)
