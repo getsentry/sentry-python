@@ -107,6 +107,46 @@ def set_data_normalized(
         span.set_data(key, json.dumps(normalized))
 
 
+def extract_response_output(
+    output_items: "Any",
+) -> "Tuple[List[Any], List[Dict[str, Any]]]":
+    """
+    Extract response text and tool calls from OpenAI Responses API output.
+
+    This handles the output format from OpenAI's Responses API where each output
+    item has a `type` field that can be "message" or "function_call".
+
+    Args:
+        output_items: Iterable of output items from the response
+
+    Returns:
+        Tuple of (response_texts, tool_calls) where:
+        - response_texts: List of text strings or dicts for unknown message types
+        - tool_calls: List of tool call dicts
+    """
+    response_texts = []  # type: List[Any]
+    tool_calls = []  # type: List[Dict[str, Any]]
+
+    for output in output_items:
+        if output.type == "function_call":
+            if hasattr(output, "model_dump"):
+                tool_calls.append(output.model_dump())
+            elif hasattr(output, "dict"):
+                tool_calls.append(output.dict())
+        elif output.type == "message":
+            for output_message in output.content:
+                try:
+                    response_texts.append(output_message.text)
+                except AttributeError:
+                    # Unknown output message type, just return the json
+                    if hasattr(output_message, "model_dump"):
+                        response_texts.append(output_message.model_dump())
+                    elif hasattr(output_message, "dict"):
+                        response_texts.append(output_message.dict())
+
+    return response_texts, tool_calls
+
+
 def normalize_message_role(role: str) -> str:
     """
     Normalize a message role to one of the 4 allowed gen_ai role values.

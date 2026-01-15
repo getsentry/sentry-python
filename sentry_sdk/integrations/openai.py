@@ -4,6 +4,7 @@ import sentry_sdk
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
+    extract_response_output,
     set_data_normalized,
     normalize_message_roles,
     parse_data_uri,
@@ -349,13 +350,44 @@ def _set_output_data(
 
     if hasattr(response, "choices"):
         if should_send_default_pii() and integration.include_prompts:
-            response_text = [
-                choice.message.model_dump()
-                for choice in response.choices
-                if choice.message is not None
-            ]
+            response_text = []  # type: list[str]
+            tool_calls = []  # type: list[Any]
+
+            for choice in response.choices:
+                if choice.message is None:
+                    continue
+
+                # Extract text content
+                content = getattr(choice.message, "content", None)
+                if content is not None:
+                    response_text.append(content)
+
+                # Extract audio transcript if available
+                audio = getattr(choice.message, "audio", None)
+                if audio is not None:
+                    transcript = getattr(audio, "transcript", None)
+                    if transcript is not None:
+                        response_text.append(transcript)
+
+                # Extract tool calls
+                message_tool_calls = getattr(choice.message, "tool_calls", None)
+                if message_tool_calls is not None:
+                    for tool_call in message_tool_calls:
+                        if hasattr(tool_call, "model_dump"):
+                            tool_calls.append(tool_call.model_dump())
+                        elif hasattr(tool_call, "dict"):
+                            tool_calls.append(tool_call.dict())
+
             if len(response_text) > 0:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
+
+            if len(tool_calls) > 0:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    tool_calls,
+                    unpack=False,
+                )
 
         _calculate_token_usage(messages, response, span, None, integration.count_tokens)
 
@@ -364,34 +396,18 @@ def _set_output_data(
 
     elif hasattr(response, "output"):
         if should_send_default_pii() and integration.include_prompts:
-            output_messages: "dict[str, list[Any]]" = {
-                "response": [],
-                "tool": [],
-            }
+            response_texts, tool_calls = extract_response_output(response.output)
 
-            for output in response.output:
-                if output.type == "function_call":
-                    output_messages["tool"].append(output.dict())
-                elif output.type == "message":
-                    for output_message in output.content:
-                        try:
-                            output_messages["response"].append(output_message.text)
-                        except AttributeError:
-                            # Unknown output message type, just return the json
-                            output_messages["response"].append(output_message.dict())
-
-            if len(output_messages["tool"]) > 0:
+            if len(tool_calls) > 0:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                    output_messages["tool"],
+                    tool_calls,
                     unpack=False,
                 )
 
-            if len(output_messages["response"]) > 0:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
-                )
+            if len(response_texts) > 0:
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_texts)
 
         _calculate_token_usage(messages, response, span, None, integration.count_tokens)
 

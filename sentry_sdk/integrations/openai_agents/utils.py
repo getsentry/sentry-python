@@ -1,6 +1,7 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
+    extract_response_output,
     normalize_message_roles,
     parse_data_uri,
     set_data_normalized,
@@ -300,31 +301,13 @@ def _set_output_data(span: "sentry_sdk.tracing.Span", result: "Any") -> None:
     if not should_send_default_pii():
         return
 
-    output_messages: "dict[str, list[Any]]" = {
-        "response": [],
-        "tool": [],
-    }
+    response_texts, tool_calls = extract_response_output(result.output)
 
-    for output in result.output:
-        if output.type == "function_call":
-            output_messages["tool"].append(output.dict())
-        elif output.type == "message":
-            for output_message in output.content:
-                try:
-                    output_messages["response"].append(output_message.text)
-                except AttributeError:
-                    # Unknown output message type, just return the json
-                    output_messages["response"].append(output_message.dict())
+    if len(tool_calls) > 0:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
 
-    if len(output_messages["tool"]) > 0:
-        span.set_data(
-            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(output_messages["tool"])
-        )
-
-    if len(output_messages["response"]) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
-        )
+    if len(response_texts) > 0:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_texts)
 
 
 def _create_mcp_execute_tool_spans(
