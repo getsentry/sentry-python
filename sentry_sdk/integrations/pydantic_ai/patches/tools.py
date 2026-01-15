@@ -1,7 +1,9 @@
+import sys
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 import sentry_sdk
+from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import execute_tool_span, update_execute_tool_span
 from ..utils import _capture_exception, get_current_agent
@@ -81,21 +83,22 @@ def _patch_tool_execution() -> None:
                         update_execute_tool_span(span, result)
                         return result
                     except ToolRetryError as exc:
-                        # Avoid circular import due to multi-file integration structure
-                        from sentry_sdk.integrations.pydantic_ai import (
-                            PydanticAIIntegration,
-                        )
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            # Avoid circular import due to multi-file integration structure
+                            from sentry_sdk.integrations.pydantic_ai import (
+                                PydanticAIIntegration,
+                            )
 
-                        integration = sentry_sdk.get_client().get_integration(
-                            PydanticAIIntegration
-                        )
-                        if (
-                            integration is None
-                            or not integration.handled_tool_call_exceptions
-                        ):
-                            raise exc from None
-                        _capture_exception(exc, handled=True)
-                        raise exc from None
+                            integration = sentry_sdk.get_client().get_integration(
+                                PydanticAIIntegration
+                            )
+                            if (
+                                integration is not None
+                                and integration.handled_tool_call_exceptions
+                            ):
+                                _capture_exception(exc, handled=True)
+                        reraise(*exc_info)
 
         # No span context - just call original
         return await original_call_tool(
