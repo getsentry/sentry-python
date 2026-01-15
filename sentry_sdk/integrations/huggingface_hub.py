@@ -1,3 +1,4 @@
+import sys
 import inspect
 from functools import wraps
 
@@ -11,6 +12,7 @@ from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    reraise,
 )
 
 from typing import TYPE_CHECKING
@@ -126,9 +128,11 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         try:
             res = f(*args, **kwargs)
         except Exception as e:
-            _capture_exception(e)
-            span.__exit__(None, None, None)
-            raise e from None
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(e)
+                span.__exit__(None, None, None)
+            reraise(*exc_info)
 
         # Output attributes
         finish_reason = None
