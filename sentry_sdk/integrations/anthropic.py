@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING
@@ -20,6 +21,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
     safe_serialize,
+    reraise,
 )
 
 try:
@@ -386,8 +388,10 @@ def _wrap_message_create(f: "Any") -> "Any":
             try:
                 result = f(*args, **kwargs)
             except Exception as exc:
-                _capture_exception(exc)
-                raise exc from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
@@ -422,8 +426,10 @@ def _wrap_message_create_async(f: "Any") -> "Any":
             try:
                 result = await f(*args, **kwargs)
             except Exception as exc:
-                _capture_exception(exc)
-                raise exc from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
