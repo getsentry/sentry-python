@@ -1609,6 +1609,55 @@ def test_convert_message_parts_malformed_data_uri():
     assert item["modality"] == "image"
 
 
+def test_convert_message_parts_image_url_as_string():
+    """Test that image_url as a string (instead of dict) is handled gracefully"""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    # Some implementations pass image_url as a string directly
+                    "image_url": "https://example.com/image.jpg",
+                },
+            ],
+        }
+    ]
+
+    # Should not raise an exception
+    converted = _convert_message_parts(messages)
+
+    assert len(converted) == 1
+    item = converted[0]["content"][0]
+    assert item["type"] == "uri"
+    assert item["modality"] == "image"
+    assert item["uri"] == "https://example.com/image.jpg"
+
+
+def test_convert_message_parts_image_url_as_string_data_uri():
+    """Test that image_url as a data URI string is correctly converted to blob"""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": "data:image/png;base64,iVBORw0KGgo=",
+                },
+            ],
+        }
+    ]
+
+    converted = _convert_message_parts(messages)
+
+    assert len(converted) == 1
+    item = converted[0]["content"][0]
+    assert item["type"] == "blob"
+    assert item["modality"] == "image"
+    assert item["mime_type"] == "image/png"
+    assert item["content"] == "iVBORw0KGgo="
+
+
 def test_openai_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in OpenAI integration."""
     sentry_init(

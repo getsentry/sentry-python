@@ -224,8 +224,13 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
             return item
 
         if item.get("type") == "image_url":
-            image_url = item.get("image_url") or {}
-            url = image_url.get("url", "")
+            image_url = item.get("image_url")
+            if isinstance(image_url, str):
+                url = image_url
+            elif isinstance(image_url, dict):
+                url = image_url.get("url", "")
+            else:
+                url = ""
             if url.startswith("data:"):
                 try:
                     mime_type, content = parse_data_uri(url)
