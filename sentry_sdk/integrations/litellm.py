@@ -6,9 +6,9 @@ from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
-    parse_data_uri,
     set_data_normalized,
     truncate_and_annotate_messages,
+    transform_message_content,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -40,74 +40,19 @@ def _get_metadata_dict(kwargs: "Dict[str, Any]") -> "Dict[str, Any]":
 
 def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, Any]]":
     """
-    Convert the message parts from OpenAI format to the `gen_ai.request.messages` format.
-    e.g:
-    {
-        "role": "user",
-        "content": [
-            {
-                "text": "How many ponies do you see in the image?",
-                "type": "text"
-            },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": "data:image/jpeg;base64,...",
-                    "detail": "high"
-                }
-            }
-        ]
-    }
-    becomes:
-    {
-        "role": "user",
-        "content": [
-            {
-                "text": "How many ponies do you see in the image?",
-                "type": "text"
-            },
-            {
-                "type": "blob",
-                "modality": "image",
-                "mime_type": "image/jpeg",
-                "content": "<base64 encoded data>"
-            }
-        ]
-    }
+    Convert the message parts from OpenAI format to the `gen_ai.request.messages` format
+    using the shared transform_message_content function.
+
+    Deep copies messages to avoid mutating original kwargs.
     """
     # Deep copy to avoid mutating original messages from kwargs
     messages = copy.deepcopy(messages)
 
-    def _map_item(item: "Dict[str, Any]") -> "Dict[str, Any]":
-        if not isinstance(item, dict):
-            return item
-        if item.get("type") == "image_url":
-            image_url = item.get("image_url") or {}
-            url = image_url.get("url", "")
-            if url.startswith("data:") and ";base64," in url:
-                try:
-                    mime_type, content = parse_data_uri(url)
-                    return {
-                        "type": "blob",
-                        "modality": "image",
-                        "mime_type": mime_type,
-                        "content": content,
-                    }
-                except ValueError:
-                    pass
-            if url:
-                return {
-                    "type": "uri",
-                    "uri": url,
-                }
-        return item
-
     for message in messages:
         if not isinstance(message, dict):
             continue
-        content = message.get("content")
-        if isinstance(content, list):
-            message["content"] = [_map_item(item) for item in content]
+        if "content" in message:
+            message["content"] = transform_message_content(message["content"])
     return messages
 
 
