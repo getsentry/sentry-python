@@ -78,7 +78,7 @@ TEST_SUITE_CONFIG = {
         },
         "num_versions": 2,
     },
-    "claude_code_sdk": {
+    "claude_agent_sdk": {
         "package": "claude-agent-sdk",
         "deps": {
             "*": ["pytest-asyncio"],

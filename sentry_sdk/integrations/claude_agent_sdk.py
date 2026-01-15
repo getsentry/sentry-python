@@ -10,7 +10,7 @@ The integration supports:
 
 Usage:
     import sentry_sdk
-    from sentry_sdk.integrations.claude_code_sdk import ClaudeCodeSDKIntegration
+    from sentry_sdk.integrations.claude_agent_sdk import ClaudeCodeSDKIntegration
 
     sentry_sdk.init(
         dsn="...",
@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-class ClaudeCodeSDKIntegration(Integration):
+class ClaudeAgentSDKIntegration(Integration):
     """
     Integration for Claude Agent SDK.
 
@@ -66,7 +66,7 @@ class ClaudeCodeSDKIntegration(Integration):
             Requires send_default_pii=True in Sentry init. Defaults to True.
     """
 
-    identifier = "claude_code_sdk"
+    identifier = "claude_agent_sdk"
     origin = f"auto.ai.{identifier}"
 
     def __init__(self, include_prompts: bool = True) -> None:
@@ -75,7 +75,7 @@ class ClaudeCodeSDKIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         version = package_version("claude_agent_sdk")
-        _check_minimum_version(ClaudeCodeSDKIntegration, version)
+        _check_minimum_version(ClaudeAgentSDKIntegration, version)
 
         # Patch the query function
         claude_agent_sdk.query = _wrap_query(original_query)
@@ -97,7 +97,7 @@ def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
-        mechanism={"type": "claude_code_sdk", "handled": False},
+        mechanism={"type": "claude_agent_sdk", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
 
@@ -106,10 +106,10 @@ def _set_span_input_data(
     span: "Span",
     prompt: "str",
     options: "Optional[Any]",
-    integration: "ClaudeCodeSDKIntegration",
+    integration: "ClaudeAgentSDKIntegration",
 ) -> None:
     """Set input data on the span."""
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "claude-code")
+    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "claude-agent-sdk-python")
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     # Extract configuration from options if available
@@ -187,7 +187,7 @@ def _extract_tool_calls(message: "Any") -> "Optional[list]":
 def _set_span_output_data(
     span: "Span",
     messages: "list",
-    integration: "ClaudeCodeSDKIntegration",
+    integration: "ClaudeAgentSDKIntegration",
 ) -> None:
     """Set output data on the span from collected messages."""
     response_texts = []
@@ -273,7 +273,7 @@ def _wrap_query(original_func: "Any") -> "Any":
     async def wrapper(
         *, prompt: str, options: "Optional[Any]" = None, **kwargs: "Any"
     ) -> "AsyncGenerator[Any, None]":
-        integration = sentry_sdk.get_client().get_integration(ClaudeCodeSDKIntegration)
+        integration = sentry_sdk.get_client().get_integration(ClaudeAgentSDKIntegration)
         if integration is None:
             async for message in original_func(prompt=prompt, options=options, **kwargs):
                 yield message
@@ -285,8 +285,8 @@ def _wrap_query(original_func: "Any") -> "Any":
 
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
-            name=f"claude-code query {model}".strip(),
-            origin=ClaudeCodeSDKIntegration.origin,
+            name=f"claude-agent-sdk query {model}".strip(),
+            origin=ClaudeAgentSDKIntegration.origin,
         )
         span.__enter__()
 
@@ -315,7 +315,7 @@ def _wrap_client_query(original_method: "Any") -> "Any":
 
     @wraps(original_method)
     async def wrapper(self: "Any", prompt: str, **kwargs: "Any") -> "Any":
-        integration = sentry_sdk.get_client().get_integration(ClaudeCodeSDKIntegration)
+        integration = sentry_sdk.get_client().get_integration(ClaudeAgentSDKIntegration)
         if integration is None:
             return await original_method(self, prompt, **kwargs)
 
@@ -330,8 +330,8 @@ def _wrap_client_query(original_method: "Any") -> "Any":
 
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
-            name=f"claude-code client {model}".strip(),
-            origin=ClaudeCodeSDKIntegration.origin,
+            name=f"claude-agent-sdk client {model}".strip(),
+            origin=ClaudeAgentSDKIntegration.origin,
         )
         span.__enter__()
 
@@ -367,7 +367,7 @@ def _wrap_receive_response(original_method: "Any") -> "Any":
 
     @wraps(original_method)
     async def wrapper(self: "Any", **kwargs: "Any") -> "AsyncGenerator[Any, None]":
-        integration = sentry_sdk.get_client().get_integration(ClaudeCodeSDKIntegration)
+        integration = sentry_sdk.get_client().get_integration(ClaudeAgentSDKIntegration)
         if integration is None:
             async for message in original_method(self, **kwargs):
                 yield message

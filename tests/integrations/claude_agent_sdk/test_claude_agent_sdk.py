@@ -6,8 +6,8 @@ import json
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.claude_code_sdk import (
-    ClaudeCodeSDKIntegration,
+from sentry_sdk.integrations.claude_agent_sdk import (
+    ClaudeAgentSDKIntegration,
     _set_span_input_data,
     _set_span_output_data,
     _extract_text_from_message,
@@ -80,11 +80,11 @@ def test_extract_text_from_assistant_message():
     """Test extracting text from an AssistantMessage."""
     # Patch the AssistantMessage and TextBlock type checks
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+            "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
             MockTextBlock,
         ):
             message = MockAssistantMessage(
@@ -98,11 +98,11 @@ def test_extract_text_from_assistant_message():
 def test_extract_text_from_multiple_blocks():
     """Test extracting text from multiple text blocks."""
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+            "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
             MockTextBlock,
         ):
             message = MockAssistantMessage(
@@ -119,11 +119,11 @@ def test_extract_text_from_multiple_blocks():
 def test_extract_tool_calls():
     """Test extracting tool calls from an AssistantMessage."""
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.ToolUseBlock",
+            "sentry_sdk.integrations.claude_agent_sdk.ToolUseBlock",
             MockToolUseBlock,
         ):
             message = MockAssistantMessage(
@@ -142,18 +142,18 @@ def test_extract_tool_calls():
 def test_set_span_input_data_basic(sentry_init):
     """Test setting basic input data on a span."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with start_transaction(name="test") as transaction:
         span = transaction.start_child(op="test")
-        integration = ClaudeCodeSDKIntegration(include_prompts=True)
+        integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
         _set_span_input_data(span, "Hello", None, integration)
 
-        assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-code"
+        assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-agent-sdk-python"
         assert span._data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data
 
@@ -161,14 +161,14 @@ def test_set_span_input_data_basic(sentry_init):
 def test_set_span_input_data_with_options(sentry_init):
     """Test setting input data with options."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with start_transaction(name="test") as transaction:
         span = transaction.start_child(op="test")
-        integration = ClaudeCodeSDKIntegration(include_prompts=True)
+        integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
         options = MockClaudeAgentOptions(
             model="claude-opus-4-5-20251101",
@@ -191,62 +191,62 @@ def test_set_span_input_data_with_options(sentry_init):
 def test_set_span_input_data_pii_disabled(sentry_init):
     """Test that PII-sensitive data is not captured when PII is disabled."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
     )
 
     with start_transaction(name="test") as transaction:
         span = transaction.start_child(op="test")
-        integration = ClaudeCodeSDKIntegration(include_prompts=True)
+        integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
         _set_span_input_data(span, "Hello", None, integration)
 
-        assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-code"
+        assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-agent-sdk-python"
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span._data
 
 
 def test_set_span_input_data_include_prompts_disabled(sentry_init):
     """Test that prompts are not captured when include_prompts is False."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration(include_prompts=False)],
+        integrations=[ClaudeAgentSDKIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with start_transaction(name="test") as transaction:
         span = transaction.start_child(op="test")
-        integration = ClaudeCodeSDKIntegration(include_prompts=False)
+        integration = ClaudeAgentSDKIntegration(include_prompts=False)
 
         _set_span_input_data(span, "Hello", None, integration)
 
-        assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-code"
+        assert span._data[SPANDATA.GEN_AI_SYSTEM] == "claude-agent-sdk-python"
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span._data
 
 
 def test_set_span_output_data_with_messages(sentry_init):
     """Test setting output data from messages."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.ResultMessage",
+            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
             MockResultMessage,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
                 MockTextBlock,
             ):
                 with start_transaction(name="test") as transaction:
                     span = transaction.start_child(op="test")
-                    integration = ClaudeCodeSDKIntegration(include_prompts=True)
+                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
                     messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
                     _set_span_output_data(span, messages, integration)
@@ -269,26 +269,26 @@ def test_set_span_output_data_with_messages(sentry_init):
 def test_set_span_output_data_no_usage(sentry_init):
     """Test output data when there's no usage information."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.ResultMessage",
+            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
             MockResultMessage,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
                 MockTextBlock,
             ):
                 with start_transaction(name="test") as transaction:
                     span = transaction.start_child(op="test")
-                    integration = ClaudeCodeSDKIntegration(include_prompts=True)
+                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
                     result_no_usage = MockResultMessage(usage=None, total_cost_usd=None)
                     messages = [EXAMPLE_ASSISTANT_MESSAGE, result_no_usage]
@@ -307,30 +307,30 @@ def test_set_span_output_data_no_usage(sentry_init):
 def test_set_span_output_data_with_tool_calls(sentry_init):
     """Test output data with tool calls."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.ResultMessage",
+            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
             MockResultMessage,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
                 MockTextBlock,
             ):
                 with mock.patch(
-                    "sentry_sdk.integrations.claude_code_sdk.ToolUseBlock",
+                    "sentry_sdk.integrations.claude_agent_sdk.ToolUseBlock",
                     MockToolUseBlock,
                 ):
                     with start_transaction(name="test") as transaction:
                         span = transaction.start_child(op="test")
-                        integration = ClaudeCodeSDKIntegration(include_prompts=True)
+                        integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
                         assistant_with_tool = MockAssistantMessage(
                             content=[
@@ -350,26 +350,26 @@ def test_set_span_output_data_with_tool_calls(sentry_init):
 def test_set_span_output_data_pii_disabled(sentry_init):
     """Test that response text is not captured when PII is disabled."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
     )
 
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.ResultMessage",
+            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
             MockResultMessage,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
                 MockTextBlock,
             ):
                 with start_transaction(name="test") as transaction:
                     span = transaction.start_child(op="test")
-                    integration = ClaudeCodeSDKIntegration(include_prompts=True)
+                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
                     messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
                     _set_span_output_data(span, messages, integration)
@@ -386,20 +386,20 @@ def test_set_span_output_data_pii_disabled(sentry_init):
 
 def test_integration_identifier():
     """Test that the integration has the correct identifier."""
-    integration = ClaudeCodeSDKIntegration()
-    assert integration.identifier == "claude_code_sdk"
-    assert integration.origin == "auto.ai.claude_code_sdk"
+    integration = ClaudeAgentSDKIntegration()
+    assert integration.identifier == "claude_agent_sdk"
+    assert integration.origin == "auto.ai.claude_agent_sdk"
 
 
 def test_integration_include_prompts_default():
     """Test that include_prompts defaults to True."""
-    integration = ClaudeCodeSDKIntegration()
+    integration = ClaudeAgentSDKIntegration()
     assert integration.include_prompts is True
 
 
 def test_integration_include_prompts_false():
     """Test setting include_prompts to False."""
-    integration = ClaudeCodeSDKIntegration(include_prompts=False)
+    integration = ClaudeAgentSDKIntegration(include_prompts=False)
     assert integration.include_prompts is False
 
 
@@ -417,14 +417,14 @@ def test_pii_and_prompts_matrix(
 ):
     """Test the matrix of PII and include_prompts settings."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration(include_prompts=include_prompts)],
+        integrations=[ClaudeAgentSDKIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
 
     with start_transaction(name="test") as transaction:
         span = transaction.start_child(op="test")
-        integration = ClaudeCodeSDKIntegration(include_prompts=include_prompts)
+        integration = ClaudeAgentSDKIntegration(include_prompts=include_prompts)
 
         _set_span_input_data(span, "Test prompt", None, integration)
 
@@ -437,26 +437,26 @@ def test_pii_and_prompts_matrix(
 def test_model_fallback_from_response(sentry_init):
     """Test that request model falls back to response model if not set."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.ResultMessage",
+            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
             MockResultMessage,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
                 MockTextBlock,
             ):
                 with start_transaction(name="test") as transaction:
                     span = transaction.start_child(op="test")
-                    integration = ClaudeCodeSDKIntegration(include_prompts=True)
+                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
                     # Don't set request model in input
                     _set_span_input_data(span, "Hello", None, integration)
@@ -479,26 +479,26 @@ def test_model_fallback_from_response(sentry_init):
 def test_model_from_options_preserved(sentry_init):
     """Test that request model from options is preserved."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.ResultMessage",
+            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
             MockResultMessage,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
                 MockTextBlock,
             ):
                 with start_transaction(name="test") as transaction:
                     span = transaction.start_child(op="test")
-                    integration = ClaudeCodeSDKIntegration(include_prompts=True)
+                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
                     # Set request model from options
                     options = MockClaudeAgentOptions(model="claude-opus-4-5-20251101")
@@ -523,14 +523,14 @@ def test_model_from_options_preserved(sentry_init):
 def test_available_tools_format(sentry_init):
     """Test that available tools are formatted correctly."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with start_transaction(name="test") as transaction:
         span = transaction.start_child(op="test")
-        integration = ClaudeCodeSDKIntegration(include_prompts=True)
+        integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
         options = MockClaudeAgentOptions(allowed_tools=["Read", "Write", "Bash"])
         _set_span_input_data(span, "Hello", options, integration)
@@ -548,26 +548,26 @@ def test_available_tools_format(sentry_init):
 def test_cached_tokens_extraction(sentry_init):
     """Test extraction of cached input tokens."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with mock.patch(
-        "sentry_sdk.integrations.claude_code_sdk.AssistantMessage",
+        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
         MockAssistantMessage,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.claude_code_sdk.ResultMessage",
+            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
             MockResultMessage,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.claude_code_sdk.TextBlock",
+                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
                 MockTextBlock,
             ):
                 with start_transaction(name="test") as transaction:
                     span = transaction.start_child(op="test")
-                    integration = ClaudeCodeSDKIntegration(include_prompts=True)
+                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
                     result_with_cache = MockResultMessage(
                         usage={
@@ -590,14 +590,14 @@ def test_cached_tokens_extraction(sentry_init):
 def test_empty_messages_list(sentry_init):
     """Test handling of empty messages list."""
     sentry_init(
-        integrations=[ClaudeCodeSDKIntegration()],
+        integrations=[ClaudeAgentSDKIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
     with start_transaction(name="test") as transaction:
         span = transaction.start_child(op="test")
-        integration = ClaudeCodeSDKIntegration(include_prompts=True)
+        integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
         _set_span_output_data(span, [], integration)
 
