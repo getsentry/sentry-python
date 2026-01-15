@@ -52,6 +52,7 @@ setup(
         "celery": ["celery>=3"],
         "celery-redbeat": ["celery-redbeat>=2"],
         "chalice": ["chalice>=1.16.0"],
+        "claude_code_sdk": ["claude-agent-sdk>=0.1.0"],
         "clickhouse-driver": ["clickhouse-driver>=0.2.0"],
         "django": ["django>=1.8"],
         "falcon": ["falcon>=1.4"],

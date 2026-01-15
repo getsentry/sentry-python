@@ -84,6 +84,10 @@ module = "anthropic.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "claude_agent_sdk.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "sanic.*"
 ignore_missing_imports = true
 

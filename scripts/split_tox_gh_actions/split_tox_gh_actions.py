@@ -74,6 +74,7 @@ GROUPS = {
         "fastmcp",
     ],
     "Agents": [
+        "claude_code_sdk",
         "openai_agents",
         "pydantic_ai",
     ],

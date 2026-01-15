@@ -78,6 +78,13 @@ TEST_SUITE_CONFIG = {
         },
         "num_versions": 2,
     },
+    "claude_code_sdk": {
+        "package": "claude-agent-sdk",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.10",
+    },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
         "num_versions": 2,
