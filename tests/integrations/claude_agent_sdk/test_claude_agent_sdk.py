@@ -75,68 +75,61 @@ EXAMPLE_RESULT_MESSAGE = MockResultMessage(
     total_cost_usd=0.005,
 )
 
+# Module path for patching
+INTEGRATION_MODULE = "sentry_sdk.integrations.claude_agent_sdk"
+
 
 def test_extract_text_from_assistant_message():
     """Test extracting text from an AssistantMessage."""
-    # Patch the AssistantMessage and TextBlock type checks
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        TextBlock=MockTextBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-            MockTextBlock,
-        ):
-            message = MockAssistantMessage(
-                content=[MockTextBlock(text="Hello!")],
-                model="test-model",
-            )
-            text = _extract_text_from_message(message)
-            assert text == "Hello!"
+        message = MockAssistantMessage(
+            content=[MockTextBlock(text="Hello!")],
+            model="test-model",
+        )
+        text = _extract_text_from_message(message)
+        assert text == "Hello!"
 
 
 def test_extract_text_from_multiple_blocks():
     """Test extracting text from multiple text blocks."""
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        TextBlock=MockTextBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-            MockTextBlock,
-        ):
-            message = MockAssistantMessage(
-                content=[
-                    MockTextBlock(text="First. "),
-                    MockTextBlock(text="Second."),
-                ],
-                model="test-model",
-            )
-            text = _extract_text_from_message(message)
-            assert text == "First. Second."
+        message = MockAssistantMessage(
+            content=[
+                MockTextBlock(text="First. "),
+                MockTextBlock(text="Second."),
+            ],
+            model="test-model",
+        )
+        text = _extract_text_from_message(message)
+        assert text == "First. Second."
 
 
 def test_extract_tool_calls():
     """Test extracting tool calls from an AssistantMessage."""
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ToolUseBlock=MockToolUseBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.ToolUseBlock",
-            MockToolUseBlock,
-        ):
-            message = MockAssistantMessage(
-                content=[
-                    MockTextBlock(text="Let me help."),
-                    MockToolUseBlock(name="Read", input={"path": "/test.txt"}),
-                ],
-                model="test-model",
-            )
-            tool_calls = _extract_tool_calls(message)
-            assert len(tool_calls) == 1
-            assert tool_calls[0]["name"] == "Read"
-            assert tool_calls[0]["input"] == {"path": "/test.txt"}
+        message = MockAssistantMessage(
+            content=[
+                MockTextBlock(text="Let me help."),
+                MockToolUseBlock(name="Read", input={"path": "/test.txt"}),
+            ],
+            model="test-model",
+        )
+        tool_calls = _extract_tool_calls(message)
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["name"] == "Read"
+        assert tool_calls[0]["input"] == {"path": "/test.txt"}
 
 
 def test_set_span_input_data_basic(sentry_init):
@@ -232,38 +225,32 @@ def test_set_span_output_data_with_messages(sentry_init):
         send_default_pii=True,
     )
 
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ResultMessage=MockResultMessage,
+        TextBlock=MockTextBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
-            MockResultMessage,
-        ):
-            with mock.patch(
-                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-                MockTextBlock,
-            ):
-                with start_transaction(name="test") as transaction:
-                    span = transaction.start_child(op="test")
-                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        with start_transaction(name="test") as transaction:
+            span = transaction.start_child(op="test")
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
-                    messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
-                    _set_span_output_data(span, messages, integration)
+            messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
+            _set_span_output_data(span, messages, integration)
 
-                    assert (
-                        span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
-                        == "claude-sonnet-4-5-20250929"
-                    )
-                    assert (
-                        span._data[SPANDATA.GEN_AI_REQUEST_MODEL]
-                        == "claude-sonnet-4-5-20250929"
-                    )
-                    assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-                    assert span._data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-                    assert span._data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-                    assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 100
-                    assert span._data["claude_code.total_cost_usd"] == 0.005
+            assert (
+                span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "claude-sonnet-4-5-20250929"
+            )
+            assert (
+                span._data[SPANDATA.GEN_AI_REQUEST_MODEL]
+                == "claude-sonnet-4-5-20250929"
+            )
+            assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+            assert span._data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+            assert span._data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+            assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 100
+            assert span._data["claude_code.total_cost_usd"] == 0.005
 
 
 def test_set_span_output_data_no_usage(sentry_init):
@@ -274,34 +261,28 @@ def test_set_span_output_data_no_usage(sentry_init):
         send_default_pii=True,
     )
 
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ResultMessage=MockResultMessage,
+        TextBlock=MockTextBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
-            MockResultMessage,
-        ):
-            with mock.patch(
-                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-                MockTextBlock,
-            ):
-                with start_transaction(name="test") as transaction:
-                    span = transaction.start_child(op="test")
-                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        with start_transaction(name="test") as transaction:
+            span = transaction.start_child(op="test")
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
-                    result_no_usage = MockResultMessage(usage=None, total_cost_usd=None)
-                    messages = [EXAMPLE_ASSISTANT_MESSAGE, result_no_usage]
-                    _set_span_output_data(span, messages, integration)
+            result_no_usage = MockResultMessage(usage=None, total_cost_usd=None)
+            messages = [EXAMPLE_ASSISTANT_MESSAGE, result_no_usage]
+            _set_span_output_data(span, messages, integration)
 
-                    # Should still have model info
-                    assert (
-                        span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
-                        == "claude-sonnet-4-5-20250929"
-                    )
-                    # But no token usage
-                    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in span._data
-                    assert "claude_code.total_cost_usd" not in span._data
+            # Should still have model info
+            assert (
+                span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "claude-sonnet-4-5-20250929"
+            )
+            # But no token usage
+            assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in span._data
+            assert "claude_code.total_cost_usd" not in span._data
 
 
 def test_set_span_output_data_with_tool_calls(sentry_init):
@@ -312,39 +293,28 @@ def test_set_span_output_data_with_tool_calls(sentry_init):
         send_default_pii=True,
     )
 
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ResultMessage=MockResultMessage,
+        TextBlock=MockTextBlock,
+        ToolUseBlock=MockToolUseBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
-            MockResultMessage,
-        ):
-            with mock.patch(
-                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-                MockTextBlock,
-            ):
-                with mock.patch(
-                    "sentry_sdk.integrations.claude_agent_sdk.ToolUseBlock",
-                    MockToolUseBlock,
-                ):
-                    with start_transaction(name="test") as transaction:
-                        span = transaction.start_child(op="test")
-                        integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        with start_transaction(name="test") as transaction:
+            span = transaction.start_child(op="test")
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
-                        assistant_with_tool = MockAssistantMessage(
-                            content=[
-                                MockTextBlock(text="Let me read that."),
-                                MockToolUseBlock(
-                                    name="Read", input={"path": "/test.txt"}
-                                ),
-                            ],
-                            model="claude-sonnet-4-5-20250929",
-                        )
-                        messages = [assistant_with_tool, EXAMPLE_RESULT_MESSAGE]
-                        _set_span_output_data(span, messages, integration)
+            assistant_with_tool = MockAssistantMessage(
+                content=[
+                    MockTextBlock(text="Let me read that."),
+                    MockToolUseBlock(name="Read", input={"path": "/test.txt"}),
+                ],
+                model="claude-sonnet-4-5-20250929",
+            )
+            messages = [assistant_with_tool, EXAMPLE_RESULT_MESSAGE]
+            _set_span_output_data(span, messages, integration)
 
-                        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in span._data
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in span._data
 
 
 def test_set_span_output_data_pii_disabled(sentry_init):
@@ -355,33 +325,27 @@ def test_set_span_output_data_pii_disabled(sentry_init):
         send_default_pii=False,  # PII disabled
     )
 
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ResultMessage=MockResultMessage,
+        TextBlock=MockTextBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
-            MockResultMessage,
-        ):
-            with mock.patch(
-                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-                MockTextBlock,
-            ):
-                with start_transaction(name="test") as transaction:
-                    span = transaction.start_child(op="test")
-                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        with start_transaction(name="test") as transaction:
+            span = transaction.start_child(op="test")
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
-                    messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
-                    _set_span_output_data(span, messages, integration)
+            messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
+            _set_span_output_data(span, messages, integration)
 
-                    # Should have model and tokens
-                    assert (
-                        span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
-                        == "claude-sonnet-4-5-20250929"
-                    )
-                    assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-                    # But not response text
-                    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span._data
+            # Should have model and tokens
+            assert (
+                span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "claude-sonnet-4-5-20250929"
+            )
+            assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+            # But not response text
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span._data
 
 
 def test_integration_identifier():
@@ -442,38 +406,32 @@ def test_model_fallback_from_response(sentry_init):
         send_default_pii=True,
     )
 
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ResultMessage=MockResultMessage,
+        TextBlock=MockTextBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
-            MockResultMessage,
-        ):
-            with mock.patch(
-                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-                MockTextBlock,
-            ):
-                with start_transaction(name="test") as transaction:
-                    span = transaction.start_child(op="test")
-                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        with start_transaction(name="test") as transaction:
+            span = transaction.start_child(op="test")
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
-                    # Don't set request model in input
-                    _set_span_input_data(span, "Hello", None, integration)
+            # Don't set request model in input
+            _set_span_input_data(span, "Hello", None, integration)
 
-                    # Now set output with response model
-                    messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
-                    _set_span_output_data(span, messages, integration)
+            # Now set output with response model
+            messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
+            _set_span_output_data(span, messages, integration)
 
-                    # Request model should be set from response model
-                    assert (
-                        span._data[SPANDATA.GEN_AI_REQUEST_MODEL]
-                        == "claude-sonnet-4-5-20250929"
-                    )
-                    assert (
-                        span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
-                        == "claude-sonnet-4-5-20250929"
-                    )
+            # Request model should be set from response model
+            assert (
+                span._data[SPANDATA.GEN_AI_REQUEST_MODEL]
+                == "claude-sonnet-4-5-20250929"
+            )
+            assert (
+                span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "claude-sonnet-4-5-20250929"
+            )
 
 
 def test_model_from_options_preserved(sentry_init):
@@ -484,40 +442,34 @@ def test_model_from_options_preserved(sentry_init):
         send_default_pii=True,
     )
 
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ResultMessage=MockResultMessage,
+        TextBlock=MockTextBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
-            MockResultMessage,
-        ):
-            with mock.patch(
-                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-                MockTextBlock,
-            ):
-                with start_transaction(name="test") as transaction:
-                    span = transaction.start_child(op="test")
-                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        with start_transaction(name="test") as transaction:
+            span = transaction.start_child(op="test")
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
-                    # Set request model from options
-                    options = MockClaudeAgentOptions(model="claude-opus-4-5-20251101")
-                    _set_span_input_data(span, "Hello", options, integration)
+            # Set request model from options
+            options = MockClaudeAgentOptions(model="claude-opus-4-5-20251101")
+            _set_span_input_data(span, "Hello", options, integration)
 
-                    # Now set output with different response model
-                    messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
-                    _set_span_output_data(span, messages, integration)
+            # Now set output with different response model
+            messages = [EXAMPLE_ASSISTANT_MESSAGE, EXAMPLE_RESULT_MESSAGE]
+            _set_span_output_data(span, messages, integration)
 
-                    # Request model should be preserved from options
-                    assert (
-                        span._data[SPANDATA.GEN_AI_REQUEST_MODEL]
-                        == "claude-opus-4-5-20251101"
-                    )
-                    # Response model should be from response
-                    assert (
-                        span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
-                        == "claude-sonnet-4-5-20250929"
-                    )
+            # Request model should be preserved from options
+            assert (
+                span._data[SPANDATA.GEN_AI_REQUEST_MODEL]
+                == "claude-opus-4-5-20251101"
+            )
+            # Response model should be from response
+            assert (
+                span._data[SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "claude-sonnet-4-5-20250929"
+            )
 
 
 def test_available_tools_format(sentry_init):
@@ -553,38 +505,32 @@ def test_cached_tokens_extraction(sentry_init):
         send_default_pii=True,
     )
 
-    with mock.patch(
-        "sentry_sdk.integrations.claude_agent_sdk.AssistantMessage",
-        MockAssistantMessage,
+    with mock.patch.multiple(
+        INTEGRATION_MODULE,
+        AssistantMessage=MockAssistantMessage,
+        ResultMessage=MockResultMessage,
+        TextBlock=MockTextBlock,
     ):
-        with mock.patch(
-            "sentry_sdk.integrations.claude_agent_sdk.ResultMessage",
-            MockResultMessage,
-        ):
-            with mock.patch(
-                "sentry_sdk.integrations.claude_agent_sdk.TextBlock",
-                MockTextBlock,
-            ):
-                with start_transaction(name="test") as transaction:
-                    span = transaction.start_child(op="test")
-                    integration = ClaudeAgentSDKIntegration(include_prompts=True)
+        with start_transaction(name="test") as transaction:
+            span = transaction.start_child(op="test")
+            integration = ClaudeAgentSDKIntegration(include_prompts=True)
 
-                    result_with_cache = MockResultMessage(
-                        usage={
-                            "input_tokens": 5,
-                            "output_tokens": 15,
-                            "cache_read_input_tokens": 500,
-                        },
-                        total_cost_usd=0.003,
-                    )
+            result_with_cache = MockResultMessage(
+                usage={
+                    "input_tokens": 5,
+                    "output_tokens": 15,
+                    "cache_read_input_tokens": 500,
+                },
+                total_cost_usd=0.003,
+            )
 
-                    messages = [EXAMPLE_ASSISTANT_MESSAGE, result_with_cache]
-                    _set_span_output_data(span, messages, integration)
+            messages = [EXAMPLE_ASSISTANT_MESSAGE, result_with_cache]
+            _set_span_output_data(span, messages, integration)
 
-                    assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
-                    assert span._data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
-                    assert span._data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
-                    assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 500
+            assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+            assert span._data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
+            assert span._data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+            assert span._data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 500
 
 
 def test_empty_messages_list(sentry_init):
