@@ -6,8 +6,11 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
-from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled, has_tracing_enabled
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    has_span_streaming_enabled,
+    has_tracing_enabled,
+)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
@@ -37,6 +40,7 @@ TODO[span-first] / notes
 - profile not part of the event, how to send?
 - maybe: use getters/setter OR properties but not both
 - add size-based flushing to buffer(s)
+- migrate transaction sample_rand logic
 
 Notes:
 - removed ability to provide a start_timestamp
@@ -47,8 +51,8 @@ Notes:
 def start_span(
     name: str,
     attributes: "Optional[Attributes]" = None,
-    parent_span: "Optional[Span]" = None,
-) -> Span:
+    parent_span: "Optional[StreamedSpan]" = None,
+) -> "StreamedSpan":
     return sentry_sdk.get_current_scope().start_streamed_span()
 
 
@@ -120,6 +124,9 @@ class StreamedSpan:
         "_context_manager_state",
         "_profile",
         "_continuous_profile",
+        "_baggage",
+        "_sample_rate",
+        "_sample_rand",
     )
 
     def __init__(
@@ -128,7 +135,7 @@ class StreamedSpan:
         trace_id: str,
         attributes: "Optional[Attributes]" = None,
         parent_span_id: "Optional[str]" = None,
-        segment: "Optional[Span]" = None,
+        segment: "Optional[StreamedSpan]" = None,
         scope: "Optional[Scope]" = None,
     ) -> None:
         self._name: str = name
@@ -167,7 +174,7 @@ class StreamedSpan:
             f"sampled={self._sampled})>"
         )
 
-    def __enter__(self) -> "Span":
+    def __enter__(self) -> "StreamedSpan":
         scope = self._scope or sentry_sdk.get_current_scope()
         old_span = scope.span
         scope.span = self
@@ -303,6 +310,11 @@ class StreamedSpan:
 
         return self._trace_id
 
+    @property
+    def dynamic_sampling_context(self) -> str:
+        # TODO
+        return self.segment.get_baggage().dynamic_sampling_context()
+
     def _update_active_thread(self) -> None:
         thread_id, thread_name = get_current_thread_meta()
         self._set_thread(thread_id, thread_name)
@@ -327,3 +339,15 @@ class StreamedSpan:
             self.set_status(SpanStatus.ERROR)
         else:
             self.set_status(SpanStatus.OK)
+
+    def _get_baggage(self) -> "Baggage":
+        """
+        Return the :py:class:`~sentry_sdk.tracing_utils.Baggage` associated with
+        the segment.
+
+        The first time a new baggage with Sentry items is made, it will be frozen.
+        """
+        if not self._baggage or self._baggage.mutable:
+            self._baggage = Baggage.populate_from_segment(self)
+
+        return self._baggage

@@ -749,6 +749,54 @@ class Baggage:
 
         return Baggage(sentry_items, mutable=False)
 
+    @classmethod
+    def populate_from_segment(
+        cls, segment: "sentry_sdk.trace.StreamedSpan"
+    ) -> "Baggage":
+        """
+        Populate fresh baggage entry with sentry_items and make it immutable
+        if this is the head SDK which originates traces.
+        """
+        client = sentry_sdk.get_client()
+        sentry_items: "Dict[str, str]" = {}
+
+        if not client.is_active():
+            return Baggage(sentry_items)
+
+        options = client.options or {}
+
+        sentry_items["trace_id"] = segment.trace_id
+        sentry_items["sample_rand"] = f"{segment._sample_rand:.6f}"  # noqa: E231
+
+        if options.get("environment"):
+            sentry_items["environment"] = options["environment"]
+
+        if options.get("release"):
+            sentry_items["release"] = options["release"]
+
+        if client.parsed_dsn:
+            sentry_items["public_key"] = client.parsed_dsn.public_key
+            if client.parsed_dsn.org_id:
+                sentry_items["org_id"] = client.parsed_dsn.org_id
+
+        if segment.source not in LOW_QUALITY_TRANSACTION_SOURCES:
+            sentry_items["transaction"] = segment.name
+
+        if segment._sample_rate is not None:
+            sentry_items["sample_rate"] = str(segment._sample_rate)
+
+        if segment._sampled is not None:
+            sentry_items["sampled"] = "true" if segment._sampled else "false"
+
+        # There's an existing baggage but it was mutable, which is why we are
+        # creating this new baggage.
+        # However, if by chance the user put some sentry items in there, give
+        # them precedence.
+        if segment._baggage and segment._baggage.sentry_items:
+            sentry_items.update(segment._baggage.sentry_items)
+
+        return Baggage(sentry_items, mutable=False)
+
     def freeze(self) -> None:
         self.mutable = False
 
