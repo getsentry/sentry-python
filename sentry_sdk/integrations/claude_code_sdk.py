@@ -30,11 +30,12 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    package_version,
 )
 from sentry_sdk.tracing_utils import set_span_errored
 
@@ -73,6 +74,9 @@ class ClaudeCodeSDKIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("claude_agent_sdk")
+        _check_minimum_version(ClaudeCodeSDKIntegration, version)
+
         # Patch the query function
         claude_agent_sdk.query = _wrap_query(original_query)
 

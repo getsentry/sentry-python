@@ -67,6 +67,7 @@ _DEFAULT_INTEGRATIONS = [
 _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
     "sentry_sdk.integrations.anthropic.AnthropicIntegration",
+    "sentry_sdk.integrations.claude_code_sdk.ClaudeCodeSDKIntegration",
     "sentry_sdk.integrations.ariadne.AriadneIntegration",
     "sentry_sdk.integrations.arq.ArqIntegration",
     "sentry_sdk.integrations.asyncpg.AsyncPGIntegration",
@@ -127,6 +128,7 @@ _MIN_VERSIONS = {
     "celery": (4, 4, 7),
     "chalice": (1, 16, 0),
     "clickhouse_driver": (0, 2, 0),
+    "claude_code_sdk": (0, 1, 0),
     "cohere": (5, 4, 0),
     "django": (1, 8),
     "dramatiq": (1, 9),
