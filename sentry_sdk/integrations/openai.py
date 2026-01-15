@@ -133,12 +133,7 @@ def _calculate_token_usage(
 
     if hasattr(response, "usage"):
         input_tokens = _get_usage(response.usage, ["input_tokens", "prompt_tokens"])
-        if hasattr(response.usage, "prompt_tokens_details"):
-            input_tokens_cached = _get_usage(
-                response.usage.prompt_tokens_details, ["cached_tokens"]
-            )
-        # OpenAI also supports input_tokens_details for compatibility
-        elif hasattr(response.usage, "input_tokens_details"):
+        if hasattr(response.usage, "input_tokens_details"):
             input_tokens_cached = _get_usage(
                 response.usage.input_tokens_details, ["cached_tokens"]
             )
@@ -149,10 +144,6 @@ def _calculate_token_usage(
         if hasattr(response.usage, "output_tokens_details"):
             output_tokens_reasoning = _get_usage(
                 response.usage.output_tokens_details, ["reasoning_tokens"]
-            )
-        elif hasattr(response.usage, "completion_tokens_details"):
-            output_tokens_reasoning = _get_usage(
-                response.usage.completion_tokens_details, ["reasoning_tokens"]
             )
 
         total_tokens = _get_usage(response.usage, ["total_tokens"])
