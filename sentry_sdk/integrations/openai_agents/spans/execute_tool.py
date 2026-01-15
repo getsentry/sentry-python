@@ -51,3 +51,8 @@ def update_execute_tool_span(
 
     if should_send_default_pii():
         span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
+
+    # Add conversation ID from agent
+    conv_id = getattr(agent, "_sentry_conversation_id", None)
+    if conv_id:
+        span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)

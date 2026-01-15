@@ -95,6 +95,11 @@ def update_invoke_agent_span(
                 span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
             )
 
+        # Add conversation ID from agent
+        conv_id = getattr(agent, "_sentry_conversation_id", None)
+        if conv_id:
+            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+
         span.__exit__(None, None, None)
         delattr(context, "_sentry_agent_span")
 

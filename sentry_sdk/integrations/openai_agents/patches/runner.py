@@ -2,6 +2,7 @@ import sys
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
@@ -34,7 +35,19 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
         with sentry_sdk.isolation_scope():
             # Clone agent because agent invocation spans are attached per run.
             agent = args[0].clone()
-            with agent_workflow_span(agent):
+
+            # Capture conversation_id from kwargs if provided
+            conversation_id = kwargs.get("conversation_id")
+            if conversation_id:
+                agent._sentry_conversation_id = conversation_id
+
+            with agent_workflow_span(agent) as workflow_span:
+                # Set conversation ID on workflow span early so it's captured even on errors
+                if conversation_id:
+                    workflow_span.set_data(
+                        SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+                    )
+
                 args = (agent, *args[1:])
                 try:
                     run_result = await original_func(*args, **kwargs)
@@ -67,5 +80,61 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
 
                 end_invoke_agent_span(run_result.context_wrapper, agent)
                 return run_result
+
+    return wrapper
+
+
+def _create_run_streamed_wrapper(
+    original_func: "Callable[..., Any]",
+) -> "Callable[..., Any]":
+    """
+    Wraps the agents.Runner.run_streamed method to create a root span for streaming agent workflow runs.
+
+    Unlike run(), run_streamed() returns immediately with a RunResultStreaming object
+    while execution continues in a background task. The workflow span must stay open
+    throughout the streaming operation and close when streaming completes or is abandoned.
+
+    Note: We don't use isolation_scope() here because it uses context variables that
+    cannot span async boundaries (the __enter__ and __exit__ would be called from
+    different async contexts, causing ValueError).
+    """
+
+    @wraps(original_func)
+    def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+        # Clone agent because agent invocation spans are attached per run.
+        agent = args[0].clone()
+
+        # Capture conversation_id from kwargs if provided
+        conversation_id = kwargs.get("conversation_id")
+        if conversation_id:
+            agent._sentry_conversation_id = conversation_id
+
+        # Start workflow span immediately (before run_streamed returns)
+        workflow_span = agent_workflow_span(agent)
+        workflow_span.__enter__()
+
+        # Set conversation ID on workflow span early so it's captured even on errors
+        if conversation_id:
+            workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
+
+        # Store span on agent for cleanup
+        agent._sentry_workflow_span = workflow_span
+
+        args = (agent, *args[1:])
+
+        try:
+            # Call original function to get RunResultStreaming
+            run_result = original_func(*args, **kwargs)
+        except Exception as exc:
+            # If run_streamed itself fails (not the background task), clean up immediately
+            workflow_span.__exit__(*sys.exc_info())
+            _capture_exception(exc)
+            raise exc from None
+
+        # Store references for cleanup
+        run_result._sentry_workflow_span = workflow_span
+        run_result._sentry_agent = agent
+
+        return run_result
 
     return wrapper

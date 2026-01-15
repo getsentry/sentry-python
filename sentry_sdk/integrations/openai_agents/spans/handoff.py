@@ -18,3 +18,8 @@ def handoff_span(
         origin=SPAN_ORIGIN,
     ) as span:
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "handoff")
+
+        # Add conversation ID from agent
+        conv_id = getattr(from_agent, "_sentry_conversation_id", None)
+        if conv_id:
+            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
