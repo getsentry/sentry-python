@@ -70,7 +70,7 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
                 "type": "blob",
                 "modality": "image",
                 "mime_type": "image/jpeg",
-                "content": "data:image/jpeg;base64,..."
+                "content": "<base64 encoded data>"
             }
         ]
     }
