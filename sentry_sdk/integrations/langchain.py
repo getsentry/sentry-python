@@ -127,6 +127,24 @@ LANGCHAIN_TYPE_TO_MODALITY = {
 }
 
 
+def _get_modality_from_mime_type(mime_type: str) -> str:
+    """Infer the content modality from a MIME type string."""
+    if not mime_type:
+        return "image"  # Default fallback
+
+    mime_lower = mime_type.lower()
+    if mime_lower.startswith("image/"):
+        return "image"
+    elif mime_lower.startswith("audio/"):
+        return "audio"
+    elif mime_lower.startswith("video/"):
+        return "video"
+    elif mime_lower.startswith("application/") or mime_lower.startswith("text/"):
+        return "document"
+    else:
+        return "image"  # Default fallback for unknown types
+
+
 def _transform_langchain_content_block(
     content_block: "Dict[str, Any]",
 ) -> "Dict[str, Any]":
@@ -260,10 +278,11 @@ def _transform_langchain_content_block(
     if "inline_data" in content_block:
         inline_data = content_block.get("inline_data", {})
         if isinstance(inline_data, dict):
+            mime_type = inline_data.get("mime_type", "")
             return {
                 "type": "blob",
-                "modality": "image",
-                "mime_type": inline_data.get("mime_type", ""),
+                "modality": _get_modality_from_mime_type(mime_type),
+                "mime_type": mime_type,
                 "content": inline_data.get("data", ""),
             }
 
@@ -271,10 +290,11 @@ def _transform_langchain_content_block(
     if "file_data" in content_block:
         file_data = content_block.get("file_data", {})
         if isinstance(file_data, dict):
+            mime_type = file_data.get("mime_type", "")
             return {
                 "type": "uri",
-                "modality": "image",
-                "mime_type": file_data.get("mime_type", ""),
+                "modality": _get_modality_from_mime_type(mime_type),
+                "mime_type": mime_type,
                 "uri": file_data.get("file_uri", ""),
             }
 
