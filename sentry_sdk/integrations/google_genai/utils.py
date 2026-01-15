@@ -22,6 +22,8 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     normalize_message_roles,
     redact_blob_message_parts,
+    transform_content_part,
+    get_modality_from_mime_type,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
@@ -294,30 +296,17 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         if part.get("text"):
             return {"text": part["text"], "type": "text"}
 
-        if part.get("file_data"):
-            file_data = part["file_data"]
-            if isinstance(file_data, dict):
-                mime_type = file_data.get("mime_type")
-                file_uri = file_data.get("file_uri")
-                if mime_type and file_uri:
-                    return {
-                        "type": "blob",
-                        "mime_type": mime_type,
-                        "file_uri": file_uri,
-                    }
-
-        if part.get("inline_data"):
-            inline_data = part["inline_data"]
-            if isinstance(inline_data, dict):
-                data = inline_data.get("data")
-                mime_type = inline_data.get("mime_type")
-                if data and mime_type:
-                    if isinstance(data, bytes):
-                        return {
-                            "type": "blob",
-                            "mime_type": mime_type,
-                            "content": BLOB_DATA_SUBSTITUTE,
-                        }
+        # Try using shared transform_content_part for Google dict formats (inline_data, file_data)
+        result = transform_content_part(part)
+        if result is not None:
+            # For inline_data with bytes data, substitute the content
+            if "inline_data" in part:
+                inline_data = part["inline_data"]
+                if isinstance(inline_data, dict) and isinstance(
+                    inline_data.get("data"), bytes
+                ):
+                    result["content"] = BLOB_DATA_SUBSTITUTE
+            return result
 
         return None
 

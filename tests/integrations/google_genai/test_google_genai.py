@@ -1638,7 +1638,8 @@ def test_extract_contents_messages_pil_image():
         assert blob_part["type"] == "blob"
         assert blob_part["mime_type"].startswith("image/")
         assert "content" in blob_part
-        assert blob_part["content"].startswith("data:image/")
+        # Binary content is substituted with placeholder for privacy
+        assert blob_part["content"] == "[Blob substitute]"
     except ImportError:
         pytest.skip("PIL not available")
 
