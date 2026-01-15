@@ -75,12 +75,12 @@ def _capture_exception(exc: "Any") -> None:
 def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
     """
     Get token usage from the Anthropic response.
-    Returns: (input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens)
+    Returns: (input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens)
     """
     input_tokens = 0
     output_tokens = 0
     cache_read_input_tokens = 0
-    cache_creation_input_tokens = 0
+    cache_write_input_tokens = 0
     if hasattr(result, "usage"):
         usage = result.usage
         if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
@@ -90,9 +90,9 @@ def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
         if hasattr(usage, "cache_read_input_tokens") and isinstance(usage.cache_read_input_tokens, int):
             cache_read_input_tokens = usage.cache_read_input_tokens
         if hasattr(usage, "cache_creation_input_tokens") and isinstance(usage.cache_creation_input_tokens, int):
-            cache_creation_input_tokens = usage.cache_creation_input_tokens
+            cache_write_input_tokens = usage.cache_creation_input_tokens
 
-    return input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens
+    return input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens
 
 
 def _collect_ai_data(
@@ -102,7 +102,7 @@ def _collect_ai_data(
     output_tokens: int,
     content_blocks: "list[str]",
     cache_read_input_tokens: int,
-    cache_creation_input_tokens: int,
+    cache_write_input_tokens: int,
 ) -> "tuple[str | None, int, int, list[str], int, int]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
@@ -116,7 +116,7 @@ def _collect_ai_data(
                 if hasattr(usage, "cache_read_input_tokens") and isinstance(usage.cache_read_input_tokens, int):
                     cache_read_input_tokens += usage.cache_read_input_tokens
                 if hasattr(usage, "cache_creation_input_tokens") and isinstance(usage.cache_creation_input_tokens, int):
-                    cache_creation_input_tokens += usage.cache_creation_input_tokens
+                    cache_write_input_tokens += usage.cache_creation_input_tokens
                 model = event.message.model or model
             elif event.type == "content_block_start":
                 pass
@@ -130,7 +130,7 @@ def _collect_ai_data(
             elif event.type == "message_delta":
                 output_tokens += event.usage.output_tokens
 
-    return model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_creation_input_tokens
+    return model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_write_input_tokens
 
 
 def _set_input_data(
@@ -235,7 +235,7 @@ def _set_output_data(
     content_blocks: "list[Any]",
     finish_span: bool = False,
     cache_read_input_tokens: "int | None" = None,
-    cache_creation_input_tokens: "int | None" = None,
+    cache_write_input_tokens: "int | None" = None,
 ) -> None:
     """
     Set output data for the span based on the AI response."""
@@ -270,7 +270,7 @@ def _set_output_data(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         input_tokens_cached=cache_read_input_tokens,
-        input_tokens_cache_write=cache_creation_input_tokens,
+        input_tokens_cache_write=cache_write_input_tokens,
     )
 
     if finish_span:
@@ -305,7 +305,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
     with capture_internal_exceptions():
         if hasattr(result, "content"):
-            input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens = _get_token_usage(result)
+            input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens = _get_token_usage(result)
 
             content_blocks = []
             for content_block in result.content:
@@ -325,7 +325,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 content_blocks=content_blocks,
                 finish_span=True,
                 cache_read_input_tokens=cache_read_input_tokens,
-                cache_creation_input_tokens=cache_creation_input_tokens,
+                cache_write_input_tokens=cache_write_input_tokens,
             )
 
         # Streaming response
@@ -338,12 +338,12 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 output_tokens = 0
                 content_blocks: "list[str]" = []
                 cache_read_input_tokens = 0
-                cache_creation_input_tokens = 0
+                cache_write_input_tokens = 0
 
                 for event in old_iterator:
-                    model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_creation_input_tokens = (
+                    model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_write_input_tokens = (
                         _collect_ai_data(
-                            event, model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_creation_input_tokens
+                            event, model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_write_input_tokens
                         )
                     )
                     yield event
@@ -357,7 +357,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                     cache_read_input_tokens=cache_read_input_tokens,
-                    cache_creation_input_tokens=cache_creation_input_tokens,
+                    cache_write_input_tokens=cache_write_input_tokens,
                 )
 
             async def new_iterator_async() -> "AsyncIterator[MessageStreamEvent]":
@@ -366,12 +366,12 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 output_tokens = 0
                 content_blocks: "list[str]" = []
                 cache_read_input_tokens = 0
-                cache_creation_input_tokens = 0
+                cache_write_input_tokens = 0
 
                 async for event in old_iterator:
-                    model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_creation_input_tokens = (
+                    model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_write_input_tokens = (
                         _collect_ai_data(
-                            event, model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_creation_input_tokens
+                            event, model, input_tokens, output_tokens, content_blocks, cache_read_input_tokens, cache_write_input_tokens
                         )
                     )
                     yield event
@@ -385,7 +385,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                     cache_read_input_tokens=cache_read_input_tokens,
-                    cache_creation_input_tokens=cache_creation_input_tokens,
+                    cache_write_input_tokens=cache_write_input_tokens,
                 )
 
             if str(type(result._iterator)) == "<class 'async_generator'>":
