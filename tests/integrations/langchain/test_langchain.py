@@ -1753,18 +1753,18 @@ def test_langchain_response_model_extraction(
 @pytest.mark.parametrize(
     "token_usage,expected_cached,expected_cache_write",
     [
-        # OpenAI format
-        ({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150, "cached_tokens": 25, "cache_write_tokens": 30}, 25, 30),
+        # LangChain InputTokenDetails format (standard LangChain way)
+        ({"input_tokens": 100, "output_tokens": 50, "total_tokens": 150, "input_token_details": {"cache_read": 25, "cache_creation": 30}}, 25, 30),
+        # OpenAI format (via llm_output)
+        ({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150, "cached_tokens": 25}, 25, None),
         # Anthropic format
         ({"input_tokens": 100, "output_tokens": 50, "total_tokens": 150, "cache_read_input_tokens": 25, "cache_write_input_tokens": 30}, 25, 30),
-        # Pydantic-AI format
-        ({"input_tokens": 100, "output_tokens": 50, "total_tokens": 150, "cache_read_tokens": 25, "cache_write_tokens": 30}, 25, 30),
         # Google GenAI format (no cache write)
         ({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150, "cached_content_token_count": 25}, 25, None),
         # No cache tokens
         ({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}, None, None),
     ],
-    ids=["openai", "anthropic", "pydantic_ai", "google_genai", "no_cache"],
+    ids=["langchain_input_token_details", "openai", "anthropic", "google_genai", "no_cache"],
 )
 def test_llm_callback_cache_tokens(sentry_init, capture_events, token_usage, expected_cached, expected_cache_write):
     """Test that cache tokens from various provider formats are captured correctly."""

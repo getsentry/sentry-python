@@ -624,17 +624,23 @@ def _extract_tokens(
     )
     total_tokens = _get_value(token_usage, "total_tokens")
 
+    # Check for LangChain's input_token_details structure (InputTokenDetails TypedDict)
+    # See: https://api.python.langchain.com/en/latest/messages/langchain_core.messages.ai.InputTokenDetails.html
+    input_token_details = _get_value(token_usage, "input_token_details")
+
     # Cache tokens - check multiple possible field names from different providers
     cached_tokens = (
         _get_value(token_usage, "cached_tokens") or  # OpenAI
         _get_value(token_usage, "cache_read_tokens") or  # Pydantic-AI
         _get_value(token_usage, "cache_read_input_tokens") or  # Anthropic
-        _get_value(token_usage, "cached_content_token_count")  # Google GenAI
+        _get_value(token_usage, "cached_content_token_count") or  # Google GenAI
+        _get_value(input_token_details, "cache_read")  # LangChain InputTokenDetails
     )
 
     cache_write_tokens = (
         _get_value(token_usage, "cache_write_tokens") or  # Pydantic-AI
-        _get_value(token_usage, "cache_write_input_tokens")  # Anthropic
+        _get_value(token_usage, "cache_write_input_tokens") or  # Anthropic
+        _get_value(input_token_details, "cache_creation")  # LangChain InputTokenDetails
     )
 
     return input_tokens, output_tokens, total_tokens, cached_tokens, cache_write_tokens
