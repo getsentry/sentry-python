@@ -72,6 +72,243 @@ def parse_data_uri(url: str) -> "Tuple[str, str]":
     return mime_type, content
 
 
+def get_modality_from_mime_type(mime_type: str) -> str:
+    """
+    Infer the content modality from a MIME type string.
+
+    Args:
+        mime_type: A MIME type string (e.g., "image/jpeg", "audio/mp3")
+
+    Returns:
+        One of: "image", "audio", "video", or "document"
+        Defaults to "image" for unknown or empty MIME types.
+
+    Examples:
+        "image/jpeg" -> "image"
+        "audio/mp3" -> "audio"
+        "video/mp4" -> "video"
+        "application/pdf" -> "document"
+        "text/plain" -> "document"
+    """
+    if not mime_type:
+        return "image"  # Default fallback
+
+    mime_lower = mime_type.lower()
+    if mime_lower.startswith("image/"):
+        return "image"
+    elif mime_lower.startswith("audio/"):
+        return "audio"
+    elif mime_lower.startswith("video/"):
+        return "video"
+    elif mime_lower.startswith("application/") or mime_lower.startswith("text/"):
+        return "document"
+    else:
+        return "image"  # Default fallback for unknown types
+
+
+def transform_content_part(
+    content_part: "Dict[str, Any]",
+) -> "Optional[Dict[str, Any]]":
+    """
+    Transform a content part from various AI SDK formats to Sentry's standardized format.
+
+    Supported input formats:
+    - OpenAI/LiteLLM: {"type": "image_url", "image_url": {"url": "..."}}
+    - Anthropic: {"type": "image|document", "source": {"type": "base64|url|file", ...}}
+    - Google: {"inline_data": {...}} or {"file_data": {...}}
+    - Generic: {"type": "image|audio|video|file", "base64|url|file_id": "...", "mime_type": "..."}
+
+    Output format (one of):
+    - {"type": "blob", "modality": "...", "mime_type": "...", "content": "..."}
+    - {"type": "uri", "modality": "...", "mime_type": "...", "uri": "..."}
+    - {"type": "file", "modality": "...", "mime_type": "...", "file_id": "..."}
+
+    Args:
+        content_part: A dictionary representing a content part from an AI SDK
+
+    Returns:
+        A transformed dictionary in standardized format, or None if the format
+        is unrecognized or transformation fails.
+    """
+    if not isinstance(content_part, dict):
+        return None
+
+    block_type = content_part.get("type")
+
+    # Handle OpenAI/LiteLLM image_url format
+    # {"type": "image_url", "image_url": {"url": "..."}} or {"type": "image_url", "image_url": "..."}
+    if block_type == "image_url":
+        image_url_data = content_part.get("image_url")
+        if isinstance(image_url_data, str):
+            url = image_url_data
+        elif isinstance(image_url_data, dict):
+            url = image_url_data.get("url", "")
+        else:
+            return None
+
+        if not url:
+            return None
+
+        # Check if it's a data URI (base64 encoded)
+        if url.startswith("data:"):
+            try:
+                mime_type, content = parse_data_uri(url)
+                return {
+                    "type": "blob",
+                    "modality": get_modality_from_mime_type(mime_type),
+                    "mime_type": mime_type,
+                    "content": content,
+                }
+            except ValueError:
+                # If parsing fails, return as URI
+                return {
+                    "type": "uri",
+                    "modality": "image",
+                    "mime_type": "",
+                    "uri": url,
+                }
+        else:
+            # Regular URL
+            return {
+                "type": "uri",
+                "modality": "image",
+                "mime_type": "",
+                "uri": url,
+            }
+
+    # Handle Anthropic format with source dict
+    # {"type": "image|document", "source": {"type": "base64|url|file", "media_type": "...", "data|url|file_id": "..."}}
+    if block_type in ("image", "document") and "source" in content_part:
+        source = content_part.get("source")
+        if not isinstance(source, dict):
+            return None
+
+        source_type = source.get("type")
+        media_type = source.get("media_type", "")
+        modality = (
+            "document"
+            if block_type == "document"
+            else get_modality_from_mime_type(media_type)
+        )
+
+        if source_type == "base64":
+            return {
+                "type": "blob",
+                "modality": modality,
+                "mime_type": media_type,
+                "content": source.get("data", ""),
+            }
+        elif source_type == "url":
+            return {
+                "type": "uri",
+                "modality": modality,
+                "mime_type": media_type,
+                "uri": source.get("url", ""),
+            }
+        elif source_type == "file":
+            return {
+                "type": "file",
+                "modality": modality,
+                "mime_type": media_type,
+                "file_id": source.get("file_id", ""),
+            }
+        return None
+
+    # Handle Google inline_data format
+    # {"inline_data": {"mime_type": "...", "data": "..."}}
+    if "inline_data" in content_part:
+        inline_data = content_part.get("inline_data")
+        if isinstance(inline_data, dict):
+            mime_type = inline_data.get("mime_type", "")
+            return {
+                "type": "blob",
+                "modality": get_modality_from_mime_type(mime_type),
+                "mime_type": mime_type,
+                "content": inline_data.get("data", ""),
+            }
+        return None
+
+    # Handle Google file_data format
+    # {"file_data": {"mime_type": "...", "file_uri": "..."}}
+    if "file_data" in content_part:
+        file_data = content_part.get("file_data")
+        if isinstance(file_data, dict):
+            mime_type = file_data.get("mime_type", "")
+            return {
+                "type": "uri",
+                "modality": get_modality_from_mime_type(mime_type),
+                "mime_type": mime_type,
+                "uri": file_data.get("file_uri", ""),
+            }
+        return None
+
+    # Handle generic format with direct fields (LangChain style)
+    # {"type": "image|audio|video|file", "base64|url|file_id": "...", "mime_type": "..."}
+    if block_type in ("image", "audio", "video", "file"):
+        mime_type = content_part.get("mime_type", "")
+        modality = block_type if block_type != "file" else "document"
+
+        # Check for base64 encoded content
+        if "base64" in content_part:
+            return {
+                "type": "blob",
+                "modality": modality,
+                "mime_type": mime_type,
+                "content": content_part.get("base64", ""),
+            }
+        # Check for URL reference
+        elif "url" in content_part:
+            return {
+                "type": "uri",
+                "modality": modality,
+                "mime_type": mime_type,
+                "uri": content_part.get("url", ""),
+            }
+        # Check for file_id reference
+        elif "file_id" in content_part:
+            return {
+                "type": "file",
+                "modality": modality,
+                "mime_type": mime_type,
+                "file_id": content_part.get("file_id", ""),
+            }
+
+    # Unrecognized format
+    return None
+
+
+def transform_message_content(content: "Any") -> "Any":
+    """
+    Transform message content, handling both string content and list of content blocks.
+
+    For list content, each item is transformed using transform_content_part().
+    Items that cannot be transformed (return None) are kept as-is.
+
+    Args:
+        content: Message content - can be a string, list of content blocks, or other
+
+    Returns:
+        - String content: returned as-is
+        - List content: list with each transformable item converted to standardized format
+        - Other: returned as-is
+    """
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, (list, tuple)):
+        transformed = []
+        for item in content:
+            if isinstance(item, dict):
+                result = transform_content_part(item)
+                # If transformation succeeded, use the result; otherwise keep original
+                transformed.append(result if result is not None else item)
+            else:
+                transformed.append(item)
+        return transformed
+
+    return content
+
+
 def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
     # convert pydantic data (e.g. OpenAI v1+) to json compatible format
     if hasattr(data, "model_dump"):

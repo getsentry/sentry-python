@@ -1,3 +1,4 @@
+import sys
 from functools import wraps
 
 from sentry_sdk import consts
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
 
 try:
     from cohere.client import Client
@@ -151,9 +152,11 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
         try:
             res = f(*args, **kwargs)
         except Exception as e:
-            _capture_exception(e)
-            span.__exit__(None, None, None)
-            raise e from None
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(e)
+                span.__exit__(None, None, None)
+            reraise(*exc_info)
 
         with capture_internal_exceptions():
             if should_send_default_pii() and integration.include_prompts:
@@ -247,8 +250,10 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
             try:
                 res = f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
-                raise e from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e)
+                reraise(*exc_info)
             if (
                 hasattr(res, "meta")
                 and hasattr(res.meta, "billed_units")
