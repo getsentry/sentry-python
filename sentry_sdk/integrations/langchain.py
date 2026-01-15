@@ -12,9 +12,9 @@ from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
     get_start_span_function,
     normalize_message_roles,
-    parse_data_uri,
     set_data_normalized,
     truncate_and_annotate_messages,
+    transform_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -117,189 +117,18 @@ DATA_FIELDS = {
     "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
 }
 
-# Map LangChain content types to Sentry modalities
-LANGCHAIN_TYPE_TO_MODALITY = {
-    "image": "image",
-    "image_url": "image",
-    "audio": "audio",
-    "video": "video",
-    "file": "document",
-}
-
-
-def _get_modality_from_mime_type(mime_type: str) -> str:
-    """Infer the content modality from a MIME type string."""
-    if not mime_type:
-        return "image"  # Default fallback
-
-    mime_lower = mime_type.lower()
-    if mime_lower.startswith("image/"):
-        return "image"
-    elif mime_lower.startswith("audio/"):
-        return "audio"
-    elif mime_lower.startswith("video/"):
-        return "video"
-    elif mime_lower.startswith("application/") or mime_lower.startswith("text/"):
-        return "document"
-    else:
-        return "image"  # Default fallback for unknown types
-
 
 def _transform_langchain_content_block(
     content_block: "Dict[str, Any]",
 ) -> "Dict[str, Any]":
     """
-    Transform a LangChain content block to Sentry-compatible format.
+    Transform a LangChain content block using the shared transform_content_part function.
 
-    Handles multimodal content (images, audio, video, documents) by converting them
-    to the standardized format:
-    - base64 encoded data -> type: "blob"
-    - URL references -> type: "uri"
-    - file_id references -> type: "file"
-
-    Supports multiple content block formats:
-    - LangChain standard: type + base64/url/file_id fields
-    - OpenAI legacy: image_url with nested url field
-    - Anthropic: type + source dict with type/media_type/data or url
-    - Google: inline_data or file_data dicts
+    Returns the original content block if transformation is not applicable
+    (e.g., for text blocks or unrecognized formats).
     """
-    if not isinstance(content_block, dict):
-        return content_block
-
-    block_type = content_block.get("type")
-
-    # Handle standard multimodal content types (image, audio, video, file)
-    if block_type in ("image", "audio", "video", "file"):
-        modality = LANGCHAIN_TYPE_TO_MODALITY.get(block_type, block_type)
-        mime_type = content_block.get("mime_type", "")
-
-        # Check for base64 encoded content
-        if "base64" in content_block:
-            return {
-                "type": "blob",
-                "modality": modality,
-                "mime_type": mime_type,
-                "content": content_block.get("base64", ""),
-            }
-        # Check for URL reference
-        elif "url" in content_block:
-            return {
-                "type": "uri",
-                "modality": modality,
-                "mime_type": mime_type,
-                "uri": content_block.get("url", ""),
-            }
-        # Check for file_id reference
-        elif "file_id" in content_block:
-            return {
-                "type": "file",
-                "modality": modality,
-                "mime_type": mime_type,
-                "file_id": content_block.get("file_id", ""),
-            }
-        # Handle Anthropic-style format with nested "source" dict
-        elif "source" in content_block:
-            source = content_block.get("source", {})
-            if isinstance(source, dict):
-                source_type = source.get("type")
-                media_type = source.get("media_type", "") or mime_type
-
-                if source_type == "base64":
-                    return {
-                        "type": "blob",
-                        "modality": modality,
-                        "mime_type": media_type,
-                        "content": source.get("data", ""),
-                    }
-                elif source_type == "url":
-                    return {
-                        "type": "uri",
-                        "modality": modality,
-                        "mime_type": media_type,
-                        "uri": source.get("url", ""),
-                    }
-        # Handle Google-style inline_data format with standard type
-        elif "inline_data" in content_block:
-            inline_data = content_block.get("inline_data", {})
-            if isinstance(inline_data, dict):
-                return {
-                    "type": "blob",
-                    "modality": modality,
-                    "mime_type": inline_data.get("mime_type", "") or mime_type,
-                    "content": inline_data.get("data", ""),
-                }
-        # Handle Google-style file_data format with standard type
-        elif "file_data" in content_block:
-            file_data = content_block.get("file_data", {})
-            if isinstance(file_data, dict):
-                return {
-                    "type": "uri",
-                    "modality": modality,
-                    "mime_type": file_data.get("mime_type", "") or mime_type,
-                    "uri": file_data.get("file_uri", ""),
-                }
-
-    # Handle legacy image_url format (OpenAI style)
-    elif block_type == "image_url":
-        image_url_data = content_block.get("image_url", {})
-        if isinstance(image_url_data, dict):
-            url = image_url_data.get("url", "")
-        else:
-            url = str(image_url_data)
-
-        # Check if it's a data URI (base64 encoded)
-        if url and url.startswith("data:"):
-            try:
-                mime_type, content = parse_data_uri(url)
-                return {
-                    "type": "blob",
-                    "modality": "image",
-                    "mime_type": mime_type,
-                    "content": content,
-                }
-            except ValueError:
-                # If parsing fails, return as URI
-                return {
-                    "type": "uri",
-                    "modality": "image",
-                    "mime_type": "",
-                    "uri": url,
-                }
-        else:
-            # Regular URL
-            return {
-                "type": "uri",
-                "modality": "image",
-                "mime_type": "",
-                "uri": url,
-            }
-
-    # Handle Google-style inline_data format
-    if "inline_data" in content_block:
-        inline_data = content_block.get("inline_data", {})
-        if isinstance(inline_data, dict):
-            mime_type = inline_data.get("mime_type", "")
-            return {
-                "type": "blob",
-                "modality": _get_modality_from_mime_type(mime_type),
-                "mime_type": mime_type,
-                "content": inline_data.get("data", ""),
-            }
-
-    # Handle Google-style file_data format
-    if "file_data" in content_block:
-        file_data = content_block.get("file_data", {})
-        if isinstance(file_data, dict):
-            mime_type = file_data.get("mime_type", "")
-            return {
-                "type": "uri",
-                "modality": _get_modality_from_mime_type(mime_type),
-                "mime_type": mime_type,
-                "uri": file_data.get("file_uri", ""),
-            }
-
-    # For text blocks and other types, return as-is
-    return content_block
+    result = transform_content_part(content_block)
+    return result if result is not None else content_block
 
 
 def _transform_langchain_message_content(content: "Any") -> "Any":

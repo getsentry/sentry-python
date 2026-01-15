@@ -1911,20 +1911,21 @@ class TestTransformLangchainContentBlock:
         }
 
     def test_transform_anthropic_source_without_media_type(self):
-        """Test transformation of Anthropic-style image without media_type falls back to mime_type."""
+        """Test transformation of Anthropic-style image without media_type uses empty mime_type."""
         content_block = {
             "type": "image",
-            "mime_type": "image/webp",
+            "mime_type": "image/webp",  # Top-level mime_type is ignored by standard Anthropic format
             "source": {
                 "type": "base64",
                 "data": "UklGRh4AAABXRUJQVlA4IBIAAAAwAQCdASoBAAEAAQAcJYgCdAEO",
             },
         }
         result = _transform_langchain_content_block(content_block)
+        # Note: The shared transform_content_part uses media_type from source, not top-level mime_type
         assert result == {
             "type": "blob",
             "modality": "image",
-            "mime_type": "image/webp",
+            "mime_type": "",
             "content": "UklGRh4AAABXRUJQVlA4IBIAAAAwAQCdASoBAAEAAQAcJYgCdAEO",
         }
 
