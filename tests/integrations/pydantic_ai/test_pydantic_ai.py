@@ -2604,3 +2604,211 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_events)
 
     # Should not crash
     assert transaction is not None
+
+
+# ==================== Cache Token Tests ====================
+
+
+@pytest.mark.asyncio
+async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
+    """
+    Test that _set_usage_data correctly handles cache_read_tokens and cache_write_tokens.
+    """
+    import sentry_sdk
+    from unittest.mock import MagicMock
+    from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+    from sentry_sdk.consts import SPANDATA
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
+        span = sentry_sdk.start_span(op="test_span")
+
+        # Create usage object with cache tokens
+        mock_usage = MagicMock()
+        mock_usage.input_tokens = 100
+        mock_usage.output_tokens = 50
+        mock_usage.total_tokens = 150
+        mock_usage.cache_read_tokens = 25
+        mock_usage.cache_write_tokens = 30
+
+        _set_usage_data(span, mock_usage)
+
+        span.finish()
+
+    (tx,) = events
+    test_span = [s for s in tx["spans"] if s["op"] == "test_span"][0]
+
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 30
+
+
+@pytest.mark.asyncio
+async def test_set_usage_data_with_cache_read_only(sentry_init, capture_events):
+    """
+    Test that _set_usage_data correctly handles only cache_read_tokens.
+    """
+    import sentry_sdk
+    from unittest.mock import MagicMock
+    from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+    from sentry_sdk.consts import SPANDATA
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
+        span = sentry_sdk.start_span(op="test_span")
+
+        # Create usage object with only cache read tokens
+        mock_usage = MagicMock()
+        mock_usage.input_tokens = 100
+        mock_usage.output_tokens = 50
+        mock_usage.total_tokens = 150
+        mock_usage.cache_read_tokens = 25
+        mock_usage.cache_write_tokens = None  # No cache write
+
+        _set_usage_data(span, mock_usage)
+
+        span.finish()
+
+    (tx,) = events
+    test_span = [s for s in tx["spans"] if s["op"] == "test_span"][0]
+
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE not in test_span["data"]
+
+
+@pytest.mark.asyncio
+async def test_set_usage_data_with_cache_write_only(sentry_init, capture_events):
+    """
+    Test that _set_usage_data correctly handles only cache_write_tokens.
+    """
+    import sentry_sdk
+    from unittest.mock import MagicMock
+    from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+    from sentry_sdk.consts import SPANDATA
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
+        span = sentry_sdk.start_span(op="test_span")
+
+        # Create usage object with only cache write tokens
+        mock_usage = MagicMock()
+        mock_usage.input_tokens = 100
+        mock_usage.output_tokens = 50
+        mock_usage.total_tokens = 150
+        mock_usage.cache_read_tokens = None  # No cache read
+        mock_usage.cache_write_tokens = 30
+
+        _set_usage_data(span, mock_usage)
+
+        span.finish()
+
+    (tx,) = events
+    test_span = [s for s in tx["spans"] if s["op"] == "test_span"][0]
+
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED not in test_span["data"]
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 30
+
+
+@pytest.mark.asyncio
+async def test_set_usage_data_without_cache_attrs(sentry_init, capture_events):
+    """
+    Test that _set_usage_data handles usage objects without cache token attributes.
+    """
+    import sentry_sdk
+    from unittest.mock import MagicMock
+    from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+    from sentry_sdk.consts import SPANDATA
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
+        span = sentry_sdk.start_span(op="test_span")
+
+        # Create usage object without cache token attributes
+        mock_usage = MagicMock(spec=["input_tokens", "output_tokens", "total_tokens"])
+        mock_usage.input_tokens = 100
+        mock_usage.output_tokens = 50
+        mock_usage.total_tokens = 150
+        # cache_read_tokens and cache_write_tokens not present
+
+        _set_usage_data(span, mock_usage)
+
+        span.finish()
+
+    (tx,) = events
+    test_span = [s for s in tx["spans"] if s["op"] == "test_span"][0]
+
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    # Cache tokens should not be present since the attributes don't exist
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED not in test_span["data"]
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE not in test_span["data"]
+
+
+@pytest.mark.asyncio
+async def test_set_usage_data_with_zero_cache_tokens(sentry_init, capture_events):
+    """
+    Test that _set_usage_data correctly handles zero cache token values.
+    Zero is a valid value and should be set (since the check is 'is not None').
+    """
+    import sentry_sdk
+    from unittest.mock import MagicMock
+    from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+    from sentry_sdk.consts import SPANDATA
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
+        span = sentry_sdk.start_span(op="test_span")
+
+        # Create usage object with zero cache tokens
+        mock_usage = MagicMock()
+        mock_usage.input_tokens = 100
+        mock_usage.output_tokens = 50
+        mock_usage.total_tokens = 150
+        mock_usage.cache_read_tokens = 0  # Zero is a valid value
+        mock_usage.cache_write_tokens = 0  # Zero is a valid value
+
+        _set_usage_data(span, mock_usage)
+
+        span.finish()
+
+    (tx,) = events
+    test_span = [s for s in tx["spans"] if s["op"] == "test_span"][0]
+
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+    # Zero values should be set since the implementation checks "is not None"
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 0
+    assert test_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0

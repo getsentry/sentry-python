@@ -9,7 +9,8 @@ from sentry_sdk._types import (
     SENSITIVE_DATA_SUBSTITUTE,
     BLOB_DATA_SUBSTITUTE,
 )
-from sentry_sdk.ai.monitoring import ai_track
+from sentry_sdk.ai.monitoring import ai_track, record_token_usage
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
     MAX_SINGLE_MESSAGE_CONTENT_CHARS,
@@ -757,3 +758,101 @@ class TestRedactBlobMessageParts:
 
         # Should return same list since no blobs
         assert result is messages
+
+
+class TestRecordTokenUsage:
+    def test_record_token_usage_with_all_parameters(self, sentry_init, capture_events):
+        """Test that record_token_usage correctly sets all token usage data including cache write tokens."""
+        sentry_init(traces_sample_rate=1.0)
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            with sentry_sdk.start_span(op="gen_ai.chat", name="test span") as span:
+                record_token_usage(
+                    span,
+                    input_tokens=100,
+                    input_tokens_cached=25,
+                    input_tokens_cache_write=50,
+                    output_tokens=75,
+                    output_tokens_reasoning=10,
+                    total_tokens=175,
+                )
+
+        (transaction,) = events
+        assert transaction["type"] == "transaction"
+
+        span_data = transaction["spans"][0]["data"]
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 25
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 50
+        assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 75
+        assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 10
+        assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 175
+
+    def test_record_token_usage_with_cache_write_only(self, sentry_init, capture_events):
+        """Test that record_token_usage correctly sets cache write tokens independently."""
+        sentry_init(traces_sample_rate=1.0)
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            with sentry_sdk.start_span(op="gen_ai.chat", name="test span") as span:
+                record_token_usage(
+                    span,
+                    input_tokens=100,
+                    input_tokens_cache_write=50,
+                    output_tokens=75,
+                )
+
+        (transaction,) = events
+        span_data = transaction["spans"][0]["data"]
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 50
+        assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 75
+        # input_tokens_cached should not be set
+        assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED not in span_data
+
+    def test_record_token_usage_with_both_cache_types(self, sentry_init, capture_events):
+        """Test that both cache read and cache write tokens can be set together."""
+        sentry_init(traces_sample_rate=1.0)
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            with sentry_sdk.start_span(op="gen_ai.chat", name="test span") as span:
+                record_token_usage(
+                    span,
+                    input_tokens=200,
+                    input_tokens_cached=100,  # cache read
+                    input_tokens_cache_write=75,  # cache write
+                    output_tokens=50,
+                )
+
+        (transaction,) = events
+        span_data = transaction["spans"][0]["data"]
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 100
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 75
+        assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+        # Total should be auto-calculated
+        assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250
+
+    def test_record_token_usage_none_values_not_set(self, sentry_init, capture_events):
+        """Test that None values for cache tokens are not set on the span."""
+        sentry_init(traces_sample_rate=1.0)
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            with sentry_sdk.start_span(op="gen_ai.chat", name="test span") as span:
+                record_token_usage(
+                    span,
+                    input_tokens=100,
+                    input_tokens_cached=None,
+                    input_tokens_cache_write=None,
+                    output_tokens=50,
+                )
+
+        (transaction,) = events
+        span_data = transaction["spans"][0]["data"]
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+        assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+        assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED not in span_data
+        assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE not in span_data
