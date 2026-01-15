@@ -47,9 +47,8 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
-    _convert_message_parts,
 )
-from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
+from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES, transform_message_content
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.serializer import serialize
 
@@ -1514,42 +1513,35 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     assert "ai" not in roles
 
 
-def test_convert_message_parts_image_url_to_blob():
+def test_transform_message_content_image_url_to_blob():
     """Test that OpenAI image_url message parts are correctly converted to blob format"""
-    messages = [
+    content = [
         {
-            "role": "user",
-            "content": [
-                {
-                    "text": "How many ponies do you see in the image?",
-                    "type": "text",
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
-                        "detail": "high",
-                    },
-                },
-            ],
-        }
+            "text": "How many ponies do you see in the image?",
+            "type": "text",
+        },
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+                "detail": "high",
+            },
+        },
     ]
 
-    converted = _convert_message_parts(messages)
+    converted = transform_message_content(content)
 
-    assert len(converted) == 1
-    assert converted[0]["role"] == "user"
-    assert isinstance(converted[0]["content"], list)
-    assert len(converted[0]["content"]) == 2
+    assert isinstance(converted, list)
+    assert len(converted) == 2
 
     # First item (text) should remain unchanged
-    assert converted[0]["content"][0] == {
+    assert converted[0] == {
         "text": "How many ponies do you see in the image?",
         "type": "text",
     }
 
     # Second item (image_url) should be converted to blob format
-    blob_item = converted[0]["content"][1]
+    blob_item = converted[1]
     assert blob_item["type"] == "blob"
     assert blob_item["modality"] == "image"
     assert blob_item["mime_type"] == "image/jpeg"
@@ -1558,104 +1550,84 @@ def test_convert_message_parts_image_url_to_blob():
     assert "image_url" not in blob_item
 
 
-def test_convert_message_parts_image_url_to_uri():
+def test_transform_message_content_image_url_to_uri():
     """Test that OpenAI image_url with non-data URLs are converted to uri format"""
-    messages = [
+    content = [
         {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": "https://example.com/image.jpg",
-                        "detail": "low",
-                    },
-                },
-            ],
-        }
+            "type": "image_url",
+            "image_url": {
+                "url": "https://example.com/image.jpg",
+                "detail": "low",
+            },
+        },
     ]
 
-    converted = _convert_message_parts(messages)
+    converted = transform_message_content(content)
 
     assert len(converted) == 1
-    uri_item = converted[0]["content"][0]
+    uri_item = converted[0]
     assert uri_item["type"] == "uri"
     assert uri_item["uri"] == "https://example.com/image.jpg"
     # Verify the original image_url structure is replaced
     assert "image_url" not in uri_item
 
 
-def test_convert_message_parts_malformed_data_uri():
+def test_transform_message_content_malformed_data_uri():
     """Test that malformed data URIs are handled gracefully without crashing"""
-    messages = [
+    content = [
         {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        # Malformed: missing ;base64, and comma separator
-                        "url": "data:image/jpeg",
-                    },
-                },
-            ],
-        }
+            "type": "image_url",
+            "image_url": {
+                # Malformed: missing ;base64, and comma separator
+                "url": "data:image/jpeg",
+            },
+        },
     ]
 
     # Should not raise an exception
-    converted = _convert_message_parts(messages)
+    converted = transform_message_content(content)
 
     assert len(converted) == 1
     # Malformed data URI should fall back to uri type
-    item = converted[0]["content"][0]
+    item = converted[0]
     assert item["type"] == "uri"
     assert item["uri"] == "data:image/jpeg"
     assert item["modality"] == "image"
 
 
-def test_convert_message_parts_image_url_as_string():
+def test_transform_message_content_image_url_as_string():
     """Test that image_url as a string (instead of dict) is handled gracefully"""
-    messages = [
+    content = [
         {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    # Some implementations pass image_url as a string directly
-                    "image_url": "https://example.com/image.jpg",
-                },
-            ],
-        }
+            "type": "image_url",
+            # Some implementations pass image_url as a string directly
+            "image_url": "https://example.com/image.jpg",
+        },
     ]
 
     # Should not raise an exception
-    converted = _convert_message_parts(messages)
+    converted = transform_message_content(content)
 
     assert len(converted) == 1
-    item = converted[0]["content"][0]
+    item = converted[0]
     assert item["type"] == "uri"
     assert item["modality"] == "image"
     assert item["uri"] == "https://example.com/image.jpg"
 
 
-def test_convert_message_parts_image_url_as_string_data_uri():
+def test_transform_message_content_image_url_as_string_data_uri():
     """Test that image_url as a data URI string is correctly converted to blob"""
-    messages = [
+    content = [
         {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": "data:image/png;base64,iVBORw0KGgo=",
-                },
-            ],
-        }
+            "type": "image_url",
+            "image_url": "data:image/png;base64,iVBORw0KGgo=",
+        },
     ]
 
-    converted = _convert_message_parts(messages)
+    converted = transform_message_content(content)
 
     assert len(converted) == 1
-    item = converted[0]["content"][0]
+    item = converted[0]
     assert item["type"] == "blob"
     assert item["modality"] == "image"
     assert item["mime_type"] == "image/png"
