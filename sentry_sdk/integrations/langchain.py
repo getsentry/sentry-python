@@ -634,7 +634,7 @@ def _extract_tokens(
 
     cache_write_tokens = (
         _get_value(token_usage, "cache_write_tokens") or  # Pydantic-AI
-        _get_value(token_usage, "cache_creation_input_tokens")  # Anthropic
+        _get_value(token_usage, "cache_write_input_tokens")  # Anthropic
     )
 
     return input_tokens, output_tokens, total_tokens, cached_tokens, cache_write_tokens
