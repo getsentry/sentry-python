@@ -222,10 +222,6 @@ def _success_callback(
             record_token_usage(
                 span,
                 input_tokens=getattr(usage, "prompt_tokens", None),
-                input_tokens_cached=getattr(usage, "cache_read_input_tokens", None),
-                input_tokens_cache_write=getattr(
-                    usage, "cache_write_input_tokens", None
-                ),
                 output_tokens=getattr(usage, "completion_tokens", None),
                 total_tokens=getattr(usage, "total_tokens", None),
             )
