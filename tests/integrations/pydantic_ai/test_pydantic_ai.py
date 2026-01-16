@@ -2731,6 +2731,7 @@ async def test_binary_content_in_agent_run(sentry_init, capture_events):
         messages_str = str(chat_span["data"]["gen_ai.request.messages"])
         assert any(keyword in messages_str for keyword in ["blob", "image", "base64"])
 
+
 @pytest.mark.asyncio
 async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
     """Test that cache_read_tokens and cache_write_tokens are tracked."""
@@ -2758,4 +2759,3 @@ async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
     (span_data,) = event["spans"]
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
-
