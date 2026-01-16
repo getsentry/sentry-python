@@ -878,8 +878,6 @@ class SPANSTATUS:
     UNIMPLEMENTED = "unimplemented"
     UNKNOWN_ERROR = "unknown_error"
 
-    ERROR = "error"  # span-first specific
-
 
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"

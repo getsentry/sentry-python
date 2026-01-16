@@ -1427,7 +1427,7 @@ def trace(
         return decorator
 
 
-def streamind_trace(
+def streaming_trace(
     func: "Optional[Callable[P, R]]" = None,
     *,
     name: "Optional[str]" = None,
