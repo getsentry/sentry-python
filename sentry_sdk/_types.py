@@ -284,24 +284,6 @@ if TYPE_CHECKING:
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
 
-    SpanV2Status = Literal[SPANSTATUS.OK, SPANSTATUS.ERROR]
-    # This is the V2 span format
-    # https://develop.sentry.dev/sdk/telemetry/spans/span-protocol/
-    SpanV2 = TypedDict(
-        "SpanV2",
-        {
-            "trace_id": str,
-            "span_id": str,
-            "parent_span_id": Optional[str],
-            "name": str,
-            "status": SpanV2Status,
-            "is_segment": bool,
-            "start_timestamp": float,
-            "end_timestamp": float,
-            "attributes": Attributes,
-        },
-    )
-
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]
 

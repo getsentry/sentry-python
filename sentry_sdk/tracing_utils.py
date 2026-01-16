@@ -452,8 +452,10 @@ class PropagationContext:
     ) -> "PropagationContext":
         propagation_context = PropagationContext()
         normalized_data = normalize_incoming_data(incoming_data)
+
         sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
         sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
+
         # nothing to propagate if no sentry-trace
         if sentrytrace_data is None:
             return propagation_context

@@ -88,8 +88,6 @@ class SpanBatcher(Batcher["Span"]):
         return res
 
     def _flush(self) -> "Optional[Envelope]":
-        print("batcher.flush")
-
         with self._lock:
             if len(self._span_buffer) == 0:
                 return None
