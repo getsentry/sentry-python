@@ -938,7 +938,7 @@ class _Client(BaseClient):
         if ty == "log":
             before_send = get_before_send_log(self.options)
         elif ty == "metric":
-            before_send = get_before_send_metric(self.options)
+            before_send = get_before_send_metric(self.options)  # type: ignore
         # no before_send for spans
 
         if before_send is not None:
@@ -951,9 +951,9 @@ class _Client(BaseClient):
         if ty == "log":
             batcher = self.log_batcher
         elif ty == "metric":
-            batcher = self.metrics_batcher
+            batcher = self.metrics_batcher  # type: ignore
         elif ty == "span":
-            batcher = self.span_batcher
+            batcher = self.span_batcher  # type: ignore
 
         if batcher is not None:
             batcher.add(telemetry)  # type: ignore

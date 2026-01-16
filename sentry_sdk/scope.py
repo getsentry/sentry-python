@@ -708,7 +708,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture: bool = True
 
-        self._span: "Optional[Span]" = None
+        self._span: "Optional[Union[Span, StreamedSpan]]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
 
@@ -822,12 +822,12 @@ class Scope:
             session.update(user=value)
 
     @property
-    def span(self) -> "Optional[Span]":
+    def span(self) -> "Optional[Union[Span, StreamedSpan]]":
         """Get/set current tracing span or transaction."""
         return self._span
 
     @span.setter
-    def span(self, span: "Optional[Span]") -> None:
+    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -1572,7 +1572,7 @@ class Scope:
             )
 
     def _apply_scope_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric, Span]"
+        self, telemetry: "Union[Log, Metric, StreamedSpan]"
     ) -> None:
         # TODO: turn Logs, Metrics into actual classes
         if isinstance(telemetry, dict):
@@ -1585,7 +1585,7 @@ class Scope:
                 attributes[attribute] = value
 
     def _apply_user_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric, Span]"
+        self, telemetry: "Union[Log, Metric, StreamedSpan]"
     ) -> None:
         if isinstance(telemetry, dict):
             attributes = telemetry["attributes"]

@@ -11,9 +11,10 @@ from sentry_sdk.utils import format_timestamp, serialize_attribute, safe_repr
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
     from sentry_sdk._tracing import SpanStatus, StreamedSpan
+    from sentry_sdk._types import SerializedAttributeValue
 
 
-class SpanBatcher(Batcher["Span"]):
+class SpanBatcher(Batcher["StreamedSpan"]):
     # TODO[span-first]: size-based flushes
     MAX_BEFORE_FLUSH = 1000
     MAX_BEFORE_DROP = 5000
@@ -67,15 +68,18 @@ class SpanBatcher(Batcher["Span"]):
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
-        res = {
+        res: "dict[str, Any]" = {
             "trace_id": item.trace_id,
             "span_id": item.span_id,
             "name": item.get_name(),
             "status": item.status.value,
             "is_segment": item.is_segment(),
             "start_timestamp": item.start_timestamp.timestamp(),  # TODO[span-first]
-            "end_timestamp": item.timestamp.timestamp(),
         }
+
+        if item.timestamp:
+            # this is here to make mypy happy
+            res["end_timestamp"] = item.timestamp.timestamp()
 
         if item.parent_span_id:
             res["parent_span_id"] = item.parent_span_id

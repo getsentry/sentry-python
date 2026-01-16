@@ -750,9 +750,7 @@ class Baggage:
         return Baggage(sentry_items, mutable=False)
 
     @classmethod
-    def populate_from_segment(
-        cls, segment: "sentry_sdk.trace.StreamedSpan"
-    ) -> "Baggage":
+    def populate_from_segment(cls, segment: "StreamedSpan") -> "Baggage":
         """
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
@@ -779,7 +777,7 @@ class Baggage:
             if client.parsed_dsn.org_id:
                 sentry_items["org_id"] = client.parsed_dsn.org_id
 
-        if segment.source not in LOW_QUALITY_TRANSACTION_SOURCES:
+        if segment.source not in LOW_QUALITY_SEGMENT_SOURCES:
             sentry_items["transaction"] = segment.name
 
         if segment.sample_rate is not None:
@@ -990,7 +988,9 @@ def create_span_decorator(
     return span_decorator
 
 
-def get_current_span(scope: "Optional[sentry_sdk.Scope]" = None) -> "Optional[Span]":
+def get_current_span(
+    scope: "Optional[sentry_sdk.Scope]" = None,
+) -> "Optional[Union[Span, StreamedSpan]]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -1366,5 +1366,8 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
 )
 
+from sentry_sdk._tracing import LOW_QUALITY_SEGMENT_SOURCES
+
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
+    from sentry_sdk._tracing import StreamedSpan

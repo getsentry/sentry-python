@@ -160,7 +160,7 @@ class StreamedSpan:
         self._scope = scope
 
         self.name: str = name
-        self.attributes: "Attributes" = attributes
+        self.attributes: "Attributes" = attributes or {}
 
         self._trace_id = trace_id
         self.parent_span_id = parent_span_id
