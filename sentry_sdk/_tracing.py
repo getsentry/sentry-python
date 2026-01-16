@@ -8,6 +8,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.tracing_utils import (
     Baggage,
+    _generate_sample_rand,
     has_span_streaming_enabled,
     has_tracing_enabled,
 )
@@ -38,10 +39,15 @@ TODO[span-first] / notes
 - initial status: OK? or unset?
 - dropped spans are not migrated
 - recheck transaction.finish <-> Streamedspan.end
-- profile not part of the event, how to send?
+- profiling: drop transaction based
+- profiling: actually send profiles
 - maybe: use getters/setter OR properties but not both
 - add size-based flushing to buffer(s)
 - migrate transaction sample_rand logic
+- remove deprecated profiler impl
+- {custom_}sampling_context? -> if this is going to die, we need to revive the
+  potel pr that went through the integrations and got rid of custom_sampling_context
+  in favor of attributes
 
 Notes:
 - removed ability to provide a start_timestamp
@@ -54,7 +60,9 @@ def start_span(
     attributes: "Optional[Attributes]" = None,
     parent_span: "Optional[StreamedSpan]" = None,
 ) -> "StreamedSpan":
-    return sentry_sdk.get_current_scope().start_streamed_span()
+    return sentry_sdk.get_current_scope().start_streamed_span(
+        name, attributes, parent_span
+    )
 
 
 class SpanStatus(str, Enum):
@@ -109,16 +117,17 @@ class StreamedSpan:
     """
 
     __slots__ = (
-        "_name",
-        "_attributes",
+        "name",
+        "attributes",
         "_span_id",
         "_trace_id",
-        "_parent_span_id",
-        "_segment",
+        "parent_span_id",
+        "segment",
         "_sampled",
-        "_start_timestamp",
-        "_timestamp",
-        "_status",
+        "parent_sampled",
+        "start_timestamp",
+        "timestamp",
+        "status",
         "_start_timestamp_monotonic_ns",
         "_scope",
         "_flags",
@@ -126,27 +135,39 @@ class StreamedSpan:
         "_profile",
         "_continuous_profile",
         "_baggage",
-        "_sample_rate",
+        "sample_rate",
         "_sample_rand",
+        "source",
     )
 
     def __init__(
         self,
+        *,
         name: str,
-        trace_id: str,
+        scope: "Scope",
         attributes: "Optional[Attributes]" = None,
+        # TODO[span-first]: would be good to actually take this propagation
+        # context stuff directly from the PropagationContext, but for that
+        # we'd actually need to refactor PropagationContext to stay in sync
+        # with what's going on (e.g. update the current span_id) and not just
+        # update when a trace is continued
+        trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
+        parent_sampled: "Optional[bool]" = None,
+        baggage: "Optional[Baggage]" = None,
         segment: "Optional[StreamedSpan]" = None,
-        scope: "Optional[Scope]" = None,
     ) -> None:
-        self._name: str = name
-        self._attributes: "Attributes" = attributes
+        self._scope = scope
+
+        self.name: str = name
+        self.attributes: "Attributes" = attributes
 
         self._trace_id = trace_id
-        self._parent_span_id = parent_span_id
-        self._segment = segment or self
+        self.parent_span_id = parent_span_id
+        self.parent_sampled = parent_sampled
+        self.segment = segment or self
 
-        self._start_timestamp = datetime.now(timezone.utc)
+        self.start_timestamp = datetime.now(timezone.utc)
 
         try:
             # profiling depends on this value and requires that
@@ -155,12 +176,30 @@ class StreamedSpan:
         except AttributeError:
             pass
 
-        self._timestamp: "Optional[datetime]" = None
+        self.timestamp: "Optional[datetime]" = None
         self._span_id: "Optional[str]" = None
-        self._status: SpanStatus = SpanStatus.OK
+
+        self.status: SpanStatus = SpanStatus.OK
+        self.source: "Optional[SegmentSource]" = SegmentSource.CUSTOM
+        # XXX[span-first] ^ populate this correctly
+
         self._sampled: "Optional[bool]" = None
-        self._scope: "Optional[Scope]" = scope  # TODO[span-first] when are we starting a span with a specific scope? is this needed?
+        self.sample_rate: "Optional[float]" = None
+        self._sample_rand: "Optional[float]" = None
+
+        # XXX[span-first]: just do this for segments?
+        self._baggage = baggage
+        baggage_sample_rand = (
+            None if self._baggage is None else self._baggage._sample_rand()
+        )
+        if baggage_sample_rand is not None:
+            self._sample_rand = baggage_sample_rand
+        else:
+            self._sample_rand = _generate_sample_rand(self.trace_id)
+
         self._flags: dict[str, bool] = {}
+        self._profile = None
+        self._continuous_profile = None
 
         self._update_active_thread()
         self._set_profiler_id(get_profiler_id())
@@ -168,11 +207,11 @@ class StreamedSpan:
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__}("
-            f"name={self._name}, "
-            f"trace_id={self._trace_id}, "
-            f"span_id={self._span_id}, "
-            f"parent_span_id={self._parent_span_id}, "
-            f"sampled={self._sampled})>"
+            f"name={self.name}, "
+            f"trace_id={self.trace_id}, "
+            f"span_id={self.span_id}, "
+            f"parent_span_id={self.parent_span_id}, "
+            f"sampled={self.sampled})>"
         )
 
     def __enter__(self) -> "StreamedSpan":
@@ -215,8 +254,7 @@ class StreamedSpan:
 
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
-        :param scope: The scope to use for this transaction.
-            If not provided, the current scope will be used.
+        :param scope: The scope to use.
         """
         client = sentry_sdk.get_client()
         if not client.is_active():
@@ -227,7 +265,7 @@ class StreamedSpan:
         )
 
         # Explicit check against False needed because self.sampled might be None
-        if self._sampled is False:
+        if self.sampled is False:
             logger.debug("Discarding span because sampled = False")
 
             # This is not entirely accurate because discards here are not
@@ -243,7 +281,7 @@ class StreamedSpan:
 
             return None
 
-        if self._sampled is None:
+        if self.sampled is None:
             logger.warning("Discarding transaction without sampling decision.")
 
         if self.timestamp is not None:
@@ -257,45 +295,38 @@ class StreamedSpan:
                 self.timestamp = end_timestamp
             else:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-                self.timestamp = self._start_timestamp + timedelta(
+                self.timestamp = self.start_timestamp + timedelta(
                     microseconds=elapsed / 1000
                 )
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
-        if self.segment.sampled:
-            client._capture_span(self)
+        if self.segment.sampled:  # XXX this should just use its own sampled
+            sentry_sdk.get_current_scope()._capture_span(self)
+
         return
 
     def get_attributes(self) -> "Attributes":
-        return self._attributes
+        return self.attributes
 
     def set_attribute(self, key: str, value: "AttributeValue") -> None:
-        self._attributes[key] = format_attribute(value)
+        self.attributes[key] = format_attribute(value)
 
     def set_attributes(self, attributes: "Attributes") -> None:
         for key, value in attributes.items():
             self.set_attribute(key, value)
 
     def set_status(self, status: SpanStatus) -> None:
-        self._status = status
+        self.status = status
 
     def get_name(self) -> str:
-        return self._name
+        return self.name
 
     def set_name(self, name: str) -> None:
-        self._name = name
-
-    @property
-    def segment(self) -> "StreamedSpan":
-        return self._segment
+        self.name = name
 
     def is_segment(self) -> bool:
         return self.segment == self
-
-    @property
-    def sampled(self) -> "Optional[bool]":
-        return self._sampled
 
     @property
     def span_id(self) -> str:
@@ -312,6 +343,15 @@ class StreamedSpan:
         return self._trace_id
 
     @property
+    def sampled(self) -> "Optional[bool]":
+        if self._sampled is not None:
+            return self._sampled
+
+        if not self.is_segment():
+            self._sampled = self.parent_sampled
+
+        return self._sampled
+
     def dynamic_sampling_context(self) -> str:
         return self.segment._get_baggage().dynamic_sampling_context()
 
@@ -352,29 +392,15 @@ class StreamedSpan:
 
         return self._baggage
 
-    def _set_initial_sampling_decision(
-        self, sampling_context: "SamplingContext"
-    ) -> None:
+    def _set_sampling_decision(self, sampling_context: "SamplingContext") -> None:
         """
-        Sets the segment's sampling decision, according to the following
-        precedence rules:
-
-        1. If `traces_sampler` is defined, its decision will be used. It can
-        choose to keep or ignore any parent sampling decision, or use the
-        sampling context data to make its own decision or to choose a sample
-        rate for the transaction.
-
-        2. If `traces_sampler` is not defined, but there's a parent sampling
-        decision, the parent sampling decision will be used.
-
-        3. If `traces_sampler` is not defined and there's no parent sampling
-        decision, `traces_sample_rate` will be used.
+        Set the segment's sampling decision, inherited by all child spans.
         """
         client = sentry_sdk.get_client()
 
         # nothing to do if tracing is disabled
         if not has_tracing_enabled(client.options):
-            self.sampled = False
+            self._sampled = False
             return
 
         if not self.is_segment():
@@ -398,9 +424,9 @@ class StreamedSpan:
         # booleans or numbers between 0 and 1.)
         if not is_valid_sample_rate(sample_rate, source="Tracing"):
             logger.warning(
-                f"[Tracing] Discarding {self._name} because of invalid sample rate."
+                f"[Tracing] Discarding {self.name} because of invalid sample rate."
             )
-            self.sampled = False
+            self._sampled = False
             return
 
         self.sample_rate = float(sample_rate)
@@ -416,12 +442,12 @@ class StreamedSpan:
             else:
                 reason = "traces_sample_rate is set to 0"
 
-            logger.debug(f"[Tracing] Discarding {self._name} because {reason}")
-            self.sampled = False
+            logger.debug(f"[Tracing] Discarding {self.name} because {reason}")
+            self._sampled = False
             return
 
         # Now we roll the dice.
-        self.sampled = self._sample_rand < self.sample_rate
+        self._sampled = self._sample_rand < self.sample_rate
 
         if self.sampled:
             logger.debug(f"[Tracing] Starting {self.name}")

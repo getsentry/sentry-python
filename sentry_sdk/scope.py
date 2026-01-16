@@ -29,6 +29,7 @@ from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
+    has_span_streaming_enabled,
     normalize_incoming_data,
     PropagationContext,
 )
@@ -1155,30 +1156,55 @@ class Scope:
         parent_span: "Optional[StreamedSpan]" = None,
     ) -> "StreamedSpan":
         # TODO: rename to start_span once we drop the old API
-        with new_scope():
-            if parent_span is None:
-                # get current span or transaction
-                parent_span = self.span or self.get_isolation_scope().span
+        if parent_span is None:
+            # Get currently active span
+            parent_span = self.span or self.get_isolation_scope().span
 
-            if parent_span is None:
-                # New spans get the `trace_id` from the scope
-                propagation_context = self.get_active_propagation_context()
-                span = StreamedSpan(
-                    name=name,
-                    attributes=attributes,
-                    trace_id=propagation_context.trace_id,
-                    scope=self,
-                )
-            else:
-                # Children take propagation context from the parent span
-                span = StreamedSpan(
-                    name=name,
-                    attributes=attributes,
-                    trace_id=parent_span.trace_id,
-                    parent_span_id=parent_span.span_id,
-                    segment=parent_span.segment,
-                    scope=self,
-                )
+        # If no specific parent_span provided and there is no currently
+        # active span, this is a segment
+        if parent_span is None:
+            propagation_context = self.get_active_propagation_context()
+            span = StreamedSpan(
+                name=name,
+                attributes=attributes,
+                scope=self,
+                segment=None,
+                trace_id=propagation_context.trace_id,
+                parent_span_id=propagation_context.parent_span_id,
+                parent_sampled=propagation_context.parent_sampled,
+                baggage=propagation_context.baggage,
+            )
+
+            try_autostart_continuous_profiler()
+
+            # XXX[span-first]: no sampling context?
+            sampling_context = {
+                "transaction_context": {
+                    "trace_id": span.trace_id,
+                    "span_id": span.span_id,
+                    "parent_span_id": span.parent_span_id,
+                },
+                "parent_sampled": span.parent_sampled,
+                "attributes": span.attributes,
+            }
+            # Use traces_sample_rate, traces_sampler, and/or inheritance to make a
+            # sampling decision
+            span._set_sampling_decision(sampling_context=sampling_context)
+
+            return span
+
+        # This is a child span; take propagation context from the parent span
+        with new_scope():
+            span = StreamedSpan(
+                name=name,
+                attributes=attributes,
+                scope=self,
+                trace_id=parent_span.trace_id,
+                parent_span_id=parent_span.span_id,
+                parent_sampled=parent_span.sampled,
+                segment=parent_span.segment,
+                # XXX[span-first]: baggage?
+            )
 
             return span
 
@@ -1290,6 +1316,17 @@ class Scope:
             )
 
         client._capture_metric(metric, scope=merged_scope)
+
+    def _capture_span(self, span: "Optional[StreamedSpan]") -> None:
+        if span is None:
+            return
+
+        client = self.get_client()
+        if not has_span_streaming_enabled(client.options):
+            return
+
+        merged_scope = self._merge_scopes()
+        client._capture_span(span, scope=merged_scope)
 
     def capture_message(
         self,
@@ -1535,16 +1572,25 @@ class Scope:
             )
 
     def _apply_scope_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
+        self, telemetry: "Union[Log, Metric, Span]"
     ) -> None:
+        # TODO: turn Logs, Metrics into actual classes
+        if isinstance(telemetry, dict):
+            attributes = telemetry["attributes"]
+        else:
+            attributes = telemetry.attributes
+
         for attribute, value in self._attributes.items():
-            if attribute not in telemetry["attributes"]:
-                telemetry["attributes"][attribute] = value
+            if attribute not in attributes:
+                attributes[attribute] = value
 
     def _apply_user_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
+        self, telemetry: "Union[Log, Metric, Span]"
     ) -> None:
-        attributes = telemetry["attributes"]
+        if isinstance(telemetry, dict):
+            attributes = telemetry["attributes"]
+        else:
+            attributes = telemetry.attributes
 
         if not should_send_default_pii() or self._user is None:
             return
@@ -1664,16 +1710,19 @@ class Scope:
         return event
 
     @_disable_capture
-    def apply_to_telemetry(self, telemetry: "Union[Log, Metric]") -> None:
+    def apply_to_telemetry(self, telemetry: "Union[Log, Metric, StreamedSpan]") -> None:
         # Attributes-based events and telemetry go through here (logs, metrics,
         # spansV2)
-        trace_context = self.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        if telemetry.get("trace_id") is None:
-            telemetry["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
-        span_id = trace_context.get("span_id")
-        if telemetry.get("span_id") is None and span_id:
-            telemetry["span_id"] = span_id
+        if not isinstance(telemetry, StreamedSpan):
+            trace_context = self.get_trace_context()
+            trace_id = trace_context.get("trace_id")
+            if telemetry.get("trace_id") is None:
+                telemetry["trace_id"] = (
+                    trace_id or "00000000-0000-0000-0000-000000000000"
+                )
+            span_id = trace_context.get("span_id")
+            if telemetry.get("span_id") is None and span_id:
+                telemetry["span_id"] = span_id
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)

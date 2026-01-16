@@ -228,6 +228,9 @@ class BaseClient:
     def _capture_metric(self, metric: "Metric", scope: "Scope") -> None:
         pass
 
+    def _capture_span(self, span: "StreamedSpan", scope: "Scope") -> None:
+        pass
+
     def capture_session(self, *args: "Any", **kwargs: "Any") -> None:
         return None
 
@@ -406,7 +409,8 @@ class _Client(BaseClient):
             self.span_batcher = None
             if has_span_streaming_enabled(self.options):
                 self.span_batcher = SpanBatcher(
-                    capture_func=_capture_envelope, record_lost_func=_record_lost_event
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
                 )
 
             max_request_body_size = ("always", "never", "small", "medium")
@@ -935,6 +939,7 @@ class _Client(BaseClient):
             before_send = get_before_send_log(self.options)
         elif ty == "metric":
             before_send = get_before_send_metric(self.options)
+        # no before_send for spans
 
         if before_send is not None:
             telemetry = before_send(telemetry, {})  # type: ignore
@@ -1011,6 +1016,8 @@ class _Client(BaseClient):
                 self.log_batcher.kill()
             if self.metrics_batcher is not None:
                 self.metrics_batcher.kill()
+            if self.span_batcher is not None:
+                self.span_batcher.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -1036,6 +1043,8 @@ class _Client(BaseClient):
                 self.log_batcher.flush()
             if self.metrics_batcher is not None:
                 self.metrics_batcher.flush()
+            if self.span_batcher is not None:
+                self.span_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self) -> "_Client":

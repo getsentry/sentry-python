@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from sentry_sdk._batcher import Batcher
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.utils import serialize_attribute, safe_repr
+from sentry_sdk.utils import format_timestamp, serialize_attribute, safe_repr
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -71,24 +71,24 @@ class SpanBatcher(Batcher["Span"]):
             "trace_id": item.trace_id,
             "span_id": item.span_id,
             "name": item.get_name(),
-            "status": item._status,
+            "status": item.status.value,
             "is_segment": item.is_segment(),
-            "start_timestamp": item._start_timestamp.timestamp(),  # TODO[span-first]
-            "end_timestamp": item._timestamp.timestamp(),
+            "start_timestamp": item.start_timestamp.timestamp(),  # TODO[span-first]
+            "end_timestamp": item.timestamp.timestamp(),
         }
 
-        if item._parent_span_id:
-            res["parent_span_id"] = item._parent_span_id
+        if item.parent_span_id:
+            res["parent_span_id"] = item.parent_span_id
 
-        if item._attributes:
+        if item.attributes:
             res["attributes"] = {
-                k: serialize_attribute(v) for (k, v) in item._attributes.items()
+                k: serialize_attribute(v) for (k, v) in item.attributes.items()
             }
 
         return res
 
-    def _flush(self) -> Optional[Envelope]:
-        from sentry_sdk.utils import format_timestamp
+    def _flush(self) -> "Optional[Envelope]":
+        print("batcher.flush")
 
         with self._lock:
             if len(self._span_buffer) == 0:

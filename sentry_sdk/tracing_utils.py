@@ -452,10 +452,8 @@ class PropagationContext:
     ) -> "PropagationContext":
         propagation_context = PropagationContext()
         normalized_data = normalize_incoming_data(incoming_data)
-
         sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
         sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
-
         # nothing to propagate if no sentry-trace
         if sentrytrace_data is None:
             return propagation_context
@@ -782,11 +780,11 @@ class Baggage:
         if segment.source not in LOW_QUALITY_TRANSACTION_SOURCES:
             sentry_items["transaction"] = segment.name
 
-        if segment._sample_rate is not None:
-            sentry_items["sample_rate"] = str(segment._sample_rate)
+        if segment.sample_rate is not None:
+            sentry_items["sample_rate"] = str(segment.sample_rate)
 
-        if segment._sampled is not None:
-            sentry_items["sampled"] = "true" if segment._sampled else "false"
+        if segment.sampled is not None:
+            sentry_items["sampled"] = "true" if segment.sampled else "false"
 
         # There's an existing baggage but it was mutable, which is why we are
         # creating this new baggage.
