@@ -96,23 +96,15 @@ def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "agents.Agent") -> N
 
 def _set_usage_data(span: "sentry_sdk.tracing.Span", usage: "Usage") -> None:
     span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
-
-    if hasattr(usage, "input_tokens_details") and usage.input_tokens_details:
-        if hasattr(usage.input_tokens_details, "cached_tokens"):
-            span.set_data(
-                SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
-                usage.input_tokens_details.cached_tokens,
-            )
-
+    span.set_data(
+        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+        usage.input_tokens_details.cached_tokens,
+    )
     span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
-
-    if hasattr(usage, "output_tokens_details") and usage.output_tokens_details:
-        if hasattr(usage.output_tokens_details, "reasoning_tokens"):
-            span.set_data(
-                SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
-                usage.output_tokens_details.reasoning_tokens,
-            )
-
+    span.set_data(
+        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+        usage.output_tokens_details.reasoning_tokens,
+    )
     span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
 
 
