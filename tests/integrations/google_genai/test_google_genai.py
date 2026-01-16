@@ -1421,6 +1421,451 @@ async def test_async_embed_content_span_origin(
         assert span["origin"] == "auto.ai.google_genai"
 
 
+# Integration tests for generate_content with different input message formats
+def test_generate_content_with_content_object(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with Content object input."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Create Content object
+    content = genai_types.Content(
+        role="user", parts=[genai_types.Part(text="Hello from Content object")]
+    )
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=content, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [
+        {"text": "Hello from Content object", "type": "text"}
+    ]
+
+
+def test_generate_content_with_conversation_history(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with list of Content objects (conversation history)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Create conversation history
+    contents = [
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(text="What is the capital of France?")]
+        ),
+        genai_types.Content(
+            role="model",
+            parts=[genai_types.Part(text="The capital of France is Paris.")],
+        ),
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(text="What about Germany?")]
+        ),
+    ]
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 3
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [
+        {"text": "What is the capital of France?", "type": "text"}
+    ]
+    assert (
+        messages[1]["role"] == "assistant"
+    )  # "model" should be normalized to "assistant"
+    assert messages[1]["content"] == [
+        {"text": "The capital of France is Paris.", "type": "text"}
+    ]
+    assert messages[2]["role"] == "user"
+    assert messages[2]["content"] == [{"text": "What about Germany?", "type": "text"}]
+
+
+def test_generate_content_with_dict_format(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with dict format input (ContentDict)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Dict format content
+    contents = {"role": "user", "parts": [{"text": "Hello from dict format"}]}
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [
+        {"text": "Hello from dict format", "type": "text"}
+    ]
+
+
+def test_generate_content_with_file_data(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with file_data (external file reference)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Content with file_data
+    file_data = genai_types.FileData(
+        file_uri="gs://bucket/image.jpg", mime_type="image/jpeg"
+    )
+    content = genai_types.Content(
+        role="user",
+        parts=[
+            genai_types.Part(text="What's in this image?"),
+            genai_types.Part(file_data=file_data),
+        ],
+    )
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=content, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert len(messages[0]["content"]) == 2
+    assert messages[0]["content"][0] == {
+        "text": "What's in this image?",
+        "type": "text",
+    }
+    assert messages[0]["content"][1]["type"] == "blob"
+    assert messages[0]["content"][1]["mime_type"] == "image/jpeg"
+    assert messages[0]["content"][1]["file_uri"] == "gs://bucket/image.jpg"
+
+
+def test_generate_content_with_inline_data(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with inline_data (binary data)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Content with inline binary data
+    image_bytes = b"fake_image_binary_data"
+    blob = genai_types.Blob(data=image_bytes, mime_type="image/png")
+    content = genai_types.Content(
+        role="user",
+        parts=[
+            genai_types.Part(text="Describe this image"),
+            genai_types.Part(inline_data=blob),
+        ],
+    )
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=content, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert len(messages[0]["content"]) == 2
+    assert messages[0]["content"][0] == {"text": "Describe this image", "type": "text"}
+    assert messages[0]["content"][1]["type"] == "blob"
+    assert messages[0]["content"][1]["mime_type"] == "image/png"
+    # Binary data should be substituted for privacy
+    assert messages[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+
+
+def test_generate_content_with_function_response(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with function_response (tool result)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Conversation with function response (tool result)
+    function_response = genai_types.FunctionResponse(
+        id="call_123", name="get_weather", response={"output": "Sunny, 72F"}
+    )
+    contents = [
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(text="What's the weather in Paris?")]
+        ),
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(function_response=function_response)]
+        ),
+    ]
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 2
+    # First message is user message
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [
+        {"text": "What's the weather in Paris?", "type": "text"}
+    ]
+    # Second message is tool message
+    assert messages[1]["role"] == "tool"
+    assert messages[1]["content"]["toolCallId"] == "call_123"
+    assert messages[1]["content"]["toolName"] == "get_weather"
+    assert messages[1]["content"]["output"] == '"Sunny, 72F"'
+
+
+def test_generate_content_with_mixed_string_and_content(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with mixed string and Content objects in list."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Mix of strings and Content objects
+    contents = [
+        "Hello, this is a string message",
+        genai_types.Content(
+            role="model",
+            parts=[genai_types.Part(text="Hi! How can I help you?")],
+        ),
+        genai_types.Content(
+            role="user",
+            parts=[genai_types.Part(text="Tell me a joke")],
+        ),
+    ]
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 3
+    # String becomes user message
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Hello, this is a string message"
+    # Model role normalized to assistant
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"] == [
+        {"text": "Hi! How can I help you?", "type": "text"}
+    ]
+    # User message
+    assert messages[2]["role"] == "user"
+    assert messages[2]["content"] == [{"text": "Tell me a joke", "type": "text"}]
+
+
+def test_generate_content_with_part_object_directly(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with Part object directly (not wrapped in Content)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Part object directly
+    part = genai_types.Part(text="Direct Part object")
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=part, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [{"text": "Direct Part object", "type": "text"}]
+
+
+def test_generate_content_with_list_of_dicts(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with list of dict format inputs."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # List of dicts (conversation in dict format)
+    contents = [
+        {"role": "user", "parts": [{"text": "First user message"}]},
+        {"role": "model", "parts": [{"text": "First model response"}]},
+        {"role": "user", "parts": [{"text": "Second user message"}]},
+    ]
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 3
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [{"text": "First user message", "type": "text"}]
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"] == [{"text": "First model response", "type": "text"}]
+    assert messages[2]["role"] == "user"
+    assert messages[2]["content"] == [{"text": "Second user message", "type": "text"}]
+
+
+def test_generate_content_with_dict_inline_data(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with dict format containing inline_data."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Dict with inline_data
+    contents = {
+        "role": "user",
+        "parts": [
+            {"text": "What's in this image?"},
+            {"inline_data": {"data": b"fake_binary_data", "mime_type": "image/gif"}},
+        ],
+    }
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert len(messages[0]["content"]) == 2
+    assert messages[0]["content"][0] == {
+        "text": "What's in this image?",
+        "type": "text",
+    }
+    assert messages[0]["content"][1]["type"] == "blob"
+    assert messages[0]["content"][1]["mime_type"] == "image/gif"
+    assert messages[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+
+
 # Tests for extract_contents_messages function
 def test_extract_contents_messages_none():
     """Test extract_contents_messages with None input"""
