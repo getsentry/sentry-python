@@ -48,6 +48,8 @@ TODO[span-first] / notes
 - {custom_}sampling_context? -> if this is going to die, we need to revive the
   potel pr that went through the integrations and got rid of custom_sampling_context
   in favor of attributes
+- noop spans
+- add a switcher to top level API that figures out which @trace to enable
 
 Notes:
 - removed ability to provide a start_timestamp
@@ -104,6 +106,10 @@ SOURCE_FOR_STYLE = {
     "uri_template": SegmentSource.ROUTE,
     "url": SegmentSource.ROUTE,
 }
+
+
+class NoOpStreamedSpan:
+    pass
 
 
 class StreamedSpan:
@@ -185,7 +191,6 @@ class StreamedSpan:
 
         self._sampled: "Optional[bool]" = None
         self.sample_rate: "Optional[float]" = None
-        self._sample_rand: "Optional[float]" = None
 
         # XXX[span-first]: just do this for segments?
         self._baggage = baggage
@@ -248,9 +253,9 @@ class StreamedSpan:
         self,
         end_timestamp: "Optional[Union[float, datetime]]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
-    ) -> "Optional[str]":
+    ) -> None:
         """
-        Set the end timestamp of the span.
+        Set the end timestamp of the span and queue it for sending.
 
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
@@ -258,7 +263,7 @@ class StreamedSpan:
         """
         client = sentry_sdk.get_client()
         if not client.is_active():
-            return None
+            return
 
         scope: "Optional[sentry_sdk.Scope]" = (
             scope or self._scope or sentry_sdk.get_current_scope()
@@ -279,14 +284,14 @@ class StreamedSpan:
 
                 client.transport.record_lost_event(reason, data_category="span")
 
-            return None
+            return
 
         if self.sampled is None:
             logger.warning("Discarding transaction without sampling decision.")
 
         if self.timestamp is not None:
             # This span is already finished, ignore.
-            return None
+            return
 
         try:
             if end_timestamp:
@@ -303,8 +308,6 @@ class StreamedSpan:
 
         if self.segment.sampled:  # XXX this should just use its own sampled
             sentry_sdk.get_current_scope()._capture_span(self)
-
-        return
 
     def get_attributes(self) -> "Attributes":
         return self.attributes
@@ -324,6 +327,10 @@ class StreamedSpan:
 
     def set_name(self, name: str) -> None:
         self.name = name
+
+    def set_flag(self, flag: str, result: bool) -> None:
+        if len(self._flags) < FLAGS_CAPACITY:
+            self._flags[flag] = result
 
     def is_segment(self) -> bool:
         return self.segment == self
@@ -352,7 +359,7 @@ class StreamedSpan:
 
         return self._sampled
 
-    def dynamic_sampling_context(self) -> str:
+    def dynamic_sampling_context(self) -> dict[str, str]:
         return self.segment._get_baggage().dynamic_sampling_context()
 
     def _update_active_thread(self) -> None:

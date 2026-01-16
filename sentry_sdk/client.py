@@ -69,7 +69,7 @@ if TYPE_CHECKING:
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
-    from sentry_sdk.trace import StreamedSpan
+    from sentry_sdk._tracing import StreamedSpan
     from sentry_sdk.transport import Transport, Item
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher

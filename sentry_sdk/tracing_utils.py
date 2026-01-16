@@ -4,11 +4,12 @@ import inspect
 import os
 import re
 import sys
+import uuid
+import warnings
 from collections.abc import Mapping, MutableMapping
 from datetime import timedelta
 from random import Random
 from urllib.parse import quote, unquote
-import uuid
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
@@ -988,6 +989,58 @@ def create_span_decorator(
     return span_decorator
 
 
+def create_streaming_span_decorator(
+    name: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Any]]" = None,
+) -> "Any":
+    """
+    Create a span decorator that can wrap both sync and async functions.
+
+    :param name: The name of the span.
+    :type name: str or None
+    :param attributes: Additional attributes to set on the span.
+    :type attributes: dict or None
+    """
+    from sentry_sdk.scope import should_send_default_pii
+
+    def span_decorator(f: "Any") -> "Any":
+        """
+        Decorator to create a span for the given function.
+        """
+
+        @functools.wraps(f)
+        async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+            span_name = name or qualname_from_function(f) or ""
+
+            with start_streaming_span(name=span_name, attributes=attributes):
+                result = await f(*args, **kwargs)
+                return result
+
+        try:
+            async_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+        @functools.wraps(f)
+        def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+            span_name = name or qualname_from_function(f) or ""
+
+            with start_streaming_span(name=span_name, attributes=attributes):
+                return f(*args, **kwargs)
+
+        try:
+            sync_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+        if inspect.iscoroutinefunction(f):
+            return async_wrapper
+        else:
+            return sync_wrapper
+
+    return span_decorator
+
+
 def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
 ) -> "Optional[Union[Span, StreamedSpan]]":
@@ -1005,6 +1058,15 @@ def set_span_errored(span: "Optional[Span]" = None) -> None:
     Also sets the status of the transaction (root span) to INTERNAL_ERROR.
     """
     span = span or get_current_span()
+
+    if not isinstance(span, Span):
+        warnings.warn(
+            "set_span_errored is not available in streaming mode.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return
+
     if span is not None:
         span.set_status(SPANSTATUS.INTERNAL_ERROR)
         if span.containing_transaction is not None:
@@ -1366,7 +1428,10 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
 )
 
-from sentry_sdk._tracing import LOW_QUALITY_SEGMENT_SOURCES
+from sentry_sdk._tracing import (
+    LOW_QUALITY_SEGMENT_SOURCES,
+    start_span as start_streaming_span,
+)
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
