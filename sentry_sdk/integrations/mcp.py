@@ -17,6 +17,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.utils import safe_serialize
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import nullcontext
 
 try:
     from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
@@ -80,8 +81,8 @@ def _get_active_http_scopes() -> (
         return None
 
     return (
-        ctx.request.scope["state"].get("sentry_sdk.current_scope"),
         ctx.request.scope["state"].get("sentry_sdk.isolation_scope"),
+        ctx.request.scope["state"].get("sentry_sdk.current_scope"),
     )
 
 
@@ -410,17 +411,28 @@ async def _async_handler_wrapper(
     scopes = _get_active_http_scopes()
 
     if scopes is None:
-        current_scope = None
-        isolation_scope = None
+        isolation_scope_context = nullcontext()
+        current_scope_context = nullcontext()
     else:
-        current_scope, isolation_scope = scopes
+        isolation_scope, current_scope = scopes
+
+        isolation_scope_context = (
+            nullcontext()
+            if isolation_scope is None
+            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
+        )
+        current_scope_context = (
+            nullcontext()
+            if current_scope is None
+            else sentry_sdk.scope.use_scope(current_scope)
+        )
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data()
 
     # Start span and execute
-    with sentry_sdk.scope.use_isolation_scope(isolation_scope):
-        with sentry_sdk.scope.use_scope(current_scope):
+    with isolation_scope_context:
+        with current_scope_context:
             with get_start_span_function()(
                 op=OP.MCP_SERVER,
                 name=span_name,
@@ -490,50 +502,71 @@ def _sync_handler_wrapper(
         result_data_key,
     ) = _prepare_handler_data(handler_type, original_args)
 
-    # Start span and execute
-    with get_start_span_function()(
-        op=OP.MCP_SERVER,
-        name=span_name,
-        origin=MCPIntegration.origin,
-    ) as span:
-        # Get request ID, session ID, and transport from context
-        request_id, session_id, mcp_transport = _get_request_context_data()
+    scopes = _get_active_http_scopes()
 
-        # Set input span data
-        _set_span_input_data(
-            span,
-            handler_name,
-            span_data_key,
-            mcp_method_name,
-            arguments,
-            request_id,
-            session_id,
-            mcp_transport,
+    if scopes is None:
+        isolation_scope_context = nullcontext()
+        current_scope_context = nullcontext()
+    else:
+        isolation_scope, current_scope = scopes
+
+        isolation_scope_context = (
+            nullcontext()
+            if isolation_scope is None
+            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
+        )
+        current_scope_context = (
+            nullcontext()
+            if current_scope is None
+            else sentry_sdk.scope.use_scope(current_scope)
         )
 
-        # For resources, extract and set protocol
-        if handler_type == "resource":
-            uri = original_args[0]
-            protocol = None
-            if hasattr(uri, "scheme"):
-                protocol = uri.scheme
-            elif handler_name and "://" in handler_name:
-                protocol = handler_name.split("://")[0]
-            if protocol:
-                span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
+    # Start span and execute
+    with isolation_scope_context:
+        with current_scope_context:
+            with get_start_span_function()(
+                op=OP.MCP_SERVER,
+                name=span_name,
+                origin=MCPIntegration.origin,
+            ) as span:
+                # Get request ID, session ID, and transport from context
+                request_id, session_id, mcp_transport = _get_request_context_data()
 
-        try:
-            # Execute the sync handler
-            result = func(*original_args)
-        except Exception as e:
-            # Set error flag for tools
-            if handler_type == "tool":
-                span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
-            sentry_sdk.capture_exception(e)
-            raise
+                # Set input span data
+                _set_span_input_data(
+                    span,
+                    handler_name,
+                    span_data_key,
+                    mcp_method_name,
+                    arguments,
+                    request_id,
+                    session_id,
+                    mcp_transport,
+                )
 
-        _set_span_output_data(span, result, result_data_key, handler_type)
-        return result
+                # For resources, extract and set protocol
+                if handler_type == "resource":
+                    uri = original_args[0]
+                    protocol = None
+                    if hasattr(uri, "scheme"):
+                        protocol = uri.scheme
+                    elif handler_name and "://" in handler_name:
+                        protocol = handler_name.split("://")[0]
+                    if protocol:
+                        span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
+
+                try:
+                    # Execute the sync handler
+                    result = func(*original_args)
+                except Exception as e:
+                    # Set error flag for tools
+                    if handler_type == "tool":
+                        span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
+                    sentry_sdk.capture_exception(e)
+                    raise
+
+                _set_span_output_data(span, result, result_data_key, handler_type)
+                return result
 
 
 def _create_instrumented_handler(

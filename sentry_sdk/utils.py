@@ -16,6 +16,7 @@ from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
+from contextlib import contextmanager
 
 try:
     # Python 3.11
@@ -2078,3 +2079,9 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     # Coerce to string if we don't know what to do with the value. This should
     # never happen as we pre-format early in format_attribute, but let's be safe.
     return {"value": safe_repr(val), "type": "string"}
+
+
+# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
+@contextmanager
+def nullcontext() -> "Iterator[None]":
+    yield

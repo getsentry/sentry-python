@@ -1,4 +1,5 @@
 import sys
+import functools
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -9,7 +10,6 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
-    nullcontext,
 )
 from sentry_sdk.scope import should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     reraise,
+    nullcontext,
 )
 
 if TYPE_CHECKING:
@@ -70,6 +71,7 @@ class SentryWsgiMiddleware:
         "use_x_forwarded_for",
         "span_origin",
         "http_methods_to_capture",
+        "_wsgi_file_wrapper",
     )
 
     def __init__(
@@ -85,10 +87,18 @@ class SentryWsgiMiddleware:
         self.http_methods_to_capture = http_methods_to_capture
 
     def __call__(
-        self, environ: "Dict[str, str]", start_response: "Callable[..., Any]"
+        self, environ: "Dict[str, Any]", start_response: "Callable[..., Any]"
     ) -> "_ScopedResponse":
         if _wsgi_middleware_applied.get(False):
             return self.app(environ, start_response)
+
+        old_wsgi_file_wrapper = environ["wsgi.file_wrapper"]
+
+        def _patch_environ_wsgi_file_wrapper(fileobj, block_size=8192):
+            self._wsgi_file_wrapper = old_wsgi_file_wrapper(fileobj, block_size)
+            return self._wsgi_file_wrapper
+
+        environ["wsgi.file_wrapper"] = _patch_environ_wsgi_file_wrapper
 
         _wsgi_middleware_applied.set(True)
         try:
@@ -134,6 +144,9 @@ class SentryWsgiMiddleware:
                             reraise(*_capture_exception())
         finally:
             _wsgi_middleware_applied.set(False)
+
+        if response is self._wsgi_file_wrapper:
+            return response
 
         return _ScopedResponse(scope, response)
 
@@ -213,6 +226,14 @@ def _capture_exception() -> "ExcInfo":
         sentry_sdk.capture_event(event, hint=hint)
 
     return exc_info
+
+
+class _ScopedFileWrapper:
+    def __init__(self, scope: "sentry_sdk.scope.Scope", fileno):
+        pass
+
+    def fileno():
+        pass
 
 
 class _ScopedResponse:
