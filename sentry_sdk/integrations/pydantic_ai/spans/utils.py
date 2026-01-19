@@ -44,14 +44,5 @@ def _set_usage_data(
     if hasattr(usage, "output_tokens") and usage.output_tokens is not None:
         span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
 
-    if (
-        hasattr(usage, "output_tokens_reasoning")
-        and usage.output_tokens_reasoning is not None
-    ):
-        span.set_data(
-            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
-            usage.output_tokens_reasoning,
-        )
-
     if hasattr(usage, "total_tokens") and usage.total_tokens is not None:
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)

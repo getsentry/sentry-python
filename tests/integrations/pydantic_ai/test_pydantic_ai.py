@@ -8,11 +8,14 @@ from pydantic import Field
 
 import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
+from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, UserPromptPart
+from pydantic_ai.usage import RequestUsage
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
 
@@ -2735,11 +2738,6 @@ async def test_binary_content_in_agent_run(sentry_init, capture_events):
 @pytest.mark.asyncio
 async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
     """Test that cache_read_tokens and cache_write_tokens are tracked."""
-    import sentry_sdk
-    from pydantic_ai.usage import RequestUsage
-    from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
-    from sentry_sdk.consts import SPANDATA
-
     sentry_init(integrations=[PydanticAIIntegration()], traces_sample_rate=1.0)
 
     events = capture_events()
