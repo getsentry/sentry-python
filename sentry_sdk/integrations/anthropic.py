@@ -75,20 +75,36 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _get_token_usage(result: "Messages") -> "tuple[int, int]":
+def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
     """
     Get token usage from the Anthropic response.
+    Returns: (input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens)
     """
     input_tokens = 0
     output_tokens = 0
+    cache_read_input_tokens = 0
+    cache_write_input_tokens = 0
     if hasattr(result, "usage"):
         usage = result.usage
         if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
             input_tokens = usage.input_tokens
         if hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
             output_tokens = usage.output_tokens
+        if hasattr(usage, "cache_read_input_tokens") and isinstance(
+            usage.cache_read_input_tokens, int
+        ):
+            cache_read_input_tokens = usage.cache_read_input_tokens
+        if hasattr(usage, "cache_creation_input_tokens") and isinstance(
+            usage.cache_creation_input_tokens, int
+        ):
+            cache_write_input_tokens = usage.cache_creation_input_tokens
 
-    return input_tokens, output_tokens
+    return (
+        input_tokens,
+        output_tokens,
+        cache_read_input_tokens,
+        cache_write_input_tokens,
+    )
 
 
 def _collect_ai_data(
@@ -96,8 +112,10 @@ def _collect_ai_data(
     model: "str | None",
     input_tokens: int,
     output_tokens: int,
+    cache_read_input_tokens: int,
+    cache_write_input_tokens: int,
     content_blocks: "list[str]",
-) -> "tuple[str | None, int, int, list[str]]":
+) -> "tuple[str | None, int, int, int, int, list[str]]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
@@ -107,6 +125,14 @@ def _collect_ai_data(
                 usage = event.message.usage
                 input_tokens += usage.input_tokens
                 output_tokens += usage.output_tokens
+                if hasattr(usage, "cache_read_input_tokens") and isinstance(
+                    usage.cache_read_input_tokens, int
+                ):
+                    cache_read_input_tokens += usage.cache_read_input_tokens
+                if hasattr(usage, "cache_creation_input_tokens") and isinstance(
+                    usage.cache_creation_input_tokens, int
+                ):
+                    cache_write_input_tokens += usage.cache_creation_input_tokens
                 model = event.message.model or model
             elif event.type == "content_block_start":
                 pass
@@ -120,7 +146,14 @@ def _collect_ai_data(
             elif event.type == "message_delta":
                 output_tokens += event.usage.output_tokens
 
-    return model, input_tokens, output_tokens, content_blocks
+    return (
+        model,
+        input_tokens,
+        output_tokens,
+        cache_read_input_tokens,
+        cache_write_input_tokens,
+        content_blocks,
+    )
 
 
 def _transform_anthropic_content_block(
@@ -265,6 +298,8 @@ def _set_output_data(
     model: "str | None",
     input_tokens: "int | None",
     output_tokens: "int | None",
+    cache_read_input_tokens: "int | None",
+    cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
     finish_span: bool = False,
 ) -> None:
@@ -300,6 +335,8 @@ def _set_output_data(
         span,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+        input_tokens_cached=cache_read_input_tokens,
+        input_tokens_cache_write=cache_write_input_tokens,
     )
 
     if finish_span:
@@ -334,7 +371,12 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
     with capture_internal_exceptions():
         if hasattr(result, "content"):
-            input_tokens, output_tokens = _get_token_usage(result)
+            (
+                input_tokens,
+                output_tokens,
+                cache_read_input_tokens,
+                cache_write_input_tokens,
+            ) = _get_token_usage(result)
 
             content_blocks = []
             for content_block in result.content:
@@ -351,6 +393,8 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 model=getattr(result, "model", None),
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
+                cache_read_input_tokens=cache_read_input_tokens,
+                cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
                 finish_span=True,
             )
@@ -363,13 +407,26 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 model = None
                 input_tokens = 0
                 output_tokens = 0
+                cache_read_input_tokens = 0
+                cache_write_input_tokens = 0
                 content_blocks: "list[str]" = []
 
                 for event in old_iterator:
-                    model, input_tokens, output_tokens, content_blocks = (
-                        _collect_ai_data(
-                            event, model, input_tokens, output_tokens, content_blocks
-                        )
+                    (
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cache_read_input_tokens,
+                        cache_write_input_tokens,
+                        content_blocks,
+                    ) = _collect_ai_data(
+                        event,
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cache_read_input_tokens,
+                        cache_write_input_tokens,
+                        content_blocks,
                     )
                     yield event
 
@@ -379,6 +436,8 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     model=model,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
+                    cache_read_input_tokens=cache_read_input_tokens,
+                    cache_write_input_tokens=cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                 )
@@ -387,13 +446,26 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 model = None
                 input_tokens = 0
                 output_tokens = 0
+                cache_read_input_tokens = 0
+                cache_write_input_tokens = 0
                 content_blocks: "list[str]" = []
 
                 async for event in old_iterator:
-                    model, input_tokens, output_tokens, content_blocks = (
-                        _collect_ai_data(
-                            event, model, input_tokens, output_tokens, content_blocks
-                        )
+                    (
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cache_read_input_tokens,
+                        cache_write_input_tokens,
+                        content_blocks,
+                    ) = _collect_ai_data(
+                        event,
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cache_read_input_tokens,
+                        cache_write_input_tokens,
+                        content_blocks,
                     )
                     yield event
 
@@ -403,6 +475,8 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     model=model,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
+                    cache_read_input_tokens=cache_read_input_tokens,
+                    cache_write_input_tokens=cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                 )

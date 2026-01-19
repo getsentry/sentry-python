@@ -8,11 +8,14 @@ from pydantic import Field
 
 import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
+from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, UserPromptPart
+from pydantic_ai.usage import RequestUsage
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
 
@@ -2730,3 +2733,27 @@ async def test_binary_content_in_agent_run(sentry_init, capture_events):
     if "gen_ai.request.messages" in chat_span["data"]:
         messages_str = str(chat_span["data"]["gen_ai.request.messages"])
         assert any(keyword in messages_str for keyword in ["blob", "image", "base64"])
+
+
+@pytest.mark.asyncio
+async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
+    """Test that cache_read_tokens and cache_write_tokens are tracked."""
+    sentry_init(integrations=[PydanticAIIntegration()], traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        usage = RequestUsage(
+            input_tokens=100,
+            output_tokens=50,
+            cache_read_tokens=80,
+            cache_write_tokens=20,
+        )
+        _set_usage_data(span, usage)
+        span.finish()
+
+    (event,) = events
+    (span_data,) = event["spans"]
+    assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
