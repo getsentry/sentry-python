@@ -6,8 +6,10 @@ from google import genai
 from google.genai import types as genai_types
 
 from sentry_sdk import start_transaction
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
+from sentry_sdk.integrations.google_genai.utils import extract_contents_messages
 
 
 @pytest.fixture
@@ -1417,3 +1419,770 @@ async def test_async_embed_content_span_origin(
     assert event["contexts"]["trace"]["origin"] == "manual"
     for span in event["spans"]:
         assert span["origin"] == "auto.ai.google_genai"
+
+
+# Integration tests for generate_content with different input message formats
+def test_generate_content_with_content_object(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with Content object input."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Create Content object
+    content = genai_types.Content(
+        role="user", parts=[genai_types.Part(text="Hello from Content object")]
+    )
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=content, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [
+        {"text": "Hello from Content object", "type": "text"}
+    ]
+
+
+def test_generate_content_with_conversation_history(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with list of Content objects (conversation history)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Create conversation history
+    contents = [
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(text="What is the capital of France?")]
+        ),
+        genai_types.Content(
+            role="model",
+            parts=[genai_types.Part(text="The capital of France is Paris.")],
+        ),
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(text="What about Germany?")]
+        ),
+    ]
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 3
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [
+        {"text": "What is the capital of France?", "type": "text"}
+    ]
+    assert (
+        messages[1]["role"] == "assistant"
+    )  # "model" should be normalized to "assistant"
+    assert messages[1]["content"] == [
+        {"text": "The capital of France is Paris.", "type": "text"}
+    ]
+    assert messages[2]["role"] == "user"
+    assert messages[2]["content"] == [{"text": "What about Germany?", "type": "text"}]
+
+
+def test_generate_content_with_dict_format(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with dict format input (ContentDict)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Dict format content
+    contents = {"role": "user", "parts": [{"text": "Hello from dict format"}]}
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [
+        {"text": "Hello from dict format", "type": "text"}
+    ]
+
+
+def test_generate_content_with_file_data(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with file_data (external file reference)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Content with file_data
+    file_data = genai_types.FileData(
+        file_uri="gs://bucket/image.jpg", mime_type="image/jpeg"
+    )
+    content = genai_types.Content(
+        role="user",
+        parts=[
+            genai_types.Part(text="What's in this image?"),
+            genai_types.Part(file_data=file_data),
+        ],
+    )
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=content, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert len(messages[0]["content"]) == 2
+    assert messages[0]["content"][0] == {
+        "text": "What's in this image?",
+        "type": "text",
+    }
+    assert messages[0]["content"][1]["type"] == "uri"
+    assert messages[0]["content"][1]["modality"] == "image"
+    assert messages[0]["content"][1]["mime_type"] == "image/jpeg"
+    assert messages[0]["content"][1]["uri"] == "gs://bucket/image.jpg"
+
+
+def test_generate_content_with_inline_data(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with inline_data (binary data)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Content with inline binary data
+    image_bytes = b"fake_image_binary_data"
+    blob = genai_types.Blob(data=image_bytes, mime_type="image/png")
+    content = genai_types.Content(
+        role="user",
+        parts=[
+            genai_types.Part(text="Describe this image"),
+            genai_types.Part(inline_data=blob),
+        ],
+    )
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=content, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert len(messages[0]["content"]) == 2
+    assert messages[0]["content"][0] == {"text": "Describe this image", "type": "text"}
+    assert messages[0]["content"][1]["type"] == "blob"
+    assert messages[0]["content"][1]["mime_type"] == "image/png"
+    # Binary data should be substituted for privacy
+    assert messages[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+
+
+def test_generate_content_with_function_response(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with function_response (tool result)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Conversation with function response (tool result)
+    function_response = genai_types.FunctionResponse(
+        id="call_123", name="get_weather", response={"output": "Sunny, 72F"}
+    )
+    contents = [
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(text="What's the weather in Paris?")]
+        ),
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(function_response=function_response)]
+        ),
+    ]
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 2
+    # First message is user message
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [
+        {"text": "What's the weather in Paris?", "type": "text"}
+    ]
+    # Second message is tool message
+    assert messages[1]["role"] == "tool"
+    assert messages[1]["content"]["toolCallId"] == "call_123"
+    assert messages[1]["content"]["toolName"] == "get_weather"
+    assert messages[1]["content"]["output"] == '"Sunny, 72F"'
+
+
+def test_generate_content_with_mixed_string_and_content(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with mixed string and Content objects in list."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Mix of strings and Content objects
+    contents = [
+        "Hello, this is a string message",
+        genai_types.Content(
+            role="model",
+            parts=[genai_types.Part(text="Hi! How can I help you?")],
+        ),
+        genai_types.Content(
+            role="user",
+            parts=[genai_types.Part(text="Tell me a joke")],
+        ),
+    ]
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 3
+    # String becomes user message
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Hello, this is a string message"
+    # Model role normalized to assistant
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"] == [
+        {"text": "Hi! How can I help you?", "type": "text"}
+    ]
+    # User message
+    assert messages[2]["role"] == "user"
+    assert messages[2]["content"] == [{"text": "Tell me a joke", "type": "text"}]
+
+
+def test_generate_content_with_part_object_directly(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with Part object directly (not wrapped in Content)."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Part object directly
+    part = genai_types.Part(text="Direct Part object")
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=part, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [{"text": "Direct Part object", "type": "text"}]
+
+
+def test_generate_content_with_list_of_dicts(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with list of dict format inputs."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # List of dicts (conversation in dict format)
+    contents = [
+        {"role": "user", "parts": [{"text": "First user message"}]},
+        {"role": "model", "parts": [{"text": "First model response"}]},
+        {"role": "user", "parts": [{"text": "Second user message"}]},
+    ]
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 3
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [{"text": "First user message", "type": "text"}]
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"] == [{"text": "First model response", "type": "text"}]
+    assert messages[2]["role"] == "user"
+    assert messages[2]["content"] == [{"text": "Second user message", "type": "text"}]
+
+
+def test_generate_content_with_dict_inline_data(
+    sentry_init, capture_events, mock_genai_client
+):
+    """Test generate_content with dict format containing inline_data."""
+    sentry_init(
+        integrations=[GoogleGenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+
+    # Dict with inline_data
+    contents = {
+        "role": "user",
+        "parts": [
+            {"text": "What's in this image?"},
+            {"inline_data": {"data": b"fake_binary_data", "mime_type": "image/gif"}},
+        ],
+    }
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+    (event,) = events
+    invoke_span = event["spans"][0]
+
+    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert len(messages[0]["content"]) == 2
+    assert messages[0]["content"][0] == {
+        "text": "What's in this image?",
+        "type": "text",
+    }
+    assert messages[0]["content"][1]["type"] == "blob"
+    assert messages[0]["content"][1]["mime_type"] == "image/gif"
+    assert messages[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
+
+
+# Tests for extract_contents_messages function
+def test_extract_contents_messages_none():
+    """Test extract_contents_messages with None input"""
+    result = extract_contents_messages(None)
+    assert result == []
+
+
+def test_extract_contents_messages_string():
+    """Test extract_contents_messages with string input"""
+    result = extract_contents_messages("Hello world")
+    assert result == [{"role": "user", "content": "Hello world"}]
+
+
+def test_extract_contents_messages_content_object():
+    """Test extract_contents_messages with Content object"""
+    content = genai_types.Content(
+        role="user", parts=[genai_types.Part(text="Test message")]
+    )
+    result = extract_contents_messages(content)
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Test message", "type": "text"}]
+
+
+def test_extract_contents_messages_content_object_model_role():
+    """Test extract_contents_messages with Content object having model role"""
+    content = genai_types.Content(
+        role="model", parts=[genai_types.Part(text="Assistant response")]
+    )
+    result = extract_contents_messages(content)
+    assert len(result) == 1
+    assert result[0]["role"] == "assistant"
+    assert result[0]["content"] == [{"text": "Assistant response", "type": "text"}]
+
+
+def test_extract_contents_messages_content_object_no_role():
+    """Test extract_contents_messages with Content object without role"""
+    content = genai_types.Content(parts=[genai_types.Part(text="No role message")])
+    result = extract_contents_messages(content)
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "No role message", "type": "text"}]
+
+
+def test_extract_contents_messages_part_object():
+    """Test extract_contents_messages with Part object"""
+    part = genai_types.Part(text="Direct part")
+    result = extract_contents_messages(part)
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Direct part", "type": "text"}]
+
+
+def test_extract_contents_messages_file_data():
+    """Test extract_contents_messages with file_data"""
+    file_data = genai_types.FileData(
+        file_uri="gs://bucket/file.jpg", mime_type="image/jpeg"
+    )
+    part = genai_types.Part(file_data=file_data)
+    content = genai_types.Content(parts=[part])
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 1
+    blob_part = result[0]["content"][0]
+    assert blob_part["type"] == "uri"
+    assert blob_part["modality"] == "image"
+    assert blob_part["mime_type"] == "image/jpeg"
+    assert blob_part["uri"] == "gs://bucket/file.jpg"
+
+
+def test_extract_contents_messages_inline_data():
+    """Test extract_contents_messages with inline_data (binary)"""
+    # Create inline data with bytes
+    image_bytes = b"fake_image_data"
+    blob = genai_types.Blob(data=image_bytes, mime_type="image/png")
+    part = genai_types.Part(inline_data=blob)
+    content = genai_types.Content(parts=[part])
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 1
+    blob_part = result[0]["content"][0]
+    assert blob_part["type"] == "blob"
+    assert blob_part["mime_type"] == "image/png"
+    assert blob_part["content"] == BLOB_DATA_SUBSTITUTE
+
+
+def test_extract_contents_messages_function_response():
+    """Test extract_contents_messages with function_response (tool message)"""
+    function_response = genai_types.FunctionResponse(
+        id="call_123", name="get_weather", response={"output": "sunny"}
+    )
+    part = genai_types.Part(function_response=function_response)
+    content = genai_types.Content(parts=[part])
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "tool"
+    assert result[0]["content"]["toolCallId"] == "call_123"
+    assert result[0]["content"]["toolName"] == "get_weather"
+    assert result[0]["content"]["output"] == '"sunny"'
+
+
+def test_extract_contents_messages_function_response_with_output_key():
+    """Test extract_contents_messages with function_response that has output key"""
+    function_response = genai_types.FunctionResponse(
+        id="call_456", name="get_time", response={"output": "3:00 PM", "error": None}
+    )
+    part = genai_types.Part(function_response=function_response)
+    content = genai_types.Content(parts=[part])
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "tool"
+    assert result[0]["content"]["toolCallId"] == "call_456"
+    assert result[0]["content"]["toolName"] == "get_time"
+    # Should prefer "output" key
+    assert result[0]["content"]["output"] == '"3:00 PM"'
+
+
+def test_extract_contents_messages_mixed_parts():
+    """Test extract_contents_messages with mixed content parts"""
+    content = genai_types.Content(
+        role="user",
+        parts=[
+            genai_types.Part(text="Text part"),
+            genai_types.Part(
+                file_data=genai_types.FileData(
+                    file_uri="gs://bucket/image.jpg", mime_type="image/jpeg"
+                )
+            ),
+        ],
+    )
+    result = extract_contents_messages(content)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 2
+    assert result[0]["content"][0] == {"text": "Text part", "type": "text"}
+    assert result[0]["content"][1]["type"] == "uri"
+    assert result[0]["content"][1]["modality"] == "image"
+    assert result[0]["content"][1]["uri"] == "gs://bucket/image.jpg"
+
+
+def test_extract_contents_messages_list():
+    """Test extract_contents_messages with list input"""
+    contents = [
+        "First message",
+        genai_types.Content(
+            role="user", parts=[genai_types.Part(text="Second message")]
+        ),
+    ]
+    result = extract_contents_messages(contents)
+
+    assert len(result) == 2
+    assert result[0] == {"role": "user", "content": "First message"}
+    assert result[1]["role"] == "user"
+    assert result[1]["content"] == [{"text": "Second message", "type": "text"}]
+
+
+def test_extract_contents_messages_dict_content():
+    """Test extract_contents_messages with dict (ContentDict)"""
+    content_dict = {"role": "user", "parts": [{"text": "Dict message"}]}
+    result = extract_contents_messages(content_dict)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Dict message", "type": "text"}]
+
+
+def test_extract_contents_messages_dict_with_text():
+    """Test extract_contents_messages with dict containing text key"""
+    content_dict = {"role": "user", "text": "Simple text"}
+    result = extract_contents_messages(content_dict)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Simple text", "type": "text"}]
+
+
+def test_extract_contents_messages_file_object():
+    """Test extract_contents_messages with File object"""
+    file_obj = genai_types.File(
+        name="files/123", uri="gs://bucket/file.pdf", mime_type="application/pdf"
+    )
+    result = extract_contents_messages(file_obj)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 1
+    blob_part = result[0]["content"][0]
+    assert blob_part["type"] == "uri"
+    assert blob_part["modality"] == "document"
+    assert blob_part["mime_type"] == "application/pdf"
+    assert blob_part["uri"] == "gs://bucket/file.pdf"
+
+
+@pytest.mark.skipif(
+    not hasattr(genai_types, "PIL_Image") or genai_types.PIL_Image is None,
+    reason="PIL not available",
+)
+def test_extract_contents_messages_pil_image():
+    """Test extract_contents_messages with PIL.Image.Image"""
+    try:
+        from PIL import Image as PILImage
+
+        # Create a simple test image
+        img = PILImage.new("RGB", (10, 10), color="red")
+        result = extract_contents_messages(img)
+
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+        assert len(result[0]["content"]) == 1
+        blob_part = result[0]["content"][0]
+        assert blob_part["type"] == "blob"
+        assert blob_part["mime_type"].startswith("image/")
+        assert "content" in blob_part
+        # Binary content is substituted with placeholder for privacy
+        assert blob_part["content"] == "[Blob substitute]"
+    except ImportError:
+        pytest.skip("PIL not available")
+
+
+def test_extract_contents_messages_tool_and_text():
+    """Test extract_contents_messages with both tool message and text"""
+    content = genai_types.Content(
+        role="user",
+        parts=[
+            genai_types.Part(text="User question"),
+            genai_types.Part(
+                function_response=genai_types.FunctionResponse(
+                    id="call_789", name="search", response={"output": "results"}
+                )
+            ),
+        ],
+    )
+    result = extract_contents_messages(content)
+
+    # Should have two messages: one user message and one tool message
+    assert len(result) == 2
+    # First should be user message with text
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "User question", "type": "text"}]
+    # Second should be tool message
+    assert result[1]["role"] == "tool"
+    assert result[1]["content"]["toolCallId"] == "call_789"
+    assert result[1]["content"]["toolName"] == "search"
+
+
+def test_extract_contents_messages_empty_parts():
+    """Test extract_contents_messages with Content object with empty parts"""
+    content = genai_types.Content(role="user", parts=[])
+    result = extract_contents_messages(content)
+
+    assert result == []
+
+
+def test_extract_contents_messages_empty_list():
+    """Test extract_contents_messages with empty list"""
+    result = extract_contents_messages([])
+    assert result == []
+
+
+def test_extract_contents_messages_dict_inline_data():
+    """Test extract_contents_messages with dict containing inline_data"""
+    content_dict = {
+        "role": "user",
+        "parts": [{"inline_data": {"data": b"binary_data", "mime_type": "image/gif"}}],
+    }
+    result = extract_contents_messages(content_dict)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert len(result[0]["content"]) == 1
+    blob_part = result[0]["content"][0]
+    assert blob_part["type"] == "blob"
+    assert blob_part["mime_type"] == "image/gif"
+    assert blob_part["content"] == BLOB_DATA_SUBSTITUTE
+
+
+def test_extract_contents_messages_dict_function_response():
+    """Test extract_contents_messages with dict containing function_response"""
+    content_dict = {
+        "role": "user",
+        "parts": [
+            {
+                "function_response": {
+                    "id": "dict_call_1",
+                    "name": "dict_tool",
+                    "response": {"result": "success"},
+                }
+            }
+        ],
+    }
+    result = extract_contents_messages(content_dict)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "tool"
+    assert result[0]["content"]["toolCallId"] == "dict_call_1"
+    assert result[0]["content"]["toolName"] == "dict_tool"
+    assert result[0]["content"]["output"] == '{"result": "success"}'
+
+
+def test_extract_contents_messages_object_with_text_attribute():
+    """Test extract_contents_messages with object that has text attribute"""
+
+    class TextObject:
+        def __init__(self):
+            self.text = "Object text"
+
+    obj = TextObject()
+    result = extract_contents_messages(obj)
+
+    assert len(result) == 1
+    assert result[0]["role"] == "user"
+    assert result[0]["content"] == [{"text": "Object text", "type": "text"}]
