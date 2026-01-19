@@ -1592,9 +1592,10 @@ def test_generate_content_with_file_data(
         "text": "What's in this image?",
         "type": "text",
     }
-    assert messages[0]["content"][1]["type"] == "blob"
+    assert messages[0]["content"][1]["type"] == "uri"
+    assert messages[0]["content"][1]["modality"] == "image"
     assert messages[0]["content"][1]["mime_type"] == "image/jpeg"
-    assert messages[0]["content"][1]["file_uri"] == "gs://bucket/image.jpg"
+    assert messages[0]["content"][1]["uri"] == "gs://bucket/image.jpg"
 
 
 def test_generate_content_with_inline_data(
@@ -1932,9 +1933,10 @@ def test_extract_contents_messages_file_data():
     assert result[0]["role"] == "user"
     assert len(result[0]["content"]) == 1
     blob_part = result[0]["content"][0]
-    assert blob_part["type"] == "blob"
+    assert blob_part["type"] == "uri"
+    assert blob_part["modality"] == "image"
     assert blob_part["mime_type"] == "image/jpeg"
-    assert blob_part["file_uri"] == "gs://bucket/file.jpg"
+    assert blob_part["uri"] == "gs://bucket/file.jpg"
 
 
 def test_extract_contents_messages_inline_data():
@@ -2007,8 +2009,9 @@ def test_extract_contents_messages_mixed_parts():
     assert result[0]["role"] == "user"
     assert len(result[0]["content"]) == 2
     assert result[0]["content"][0] == {"text": "Text part", "type": "text"}
-    assert result[0]["content"][1]["type"] == "blob"
-    assert result[0]["content"][1]["file_uri"] == "gs://bucket/image.jpg"
+    assert result[0]["content"][1]["type"] == "uri"
+    assert result[0]["content"][1]["modality"] == "image"
+    assert result[0]["content"][1]["uri"] == "gs://bucket/image.jpg"
 
 
 def test_extract_contents_messages_list():
@@ -2058,9 +2061,10 @@ def test_extract_contents_messages_file_object():
     assert result[0]["role"] == "user"
     assert len(result[0]["content"]) == 1
     blob_part = result[0]["content"][0]
-    assert blob_part["type"] == "blob"
+    assert blob_part["type"] == "uri"
+    assert blob_part["modality"] == "document"
     assert blob_part["mime_type"] == "application/pdf"
-    assert blob_part["file_uri"] == "gs://bucket/file.pdf"
+    assert blob_part["uri"] == "gs://bucket/file.pdf"
 
 
 @pytest.mark.skipif(

@@ -326,9 +326,10 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         mime_type = getattr(file_data, "mime_type", None)
         if file_uri and mime_type:
             return {
-                "type": "blob",
+                "type": "uri",
+                "modality": get_modality_from_mime_type(mime_type),
                 "mime_type": mime_type,
-                "file_uri": file_uri,
+                "uri": file_uri,
             }
 
     # Handle inline_data
