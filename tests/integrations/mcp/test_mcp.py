@@ -15,6 +15,7 @@ The tests mock the MCP server components and request context to verify
 that the integration properly instruments MCP handlers with Sentry spans.
 """
 
+import asyncio
 import anyio
 import pytest
 import json
