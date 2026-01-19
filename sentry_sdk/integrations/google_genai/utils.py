@@ -260,7 +260,12 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
         # File object
         file_uri = getattr(contents, "uri", None)
         mime_type = getattr(contents, "mime_type", None)
-        if file_uri and mime_type:
+        # Process if we have file_uri, even if mime_type is missing
+        if file_uri is not None:
+            # Default to empty string if mime_type is None
+            if mime_type is None:
+                mime_type = ""
+
             blob_part = {
                 "type": "uri",
                 "modality": get_modality_from_mime_type(mime_type),
@@ -325,7 +330,12 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         file_data = part.file_data
         file_uri = getattr(file_data, "file_uri", None)
         mime_type = getattr(file_data, "mime_type", None)
-        if file_uri and mime_type:
+        # Process if we have file_uri, even if mime_type is missing (consistent with dict handling)
+        if file_uri is not None:
+            # Default to empty string if mime_type is None (consistent with transform_google_content_part)
+            if mime_type is None:
+                mime_type = ""
+
             return {
                 "type": "uri",
                 "modality": get_modality_from_mime_type(mime_type),
@@ -338,13 +348,25 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         inline_data = part.inline_data
         data = getattr(inline_data, "data", None)
         mime_type = getattr(inline_data, "mime_type", None)
-        if data and mime_type:
+        # Process if we have data, even if mime_type is missing/empty (consistent with dict handling)
+        if data is not None:
+            # Default to empty string if mime_type is None (consistent with transform_google_content_part)
+            if mime_type is None:
+                mime_type = ""
+
+            # Handle both bytes (binary data) and str (base64-encoded data)
             if isinstance(data, bytes):
-                return {
-                    "type": "blob",
-                    "mime_type": mime_type,
-                    "content": BLOB_DATA_SUBSTITUTE,
-                }
+                content = BLOB_DATA_SUBSTITUTE
+            else:
+                # For non-bytes data (e.g., base64 strings), use as-is
+                content = data
+
+            return {
+                "type": "blob",
+                "modality": get_modality_from_mime_type(mime_type),
+                "mime_type": mime_type,
+                "content": content,
+            }
 
     return None
 
@@ -417,6 +439,7 @@ def _extract_pil_image(image: "Any") -> "Optional[dict[str, Any]]":
 
         return {
             "type": "blob",
+            "modality": get_modality_from_mime_type(mime_type),
             "mime_type": mime_type,
             "content": BLOB_DATA_SUBSTITUTE,
         }
