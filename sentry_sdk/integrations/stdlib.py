@@ -69,9 +69,16 @@ def _install_httplib() -> None:
     def putrequest(
         self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        host = self.host
-        port = self.port
         default_port = self.default_port
+
+        # proxies go through set_tunnel
+        tunnel_host = getattr(self, "_tunnel_host", None)
+        if tunnel_host:
+            host = tunnel_host
+            port = getattr(self, "_tunnel_port", default_port)
+        else:
+            host = self.host
+            port = self.port
 
         client = sentry_sdk.get_client()
         if client.get_integration(StdlibIntegration) is None or is_sentry_url(
@@ -103,6 +110,11 @@ def _install_httplib() -> None:
             span.set_data("url", parsed_url.url)
             span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
             span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+        # for proxies, these point to the proxy host/port
+        if tunnel_host:
+            span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
+            span.set_data(SPANDATA.NETWORK_PEER_PORT, self.port)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
