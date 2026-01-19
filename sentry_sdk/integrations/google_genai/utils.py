@@ -262,9 +262,10 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
         mime_type = getattr(contents, "mime_type", None)
         if file_uri and mime_type:
             blob_part = {
-                "type": "blob",
+                "type": "uri",
+                "modality": get_modality_from_mime_type(mime_type),
                 "mime_type": mime_type,
-                "file_uri": file_uri,
+                "uri": file_uri,
             }
             return [{"role": "user", "content": [blob_part]}]
 
