@@ -44,7 +44,6 @@ from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
 )
-from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.serializer import serialize
 
@@ -1458,7 +1457,25 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     assert "gen_ai.request.available_tools" not in span["data"]
 
 
-def test_openai_message_role_mapping(sentry_init, capture_events):
+# Test messages with mixed roles including "ai" that should be mapped to "assistant"
+@pytest.mark.parametrize(
+    "test_message,expected_role",
+    [
+        ({"role": "system", "content": "You are helpful."}, "system"),
+        ({"role": "user", "content": "Hello"}, "user"),
+        (
+            {"role": "ai", "content": "Hi there!"},
+            "assistant",
+        ),  # Should be mapped to "assistant"
+        (
+            {"role": "assistant", "content": "How can I help?"},
+            "assistant",
+        ),  # Should stay "assistant"
+    ],
+)
+def test_openai_message_role_mapping(
+    sentry_init, capture_events, test_message, expected_role
+):
     """Test that OpenAI integration properly maps message roles like 'ai' to 'assistant'"""
 
     sentry_init(
@@ -1470,13 +1487,8 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
 
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
-    # Test messages with mixed roles including "ai" that should be mapped to "assistant"
-    test_messages = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hello"},
-        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
-        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
-    ]
+
+    test_messages = [test_message]
 
     with start_transaction(name="openai tx"):
         client.chat.completions.create(model="test-model", messages=test_messages)
@@ -1491,22 +1503,8 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
 
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
-    # Verify that "ai" role was mapped to "assistant"
-    assert len(stored_messages) == 4
-    assert stored_messages[0]["role"] == "system"
-    assert stored_messages[1]["role"] == "user"
-    assert (
-        stored_messages[2]["role"] == "assistant"
-    )  # "ai" should be mapped to "assistant"
-    assert stored_messages[3]["role"] == "assistant"  # should stay "assistant"
-
-    # Verify content is preserved
-    assert stored_messages[2]["content"] == "Hi there!"
-    assert stored_messages[3]["content"] == "How can I help?"
-
-    # Verify no "ai" roles remain
-    roles = [msg["role"] for msg in stored_messages]
-    assert "ai" not in roles
+    assert len(stored_messages) == 1
+    assert stored_messages[0]["role"] == expected_role
 
 
 def test_openai_message_truncation(sentry_init, capture_events):
@@ -1548,14 +1546,8 @@ def test_openai_message_truncation(sentry_init, capture_events):
     assert isinstance(parsed_messages, list)
     assert len(parsed_messages) <= len(large_messages)
 
-    if "_meta" in event and len(parsed_messages) < len(large_messages):
-        meta_path = event["_meta"]
-        if (
-            "spans" in meta_path
-            and "0" in meta_path["spans"]
-            and "data" in meta_path["spans"]["0"]
-        ):
-            span_meta = meta_path["spans"]["0"]["data"]
-            if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_meta:
-                messages_meta = span_meta[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                assert "len" in messages_meta.get("", {})
+    meta_path = event["_meta"]
+    span_meta = meta_path["spans"]["0"]["data"]
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_meta:
+        messages_meta = span_meta[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "len" in messages_meta.get("", {})
