@@ -1457,26 +1457,11 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     assert "gen_ai.request.available_tools" not in span["data"]
 
 
-# Test messages with mixed roles including "ai" that should be mapped to "assistant"
-@pytest.mark.parametrize(
-    "test_message,expected_role",
-    [
-        ({"role": "system", "content": "You are helpful."}, "system"),
-        ({"role": "user", "content": "Hello"}, "user"),
-        (
-            {"role": "ai", "content": "Hi there!"},
-            "assistant",
-        ),  # Should be mapped to "assistant"
-        (
-            {"role": "assistant", "content": "How can I help?"},
-            "assistant",
-        ),  # Should stay "assistant"
-    ],
-)
 def test_openai_message_role_mapping(
-    sentry_init, capture_events, test_message, expected_role
+    sentry_init, capture_events, input_ai_message_and_expected_role
 ):
     """Test that OpenAI integration properly maps message roles like 'ai' to 'assistant'"""
+    test_message, expected_role = input_ai_message_and_expected_role
 
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],

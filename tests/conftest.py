@@ -592,6 +592,30 @@ def suppress_deprecation_warnings():
         yield
 
 
+@pytest.fixture(
+    params=[
+        pytest.param(
+            ({"role": "system", "content": "You are helpful."}, "system"),
+            id="system",
+        ),
+        pytest.param(
+            ({"role": "user", "content": "Hello"}, "user"),
+            id="user",
+        ),
+        pytest.param(
+            ({"role": "ai", "content": "Hi there!"}, "assistant"),
+            id="ai",
+        ),
+        pytest.param(
+            ({"role": "assistant", "content": "How can I help?"}, "assistant"),
+            id="assistant",
+        ),
+    ]
+)
+def input_ai_message_and_expected_role(request):
+    return request.param
+
+
 class MockServerRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         # Process an HTTP GET request and return a response.
