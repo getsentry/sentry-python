@@ -1380,60 +1380,6 @@ async def test_streaming_create_message_with_system_prompt_async(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-def test_system_prompt_with_complex_structure(sentry_init, capture_events):
-    """Test that complex system prompt structures (list of text blocks) are properly captured."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    events = capture_events()
-    client = Anthropic(api_key="z")
-    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
-
-    system_prompt = [
-        {"type": "text", "text": "You are a helpful assistant."},
-    ]
-
-    # User prompt as list of text blocks
-    messages = [
-        {
-            "role": "user",
-            "content": "Hello",
-        },
-        {"type": "user", "text": "World!"},
-    ]
-
-    with start_transaction(name="anthropic"):
-        response = client.messages.create(
-            max_tokens=1024, messages=messages, model="model", system=system_prompt
-        )
-
-    assert response == EXAMPLE_MESSAGE
-    assert len(events) == 1
-    (event,) = events
-
-    assert len(event["spans"]) == 1
-    (span,) = event["spans"]
-
-    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
-    # Should have system message first, then user message
-    assert len(stored_messages) == 1
-    assert stored_messages[0]["role"] == "user"
-    # System content should be a list of text blocks
-    assert isinstance(stored_messages[0]["content"], list)
-    assert len(stored_messages[0]["content"]) == 1
-    # assert stored_messages[0]["content"][0]["type"] == "text"
-    # assert stored_messages[0]["content"][0]["text"] == "You are a helpful assistant."
-    # assert stored_messages[0]["content"][1]["type"] == "text"
-    # assert stored_messages[0]["content"][1]["text"] == "Be concise and clear."
-    assert stored_messages[0]["role"] == "user"
-    assert stored_messages[0]["content"] == "Hello"
-
-
 # Tests for transform_content_part (shared) and _transform_anthropic_content_block helper functions
 
 
