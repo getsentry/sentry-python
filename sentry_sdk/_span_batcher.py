@@ -91,13 +91,15 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
         return res
 
-    def _flush(self) -> "Optional[Envelope]":
+    def _flush(self) -> None:
         with self._lock:
             if len(self._span_buffer) == 0:
                 return None
 
             for trace_id, spans in self._span_buffer.items():
                 if spans:
+                    for span in spans:
+                        print(span.name)
                     dsc = spans[0].dynamic_sampling_context()
                     # XXX[span-first]: empty dsc?
 
@@ -126,7 +128,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                         )
                     )
 
-            self._span_buffer.clear()
+                    self._capture_func(envelope)
 
-        self._capture_func(envelope)
-        return envelope
+            self._span_buffer.clear()
