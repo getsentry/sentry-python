@@ -1,5 +1,96 @@
 # Changelog
 
+## 2.50.0
+
+### New Features ✨
+
+#### Ai
+
+- feat(ai): add cache writes for gen_ai by @shellmayr in [#5319](https://github.com/getsentry/sentry-python/pull/5319)
+- feat(ai): add parse_data_uri function to parse a data URI by @constantinius in [#5311](https://github.com/getsentry/sentry-python/pull/5311)
+
+#### Other
+
+- feat(asyncio): Add on-demand way to enable AsyncioIntegration by @sentrivana in [#5288](https://github.com/getsentry/sentry-python/pull/5288)
+
+  You can now enable the `AsyncioIntegration` on demand, after calling `sentry_sdk.init()`. This is useful in scenarios where you don't have
+  the event loop running early on, or when you need to instrument multiple event loops.
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.asyncio import enable_asyncio_integration
+
+# Initializing the SDK as early as possible, when there is no event loop yet
+sentry_sdk.init(
+    ...
+    # No AsyncioIntegration in explicitly provided `integrations`
+)
+
+async def main():
+    enable_asyncio_integration()  # instruments the current event loop
+    # ...your code...
+```
+
+- feat(openai-agents): Inject propagation headers for `HostedMCPTool` by @alexander-alderman-webb in [#5297](https://github.com/getsentry/sentry-python/pull/5297)
+- feat(stdlib): Handle proxy tunnels in httlib integration by @sl0thentr0py in [#5303](https://github.com/getsentry/sentry-python/pull/5303)
+- feat: Support array types for logs and metrics attributes by @alexander-alderman-webb in [#5314](https://github.com/getsentry/sentry-python/pull/5314)
+
+### Bug Fixes 🐛
+
+#### Integrations
+
+- fix(integrations): google genai report image inputs by @constantinius in [#5337](https://github.com/getsentry/sentry-python/pull/5337)
+- fix(integrations): google-genai: reworked `gen_ai.request.messages` extraction from parameters by @constantinius in [#5275](https://github.com/getsentry/sentry-python/pull/5275)
+- fix(integrations): pydantic-ai: properly format binary input message parts to be conformant with the `gen_ai.request.messages` structure by @constantinius in [#5251](https://github.com/getsentry/sentry-python/pull/5251)
+- fix(integrations): Anthropic: add content transformation for images and documents by @constantinius in [#5276](https://github.com/getsentry/sentry-python/pull/5276)
+- fix(integrations): langchain add multimodal content transformation functions for images, audio, and files by @constantinius in [#5278](https://github.com/getsentry/sentry-python/pull/5278)
+
+#### Litellm
+
+- fix(litellm): fix `gen_ai.request.messages` to be as expected by @constantinius in [#5255](https://github.com/getsentry/sentry-python/pull/5255)
+- fix(litellm): Guard against module shadowing by @alexander-alderman-webb in [#5249](https://github.com/getsentry/sentry-python/pull/5249)
+
+#### Other
+
+- fix(ai): redact message parts content of type blob by @constantinius in [#5243](https://github.com/getsentry/sentry-python/pull/5243)
+- fix(clickhouse): Guard against module shadowing by @alexander-alderman-webb in [#5250](https://github.com/getsentry/sentry-python/pull/5250)
+- fix(gql): Revert signature change of patched gql.Client.execute by @alexander-alderman-webb in [#5289](https://github.com/getsentry/sentry-python/pull/5289)
+- fix(grpc): Derive interception state from channel fields by @alexander-alderman-webb in [#5302](https://github.com/getsentry/sentry-python/pull/5302)
+- fix(pure-eval): Guard against module shadowing by @alexander-alderman-webb in [#5252](https://github.com/getsentry/sentry-python/pull/5252)
+- fix(ray): Guard against module shadowing by @alexander-alderman-webb in [#5254](https://github.com/getsentry/sentry-python/pull/5254)
+- fix(threading): Handle channels shadowing by @sentrivana in [#5299](https://github.com/getsentry/sentry-python/pull/5299)
+- fix(typer): Guard against module shadowing by @alexander-alderman-webb in [#5253](https://github.com/getsentry/sentry-python/pull/5253)
+- fix: Stop suppressing exception chains in AI integrations by @alexander-alderman-webb in [#5309](https://github.com/getsentry/sentry-python/pull/5309)
+- fix: Send client reports for span recorder overflow by @sentrivana in [#5310](https://github.com/getsentry/sentry-python/pull/5310)
+
+### Documentation 📚
+
+- docs(metrics): Remove experimental notice by @alexander-alderman-webb in [#5304](https://github.com/getsentry/sentry-python/pull/5304)
+- docs: Update Python versions banner in README by @sentrivana in [#5287](https://github.com/getsentry/sentry-python/pull/5287)
+
+### Internal Changes 🔧
+
+#### Fastmcp
+
+- test(fastmcp): Narrow `AttributeError` try-except by @alexander-alderman-webb in [#5339](https://github.com/getsentry/sentry-python/pull/5339)
+- test(fastmcp): Stop accessing non-existent attribute by @alexander-alderman-webb in [#5338](https://github.com/getsentry/sentry-python/pull/5338)
+
+#### Release
+
+- ci(release): Bump Craft version to fix issues by @BYK in [#5305](https://github.com/getsentry/sentry-python/pull/5305)
+- ci(release): Switch from action-prepare-release to Craft by @BYK in [#5290](https://github.com/getsentry/sentry-python/pull/5290)
+
+#### Other
+
+- chore(gen_ai): add auto-enablement for google genai by @shellmayr in [#5295](https://github.com/getsentry/sentry-python/pull/5295)
+- chore(repo): Add Claude Code settings with basic permissions by @philipphofmann in [#5342](https://github.com/getsentry/sentry-python/pull/5342)
+- ci: 🤖 Update test matrix with new releases (01/19) by @github-actions in [#5330](https://github.com/getsentry/sentry-python/pull/5330)
+- ci: Add periodic AI integration tests by @alexander-alderman-webb in [#5313](https://github.com/getsentry/sentry-python/pull/5313)
+- chore: Use pull_request_target for changelog preview by @BYK in [#5323](https://github.com/getsentry/sentry-python/pull/5323)
+- chore: add unlabeled trigger to changelog-preview by @BYK in [#5315](https://github.com/getsentry/sentry-python/pull/5315)
+- chore: Add type for metric units by @sentrivana in [#5312](https://github.com/getsentry/sentry-python/pull/5312)
+- ci: Update tox and handle generic classifiers by @sentrivana in [#5306](https://github.com/getsentry/sentry-python/pull/5306)
+
 ## 2.49.0
 
 ### New Features ✨
