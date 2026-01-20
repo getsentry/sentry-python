@@ -371,7 +371,7 @@ class StreamedSpan:
 
         return self._sampled
 
-    def dynamic_sampling_context(self) -> dict[str, str]:
+    def dynamic_sampling_context(self) -> "dict[str, str]":
         return self.segment._get_baggage().dynamic_sampling_context()
 
     def _update_active_thread(self) -> None:
