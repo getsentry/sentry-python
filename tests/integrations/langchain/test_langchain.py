@@ -218,15 +218,14 @@ def test_langchain_agent(
 
     if send_default_pii and include_prompts:
         assert (
-            "You are very powerful"
+            "How many letters in the word"
             in chat_spans[0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
         assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
         assert (
-            "You are very powerful"
-            in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            "get_word_length" in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
         assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -1035,9 +1034,8 @@ def test_langchain_message_truncation(sentry_init, capture_events):
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 2
-    assert "small message 4" in str(parsed_messages[0])
-    assert "small message 5" in str(parsed_messages[1])
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
