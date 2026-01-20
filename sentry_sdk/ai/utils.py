@@ -660,6 +660,10 @@ def truncate_messages_by_size(
     In the single message case, the serialized message size may exceed `max_bytes`, because
     truncation is based only on character count in that case.
     """
+    # Normalize messages to ensure JSON serialization works
+    # (handles Pydantic objects from OpenAI SDK v1+)
+    messages = _normalize_data(messages, unpack=False)
+
     serialized_json = json.dumps(messages, separators=(",", ":"))
     current_size = len(serialized_json.encode("utf-8"))
 
