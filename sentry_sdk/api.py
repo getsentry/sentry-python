@@ -7,7 +7,7 @@ from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
-from sentry_sdk._tracing import StreamedSpan
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.crons import monitor
 
 from typing import TYPE_CHECKING

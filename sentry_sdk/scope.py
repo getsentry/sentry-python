@@ -33,7 +33,7 @@ from sentry_sdk.tracing_utils import (
     normalize_incoming_data,
     PropagationContext,
 )
-from sentry_sdk._tracing import StreamedSpan
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,

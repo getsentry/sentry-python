@@ -10,7 +10,7 @@ from sentry_sdk.utils import format_timestamp, serialize_attribute, safe_repr
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
-    from sentry_sdk._tracing import SpanStatus, StreamedSpan
+    from sentry_sdk.traces import SpanStatus, StreamedSpan
     from sentry_sdk._types import SerializedAttributeValue
 
 

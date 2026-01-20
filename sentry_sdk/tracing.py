@@ -126,10 +126,6 @@ if TYPE_CHECKING:
         },
     )
 
-# TODO: Once the old Span class is gone, move _tracing.py to tracing.py. This is
-# here for now so that you can do sentry_sdk.tracing.start_span for the new API.
-from sentry_sdk._tracing import start_span
-
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
