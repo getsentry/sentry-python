@@ -606,9 +606,9 @@ def test_fastmcp_prompt_sync(
 
             # Check PII-sensitive data
             if send_default_pii and include_prompts:
-                assert SPANDATA.MCP_PROMPT_CONTENT in span["data"]
+                assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["data"]
             else:
-                assert SPANDATA.MCP_PROMPT_CONTENT not in span["data"]
+                assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
     except AttributeError:
         # Prompt handler not supported in this version
         pytest.skip("Prompt handlers not supported in this FastMCP version")
