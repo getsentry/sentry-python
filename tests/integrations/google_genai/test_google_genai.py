@@ -234,9 +234,8 @@ def test_generate_content_with_system_instruction(
     messages_str = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     # Parse the JSON string to verify content
     messages = json.loads(messages_str)
-    assert len(messages) == 2
-    assert messages[0] == {"role": "system", "content": "You are a helpful assistant"}
-    assert messages[1] == {"role": "user", "content": "What is 2+2?"}
+    assert len(messages) == 1
+    assert messages[0] == {"role": "user", "content": "What is 2+2?"}
 
 
 def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):

@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 import sentry_sdk
 from sentry_sdk.utils import logger
 
-MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 # Maximum characters when only a single message is left after bytes truncation
 MAX_SINGLE_MESSAGE_CONTENT_CHARS = 10_000
 
@@ -550,22 +549,6 @@ def _truncate_single_message_content_if_present(
     return message
 
 
-def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> int:
-    """
-    Find the index of the first message that would exceed the max bytes limit.
-    Compute the individual message sizes, and return the index of the first message from the back
-    of the list that would exceed the max bytes limit.
-    """
-    running_sum = 0
-    for idx in range(len(messages) - 1, -1, -1):
-        size = len(json.dumps(messages[idx], separators=(",", ":")).encode("utf-8"))
-        running_sum += size
-        if running_sum > max_bytes:
-            return idx + 1
-
-    return 0
-
-
 def redact_blob_message_parts(
     messages: "List[Dict[str, Any]]",
 ) -> "List[Dict[str, Any]]":
@@ -645,55 +628,21 @@ def redact_blob_message_parts(
     return messages_copy
 
 
-def truncate_messages_by_size(
-    messages: "List[Dict[str, Any]]",
-    max_bytes: int = MAX_GEN_AI_MESSAGE_BYTES,
-    max_single_message_chars: int = MAX_SINGLE_MESSAGE_CONTENT_CHARS,
-) -> "Tuple[List[Dict[str, Any]], int]":
-    """
-    Returns a truncated messages list, consisting of
-    - the last message, with its content truncated to `max_single_message_chars` characters,
-      if the last message's size exceeds `max_bytes` bytes; otherwise,
-    - the maximum number of messages, starting from the end of the `messages` list, whose total
-      serialized size does not exceed `max_bytes` bytes.
-
-    In the single message case, the serialized message size may exceed `max_bytes`, because
-    truncation is based only on character count in that case.
-    """
-    serialized_json = json.dumps(messages, separators=(",", ":"))
-    current_size = len(serialized_json.encode("utf-8"))
-
-    if current_size <= max_bytes:
-        return messages, 0
-
-    truncation_index = _find_truncation_index(messages, max_bytes)
-    if truncation_index < len(messages):
-        truncated_messages = messages[truncation_index:]
-    else:
-        truncation_index = len(messages) - 1
-        truncated_messages = messages[-1:]
-
-    if len(truncated_messages) == 1:
-        truncated_messages[0] = _truncate_single_message_content_if_present(
-            deepcopy(truncated_messages[0]), max_chars=max_single_message_chars
-        )
-
-    return truncated_messages, truncation_index
-
-
 def truncate_and_annotate_messages(
     messages: "Optional[List[Dict[str, Any]]]",
     span: "Any",
     scope: "Any",
-    max_bytes: int = MAX_GEN_AI_MESSAGE_BYTES,
+    max_single_message_chars: int = MAX_SINGLE_MESSAGE_CONTENT_CHARS,
 ) -> "Optional[List[Dict[str, Any]]]":
     if not messages:
         return None
 
     messages = redact_blob_message_parts(messages)
 
-    truncated_messages, removed_count = truncate_messages_by_size(messages, max_bytes)
-    if removed_count > 0:
+    truncated_message = _truncate_single_message_content_if_present(
+        deepcopy(messages[-1]), max_chars=max_single_message_chars
+    )
+    if len(messages) > 1:
         scope._gen_ai_original_message_count[span.span_id] = len(messages)
 
-    return truncated_messages
+    return [truncated_message]

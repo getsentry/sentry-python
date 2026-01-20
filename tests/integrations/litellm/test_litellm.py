@@ -344,11 +344,7 @@ def test_embeddings_create_with_list_input(
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
         # Check that list of embeddings input is captured (it's JSON serialized)
         embeddings_input = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-        assert json.loads(embeddings_input) == [
-            "First text",
-            "Second text",
-            "Third text",
-        ]
+        assert json.loads(embeddings_input) == ["Third text"]
 
 
 def test_embeddings_no_pii(sentry_init, capture_events, clear_litellm_cache):
@@ -752,9 +748,8 @@ def test_litellm_message_truncation(sentry_init, capture_events):
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 2
-    assert "small message 4" in str(parsed_messages[0])
-    assert "small message 5" in str(parsed_messages[1])
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 

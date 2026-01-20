@@ -899,7 +899,25 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
 
 
-def test_anthropic_message_role_mapping(sentry_init, capture_events):
+# Test messages with mixed roles including "ai" that should be mapped to "assistant"
+@pytest.mark.parametrize(
+    "test_message,expected_role",
+    [
+        ({"role": "system", "content": "You are helpful."}, "system"),
+        ({"role": "user", "content": "Hello"}, "user"),
+        (
+            {"role": "ai", "content": "Hi there!"},
+            "assistant",
+        ),  # Should be mapped to "assistant"
+        (
+            {"role": "assistant", "content": "How can I help?"},
+            "assistant",
+        ),  # Should stay "assistant"
+    ],
+)
+def test_anthropic_message_role_mapping(
+    sentry_init, capture_events, test_message, expected_role
+):
     """Test that Anthropic integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
@@ -924,13 +942,7 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
 
     client.messages._post = mock.Mock(return_value=mock_messages_create())
 
-    # Test messages with mixed roles including "ai" that should be mapped to "assistant"
-    test_messages = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hello"},
-        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
-        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
-    ]
+    test_messages = [test_message]
 
     with start_transaction(name="anthropic tx"):
         client.messages.create(
@@ -948,22 +960,7 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
     # Parse the stored messages
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
-    # Verify that "ai" role was mapped to "assistant"
-    assert len(stored_messages) == 4
-    assert stored_messages[0]["role"] == "system"
-    assert stored_messages[1]["role"] == "user"
-    assert (
-        stored_messages[2]["role"] == "assistant"
-    )  # "ai" should be mapped to "assistant"
-    assert stored_messages[3]["role"] == "assistant"  # should stay "assistant"
-
-    # Verify content is preserved
-    assert stored_messages[2]["content"] == "Hi there!"
-    assert stored_messages[3]["content"] == "How can I help?"
-
-    # Verify no "ai" roles remain
-    roles = [msg["role"] for msg in stored_messages]
-    assert "ai" not in roles
+    assert stored_messages[0]["role"] == expected_role
 
 
 def test_anthropic_message_truncation(sentry_init, capture_events):
@@ -1010,9 +1007,8 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 2
-    assert "small message 4" in str(parsed_messages[0])
-    assert "small message 5" in str(parsed_messages[1])
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
@@ -1076,13 +1072,9 @@ def test_nonstreaming_create_message_with_system_prompt(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert len(stored_messages) == 2
-        # System message should be first
-        assert stored_messages[0]["role"] == "system"
-        assert stored_messages[0]["content"] == "You are a helpful assistant."
-        # User message should be second
-        assert stored_messages[1]["role"] == "user"
-        assert stored_messages[1]["content"] == "Hello, Claude"
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1155,13 +1147,9 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert len(stored_messages) == 2
-        # System message should be first
-        assert stored_messages[0]["role"] == "system"
-        assert stored_messages[0]["content"] == "You are a helpful assistant."
-        # User message should be second
-        assert stored_messages[1]["role"] == "user"
-        assert stored_messages[1]["content"] == "Hello, Claude"
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1266,13 +1254,9 @@ def test_streaming_create_message_with_system_prompt(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert len(stored_messages) == 2
-        # System message should be first
-        assert stored_messages[0]["role"] == "system"
-        assert stored_messages[0]["content"] == "You are a helpful assistant."
-        # User message should be second
-        assert stored_messages[1]["role"] == "user"
-        assert stored_messages[1]["content"] == "Hello, Claude"
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
@@ -1381,13 +1365,9 @@ async def test_streaming_create_message_with_system_prompt_async(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert len(stored_messages) == 2
-        # System message should be first
-        assert stored_messages[0]["role"] == "system"
-        assert stored_messages[0]["content"] == "You are a helpful assistant."
-        # User message should be second
-        assert stored_messages[1]["role"] == "user"
-        assert stored_messages[1]["content"] == "Hello, Claude"
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
@@ -1411,17 +1391,17 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
     client = Anthropic(api_key="z")
     client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
 
-    # System prompt as list of text blocks
     system_prompt = [
         {"type": "text", "text": "You are a helpful assistant."},
-        {"type": "text", "text": "Be concise and clear."},
     ]
 
+    # User prompt as list of text blocks
     messages = [
         {
             "role": "user",
             "content": "Hello",
-        }
+        },
+        {"type": "user", "text": "World!"},
     ]
 
     with start_transaction(name="anthropic"):
@@ -1441,17 +1421,17 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     # Should have system message first, then user message
-    assert len(stored_messages) == 2
-    assert stored_messages[0]["role"] == "system"
+    assert len(stored_messages) == 1
+    assert stored_messages[0]["role"] == "user"
     # System content should be a list of text blocks
     assert isinstance(stored_messages[0]["content"], list)
-    assert len(stored_messages[0]["content"]) == 2
-    assert stored_messages[0]["content"][0]["type"] == "text"
-    assert stored_messages[0]["content"][0]["text"] == "You are a helpful assistant."
-    assert stored_messages[0]["content"][1]["type"] == "text"
-    assert stored_messages[0]["content"][1]["text"] == "Be concise and clear."
-    assert stored_messages[1]["role"] == "user"
-    assert stored_messages[1]["content"] == "Hello"
+    assert len(stored_messages[0]["content"]) == 1
+    # assert stored_messages[0]["content"][0]["type"] == "text"
+    # assert stored_messages[0]["content"][0]["text"] == "You are a helpful assistant."
+    # assert stored_messages[0]["content"][1]["type"] == "text"
+    # assert stored_messages[0]["content"][1]["text"] == "Be concise and clear."
+    assert stored_messages[0]["role"] == "user"
+    assert stored_messages[0]["content"] == "Hello"
 
 
 # Tests for transform_content_part (shared) and _transform_anthropic_content_block helper functions
