@@ -683,30 +683,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
         [
             {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Please use the simple test tool"}
-                ],
-            },
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "arguments": '{"message": "hello"}',
-                        "call_id": "call_123",
-                        "name": "simple_test_tool",
-                        "type": "function_call",
-                        "id": "call_123",
-                    }
-                ],
-            },
-            {
                 "role": "tool",
                 "content": [
                     {
