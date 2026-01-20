@@ -611,12 +611,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
     assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
         [
-            # {
-            #     "role": "system",
-            #     "content": [
-            #         {"type": "text", "text": "You are a helpful test assistant."}
-            #     ],
-            # },
             {
                 "role": "user",
                 "content": [
