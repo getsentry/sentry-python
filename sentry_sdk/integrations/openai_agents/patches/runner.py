@@ -113,6 +113,40 @@ def _create_run_streamed_wrapper(
         run_result._sentry_workflow_span = workflow_span
         run_result._sentry_agent = agent
 
+        def _close_workflow_span() -> None:
+            if hasattr(agent, "_sentry_workflow_span"):
+                workflow_span.__exit__(*sys.exc_info())
+                delattr(agent, "_sentry_workflow_span")
+
+        if hasattr(run_result, "stream_events"):
+            original_stream_events = run_result.stream_events
+
+            @wraps(original_stream_events)
+            async def wrapped_stream_events(
+                *stream_args: "Any", **stream_kwargs: "Any"
+            ):
+                try:
+                    async for event in original_stream_events(
+                        *stream_args, **stream_kwargs
+                    ):
+                        yield event
+                finally:
+                    _close_workflow_span()
+
+            run_result.stream_events = wrapped_stream_events
+
+        if hasattr(run_result, "cancel"):
+            original_cancel = run_result.cancel
+
+            @wraps(original_cancel)
+            def wrapped_cancel(*cancel_args: "Any", **cancel_kwargs: "Any") -> "Any":
+                try:
+                    return original_cancel(*cancel_args, **cancel_kwargs)
+                finally:
+                    _close_workflow_span()
+
+            run_result.cancel = wrapped_cancel
+
         return run_result
 
     return wrapper
