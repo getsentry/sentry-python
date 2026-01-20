@@ -96,6 +96,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             if len(self._span_buffer) == 0:
                 return None
 
+            envelopes = []
             for trace_id, spans in self._span_buffer.items():
                 if spans:
                     for span in spans:
@@ -128,6 +129,9 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                         )
                     )
 
-                    self._capture_func(envelope)
+                    envelopes.append(envelope)
 
             self._span_buffer.clear()
+
+        for envelope in envelopes:
+            self._capture_func(envelope)
