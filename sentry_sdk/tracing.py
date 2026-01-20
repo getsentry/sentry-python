@@ -390,7 +390,20 @@ class Span:
         scope = self.scope or sentry_sdk.get_current_scope()
         old_span = scope.span
         scope.span = self
-        self._context_manager_state = (scope, old_span)
+
+        # Sync PropagationContext with the new active span
+        # Use the same PropagationContext that get_active_propagation_context() would return
+        propagation_context = scope.get_active_propagation_context()
+        old_propagation_context_state = (
+            propagation_context._trace_id,
+            propagation_context._span_id,
+            propagation_context.sampled,
+        )
+        propagation_context._trace_id = self.trace_id
+        propagation_context._span_id = self.span_id
+        propagation_context.sampled = self.sampled
+
+        self._context_manager_state = (scope, old_span, propagation_context, old_propagation_context_state)
         return self
 
     def __exit__(
@@ -400,10 +413,16 @@ class Span:
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         with capture_internal_exceptions():
-            scope, old_span = self._context_manager_state
+            scope, old_span, propagation_context, old_propagation_context_state = self._context_manager_state
             del self._context_manager_state
             self.finish(scope)
             scope.span = old_span
+
+            # Restore PropagationContext state
+            old_trace_id, old_span_id, old_sampled = old_propagation_context_state
+            propagation_context._trace_id = old_trace_id
+            propagation_context._span_id = old_span_id
+            propagation_context.sampled = old_sampled
 
     @property
     def containing_transaction(self) -> "Optional[Transaction]":
@@ -857,6 +876,11 @@ class Transaction(Span):
             )
 
         super().__enter__()
+
+        # Sync baggage to PropagationContext
+        isolation_scope = sentry_sdk.get_isolation_scope()
+        if isolation_scope._propagation_context is not None:
+            isolation_scope._propagation_context.baggage = self.get_baggage()
 
         if self._profile is not None:
             self._profile.__enter__()
