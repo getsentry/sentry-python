@@ -102,7 +102,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                     for span in spans:
                         print(span.name)
                     dsc = spans[0].dynamic_sampling_context()
-                    # XXX[span-first]: empty dsc?
 
                     envelope = Envelope(
                         headers={
