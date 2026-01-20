@@ -11,12 +11,9 @@ from sentry_sdk._types import (
 )
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
-    MAX_GEN_AI_MESSAGE_BYTES,
     MAX_SINGLE_MESSAGE_CONTENT_CHARS,
     set_data_normalized,
     truncate_and_annotate_messages,
-    truncate_messages_by_size,
-    _find_truncation_index,
     parse_data_uri,
     redact_blob_message_parts,
     get_modality_from_mime_type,
@@ -222,127 +219,7 @@ def large_messages():
     ]
 
 
-class TestTruncateMessagesBySize:
-    def test_no_truncation_needed(self, sample_messages):
-        """Test that messages under the limit are not truncated"""
-        result, truncation_index = truncate_messages_by_size(
-            sample_messages, max_bytes=MAX_GEN_AI_MESSAGE_BYTES
-        )
-        assert len(result) == len(sample_messages)
-        assert result == sample_messages
-        assert truncation_index == 0
-
-    def test_truncation_removes_oldest_first(self, large_messages):
-        """Test that oldest messages are removed first during truncation"""
-        small_limit = 3000
-        result, truncation_index = truncate_messages_by_size(
-            large_messages, max_bytes=small_limit
-        )
-        assert len(result) < len(large_messages)
-
-        assert result[-1] == large_messages[-1]
-        assert truncation_index == len(large_messages) - len(result)
-
-    def test_empty_messages_list(self):
-        """Test handling of empty messages list"""
-        result, truncation_index = truncate_messages_by_size(
-            [], max_bytes=MAX_GEN_AI_MESSAGE_BYTES // 500
-        )
-        assert result == []
-        assert truncation_index == 0
-
-    def test_find_truncation_index(
-        self,
-    ):
-        """Test that the truncation index is found correctly"""
-        # when represented in JSON, these are each 7 bytes long
-        messages = ["A" * 5, "B" * 5, "C" * 5, "D" * 5, "E" * 5]
-        truncation_index = _find_truncation_index(messages, 20)
-        assert truncation_index == 3
-        assert messages[truncation_index:] == ["D" * 5, "E" * 5]
-
-        messages = ["A" * 5, "B" * 5, "C" * 5, "D" * 5, "E" * 5]
-        truncation_index = _find_truncation_index(messages, 40)
-        assert truncation_index == 0
-        assert messages[truncation_index:] == [
-            "A" * 5,
-            "B" * 5,
-            "C" * 5,
-            "D" * 5,
-            "E" * 5,
-        ]
-
-    def test_progressive_truncation(self, large_messages):
-        """Test that truncation works progressively with different limits"""
-        limits = [
-            MAX_GEN_AI_MESSAGE_BYTES // 5,
-            MAX_GEN_AI_MESSAGE_BYTES // 10,
-            MAX_GEN_AI_MESSAGE_BYTES // 25,
-            MAX_GEN_AI_MESSAGE_BYTES // 100,
-            MAX_GEN_AI_MESSAGE_BYTES // 500,
-        ]
-        prev_count = len(large_messages)
-
-        for limit in limits:
-            result = truncate_messages_by_size(large_messages, max_bytes=limit)
-            current_count = len(result)
-
-            assert current_count <= prev_count
-            assert current_count >= 1
-            prev_count = current_count
-
-    def test_single_message_truncation(self):
-        large_content = "This is a very long message. " * 10_000
-
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": large_content},
-        ]
-
-        result, truncation_index = truncate_messages_by_size(
-            messages, max_single_message_chars=MAX_SINGLE_MESSAGE_CONTENT_CHARS
-        )
-
-        assert len(result) == 1
-        assert (
-            len(result[0]["content"].rstrip("...")) <= MAX_SINGLE_MESSAGE_CONTENT_CHARS
-        )
-
-        # If the last message is too large, the system message is not present
-        system_msgs = [m for m in result if m.get("role") == "system"]
-        assert len(system_msgs) == 0
-
-        # Confirm the user message is truncated with '...'
-        user_msgs = [m for m in result if m.get("role") == "user"]
-        assert len(user_msgs) == 1
-        assert user_msgs[0]["content"].endswith("...")
-        assert len(user_msgs[0]["content"]) < len(large_content)
-
-
 class TestTruncateAndAnnotateMessages:
-    def test_no_truncation_returns_list(self, sample_messages):
-        class MockSpan:
-            def __init__(self):
-                self.span_id = "test_span_id"
-                self.data = {}
-
-            def set_data(self, key, value):
-                self.data[key] = value
-
-        class MockScope:
-            def __init__(self):
-                self._gen_ai_original_message_count = {}
-
-        span = MockSpan()
-        scope = MockScope()
-        result = truncate_and_annotate_messages(sample_messages, span, scope)
-
-        assert isinstance(result, list)
-        assert not isinstance(result, AnnotatedValue)
-        assert len(result) == len(sample_messages)
-        assert result == sample_messages
-        assert span.span_id not in scope._gen_ai_original_message_count
-
     def test_truncation_sets_metadata_on_scope(self, large_messages):
         class MockSpan:
             def __init__(self):
@@ -361,7 +238,7 @@ class TestTruncateAndAnnotateMessages:
         scope = MockScope()
         original_count = len(large_messages)
         result = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
+            large_messages, span, scope, max_single_message_chars=small_limit
         )
 
         assert isinstance(result, list)
@@ -388,7 +265,7 @@ class TestTruncateAndAnnotateMessages:
         scope = MockScope()
 
         result = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
+            large_messages, span, scope, max_single_message_chars=small_limit
         )
 
         assert scope._gen_ai_original_message_count[span.span_id] == original_count
@@ -415,6 +292,47 @@ class TestTruncateAndAnnotateMessages:
         result = truncate_and_annotate_messages(None, span, scope)
         assert result is None
 
+    def test_single_message_truncation(self, large_messages):
+        class MockSpan:
+            def __init__(self):
+                self.span_id = "test_span_id"
+                self.data = {}
+
+            def set_data(self, key, value):
+                self.data[key] = value
+
+        class MockScope:
+            def __init__(self):
+                self._gen_ai_original_message_count = {}
+
+        large_content = "This is a very long message. " * 10_000
+
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": large_content},
+        ]
+
+        span = MockSpan()
+        scope = MockScope()
+        result = truncate_and_annotate_messages(
+            messages,
+            span,
+            scope,
+            max_single_message_chars=MAX_SINGLE_MESSAGE_CONTENT_CHARS,
+        )
+        assert result is not None
+
+        assert len(result) == 1
+        assert (
+            len(result[0]["content"].rstrip("...")) <= MAX_SINGLE_MESSAGE_CONTENT_CHARS
+        )
+
+        # Confirm the user message is truncated with '...'
+        user_msgs = [m for m in result if m.get("role") == "user"]
+        assert len(user_msgs) == 1
+        assert user_msgs[0]["content"].endswith("...")
+        assert len(user_msgs[0]["content"]) < len(large_content)
+
     def test_truncated_messages_newest_first(self, large_messages):
         class MockSpan:
             def __init__(self):
@@ -432,7 +350,7 @@ class TestTruncateAndAnnotateMessages:
         span = MockSpan()
         scope = MockScope()
         result = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
+            large_messages, span, scope, max_single_message_chars=small_limit
         )
 
         assert isinstance(result, list)
@@ -500,15 +418,12 @@ class TestClientAnnotation:
             def __init__(self):
                 self._gen_ai_original_message_count = {}
 
-        small_limit = 3000
         span = MockSpan()
         scope = MockScope()
         original_count = len(large_messages)
 
         # Simulate what integrations do
-        truncated_messages = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
-        )
+        truncated_messages = truncate_and_annotate_messages(large_messages, span, scope)
         span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, truncated_messages)
 
         # Verify metadata was set on scope
@@ -557,14 +472,11 @@ class TestClientAnnotation:
             def __init__(self):
                 self._gen_ai_original_message_count = {}
 
-        small_limit = 3000
         span = MockSpan()
         scope = MockScope()
         original_message_count = len(large_messages)
 
-        truncated_messages = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
-        )
+        truncated_messages = truncate_and_annotate_messages(large_messages, span, scope)
 
         assert len(truncated_messages) < original_message_count
 
