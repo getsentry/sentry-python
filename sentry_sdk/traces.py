@@ -484,6 +484,6 @@ class StreamedSpan:
         self.set_attribute("sentry.segment.name", self.segment.name)
 
 
-def continue_trace(incoming: dict[str, "Any"]) -> None:
+def continue_trace(incoming: "dict[str, Any]") -> None:
     # XXX[span-first]: conceptually, this should be set on the iso scope
     sentry_sdk.get_current_scope().set_propagation_context(incoming)
