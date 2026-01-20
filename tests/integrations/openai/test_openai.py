@@ -1548,6 +1548,5 @@ def test_openai_message_truncation(sentry_init, capture_events):
 
     meta_path = event["_meta"]
     span_meta = meta_path["spans"]["0"]["data"]
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_meta:
-        messages_meta = span_meta[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "len" in messages_meta.get("", {})
+    messages_meta = span_meta[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert "len" in messages_meta.get("", {})
