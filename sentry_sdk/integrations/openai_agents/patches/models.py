@@ -5,15 +5,25 @@ from functools import wraps
 from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import ai_client_span, update_ai_client_span
+
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.utils import logger
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
+from sentry_sdk.tracing_utils import (
+    should_propagate_trace,
+    add_sentry_baggage_to_headers,
+)
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
+    from sentry_sdk.tracing import Span
 
 try:
     import agents
+    from agents.tool import HostedMCPTool
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
@@ -26,6 +36,34 @@ def _set_response_model_on_agent_span(
         agent_span = getattr(agent, "_sentry_agent_span", None)
         if agent_span:
             agent_span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+
+
+def _inject_trace_propagation_headers(
+    hosted_tool: "HostedMCPTool", span: "Span"
+) -> None:
+    headers = hosted_tool.tool_config.get("headers")
+    if headers is None:
+        headers = {}
+        hosted_tool.tool_config["headers"] = headers
+
+    mcp_url = hosted_tool.tool_config.get("server_url")
+    if not mcp_url:
+        return
+
+    if should_propagate_trace(sentry_sdk.get_client(), mcp_url):
+        for (
+            key,
+            value,
+        ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(span=span):
+            logger.debug(
+                "[Tracing] Adding `{key}` header {value} to outgoing request to {mcp_url}.".format(
+                    key=key, value=value, mcp_url=mcp_url
+                )
+            )
+            if key == BAGGAGE_HEADER_NAME:
+                add_sentry_baggage_to_headers(headers, value)
+            else:
+                headers[key] = value
 
 
 def _create_get_model_wrapper(
@@ -68,7 +106,17 @@ def _create_get_model_wrapper(
 
         @wraps(original_get_response)
         async def wrapped_get_response(*args: "Any", **kwargs: "Any") -> "Any":
+            mcp_tools = kwargs.get("tools")
+            hosted_tools = []
+            if mcp_tools is not None:
+                hosted_tools = [
+                    tool for tool in mcp_tools if isinstance(tool, HostedMCPTool)
+                ]
+
             with ai_client_span(agent, kwargs) as span:
+                for hosted_tool in hosted_tools:
+                    _inject_trace_propagation_headers(hosted_tool, span=span)
+
                 result = await original_get_response(*args, **kwargs)
 
                 # Get response model captured from _fetch_response and clean up

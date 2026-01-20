@@ -1,0 +1,44 @@
+name: AI integration tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    # every weekday
+    - cron: '23 3 * * 1-5'
+
+jobs:
+  ai-integration-tests:
+    name: AI integration tests
+    runs-on: ubuntu-latest
+    environment: "AI Integrations Tests"
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.14t
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Checkout repo
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Python SDK Tests
+        uses: getsentry/testing-ai-sdk-integrations@1c6853a3a46ff1217248bf2b61e3ca5c4fcafdca
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          language: py
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          google-api-key:  ${{ secrets.GOOGLE_API_KEY }}
