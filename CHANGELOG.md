@@ -12,6 +12,25 @@
 #### Other
 
 - feat(asyncio): Add on-demand way to enable AsyncioIntegration by @sentrivana in [#5288](https://github.com/getsentry/sentry-python/pull/5288)
+
+  You can now enable the `AsyncioIntegration` on demand, after calling `sentry_sdk.init()`. This is useful in scenarios where you don't have
+  the event loop running early on, or when you need to instrument multiple event loops.
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.asyncio import enable_asyncio_integration
+
+# Initializing the SDK as early as possible, when there is no event loop yet
+sentry_sdk.init(
+    ...
+    # No AsyncioIntegration in explicitly provided `integrations`
+)
+
+async def main():
+    enable_asyncio_integration()  # instruments the current event loop
+    # ...your code...
+```
+
 - feat(openai-agents): Inject propagation headers for `HostedMCPTool` by @alexander-alderman-webb in [#5297](https://github.com/getsentry/sentry-python/pull/5297)
 - feat(stdlib): Handle proxy tunnels in httlib integration by @sl0thentr0py in [#5303](https://github.com/getsentry/sentry-python/pull/5303)
 - feat: Support array types for logs and metrics attributes by @alexander-alderman-webb in [#5314](https://github.com/getsentry/sentry-python/pull/5314)
