@@ -189,6 +189,22 @@ def _get_current_agent() -> "Optional[str]":
     return None
 
 
+def _set_system_prompt(
+    span: "sentry_sdk.tracing.Span", messages: "List[List[BaseMessage]]"
+) -> None:
+    for list_ in messages:
+        for message in list_:
+            if message.type == "system":
+                system_prompt = message.content
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                    system_prompt,
+                    unpack=False,
+                )
+                return
+
+
 class LangchainIntegration(Integration):
     identifier = "langchain"
     origin = f"auto.ai.{identifier}"
@@ -430,9 +446,14 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
+                _set_system_prompt(span, messages)
+
                 normalized_messages = []
                 for list_ in messages:
                     for message in list_:
+                        if message.type == "system":
+                            continue
+
                         normalized_messages.append(
                             self._normalize_langchain_message(message)
                         )

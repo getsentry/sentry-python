@@ -219,14 +219,14 @@ def test_langchain_agent(
     if send_default_pii and include_prompts:
         assert (
             "You are very powerful"
-            in chat_spans[0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            in chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
         )
         assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
         assert (
             "You are very powerful"
-            in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            in chat_spans[1]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
         )
         assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -243,8 +243,10 @@ def test_langchain_agent(
             tool_call_str = str(tool_calls_data)
             assert "get_word_length" in tool_call_str
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
