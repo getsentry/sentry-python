@@ -192,29 +192,12 @@ def _set_input_data(
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        normalized_messages = []
         if system_prompt:
-            system_prompt_content: "Optional[Union[str, List[dict[str, Any]]]]" = None
-            if isinstance(system_prompt, str):
-                system_prompt_content = system_prompt
-            elif isinstance(system_prompt, Iterable):
-                system_prompt_content = []
-                for item in system_prompt:
-                    if (
-                        isinstance(item, dict)
-                        and item.get("type") == "text"
-                        and item.get("text")
-                    ):
-                        system_prompt_content.append(item.copy())
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS, system_prompt, unpack=False
+            )
 
-            if system_prompt_content:
-                normalized_messages.append(
-                    {
-                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM,
-                        "content": system_prompt_content,
-                    }
-                )
-
+        normalized_messages = []
         for message in messages:
             if (
                 message.get("role") == GEN_AI_ALLOWED_MESSAGE_ROLES.USER
