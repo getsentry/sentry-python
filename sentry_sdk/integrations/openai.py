@@ -300,11 +300,11 @@ def _set_embeddings_input_data(
 
     if (
         messages is not None
-        and len(messages) > 0
+        and len(messages) > 0  # type: ignore
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        normalized_messages = normalize_message_roles(messages)
+        normalized_messages = normalize_message_roles(messages)  # type: ignore
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
         if messages_data is not None:
