@@ -48,6 +48,21 @@ except ImportError:
     BinaryContent = None
 
 
+def _set_system_instruction(span: "sentry_sdk.tracing.Span", messages: "Any"):
+    print("messages", messages)
+    for msg in messages:
+        for part in msg.parts:
+            if isinstance(part, SystemPromptPart):
+                system_prompt = part.content
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                    system_prompt,
+                    unpack=False,
+                )
+                return
+
+
 def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     """Set input messages data on a span."""
     if not _should_send_prompts():
@@ -58,19 +73,6 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
 
     try:
         formatted_messages = []
-        system_prompt = None
-
-        # Extract system prompt from any ModelRequest with instructions
-        for msg in messages:
-            if hasattr(msg, "instructions") and msg.instructions:
-                system_prompt = msg.instructions
-                break
-
-        # Add system prompt as first message if present
-        if system_prompt:
-            formatted_messages.append(
-                {"role": "system", "content": [{"type": "text", "text": system_prompt}]}
-            )
 
         for msg in messages:
             if hasattr(msg, "parts"):
@@ -78,7 +80,7 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                     role = "user"
                     # Use isinstance checks with proper base classes
                     if SystemPromptPart and isinstance(part, SystemPromptPart):
-                        role = "system"
+                        continue
                     elif (
                         (TextPart and isinstance(part, TextPart))
                         or (ThinkingPart and isinstance(part, ThinkingPart))
@@ -235,6 +237,7 @@ def ai_client_span(
 
     # Set input messages (full conversation history)
     if messages:
+        _set_system_instruction(span, messages)
         _set_input_messages(span, messages)
 
     return span
