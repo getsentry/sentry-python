@@ -1085,6 +1085,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -1164,6 +1165,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -1276,6 +1278,7 @@ def test_streaming_create_message_with_system_prompt(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -1391,6 +1394,7 @@ async def test_streaming_create_message_with_system_prompt_async(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
