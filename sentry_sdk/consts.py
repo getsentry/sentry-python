@@ -545,7 +545,7 @@ class SPANDATA:
     GEN_AI_SYSTEM_INSTRUCTIONS = "gen_ai.system_instructions"
     """
     The system instructions passed to the model.
-    Example: {"role": "system", "content": "You are a helpful assistant"}
+    Example: [{"type": "text", "text": "You are a helpful assistant."},{"type": "text", "text": "Be concise and clear."}]
     """
 
     GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
