@@ -210,7 +210,7 @@ def _get_input_messages(
 def _commmon_set_input_data(
     span: "Span",
     kwargs: "dict[str, Any]",
-):
+) -> None:
     # Input attributes: Common
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
 
@@ -242,10 +242,10 @@ def _set_responses_api_input_data(
     span: "Span",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-):
+) -> None:
     messages: "Optional[Union[ResponseInputParam, list[str]]]" = _get_input_messages(
         kwargs
-    )  # type: ignore
+    )
 
     if (
         messages is not None
@@ -269,7 +269,7 @@ def _set_completions_api_input_data(
     span: "Span",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-):
+) -> None:
     messages: "Optional[Union[Iterable[ChatCompletionMessageParam], list[str]]]" = (
         _get_input_messages(kwargs)
     )
@@ -296,7 +296,7 @@ def _set_embeddings_input_data(
     span: "Span",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-):
+) -> None:
     messages = _get_input_messages(kwargs)
 
     if (
