@@ -311,68 +311,6 @@ def _set_embeddings_input_data(
     _commmon_set_input_data(span, kwargs)
 
 
-def _set_input_data(
-    span: "Span",
-    kwargs: "dict[str, Any]",
-    operation: str,
-    integration: "OpenAIIntegration",
-) -> None:
-    # Input messages (the prompt or data sent to the model)
-    messages = kwargs.get("messages")
-    if messages is None:
-        messages = kwargs.get("input")
-
-    if isinstance(messages, str):
-        messages = [messages]
-
-    if (
-        messages is not None
-        and len(messages) > 0
-        and should_send_default_pii()
-        and integration.include_prompts
-    ):
-        normalized_messages = normalize_message_roles(messages)
-        scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
-        if messages_data is not None:
-            # Use appropriate field based on operation type
-            if operation == "embeddings":
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
-                )
-            else:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-                )
-
-    # Input attributes: Common
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
-
-    # Input attributes: Optional
-    kwargs_keys_to_attributes = {
-        "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-        "stream": SPANDATA.GEN_AI_RESPONSE_STREAMING,
-        "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-        "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-        "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-        "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-        "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-    }
-    for key, attribute in kwargs_keys_to_attributes.items():
-        value = kwargs.get(key)
-
-        if value is not None and _is_given(value):
-            set_data_normalized(span, attribute, value)
-
-    # Input attributes: Tools
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
-
-
 def _set_output_data(
     span: "Span",
     response: "Any",
