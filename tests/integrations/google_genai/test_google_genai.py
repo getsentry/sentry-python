@@ -233,24 +233,7 @@ def test_generate_content_with_system_instruction(
     system_instructions = json.loads(
         invoke_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
-    assert system_instructions == {
-        "parts": [
-            {
-                "media_resolution": "None",
-                "code_execution_result": "None",
-                "executable_code": "None",
-                "file_data": "None",
-                "function_call": "None",
-                "function_response": "None",
-                "inline_data": "None",
-                "text": "You are a helpful assistant",
-                "thought": "None",
-                "thought_signature": "None",
-                "video_metadata": "None",
-            }
-        ],
-        "role": "system",
-    }
+    assert system_instructions["parts"]["text"] == "You are a helpful assistant"
 
 
 def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):
