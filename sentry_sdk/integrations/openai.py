@@ -23,8 +23,19 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Iterable, List, Optional, Callable, AsyncIterator, Iterator
+    from typing import (
+        Any,
+        Iterable,
+        List,
+        Optional,
+        Callable,
+        AsyncIterator,
+        Iterator,
+        Union,
+    )
     from sentry_sdk.tracing import Span
+
+    from openai.types.responses import ResponseInputParam
 
 try:
     try:
@@ -180,6 +191,124 @@ def _calculate_token_usage(
         output_tokens_reasoning=output_tokens_reasoning,
         total_tokens=total_tokens,
     )
+
+
+def _get_input_messages(kwargs: "dict[str, Any]") -> "Optional[list[Any] | list[str]]":
+    # Input messages (the prompt or data sent to the model)
+    messages = kwargs.get("messages")
+    if messages is None:
+        messages = kwargs.get("input")
+
+    if isinstance(messages, str):
+        messages = [messages]
+
+    return messages
+
+
+def _commmon_set_input_data(
+    span: "Span",
+    kwargs: "dict[str, Any]",
+):
+    # Input attributes: Common
+    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
+
+    # Input attributes: Optional
+    kwargs_keys_to_attributes = {
+        "model": SPANDATA.GEN_AI_REQUEST_MODEL,
+        "stream": SPANDATA.GEN_AI_RESPONSE_STREAMING,
+        "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+        "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+        "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+        "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+        "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+    }
+    for key, attribute in kwargs_keys_to_attributes.items():
+        value = kwargs.get(key)
+
+        if value is not None and _is_given(value):
+            set_data_normalized(span, attribute, value)
+
+    # Input attributes: Tools
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools) and len(tools) > 0:
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+        )
+
+
+def _set_responses_api_input_data(
+    span: "Span",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+):
+    messages: "Optional[ResponseInputParam | list[str]]" = _get_input_messages(kwargs)
+
+    if (
+        messages is not None
+        and len(messages) > 0
+        and should_send_default_pii()
+        and integration.include_prompts
+    ):
+        normalized_messages = normalize_message_roles(messages)
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+    _commmon_set_input_data(span, kwargs)
+
+
+def _set_completions_api_input_data(
+    span: "Span",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+):
+    messages: "Optional[ChatCompletionMessageParam]" = _get_input_messages(kwargs)
+
+    if (
+        messages is not None
+        and len(messages) > 0
+        and should_send_default_pii()
+        and integration.include_prompts
+    ):
+        normalized_messages = normalize_message_roles(messages)
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    _commmon_set_input_data(span, kwargs)
+
+
+def _set_embeddings_input_data(
+    span: "Span",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+):
+    messages = _get_input_messages(kwargs)
+
+    if (
+        messages is not None
+        and len(messages) > 0
+        and should_send_default_pii()
+        and integration.include_prompts
+    ):
+        normalized_messages = normalize_message_roles(messages)
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
+            )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+    _commmon_set_input_data(span, kwargs)
 
 
 def _set_input_data(
@@ -454,16 +583,15 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
-    operation = "chat"
 
     span = sentry_sdk.start_span(
         op=consts.OP.GEN_AI_CHAT,
-        name=f"{operation} {model}",
+        name=f"chat {model}",
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
 
-    _set_input_data(span, kwargs, operation, integration)
+    _set_completions_api_input_data(span, kwargs, integration)
 
     response = yield f, args, kwargs
 
@@ -546,14 +674,13 @@ def _new_embeddings_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
-    operation = "embeddings"
 
     with sentry_sdk.start_span(
         op=consts.OP.GEN_AI_EMBEDDINGS,
-        name=f"{operation} {model}",
+        name=f"embeddings {model}",
         origin=OpenAIIntegration.origin,
     ) as span:
-        _set_input_data(span, kwargs, operation, integration)
+        _set_embeddings_input_data(span, kwargs, integration)
 
         response = yield f, args, kwargs
 
@@ -634,16 +761,15 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
-    operation = "responses"
 
     span = sentry_sdk.start_span(
         op=consts.OP.GEN_AI_RESPONSES,
-        name=f"{operation} {model}",
+        name=f"responses {model}",
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
 
-    _set_input_data(span, kwargs, operation, integration)
+    _set_responses_api_input_data(span, kwargs, integration)
 
     response = yield f, args, kwargs
 
