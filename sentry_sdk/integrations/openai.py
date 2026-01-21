@@ -193,7 +193,9 @@ def _calculate_token_usage(
     )
 
 
-def _get_input_messages(kwargs: "dict[str, Any]") -> "Optional[list[Any] | list[str]]":
+def _get_input_messages(
+    kwargs: "dict[str, Any]",
+) -> "Optional[Iterable[Any] | list[str]]":
     # Input messages (the prompt or data sent to the model)
     messages = kwargs.get("messages")
     if messages is None:
@@ -241,7 +243,7 @@ def _set_responses_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ):
-    messages: "Optional[ResponseInputParam | list[str]]" = _get_input_messages(kwargs)
+    messages: "Optional[ResponseInputParam | list[str]]" = _get_input_messages(kwargs)  # type: ignore
 
     if (
         messages is not None
@@ -249,7 +251,7 @@ def _set_responses_api_input_data(
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        normalized_messages = normalize_message_roles(messages)
+        normalized_messages = normalize_message_roles(messages)  # type: ignore
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
         if messages_data is not None:
@@ -266,15 +268,17 @@ def _set_completions_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ):
-    messages: "Optional[ChatCompletionMessageParam]" = _get_input_messages(kwargs)
+    messages: "Optional[Iterable[ChatCompletionMessageParam]]" = _get_input_messages(
+        kwargs
+    )
 
     if (
         messages is not None
-        and len(messages) > 0
+        and len(messages) > 0  # type: ignore
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        normalized_messages = normalize_message_roles(messages)
+        normalized_messages = normalize_message_roles(messages)  # type: ignore
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
         if messages_data is not None:
