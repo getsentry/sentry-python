@@ -51,7 +51,7 @@ except ImportError:
 def _set_system_instruction(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     for msg in messages:
         for part in msg.parts:
-            if isinstance(part, SystemPromptPart):
+            if SystemPromptPart and isinstance(part, SystemPromptPart):
                 system_prompt = part.content
                 set_data_normalized(
                     span,
