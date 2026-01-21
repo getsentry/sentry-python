@@ -10,6 +10,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     transform_openai_content_part,
 )
+from sentry_sdk.ai._openai_completions_api import _get_system_instructions
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -129,6 +130,15 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         else:
             # For chat, look for the 'messages' parameter
             messages = kwargs.get("messages", [])
+
+            system_instructions = _get_system_instructions(messages)
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                system_instructions,
+                unpack=False,
+            )
+
             if messages:
                 scope = sentry_sdk.get_current_scope()
                 messages = _convert_message_parts(messages)
