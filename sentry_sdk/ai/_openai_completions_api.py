@@ -5,12 +5,14 @@ if TYPE_CHECKING:
         ChatCompletionMessageParam,
         ChatCompletionSystemMessageParam,
     )
-    from typing import Iterable, Union
+    from typing import Iterable, Union, TypeVar
+
+    T = TypeVar("T")
 
 
 def _get_system_instructions(
-    messages: "Iterable[Union[ChatCompletionMessageParam, str]]",
-) -> "list[ChatCompletionSystemMessageParam]":
+    messages: "Iterable[Union[T, str]]",
+) -> "list[T]":
     system_messages = []
 
     for message in messages:
