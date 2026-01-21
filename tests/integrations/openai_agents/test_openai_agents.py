@@ -2063,11 +2063,10 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
     with start_span(op="gen_ai.chat") as span:
         scope = sentry_sdk.get_current_scope()
         _set_input_data(span, get_response_kwargs)
-        if hasattr(scope, "_gen_ai_original_message_count"):
-            truncated_count = scope._gen_ai_original_message_count.get(span.span_id)
-            assert truncated_count == 5, (
-                f"Expected 5 original messages, got {truncated_count}"
-            )
+        truncated_count = scope._gen_ai_original_message_count.get(span.span_id)
+        assert truncated_count == 5, (
+            f"Expected 5 original messages, got {truncated_count}"
+        )
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data
         messages_data = span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
