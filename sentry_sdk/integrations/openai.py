@@ -9,6 +9,9 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     truncate_and_annotate_messages,
 )
+from sentry_sdk.ai._openai_completions_api import (
+    _get_system_instructions as _get_system_instructions_completions,
+)
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -35,7 +38,7 @@ if TYPE_CHECKING:
     )
     from sentry_sdk.tracing import Span
 
-    from openai.types.responses import ResponseInputParam
+    from openai.types.responses import ResponseInputParam, ResponseInputItemParam
 
 try:
     try:
@@ -193,6 +196,25 @@ def _calculate_token_usage(
     )
 
 
+def _get_system_instructions_responses(
+    input_items: "Union[ResponseInputParam, list[str]]",
+) -> "list[ResponseInputItemParam]":
+    if isinstance(input_items, str):
+        return []
+
+    system_messages = []
+
+    for item in input_items:
+        if (
+            isinstance(item, dict)
+            and item.get("type") == "message"
+            and item.get("role") == "system"
+        ):
+            system_messages.append(item)
+
+    return system_messages
+
+
 def _get_input_messages(
     kwargs: "dict[str, Any]",
 ) -> "Optional[Iterable[Any] | list[str]]":
@@ -245,6 +267,15 @@ def _set_responses_api_input_data(
 ):
     messages: "Optional[ResponseInputParam | list[str]]" = _get_input_messages(kwargs)  # type: ignore
 
+    if messages is not None:
+        system_instructions = _get_system_instructions_responses(messages)
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            system_instructions,
+            unpack=False,
+        )
+
     if (
         messages is not None
         and len(messages) > 0
@@ -271,6 +302,15 @@ def _set_completions_api_input_data(
     messages: "Optional[Iterable[ChatCompletionMessageParam] | list[str]]" = (
         _get_input_messages(kwargs)
     )
+
+    if messages is not None:
+        system_instructions = _get_system_instructions_completions(messages)
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            system_instructions,
+            unpack=False,
+        )
 
     if (
         messages is not None
