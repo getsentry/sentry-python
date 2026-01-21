@@ -40,11 +40,8 @@ def invoke_agent_span(
                 if isinstance(agent.instructions, str)
                 else safe_serialize(agent.instructions)
             )
-            messages.append(
-                {
-                    "content": [{"text": message, "type": "text"}],
-                    "role": "system",
-                }
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS, message, unpack=False
             )
 
         original_input = kwargs.get("original_input")
