@@ -11,6 +11,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     truncate_and_annotate_messages,
     get_start_span_function,
+    transform_anthropic_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
@@ -74,20 +75,36 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _get_token_usage(result: "Messages") -> "tuple[int, int]":
+def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
     """
     Get token usage from the Anthropic response.
+    Returns: (input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens)
     """
     input_tokens = 0
     output_tokens = 0
+    cache_read_input_tokens = 0
+    cache_write_input_tokens = 0
     if hasattr(result, "usage"):
         usage = result.usage
         if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
             input_tokens = usage.input_tokens
         if hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
             output_tokens = usage.output_tokens
+        if hasattr(usage, "cache_read_input_tokens") and isinstance(
+            usage.cache_read_input_tokens, int
+        ):
+            cache_read_input_tokens = usage.cache_read_input_tokens
+        if hasattr(usage, "cache_creation_input_tokens") and isinstance(
+            usage.cache_creation_input_tokens, int
+        ):
+            cache_write_input_tokens = usage.cache_creation_input_tokens
 
-    return input_tokens, output_tokens
+    return (
+        input_tokens,
+        output_tokens,
+        cache_read_input_tokens,
+        cache_write_input_tokens,
+    )
 
 
 def _collect_ai_data(
@@ -95,8 +112,10 @@ def _collect_ai_data(
     model: "str | None",
     input_tokens: int,
     output_tokens: int,
+    cache_read_input_tokens: int,
+    cache_write_input_tokens: int,
     content_blocks: "list[str]",
-) -> "tuple[str | None, int, int, list[str]]":
+) -> "tuple[str | None, int, int, int, int, list[str]]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
@@ -106,6 +125,14 @@ def _collect_ai_data(
                 usage = event.message.usage
                 input_tokens += usage.input_tokens
                 output_tokens += usage.output_tokens
+                if hasattr(usage, "cache_read_input_tokens") and isinstance(
+                    usage.cache_read_input_tokens, int
+                ):
+                    cache_read_input_tokens += usage.cache_read_input_tokens
+                if hasattr(usage, "cache_creation_input_tokens") and isinstance(
+                    usage.cache_creation_input_tokens, int
+                ):
+                    cache_write_input_tokens += usage.cache_creation_input_tokens
                 model = event.message.model or model
             elif event.type == "content_block_start":
                 pass
@@ -119,7 +146,35 @@ def _collect_ai_data(
             elif event.type == "message_delta":
                 output_tokens += event.usage.output_tokens
 
-    return model, input_tokens, output_tokens, content_blocks
+    return (
+        model,
+        input_tokens,
+        output_tokens,
+        cache_read_input_tokens,
+        cache_write_input_tokens,
+        content_blocks,
+    )
+
+
+def _transform_anthropic_content_block(
+    content_block: "dict[str, Any]",
+) -> "dict[str, Any]":
+    """
+    Transform an Anthropic content block using the Anthropic-specific transformer,
+    with special handling for Anthropic's text-type documents.
+    """
+    # Handle Anthropic's text-type documents specially (not covered by shared function)
+    if content_block.get("type") == "document":
+        source = content_block.get("source")
+        if isinstance(source, dict) and source.get("type") == "text":
+            return {
+                "type": "text",
+                "text": source.get("data", ""),
+            }
+
+    # Use Anthropic-specific transformation
+    result = transform_anthropic_content_part(content_block)
+    return result if result is not None else content_block
 
 
 def _set_input_data(
@@ -166,19 +221,41 @@ def _set_input_data(
                 and "content" in message
                 and isinstance(message["content"], (list, tuple))
             ):
+                transformed_content = []
                 for item in message["content"]:
-                    if item.get("type") == "tool_result":
-                        normalized_messages.append(
-                            {
-                                "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
-                                "content": {  # type: ignore[dict-item]
-                                    "tool_use_id": item.get("tool_use_id"),
-                                    "output": item.get("content"),
-                                },
-                            }
-                        )
+                    # Skip tool_result items - they can contain images/documents
+                    # with nested structures that are difficult to redact properly
+                    if isinstance(item, dict) and item.get("type") == "tool_result":
+                        continue
+
+                    # Transform content blocks (images, documents, etc.)
+                    transformed_content.append(
+                        _transform_anthropic_content_block(item)
+                        if isinstance(item, dict)
+                        else item
+                    )
+
+                # If there are non-tool-result items, add them as a message
+                if transformed_content:
+                    normalized_messages.append(
+                        {
+                            "role": message.get("role"),
+                            "content": transformed_content,
+                        }
+                    )
             else:
-                normalized_messages.append(message)
+                # Transform content for non-list messages or assistant messages
+                transformed_message = message.copy()
+                if "content" in transformed_message:
+                    content = transformed_message["content"]
+                    if isinstance(content, (list, tuple)):
+                        transformed_message["content"] = [
+                            _transform_anthropic_content_block(item)
+                            if isinstance(item, dict)
+                            else item
+                            for item in content
+                        ]
+                normalized_messages.append(transformed_message)
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
         scope = sentry_sdk.get_current_scope()
@@ -221,6 +298,8 @@ def _set_output_data(
     model: "str | None",
     input_tokens: "int | None",
     output_tokens: "int | None",
+    cache_read_input_tokens: "int | None",
+    cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
     finish_span: bool = False,
 ) -> None:
@@ -256,6 +335,8 @@ def _set_output_data(
         span,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+        input_tokens_cached=cache_read_input_tokens,
+        input_tokens_cache_write=cache_write_input_tokens,
     )
 
     if finish_span:
@@ -290,7 +371,12 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
     with capture_internal_exceptions():
         if hasattr(result, "content"):
-            input_tokens, output_tokens = _get_token_usage(result)
+            (
+                input_tokens,
+                output_tokens,
+                cache_read_input_tokens,
+                cache_write_input_tokens,
+            ) = _get_token_usage(result)
 
             content_blocks = []
             for content_block in result.content:
@@ -307,6 +393,8 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 model=getattr(result, "model", None),
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
+                cache_read_input_tokens=cache_read_input_tokens,
+                cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
                 finish_span=True,
             )
@@ -319,13 +407,26 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 model = None
                 input_tokens = 0
                 output_tokens = 0
+                cache_read_input_tokens = 0
+                cache_write_input_tokens = 0
                 content_blocks: "list[str]" = []
 
                 for event in old_iterator:
-                    model, input_tokens, output_tokens, content_blocks = (
-                        _collect_ai_data(
-                            event, model, input_tokens, output_tokens, content_blocks
-                        )
+                    (
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cache_read_input_tokens,
+                        cache_write_input_tokens,
+                        content_blocks,
+                    ) = _collect_ai_data(
+                        event,
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cache_read_input_tokens,
+                        cache_write_input_tokens,
+                        content_blocks,
                     )
                     yield event
 
@@ -335,6 +436,8 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     model=model,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
+                    cache_read_input_tokens=cache_read_input_tokens,
+                    cache_write_input_tokens=cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                 )
@@ -343,13 +446,26 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 model = None
                 input_tokens = 0
                 output_tokens = 0
+                cache_read_input_tokens = 0
+                cache_write_input_tokens = 0
                 content_blocks: "list[str]" = []
 
                 async for event in old_iterator:
-                    model, input_tokens, output_tokens, content_blocks = (
-                        _collect_ai_data(
-                            event, model, input_tokens, output_tokens, content_blocks
-                        )
+                    (
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cache_read_input_tokens,
+                        cache_write_input_tokens,
+                        content_blocks,
+                    ) = _collect_ai_data(
+                        event,
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cache_read_input_tokens,
+                        cache_write_input_tokens,
+                        content_blocks,
                     )
                     yield event
 
@@ -359,6 +475,8 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     model=model,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
+                    cache_read_input_tokens=cache_read_input_tokens,
+                    cache_write_input_tokens=cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                 )

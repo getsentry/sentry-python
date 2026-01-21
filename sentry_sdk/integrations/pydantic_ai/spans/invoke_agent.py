@@ -1,5 +1,12 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.ai.utils import (
+    get_modality_from_mime_type,
+    get_start_span_function,
+    normalize_message_roles,
+    set_data_normalized,
+    truncate_and_annotate_messages,
+)
 from sentry_sdk.consts import OP, SPANDATA
 
 from ..consts import SPAN_ORIGIN
@@ -15,6 +22,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
+
+try:
+    from pydantic_ai.messages import BinaryContent  # type: ignore
+except ImportError:
+    BinaryContent = None
 
 
 def invoke_agent_span(
@@ -93,6 +105,17 @@ def invoke_agent_span(
                 for item in user_prompt:
                     if isinstance(item, str):
                         content.append({"text": item, "type": "text"})
+                    elif BinaryContent and isinstance(item, BinaryContent):
+                        content.append(
+                            {
+                                "type": "blob",
+                                "modality": get_modality_from_mime_type(
+                                    item.media_type
+                                ),
+                                "mime_type": item.media_type,
+                                "content": BLOB_DATA_SUBSTITUTE,
+                            }
+                        )
                 if content:
                     messages.append(
                         {
@@ -102,8 +125,13 @@ def invoke_agent_span(
                     )
 
         if messages:
+            normalized_messages = normalize_message_roles(messages)
+            scope = sentry_sdk.get_current_scope()
+            messages_data = truncate_and_annotate_messages(
+                normalized_messages, span, scope
+            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
     return span

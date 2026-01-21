@@ -1,3 +1,4 @@
+import base64
 import json
 import pytest
 import time
@@ -21,8 +22,10 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.integrations.litellm import (
     LiteLLMIntegration,
+    _convert_message_parts,
     _input_callback,
     _success_callback,
     _failure_callback,
@@ -753,3 +756,241 @@ def test_litellm_message_truncation(sentry_init, capture_events):
     assert "small message 4" in str(parsed_messages[0])
     assert "small message 5" in str(parsed_messages[1])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
+
+
+IMAGE_DATA = b"fake_image_data_12345"
+IMAGE_B64 = base64.b64encode(IMAGE_DATA).decode("utf-8")
+IMAGE_DATA_URI = f"data:image/png;base64,{IMAGE_B64}"
+
+
+def test_binary_content_encoding_image_url(sentry_init, capture_events):
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Look at this image:"},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": IMAGE_DATA_URI, "detail": "high"},
+                },
+            ],
+        }
+    ]
+    mock_response = MockCompletionResponse()
+
+    with start_transaction(name="litellm test"):
+        kwargs = {"model": "gpt-4-vision-preview", "messages": messages}
+        _input_callback(kwargs)
+        _success_callback(kwargs, mock_response, datetime.now(), datetime.now())
+
+    (event,) = events
+    (span,) = event["spans"]
+    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+    blob_item = next(
+        (
+            item
+            for msg in messages_data
+            if "content" in msg
+            for item in msg["content"]
+            if item.get("type") == "blob"
+        ),
+        None,
+    )
+    assert blob_item is not None
+    assert blob_item["modality"] == "image"
+    assert blob_item["mime_type"] == "image/png"
+    assert (
+        IMAGE_B64 in blob_item["content"]
+        or blob_item["content"] == BLOB_DATA_SUBSTITUTE
+    )
+
+
+def test_binary_content_encoding_mixed_content(sentry_init, capture_events):
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Here is an image:"},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": IMAGE_DATA_URI},
+                },
+                {"type": "text", "text": "What do you see?"},
+            ],
+        }
+    ]
+    mock_response = MockCompletionResponse()
+
+    with start_transaction(name="litellm test"):
+        kwargs = {"model": "gpt-4-vision-preview", "messages": messages}
+        _input_callback(kwargs)
+        _success_callback(kwargs, mock_response, datetime.now(), datetime.now())
+
+    (event,) = events
+    (span,) = event["spans"]
+    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+    content_items = [
+        item for msg in messages_data if "content" in msg for item in msg["content"]
+    ]
+    assert any(item.get("type") == "text" for item in content_items)
+    assert any(item.get("type") == "blob" for item in content_items)
+
+
+def test_binary_content_encoding_uri_type(sentry_init, capture_events):
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": "https://example.com/image.jpg"},
+                }
+            ],
+        }
+    ]
+    mock_response = MockCompletionResponse()
+
+    with start_transaction(name="litellm test"):
+        kwargs = {"model": "gpt-4-vision-preview", "messages": messages}
+        _input_callback(kwargs)
+        _success_callback(kwargs, mock_response, datetime.now(), datetime.now())
+
+    (event,) = events
+    (span,) = event["spans"]
+    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
+    uri_item = next(
+        (
+            item
+            for msg in messages_data
+            if "content" in msg
+            for item in msg["content"]
+            if item.get("type") == "uri"
+        ),
+        None,
+    )
+    assert uri_item is not None
+    assert uri_item["uri"] == "https://example.com/image.jpg"
+
+
+def test_convert_message_parts_direct():
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Hello"},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": IMAGE_DATA_URI},
+                },
+            ],
+        }
+    ]
+    converted = _convert_message_parts(messages)
+    blob_item = next(
+        item for item in converted[0]["content"] if item.get("type") == "blob"
+    )
+    assert blob_item["modality"] == "image"
+    assert blob_item["mime_type"] == "image/png"
+    assert IMAGE_B64 in blob_item["content"]
+
+
+def test_convert_message_parts_does_not_mutate_original():
+    """Ensure _convert_message_parts does not mutate the original messages."""
+    original_url = IMAGE_DATA_URI
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": original_url},
+                },
+            ],
+        }
+    ]
+    _convert_message_parts(messages)
+    # Original should be unchanged
+    assert messages[0]["content"][0]["type"] == "image_url"
+    assert messages[0]["content"][0]["image_url"]["url"] == original_url
+
+
+def test_convert_message_parts_data_url_without_base64():
+    """Data URLs without ;base64, marker are still inline data and should be blobs."""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": "data:image/png,rawdata"},
+                },
+            ],
+        }
+    ]
+    converted = _convert_message_parts(messages)
+    blob_item = converted[0]["content"][0]
+    # Data URIs (with or without base64 encoding) contain inline data and should be blobs
+    assert blob_item["type"] == "blob"
+    assert blob_item["modality"] == "image"
+    assert blob_item["mime_type"] == "image/png"
+    assert blob_item["content"] == "rawdata"
+
+
+def test_convert_message_parts_image_url_none():
+    """image_url being None should not crash."""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": None,
+                },
+            ],
+        }
+    ]
+    converted = _convert_message_parts(messages)
+    # Should return item unchanged
+    assert converted[0]["content"][0]["type"] == "image_url"
+
+
+def test_convert_message_parts_image_url_missing_url():
+    """image_url missing the url key should not crash."""
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"detail": "high"},
+                },
+            ],
+        }
+    ]
+    converted = _convert_message_parts(messages)
+    # Should return item unchanged
+    assert converted[0]["content"][0]["type"] == "image_url"

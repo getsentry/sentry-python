@@ -633,6 +633,12 @@ class SPANDATA:
     Example: 50
     """
 
+    GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE = "gen_ai.usage.input_tokens.cache_write"
+    """
+    The number of tokens written to the cache when processing the AI input (prompt).
+    Example: 100
+    """
+
     GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
     """
     The number of tokens in the output.
@@ -1466,4 +1472,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.49.0"
+VERSION = "2.50.0"
