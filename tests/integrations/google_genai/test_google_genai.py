@@ -233,7 +233,7 @@ def test_generate_content_with_system_instruction(
     system_instructions = json.loads(
         invoke_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
-    assert system_instructions["parts"]["text"] == "You are a helpful assistant"
+    assert system_instructions["parts"][0]["text"] == "You are a helpful assistant"
 
 
 def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):
