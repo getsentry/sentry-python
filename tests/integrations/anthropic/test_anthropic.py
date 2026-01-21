@@ -899,14 +899,26 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
 
 
+# Test messages with mixed roles including "ai" that should be mapped to "assistant"
+@pytest.mark.parametrize(
+    "test_message,expected_role",
+    [
+        ({"role": "system", "content": "You are helpful."}, "system"),
+        ({"role": "user", "content": "Hello"}, "user"),
+        (
+            {"role": "ai", "content": "Hi there!"},
+            "assistant",
+        ),  # Should be mapped to "assistant"
+        (
+            {"role": "assistant", "content": "How can I help?"},
+            "assistant",
+        ),  # Should stay "assistant"
+    ],
+)
 def test_anthropic_message_role_mapping(
-    sentry_init,
-    capture_events,
-    input_ai_message_and_expected_role,
+    sentry_init, capture_events, test_message, expected_role
 ):
     """Test that Anthropic integration properly maps message roles like 'ai' to 'assistant'"""
-    test_message, expected_role = input_ai_message_and_expected_role
-
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,

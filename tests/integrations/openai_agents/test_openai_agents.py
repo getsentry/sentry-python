@@ -1324,12 +1324,26 @@ async def test_multiple_agents_asyncio(
     assert txn3["transaction"] == "test_agent workflow"
 
 
+# Test input messages with mixed roles including "ai"
+@pytest.mark.parametrize(
+    "test_message,expected_role",
+    [
+        ({"role": "system", "content": "You are helpful."}, "system"),
+        ({"role": "user", "content": "Hello"}, "user"),
+        (
+            {"role": "ai", "content": "Hi there!"},
+            "assistant",
+        ),  # Should be mapped to "assistant"
+        (
+            {"role": "assistant", "content": "How can I help?"},
+            "assistant",
+        ),  # Should stay "assistant"
+    ],
+)
 def test_openai_agents_message_role_mapping(
-    sentry_init, capture_events, input_ai_message_and_expected_role
+    sentry_init, capture_events, test_message, expected_role
 ):
     """Test that OpenAI Agents integration properly maps message roles like 'ai' to 'assistant'"""
-    test_message, expected_role = input_ai_message_and_expected_role
-
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
