@@ -48,8 +48,7 @@ except ImportError:
     BinaryContent = None
 
 
-def _set_system_instruction(span: "sentry_sdk.tracing.Span", messages: "Any"):
-    print("messages", messages)
+def _set_system_instruction(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     for msg in messages:
         for part in msg.parts:
             if isinstance(part, SystemPromptPart):
