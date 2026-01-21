@@ -229,14 +229,28 @@ def test_generate_content_with_system_instruction(
     (event,) = events
     invoke_span = event["spans"][0]
 
-    # Check that system instruction is included in messages
     # (PII is enabled and include_prompts is True in this test)
-    messages_str = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    # Parse the JSON string to verify content
-    messages = json.loads(messages_str)
-    assert len(messages) == 2
-    assert messages[0] == {"role": "system", "content": "You are a helpful assistant"}
-    assert messages[1] == {"role": "user", "content": "What is 2+2?"}
+    system_instructions = json.loads(
+        invoke_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+    )
+    assert system_instructions == {
+        "parts": [
+            {
+                "media_resolution": "None",
+                "code_execution_result": "None",
+                "executable_code": "None",
+                "file_data": "None",
+                "function_call": "None",
+                "function_response": "None",
+                "inline_data": "None",
+                "text": "You are a helpful assistant",
+                "thought": "None",
+                "thought_signature": "None",
+                "video_metadata": "None",
+            }
+        ],
+        "role": "system",
+    }
 
 
 def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):
@@ -933,10 +947,8 @@ def test_google_genai_message_truncation(
         with start_transaction(name="google_genai"):
             mock_genai_client.models.generate_content(
                 model="gemini-1.5-flash",
-                contents=small_content,
-                config=create_test_config(
-                    system_instruction=large_content,
-                ),
+                contents=[large_content, small_content],
+                config=create_test_config(),
             )
 
     (event,) = events

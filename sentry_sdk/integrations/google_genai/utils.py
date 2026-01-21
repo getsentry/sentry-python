@@ -743,25 +743,13 @@ def set_span_data_for_request(
         # Add system instruction if present
         if config and hasattr(config, "system_instruction"):
             system_instruction = config.system_instruction
-            if system_instruction:
-                system_messages = extract_contents_messages(system_instruction)
-                # System instruction should be a single system message
-                # Extract text from all messages and combine into one system message
-                system_texts = []
-                for msg in system_messages:
-                    content = msg.get("content")
-                    if isinstance(content, list):
-                        # Extract text from content parts
-                        for part in content:
-                            if isinstance(part, dict) and part.get("type") == "text":
-                                system_texts.append(part.get("text", ""))
-                    elif isinstance(content, str):
-                        system_texts.append(content)
 
-                if system_texts:
-                    messages.append(
-                        {"role": "system", "content": " ".join(system_texts)}
-                    )
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                system_instruction,
+                unpack=False,
+            )
 
         # Extract messages from contents
         contents_messages = extract_contents_messages(contents)
