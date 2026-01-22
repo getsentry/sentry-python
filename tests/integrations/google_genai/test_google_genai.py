@@ -4,6 +4,7 @@ from unittest import mock
 
 from google import genai
 from google.genai import types as genai_types
+from google.genai.types import Content, Part
 
 from sentry_sdk import start_transaction
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -186,6 +187,7 @@ def test_nonstreaming_generate_content(
         response_texts = json.loads(response_text)
         assert response_texts == ["Hello! How can I help you today?"]
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_span["data"]
 
@@ -202,8 +204,47 @@ def test_nonstreaming_generate_content(
     assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
 
 
+# Vibed test cases
+@pytest.mark.parametrize(
+    "system_instructions,expected_texts",
+    [
+        ("You are a helpful assistant", "You are a helpful assistant"),
+        (
+            ["You are a translator", "Translate to French"],
+            ["You are a translator", "Translate to French"],
+        ),
+        (
+            Content(role="user", parts=[Part(text="You are a helpful assistant")]),
+            "You are a helpful assistant",
+        ),
+        (
+            {"parts": [{"text": "You are a helpful assistant"}], "role": "user"},
+            "You are a helpful assistant",
+        ),
+        (Part(text="You are a helpful assistant"), "You are a helpful assistant"),
+        ({"text": "You are a helpful assistant"}, "You are a helpful assistant"),
+        (
+            [Part(text="You are a translator"), Part(text="Translate to French")],
+            ["You are a translator", "Translate to French"],
+        ),
+        (
+            [{"text": "You are a translator"}, {"text": "Translate to French"}],
+            ["You are a translator", "Translate to French"],
+        ),
+        (
+            Content(
+                role="user",
+                parts=[
+                    Part(text="You are a translator"),
+                    Part(text="Translate to French"),
+                ],
+            ),
+            ["You are a translator", "Translate to French"],
+        ),
+    ],
+)
 def test_generate_content_with_system_instruction(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_events, mock_genai_client, system_instructions, expected_texts
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
@@ -219,7 +260,7 @@ def test_generate_content_with_system_instruction(
     ):
         with start_transaction(name="google_genai"):
             config = create_test_config(
-                system_instruction="You are a helpful assistant",
+                system_instruction=system_instructions,
                 temperature=0.5,
             )
             mock_genai_client.models.generate_content(
@@ -233,7 +274,13 @@ def test_generate_content_with_system_instruction(
     system_instructions = json.loads(
         invoke_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
-    assert system_instructions["parts"][0]["text"] == "You are a helpful assistant"
+
+    if isinstance(expected_texts, str):
+        assert system_instructions == [{"type": "text", "content": expected_texts}]
+    else:
+        assert system_instructions == [
+            {"type": "text", "content": text} for text in expected_texts
+        ]
 
 
 def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):

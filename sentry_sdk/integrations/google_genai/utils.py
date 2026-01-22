@@ -32,13 +32,16 @@ from sentry_sdk.utils import (
     event_from_exception,
     safe_serialize,
 )
-from google.genai.types import GenerateContentConfig
+from google.genai.types import GenerateContentConfig, Part, Content
+from itertools import chain
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
     from google.genai.types import (
         GenerateContentResponse,
         ContentListUnion,
+        ContentUnionDict,
         Tool,
         Model,
         EmbedContentResponse,
@@ -720,6 +723,56 @@ def extract_finish_reasons(
     return finish_reasons if finish_reasons else None
 
 
+def _transform_system_instruction_one_level(
+    system_instructions: "ContentUnionDict",
+) -> "list[TextPart]":
+    text_parts: "list[TextPart]" = []
+
+    if isinstance(system_instructions, str):
+        return [{"type": "text", "content": system_instructions}]
+
+    if isinstance(system_instructions, Part) and system_instructions.text:
+        return [{"type": "text", "content": system_instructions.text}]
+
+    if isinstance(system_instructions, Content):
+        for part in system_instructions.parts:
+            if part.text:
+                text_parts.append({"type": "text", "content": part.text})
+        return text_parts
+
+    if isinstance(system_instructions, dict):
+        if system_instructions.get("text"):
+            return [{"type": "text", "content": system_instructions["text"]}]
+
+        parts = system_instructions.get("parts", [])
+        for part in parts:
+            if system_instructions.get("text"):
+                text_parts.append({"type": "text", "content": part["text"]})
+            elif isinstance(part, Part) and part.text:
+                text_parts.append({"type": "text", "content": part.text})
+        return text_parts
+
+    return text_parts
+
+
+def _transform_system_instructions(
+    system_instructions: "ContentUnionDict",
+) -> "list[TextPart]":
+    text_parts: "list[TextPart]" = []
+
+    if isinstance(system_instructions, list):
+        text_parts = list(
+            chain.from_iterable(
+                _transform_system_instruction_one_level(instructions)
+                for instructions in system_instructions
+            )
+        )
+
+        return text_parts
+
+    return _transform_system_instruction_one_level(system_instructions)
+
+
 def set_span_data_for_request(
     span: "Span",
     integration: "Any",
@@ -744,12 +797,13 @@ def set_span_data_for_request(
         if config and hasattr(config, "system_instruction"):
             system_instruction = config.system_instruction
 
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                system_instruction,
-                unpack=False,
-            )
+            if system_instruction:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                    _transform_system_instructions(system_instruction),
+                    unpack=False,
+                )
 
         # Extract messages from contents
         contents_messages = extract_contents_messages(contents)
