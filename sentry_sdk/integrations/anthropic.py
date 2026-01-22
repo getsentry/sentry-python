@@ -39,13 +39,14 @@ try:
     from anthropic.resources import AsyncMessages, Messages
 
     if TYPE_CHECKING:
-        from anthropic.types import MessageStreamEvent
+        from anthropic.types import MessageStreamEvent, TextBlockParam
 except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Iterator, List, Optional, Union
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
 
 
 class AnthropicIntegration(Integration):
@@ -177,6 +178,27 @@ def _transform_anthropic_content_block(
     return result if result is not None else content_block
 
 
+def _transform_system_instructions(
+    system_instructions: "Union[str, Iterable[TextBlockParam]]",
+) -> "list[TextPart]":
+    if isinstance(system_instructions, str):
+        return [
+            {
+                "type": "text",
+                "content": system_instructions,
+            }
+        ]
+
+    return [
+        {
+            "type": "text",
+            "content": instruction["text"],  # type: ignore
+        }
+        for instruction in system_instructions
+        if "text" in instruction
+    ]
+
+
 def _set_input_data(
     span: "Span", kwargs: "dict[str, Any]", integration: "AnthropicIntegration"
 ) -> None:
@@ -184,7 +206,7 @@ def _set_input_data(
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-    system_prompt = kwargs.get("system")
+    system_instructions: "Union[str, Iterable[TextBlockParam]]" = kwargs.get("system")  # type: ignore
     messages = kwargs.get("messages")
     if (
         messages is not None
@@ -192,9 +214,12 @@ def _set_input_data(
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        if system_prompt:
+        if system_instructions:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS, system_prompt, unpack=False
+                span,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                _transform_system_instructions(system_instructions),
+                unpack=False,
             )
 
         normalized_messages = []

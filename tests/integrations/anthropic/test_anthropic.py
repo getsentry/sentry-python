@@ -1076,7 +1076,10 @@ def test_nonstreaming_create_message_with_system_prompt(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
         system_instructions = span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert system_instructions == "You are a helpful assistant."
+        assert (
+            system_instructions
+            == '[{"type": "text", "content": "You are a helpful assistant."}]'
+        )
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -1156,7 +1159,10 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
         system_instructions = span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert system_instructions == "You are a helpful assistant."
+        assert (
+            system_instructions
+            == '[{"type": "text", "content": "You are a helpful assistant."}]'
+        )
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -1268,7 +1274,10 @@ def test_streaming_create_message_with_system_prompt(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
         system_instructions = span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert system_instructions == "You are a helpful assistant."
+        assert (
+            system_instructions
+            == '[{"type": "text", "content": "You are a helpful assistant."}]'
+        )
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -1384,7 +1393,10 @@ async def test_streaming_create_message_with_system_prompt_async(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
         system_instructions = span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert system_instructions == "You are a helpful assistant."
+        assert (
+            system_instructions
+            == '[{"type": "text", "content": "You are a helpful assistant."}]'
+        )
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -1447,10 +1459,10 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
 
     # System content should be a list of text blocks
     assert isinstance(system_instructions, list)
-    assert system_instructions[0]["type"] == "text"
-    assert system_instructions[0]["text"] == "You are a helpful assistant."
-    assert system_instructions[1]["type"] == "text"
-    assert system_instructions[1]["text"] == "Be concise and clear."
+    assert system_instructions == [
+        {"type": "text", "content": "You are a helpful assistant."},
+        {"type": "text", "content": "Be concise and clear."},
+    ]
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
