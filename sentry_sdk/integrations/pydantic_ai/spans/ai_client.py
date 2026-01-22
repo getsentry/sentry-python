@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, List, Dict
     from pydantic_ai.usage import RequestUsage  # type: ignore
-    from pydantic_ai.messages import ModelMessage  # type: ignore
+    from pydantic_ai.messages import ModelMessage, SystemPromptPart  # type: ignore
     from sentry_sdk._types import TextPart as SentryTextPart
 
 try:
@@ -62,7 +62,9 @@ def _transform_system_instructions(
     ]
 
 
-def _get_system_instructions(messages: "list[ModelMessage]") -> "list[ModelMessage]":
+def _get_system_instructions(
+    messages: "list[ModelMessage]",
+) -> "list[SystemPromptPart]":
     system_instructions = []
 
     for msg in messages:
