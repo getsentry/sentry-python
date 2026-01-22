@@ -797,7 +797,7 @@ def set_span_data_for_request(
         if config and hasattr(config, "system_instruction"):
             system_instruction = config.system_instruction
 
-            if system_instruction:
+            if system_instruction is not None:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
