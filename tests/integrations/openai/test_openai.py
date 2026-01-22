@@ -147,7 +147,11 @@ def test_nonstreaming_chat_completion(
     with start_transaction(name="openai tx"):
         response = (
             client.chat.completions.create(
-                model="some-model", messages=[{"role": "system", "content": "hello"}]
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
             )
             .choices[0]
             .message.content
@@ -160,9 +164,17 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "content": "You are a helpful assistant.",
+                "role": "system",
+            }
+        ]
+
         assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -191,7 +203,11 @@ async def test_nonstreaming_chat_completion_async(
 
     with start_transaction(name="openai tx"):
         response = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+            model="some-model",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "hello"},
+            ],
         )
         response = response.choices[0].message.content
 
@@ -202,9 +218,17 @@ async def test_nonstreaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "content": "You are a helpful assistant.",
+                "role": "system",
+            }
+        ]
+
         assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -283,7 +307,11 @@ def test_streaming_chat_completion(
     client.chat.completions._post = mock.Mock(return_value=returned_stream)
     with start_transaction(name="openai tx"):
         response_stream = client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+            model="some-model",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "hello"},
+            ],
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -298,6 +326,7 @@ def test_streaming_chat_completion(
         assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -377,7 +406,11 @@ async def test_streaming_chat_completion_async(
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
     with start_transaction(name="openai tx"):
         response_stream = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+            model="some-model",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "hello"},
+            ],
         )
 
         response_string = ""
@@ -394,6 +427,7 @@ async def test_streaming_chat_completion_async(
         assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -1425,6 +1459,37 @@ async def test_streaming_responses_api_async(
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the tools parameter.",
+)
+@pytest.mark.parametrize(
+    "tools",
+    [[], None, NOT_GIVEN, omit],
+)
+def test_chat_completion_with_system_instruction(sentry_init, capture_events, tools):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "hello"}],
+            tools=tools,
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    assert "gen_ai.request.available_tools" not in span["data"]
 
 
 @pytest.mark.skipif(
