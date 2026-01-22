@@ -1090,25 +1090,24 @@ def get_current_span(
     return current_span
 
 
-def set_span_errored(span: "Optional[Span]" = None) -> None:
+def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
     """
-    Set the status of the current or given span to INTERNAL_ERROR.
-    Also sets the status of the transaction (root span) to INTERNAL_ERROR.
+    Set the status of the current or given span to error.
+    Also sets the status of the transaction (root span) to error.
     """
+    from sentry_sdk.traces import StreamedSpan, SpanStatus
+
     span = span or get_current_span()
 
-    if not isinstance(span, Span):
-        warnings.warn(
-            "set_span_errored is not available in streaming mode.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return
-
     if span is not None:
-        span.set_status(SPANSTATUS.INTERNAL_ERROR)
-        if span.containing_transaction is not None:
-            span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+        if isinstance(span, Span):
+            span.set_status(SPANSTATUS.INTERNAL_ERROR)
+            if span.containing_transaction is not None:
+                span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+        elif isinstance(span, StreamedSpan):
+            span.set_status(SpanStatus.ERROR)
+            if span.segment is not None:
+                span.segment.set_status(SpanStatus.ERROR)
 
 
 def _generate_sample_rand(
