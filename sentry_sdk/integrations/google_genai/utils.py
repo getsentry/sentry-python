@@ -735,7 +735,7 @@ def _transform_system_instruction_one_level(
         return [{"type": "text", "content": system_instructions.text}]
 
     if isinstance(system_instructions, Content):
-        for part in system_instructions.parts:
+        for part in system_instructions.parts or []:
             if part.text:
                 text_parts.append({"type": "text", "content": part.text})
         return text_parts
@@ -747,9 +747,9 @@ def _transform_system_instruction_one_level(
         parts = system_instructions.get("parts", [])
         for part in parts:
             if part.get("text"):
-                part.append({"type": "text", "content": part["text"]})
+                text_parts.append({"type": "text", "content": part["text"]})
             elif isinstance(part, Part) and part.text:
-                part.append({"type": "text", "content": part.text})
+                text_parts.append({"type": "text", "content": part.text})
         return text_parts
 
     return text_parts
