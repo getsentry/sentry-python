@@ -30,7 +30,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, ParamSpec, TypeVar, Union
+    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue, SamplingContext
     from sentry_sdk.scope import Scope
 
@@ -39,6 +39,9 @@ if TYPE_CHECKING:
 
 
 FLAGS_CAPACITY = 10
+
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
 
 class SpanStatus(str, Enum):
@@ -362,7 +365,7 @@ class StreamedSpan:
         """
         self.__enter__()
 
-    def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+    def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         """
         Finish this span and queue it for sending.
 
@@ -455,18 +458,12 @@ class StreamedSpan:
             self._flags[flag] = result
 
     def set_op(self, op: "Union[OP, str]") -> None:
-        if isinstance(op, Enum):
-            op = op.value
-
         self.set_attribute("sentry.op", op)
 
     def set_origin(self, origin: str) -> None:
         self.set_attribute("sentry.origin", origin)
 
-    def set_source(self, source: "Union[SegmentSource, str]") -> None:
-        if isinstance(source, Enum):
-            source = source.value
-
+    def set_source(self, source: "SegmentSource") -> None:
         self.set_attribute("sentry.span.source", source)
 
     def is_segment(self) -> bool:
@@ -497,7 +494,7 @@ class StreamedSpan:
         return self._sampled
 
     def dynamic_sampling_context(self) -> "dict[str, str]":
-        return self.segment._get_baggage().dynamic_sampling_context()
+        return self.segment.get_baggage().dynamic_sampling_context()
 
     def to_traceparent(self) -> str:
         if self.sampled is True:
@@ -515,8 +512,18 @@ class StreamedSpan:
 
     def to_baggage(self) -> "Optional[Baggage]":
         if self.segment:
-            return self.segment._get_baggage()
+            return self.segment.get_baggage()
         return None
+
+    def iter_headers(self) -> "Iterator[tuple[str, str]]":
+        if not self.segment:
+            return
+
+        yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
+
+        baggage = self.segment.get_baggage().serialize()
+        if baggage:
+            yield BAGGAGE_HEADER_NAME, baggage
 
     def _update_active_thread(self) -> None:
         thread_id, thread_name = get_current_thread_meta()
@@ -543,7 +550,7 @@ class StreamedSpan:
         else:
             self.set_status(SpanStatus.OK)
 
-    def _get_baggage(self) -> "Baggage":
+    def get_baggage(self) -> "Baggage":
         """
         Return the :py:class:`~sentry_sdk.tracing_utils.Baggage` associated with
         the segment.
