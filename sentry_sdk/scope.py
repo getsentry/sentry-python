@@ -1233,7 +1233,6 @@ class Scope:
 
             try_autostart_continuous_profiler()
 
-            # XXX[span-first]: no sampling context?
             sampling_context = {
                 "transaction_context": {
                     "trace_id": span.trace_id,

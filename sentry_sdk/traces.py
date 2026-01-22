@@ -224,7 +224,6 @@ class StreamedSpan:
         "_baggage",
         "sample_rate",
         "_sample_rand",
-        "source",
         "_finished",
     )
 
@@ -269,7 +268,7 @@ class StreamedSpan:
         self._span_id: "Optional[str]" = None
 
         self.status: SpanStatus = SpanStatus.OK
-        self.source: "Optional[SegmentSource]" = SegmentSource.CUSTOM
+        self.set_source(SegmentSource.CUSTOM)
         # XXX[span-first] ^ populate this correctly
 
         self._sampled: "Optional[bool]" = None
@@ -366,7 +365,7 @@ class StreamedSpan:
         if not client.is_active():
             return
 
-        self._set_grouping_attributes()
+        self._set_segment_attributes()
 
         scope: "Optional[sentry_sdk.Scope]" = (
             scope or self._scope or sentry_sdk.get_current_scope()
@@ -595,10 +594,8 @@ class StreamedSpan:
                 f"[Tracing] Discarding {self.name} because it's not included in the random sample (sampling rate = {self.sample_rate})"
             )
 
-    def _set_grouping_attributes(self):
-        if self.is_segment():
-            self.set_attribute("sentry.span.source", self.source.value)
-        else:
+    def _set_segment_attributes(self):
+        if not self.is_segment():
             self.set_attribute("sentry.segment.id", self.segment.span_id)
 
         self.set_attribute("sentry.segment.name", self.segment.name)
