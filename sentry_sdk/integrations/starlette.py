@@ -24,6 +24,7 @@ from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
 )
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -147,9 +148,12 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         send: "Callable[[Dict[str, Any]], Awaitable[None]]",
         **kwargs: "Any",
     ) -> None:
-        integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(StarletteIntegration)
         if integration is None:
             return await old_call(app, scope, receive, send, **kwargs)
+
+        span_streaming = has_span_streaming_enabled(client.options)
 
         # Update transaction name with middleware name
         name, source = _get_transaction_from_middleware(app, scope, integration)
@@ -165,21 +169,45 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
 
         middleware_name = app.__class__.__name__
 
-        with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLETTE,
-            name=middleware_name,
-            origin=StarletteIntegration.origin,
-        ) as middleware_span:
-            middleware_span.set_tag("starlette.middleware_name", middleware_name)
+        if span_streaming:
+            span_ctx = sentry_sdk.traces.start_span(name=middleware_name)
+        else:
+            span_ctx = sentry_sdk.start_span(
+                op=OP.MIDDLEWARE_STARLETTE,
+                name=middleware_name,
+                origin=StarletteIntegration.origin,
+            )
+
+        with span_ctx as middleware_span:
+            if span_streaming:
+                middleware_span.set_op(OP.MIDDLEWARE_STARLETTE)
+                middleware_span.set_origin(StarletteIntegration.origin)
+                middleware_span.set_attribute(
+                    "starlette.middleware_name", middleware_name
+                )
+            else:
+                middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
             async def _sentry_receive(*args: "Any", **kwargs: "Any") -> "Any":
-                with sentry_sdk.start_span(
-                    op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
-                    name=getattr(receive, "__qualname__", str(receive)),
-                    origin=StarletteIntegration.origin,
-                ) as span:
-                    span.set_tag("starlette.middleware_name", middleware_name)
+                if span_streaming:
+                    span_ctx = sentry_sdk.tracing.start_span(
+                        name=getattr(receive, "__qualname__", str(receive)),
+                    )
+                else:
+                    span_ctx = sentry_sdk.start_span(
+                        op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
+                        name=getattr(receive, "__qualname__", str(receive)),
+                        origin=StarletteIntegration.origin,
+                    )
+
+                with span_ctx as span:
+                    if span_streaming:
+                        span.set_origin(StarletteIntegration.origin)
+                        span.set_op(OP.MIDDLEWARE_STARLETTE_RECEIVE)
+                        span.set_attribute("starlette.middleware_name", middleware_name)
+                    else:
+                        span.set_tag("starlette.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -188,12 +216,25 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
 
             # Creating spans for the "send" callback
             async def _sentry_send(*args: "Any", **kwargs: "Any") -> "Any":
-                with sentry_sdk.start_span(
-                    op=OP.MIDDLEWARE_STARLETTE_SEND,
-                    name=getattr(send, "__qualname__", str(send)),
-                    origin=StarletteIntegration.origin,
-                ) as span:
-                    span.set_tag("starlette.middleware_name", middleware_name)
+                if span_streaming:
+                    span_ctx = sentry_sdk.tracing.start_span(
+                        name=getattr(send, "__qualname__", str(send)),
+                    )
+                else:
+                    span_ctx = sentry_sdk.start_span(
+                        op=OP.MIDDLEWARE_STARLETTE_SEND,
+                        name=getattr(send, "__qualname__", str(send)),
+                        origin=StarletteIntegration.origin,
+                    )
+
+                with span_ctx as span:
+                    if span_streaming:
+                        span.set_op(OP.MIDDLEWARE_STARLETTE_SEND)
+                        span.set_origin(StarletteIntegration.origin)
+                        span.set_attribute("starlette.middleware_name", middleware_name)
+                    else:
+                        span.set_tag("starlette.middleware_name", middleware_name)
+
                     return await send(*args, **kwargs)
 
             send_name = getattr(send, "__name__", str(send))

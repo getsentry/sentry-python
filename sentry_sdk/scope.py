@@ -675,15 +675,6 @@ class Scope:
         span = kwargs.pop("span", None)
         span = span or self.span
 
-        if isinstance(span, StreamedSpan):
-            warnings.warn(
-                "Scope.iter_trace_propagation_headers is not available in "
-                "streaming mode.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return None
-
         if has_tracing_enabled(client.options) and span is not None:
             for header in span.iter_headers():
                 yield header
@@ -831,12 +822,9 @@ class Scope:
         self._transaction = name
         if self._span:
             if isinstance(self._span, StreamedSpan):
-                warnings.warn(
-                    "Scope.set_transaction_name is not available in streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                return None
+                self._span.segment.name = name
+                if source:
+                    self._span.segment.set_source(source)
 
             if self._span.containing_transaction:
                 self._span.containing_transaction.name = name
