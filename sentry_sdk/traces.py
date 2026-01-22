@@ -1,10 +1,17 @@
+"""
+The API in this file is only meant to be used in span streaming mode.
+
+You can enable span streaming mode via
+sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
+"""
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.tracing_utils import (
     Baggage,
@@ -425,6 +432,18 @@ class StreamedSpan:
     def set_flag(self, flag: str, result: bool) -> None:
         if len(self._flags) < FLAGS_CAPACITY:
             self._flags[flag] = result
+
+    def set_op(self, op: "Union[OP, str]") -> None:
+        if isinstance(op, Enum):
+            op = op.value
+
+        self.set_attribute("sentry.op", op)
+
+    def set_source(self, source: "Union[SegmentSource, str]") -> None:
+        if isinstance(source, Enum):
+            source = source.value
+
+        self.set_attribute("sentry.span.source", source)
 
     def is_segment(self) -> bool:
         return self.segment == self

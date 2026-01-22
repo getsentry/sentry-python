@@ -1247,6 +1247,33 @@ class Scope:
             # sampling decision
             span._set_sampling_decision(sampling_context=sampling_context)
 
+            # update the sample rate in the dsc
+            if span.sample_rate is not None:
+                propagation_context = self.get_active_propagation_context()
+                baggage = propagation_context.baggage
+
+                if baggage is not None:
+                    baggage.sentry_items["sample_rate"] = str(span.sample_rate)
+
+                if span._baggage:
+                    span._baggage.sentry_items["sample_rate"] = str(span.sample_rate)
+
+            if span.sampled:
+                profile = Profile(span.sampled, span._start_timestamp_monotonic_ns)
+                profile._set_initial_sampling_decision(
+                    sampling_context=sampling_context
+                )
+
+                span._profile = profile
+
+                span._continuous_profile = try_profile_lifecycle_trace_start()
+
+                # Typically, the profiler is set when the segment is created. But when
+                # using the auto lifecycle, the profiler isn't running when the first
+                # segment is started. So make sure we update the profiler id on it.
+                if span._continuous_profile is not None:
+                    span._set_profiler_id(get_profiler_id())
+
             return span
 
         # This is a child span; take propagation context from the parent span
