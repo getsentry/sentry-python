@@ -329,12 +329,8 @@ class StreamedSpan:
             # sampling decision
             self._set_sampling_decision(sampling_context=sampling_context)
 
-            # update the sample rate in the dsc
-            if self.sample_rate is not None:
-                if self._baggage:
-                    self._baggage.sentry_items["sample_rate"] = str(self.sample_rate)
-
-            scope.start_profile_on_segment(self)
+            scope._update_sample_rate_from_segment(self)
+            scope._start_profile_on_segment(self)
 
         return self
 

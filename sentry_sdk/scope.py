@@ -1248,7 +1248,7 @@ class Scope:
 
             return span
 
-    def start_profile_on_segment(self, span: "StreamedSpan") -> None:
+    def _start_profile_on_segment(self, span: "StreamedSpan") -> None:
         try_autostart_continuous_profiler()
 
         if not span.sampled:
@@ -1262,7 +1262,7 @@ class Scope:
         if span._continuous_profile is not None:
             span._set_profile_id(get_profiler_id())
 
-    def update_sample_rate_from_segment(self, span: "StreamedSpan") -> None:
+    def _update_sample_rate_from_segment(self, span: "StreamedSpan") -> None:
         # If we had to adjust the sample rate when setting the sampling decision
         # for the spans, it needs to be updated in the propagation context too
         propagation_context = self.get_active_propagation_context()
