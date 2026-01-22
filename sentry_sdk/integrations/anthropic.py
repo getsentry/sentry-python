@@ -195,7 +195,7 @@ def _transform_system_instructions(
             "content": instruction["text"],  # type: ignore
         }
         for instruction in system_instructions
-        if "text" in instruction
+        if isinstance(instruction, dict) and "text" in instruction
     ]
 
 
