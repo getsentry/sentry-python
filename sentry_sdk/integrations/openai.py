@@ -12,6 +12,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.ai._openai_completions_api import (
     _get_system_instructions as _get_system_instructions_completions,
     _is_system_instruction as _is_system_instruction_completions,
+    _transform_system_instructions,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
     from openai.types.responses import ResponseInputParam, ResponseInputItemParam
+    from openai import Omit
 
 try:
     try:
@@ -277,16 +279,28 @@ def _set_responses_api_input_data(
         _commmon_set_input_data(span, kwargs)
         return
 
+    explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
     system_instructions = _get_system_instructions_responses(messages)
     if (
-        len(system_instructions) > 0
+        (_is_given(explicit_instructions) or len(system_instructions) > 0)
         and should_send_default_pii()
         and integration.include_prompts
     ):
+        # Deliberate use of function accepting completions API type because
+        # of shared structure FOR THIS PURPOSE ONLY.
+        instructions_text_parts = _transform_system_instructions(system_instructions)  # type: ignore
+        if _is_given(explicit_instructions):
+            instructions_text_parts.append(
+                {
+                    "type": "text",
+                    "content": explicit_instructions,
+                }
+            )
+
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            system_instructions,
+            instructions_text_parts,
             unpack=False,
         )
 
@@ -310,7 +324,7 @@ def _set_responses_api_input_data(
             if not _is_system_instruction_responses(message)
         ]
         if len(non_system_messages) > 0:
-            normalized_messages = normalize_message_roles(messages)  # type: ignore
+            normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
             scope = sentry_sdk.get_current_scope()
             messages_data = truncate_and_annotate_messages(
                 normalized_messages, span, scope
@@ -347,7 +361,7 @@ def _set_completions_api_input_data(
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            system_instructions,
+            _transform_system_instructions(system_instructions),
             unpack=False,
         )
 
