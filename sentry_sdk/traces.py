@@ -460,6 +460,9 @@ class StreamedSpan:
 
         self.set_attribute("sentry.op", op)
 
+    def set_origin(self, origin: str) -> None:
+        self.set_attribute("sentry.origin", origin)
+
     def set_source(self, source: "Union[SegmentSource, str]") -> None:
         if isinstance(source, Enum):
             source = source.value

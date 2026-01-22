@@ -222,6 +222,7 @@ class SentryAsgiMiddleware:
                                 )
                                 span.set_op(f"{ty}.server")
                         else:
+                            sentry_sdk.traces.new_trace()
                             span = sentry_sdk.traces.start_span(
                                 name=transaction_name,
                             )
@@ -230,6 +231,7 @@ class SentryAsgiMiddleware:
                         if span is not None:
                             span.set_source(transaction_source)
                             span.set_origin(self.span_origin)
+                            span.set_attribute("asgi.type", ty)
 
                         span_context = span if span is not None else nullcontext()
 

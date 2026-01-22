@@ -826,7 +826,7 @@ class Scope:
                 if source:
                     self._span.segment.set_source(source)
 
-            if self._span.containing_transaction:
+            elif self._span.containing_transaction:
                 self._span.containing_transaction.name = name
                 if source:
                     self._span.containing_transaction.source = source
