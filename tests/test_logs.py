@@ -662,12 +662,70 @@ def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes
 
 
 @minimum_python_37
+def test_log_array_attributes(sentry_init, capture_envelopes):
+    """Test homogeneous list and tuple attributes, and fallback for inhomogeneous collections."""
+
+    sentry_init(enable_logs=True)
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.new_scope() as scope:
+        scope.set_attribute("string_list", ["value1", "value2"])
+        scope.set_attribute("int_tuple", (3, 2, 1, 4))
+        scope.set_attribute("inhomogeneous_tuple", (3, 2.0, 1, 4))  # type: ignore[arg-type]
+
+        sentry_sdk.logger.warning(
+            "Hello, world!",
+            attributes={
+                "float_list": [3.0, 3.5, 4.2],
+                "bool_tuple": (False, False, True),
+                "inhomogeneous_list": [3.2, True, None],
+            },
+        )
+
+    get_client().flush()
+
+    assert len(envelopes) == 1
+    assert len(envelopes[0].items) == 1
+    item = envelopes[0].items[0]
+    serialized_attributes = item.payload.json["items"][0]["attributes"]
+
+    assert serialized_attributes["string_list"] == {
+        "value": ["value1", "value2"],
+        "type": "string[]",
+    }
+    assert serialized_attributes["int_tuple"] == {
+        "value": [3, 2, 1, 4],
+        "type": "integer[]",
+    }
+    assert serialized_attributes["inhomogeneous_tuple"] == {
+        "value": "(3, 2.0, 1, 4)",
+        "type": "string",
+    }
+
+    assert serialized_attributes["float_list"] == {
+        "value": [3.0, 3.5, 4.2],
+        "type": "double[]",
+    }
+    assert serialized_attributes["bool_tuple"] == {
+        "value": [False, False, True],
+        "type": "boolean[]",
+    }
+    assert serialized_attributes["inhomogeneous_list"] == {
+        "value": "[3.2, True, None]",
+        "type": "string",
+    }
+
+
+@minimum_python_37
 def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes):
-    """We don't surface references to objects in attributes."""
+    """We don't surface user-held references to objects in attributes."""
 
     def before_send_log(log, _):
         assert isinstance(log["attributes"]["instance"], str)
         assert isinstance(log["attributes"]["dictionary"], str)
+        assert isinstance(log["attributes"]["inhomogeneous_list"], str)
+        assert isinstance(log["attributes"]["inhomogeneous_tuple"], str)
 
         return log
 
@@ -686,6 +744,8 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes)
         attributes={
             "instance": instance,
             "dictionary": dictionary,
+            "inhomogeneous_list": [3.2, True, None],
+            "inhomogeneous_tuple": (3, 2.0, 1, 4),
         },
     )
 
@@ -696,3 +756,31 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes)
 
     assert isinstance(log["attributes"]["instance"], str)
     assert isinstance(log["attributes"]["dictionary"], str)
+    assert isinstance(log["attributes"]["inhomogeneous_list"], str)
+    assert isinstance(log["attributes"]["inhomogeneous_tuple"], str)
+
+
+@minimum_python_37
+def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
+    """We don't surface user-held references to objects in attributes."""
+
+    strings = ["value1", "value2"]
+    ints = (3, 2, 1, 4)
+
+    def before_send_log(log, _):
+        assert log["attributes"]["string_list"] is not strings
+        assert log["attributes"]["int_tuple"] is not ints
+
+        return log
+
+    sentry_init(enable_logs=True, before_send_log=before_send_log)
+
+    sentry_sdk.logger.warning(
+        "Hello world!",
+        attributes={
+            "string_list": strings,
+            "int_tuple": ints,
+        },
+    )
+
+    get_client().flush()

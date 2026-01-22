@@ -4,6 +4,7 @@ import linecache
 import logging
 import math
 import os
+import copy
 import random
 import re
 import subprocess
@@ -2061,6 +2062,25 @@ def format_attribute(val: "Any") -> "AttributeValue":
     if isinstance(val, (bool, int, float, str)):
         return val
 
+    # Only lists of elements of a single type are supported
+    list_types: 'dict[type, Literal["string[]", "integer[]", "double[]", "boolean[]"]]' = {
+        str: "string[]",
+        int: "integer[]",
+        float: "double[]",
+        bool: "boolean[]",
+    }
+
+    if isinstance(val, (list, tuple)) and not val:
+        return []
+    elif isinstance(val, list):
+        ty = type(val[0])
+        if ty in list_types and all(type(v) is ty for v in val):
+            return copy.deepcopy(val)
+    elif isinstance(val, tuple):
+        ty = type(val[0])
+        if ty in list_types and all(type(v) is ty for v in val):
+            return list(val)
+
     return safe_repr(val)
 
 
@@ -2074,6 +2094,22 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
         return {"value": val, "type": "double"}
     if isinstance(val, str):
         return {"value": val, "type": "string"}
+
+    if isinstance(val, list):
+        if not val:
+            return {"value": [], "type": "string[]"}
+
+        # Only lists of elements of a single type are supported
+        list_types: 'dict[type, Literal["string[]", "integer[]", "double[]", "boolean[]"]]' = {
+            str: "string[]",
+            int: "integer[]",
+            float: "double[]",
+            bool: "boolean[]",
+        }
+
+        ty = type(val[0])
+        if ty in list_types and all(type(v) is ty for v in val):
+            return {"value": val, "type": list_types[ty]}
 
     # Coerce to string if we don't know what to do with the value. This should
     # never happen as we pre-format early in format_attribute, but let's be safe.
