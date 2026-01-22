@@ -677,10 +677,15 @@ class Span:
 
         scope = scope or sentry_sdk.get_current_scope()
 
-        # Copy conversation_id from scope to span data if this is a gen_ai span
+        # Copy conversation_id from scope to span data if this is an AI span
         conversation_id = scope.get_conversation_id()
-        if conversation_id and any(key.startswith("gen_ai.") for key in self._data):
-            self.set_data("gen_ai.conversation.id", conversation_id)
+        if conversation_id:
+            has_ai_op = "gen_ai.operation.name" in self._data
+            is_ai_span_op = self.op is not None and (
+                self.op.startswith("ai.") or self.op.startswith("gen_ai.")
+            )
+            if has_ai_op or is_ai_span_op:
+                self.set_data("gen_ai.conversation.id", conversation_id)
 
         maybe_create_breadcrumbs_from_span(scope, self)
 
