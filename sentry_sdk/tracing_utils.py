@@ -300,7 +300,8 @@ def add_source(
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
-            set_on_span(SPANDATA.CODE_FILEPATH, in_app_path)
+            if in_app_path:
+                set_on_span(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:
             code_function = frame.f_code.co_name

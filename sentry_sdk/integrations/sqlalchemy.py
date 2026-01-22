@@ -138,9 +138,7 @@ def _get_db_system(name: str) -> "Optional[str]":
 
 
 def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
-    span_streaming = isinstance(span, StreamedSpan)
-
-    if span_streaming:
+    if isinstance(span, StreamedSpan):
         set_on_span = span.set_attribute
     else:
         set_on_span = span.set_data
