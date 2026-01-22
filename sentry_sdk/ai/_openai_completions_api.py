@@ -5,16 +5,20 @@ if TYPE_CHECKING:
         ChatCompletionMessageParam,
         ChatCompletionSystemMessageParam,
     )
-    from typing import Iterable, Union
+    from typing import Iterable
+
+
+def _is_system_instruction(message: "ChatCompletionMessageParam"):
+    return isinstance(message, dict) and message.get("role") == "system"
 
 
 def _get_system_instructions(
-    messages: "Iterable[Union[ChatCompletionMessageParam, str]]",
+    messages: "Iterable[ChatCompletionMessageParam]",
 ) -> "list[ChatCompletionSystemMessageParam]":
-    system_messages = []
+    system_instructions = []
 
     for message in messages:
-        if isinstance(message, dict) and message.get("role") == "system":
-            system_messages.append(message)
+        if _is_system_instruction(message):
+            system_instructions.append(message)
 
-    return system_messages
+    return system_instructions
