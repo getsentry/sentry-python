@@ -186,9 +186,9 @@ def _install_httpx_async_client() -> None:
 
             span.set_http_status(rv.status_code)
             if span_streaming:
-                span.set_data("reason", rv.reason_phrase)
-            else:
                 span.set_attribute("reason", rv.reason_phrase)
+            else:
+                span.set_data("reason", rv.reason_phrase)
 
         with capture_internal_exceptions():
             add_http_request_source(span)
