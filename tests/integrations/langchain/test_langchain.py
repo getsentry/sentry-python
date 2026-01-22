@@ -217,17 +217,21 @@ def test_langchain_agent(
         assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
     if send_default_pii and include_prompts:
-        assert (
-            "You are very powerful"
-            in chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        )
+        assert [
+            {
+                "type": "text",
+                "content": "You are very powerful assistant, but don't know current events",
+            }
+        ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
         assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
-        assert (
-            "You are very powerful"
-            in chat_spans[1]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        )
+        assert [
+            {
+                "type": "text",
+                "content": "You are very powerful assistant, but don't know current events",
+            }
+        ] == json.loads(chat_spans[1]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
         assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
         # Verify tool calls are recorded when PII is enabled

@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
 
 
 try:
@@ -189,20 +190,27 @@ def _get_current_agent() -> "Optional[str]":
     return None
 
 
-def _set_system_prompt(
-    span: "sentry_sdk.tracing.Span", messages: "List[List[BaseMessage]]"
-) -> None:
+def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[TextPart]":
+    system_instructions = []
+
     for list_ in messages:
         for message in list_:
             if message.type == "system":
-                system_prompt = message.content
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                    system_prompt,
-                    unpack=False,
-                )
-                return
+                system_instructions.append(message)
+
+    return system_instructions
+
+
+def _transform_system_instructions(
+    system_instructions: "List[BaseMessage]",
+) -> "List[TextPart]":
+    return [
+        {
+            "type": "text",
+            "content": instruction.content,
+        }
+        for instruction in system_instructions
+    ]
 
 
 class LangchainIntegration(Integration):
@@ -446,7 +454,14 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
-                _set_system_prompt(span, messages)
+                system_instructions = _get_system_instructions(messages)
+                if len(system_instructions) > 0:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                        _transform_system_instructions(system_instructions),
+                        unpack=False,
+                    )
 
                 normalized_messages = []
                 for list_ in messages:
