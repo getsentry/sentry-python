@@ -1426,6 +1426,7 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
+    Span,
 )
 
 from sentry_sdk.traces import (
@@ -1434,5 +1435,4 @@ from sentry_sdk.traces import (
 )
 
 if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
     from sentry_sdk.traces import StreamedSpan

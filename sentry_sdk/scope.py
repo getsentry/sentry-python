@@ -1219,6 +1219,7 @@ class Scope:
         # active span, this is a segment
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
+
             span = StreamedSpan(
                 name=name,
                 attributes=attributes,
