@@ -1278,10 +1278,9 @@ def test_streaming_create_message_with_system_prompt(
         system_instructions = json.loads(
             span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
         )
-        assert (
-            system_instructions
-            == '[{"type": "text", "content": "You are a helpful assistant."}]'
-        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
