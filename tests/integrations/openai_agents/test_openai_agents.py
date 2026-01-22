@@ -193,9 +193,10 @@ async def test_agent_invocation_span(
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
 
     if send_default_pii:
-        assert (
-            invoke_agent_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            == '[{"type": "text", "content": "You are a helpful test assistant."}]'
+        assert invoke_agent_span["data"][
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS
+        ] == safe_serialize(
+            [{"type": "text", "content": "You are a helpful test assistant."}]
         )
         assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
             [
