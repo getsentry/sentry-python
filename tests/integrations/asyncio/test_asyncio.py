@@ -397,6 +397,75 @@ async def test_span_origin(
 
 @minimum_python_38
 @pytest.mark.asyncio
+async def test_task_spans_false(
+    sentry_init,
+    capture_events,
+    uninstall_integration,
+):
+    """
+    Test that task_spans=False disables span creation but retains scope isolation.
+    """
+    uninstall_integration("asyncio")
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            AsyncioIntegration(task_spans=False),
+        ],
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test_no_spans"):
+        with sentry_sdk.start_span(op="root", name="root span"):
+            tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
+            await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+
+    sentry_sdk.flush()
+
+    (transaction_event,) = events
+
+    # Only the root span should be present, no asyncio spans
+    assert len(transaction_event["spans"]) == 1
+    assert transaction_event["spans"][0]["op"] == "root"
+    assert transaction_event["spans"][0]["description"] == "root span"
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_enable_asyncio_integration_with_task_spans_false(
+    sentry_init,
+    capture_events,
+    uninstall_integration,
+):
+    """
+    Test that enable_asyncio_integration() helper works with task_spans=False.
+    """
+    uninstall_integration("asyncio")
+
+    sentry_init(traces_sample_rate=1.0)
+
+    assert "asyncio" not in sentry_sdk.get_client().integrations
+
+    enable_asyncio_integration(task_spans=False)
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+    assert sentry_sdk.get_client().integrations["asyncio"].task_spans is False
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    sentry_sdk.flush()
+
+    (transaction,) = events
+    # No asyncio spans should be created
+    assert not transaction["spans"]
+
+
+@minimum_python_38
+@pytest.mark.asyncio
 async def test_delayed_enable_integration(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
 
