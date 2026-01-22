@@ -746,10 +746,10 @@ def _transform_system_instruction_one_level(
 
         parts = system_instructions.get("parts", [])
         for part in parts:
-            if system_instructions.get("text"):
-                text_parts.append({"type": "text", "content": part["text"]})
+            if part.get("text"):
+                part.append({"type": "text", "content": part["text"]})
             elif isinstance(part, Part) and part.text:
-                text_parts.append({"type": "text", "content": part.text})
+                part.append({"type": "text", "content": part.text})
         return text_parts
 
     return text_parts
