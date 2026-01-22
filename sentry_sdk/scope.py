@@ -1231,48 +1231,6 @@ class Scope:
                 baggage=propagation_context.baggage,
             )
 
-            try_autostart_continuous_profiler()
-
-            sampling_context = {
-                "transaction_context": {
-                    "trace_id": span.trace_id,
-                    "span_id": span.span_id,
-                    "parent_span_id": span.parent_span_id,
-                },
-                "parent_sampled": span.parent_sampled,
-                "attributes": span.attributes,
-            }
-            # Use traces_sample_rate, traces_sampler, and/or inheritance to make a
-            # sampling decision
-            span._set_sampling_decision(sampling_context=sampling_context)
-
-            # update the sample rate in the dsc
-            if span.sample_rate is not None:
-                propagation_context = self.get_active_propagation_context()
-                baggage = propagation_context.baggage
-
-                if baggage is not None:
-                    baggage.sentry_items["sample_rate"] = str(span.sample_rate)
-
-                if span._baggage:
-                    span._baggage.sentry_items["sample_rate"] = str(span.sample_rate)
-
-            if span.sampled:
-                profile = Profile(span.sampled, span._start_timestamp_monotonic_ns)
-                profile._set_initial_sampling_decision(
-                    sampling_context=sampling_context
-                )
-
-                span._profile = profile
-
-                span._continuous_profile = try_profile_lifecycle_trace_start()
-
-                # Typically, the profiler is set when the segment is created. But when
-                # using the auto lifecycle, the profiler isn't running when the first
-                # segment is started. So make sure we update the profiler id on it.
-                if span._continuous_profile is not None:
-                    span._set_profile_id(get_profiler_id())
-
             return span
 
         # This is a child span; take propagation context from the parent span
@@ -1289,6 +1247,29 @@ class Scope:
             )
 
             return span
+
+    def start_profile_on_segment(self, span: "StreamedSpan") -> None:
+        try_autostart_continuous_profiler()
+
+        if not span.sampled:
+            return
+
+        span._continuous_profile = try_profile_lifecycle_trace_start()
+
+        # Typically, the profiler is set when the segment is created. But when
+        # using the auto lifecycle, the profiler isn't running when the first
+        # segment is started. So make sure we update the profiler id on it.
+        if span._continuous_profile is not None:
+            span._set_profile_id(get_profiler_id())
+
+    def update_sample_rate_from_segment(self, span: "StreamedSpan") -> None:
+        # If we had to adjust the sample rate when setting the sampling decision
+        # for the spans, it needs to be updated in the propagation context too
+        propagation_context = self.get_active_propagation_context()
+        baggage = propagation_context.baggage
+
+        if baggage is not None:
+            baggage.sentry_items["sample_rate"] = str(span.sample_rate)
 
     def continue_trace(
         self,

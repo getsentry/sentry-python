@@ -172,6 +172,14 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
 
     continue_trace() doesn't start any spans on its own.
     """
+    # This is set both on the isolation and the current scope for compatibility
+    # reasons. Conceptually, it belongs on the isolation scope, and it also
+    # used to be set there in non-span-first mode. But in span first mode, we
+    # start segments on the current span, like JS does, so we need to set the
+    # propagation context there.
+    sentry_sdk.get_isolation_scope().generate_propagation_context(
+        incoming,
+    )
     return sentry_sdk.get_current_scope().generate_propagation_context(
         incoming,
     )
@@ -307,8 +315,26 @@ class StreamedSpan:
         scope.span = self
         self._context_manager_state = (scope, old_span)
 
-        if self.is_segment() and self._profile is not None:
-            self._profile.__enter__()
+        if self.is_segment():
+            sampling_context = {
+                "transaction_context": {
+                    "trace_id": self.trace_id,
+                    "span_id": self.span_id,
+                    "parent_span_id": self.parent_span_id,
+                },
+                "parent_sampled": self.parent_sampled,
+                "attributes": self.attributes,
+            }
+            # Use traces_sample_rate, traces_sampler, and/or inheritance to make a
+            # sampling decision
+            self._set_sampling_decision(sampling_context=sampling_context)
+
+            # update the sample rate in the dsc
+            if self.sample_rate is not None:
+                if self._baggage:
+                    self._baggage.sentry_items["sample_rate"] = str(self.sample_rate)
+
+            scope.start_profile_on_segment(self)
 
         return self
 
@@ -510,7 +536,7 @@ class StreamedSpan:
         if profiler_id is not None:
             self.set_attribute("sentry.profiler_id", profiler_id)
 
-    def _set_http_status(self, http_status: int) -> None:
+    def set_http_status(self, http_status: int) -> None:
         self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
 
         if http_status >= 400:

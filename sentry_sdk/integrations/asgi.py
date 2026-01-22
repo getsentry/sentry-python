@@ -36,6 +36,7 @@ from sentry_sdk.utils import (
     _get_installed_modules,
 )
 from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 
@@ -185,6 +186,9 @@ class SentryAsgiMiddleware:
                 self._capture_lifespan_exception(exc)
                 raise exc from None
 
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
+
         _asgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as sentry_scope:
@@ -204,48 +208,77 @@ class SentryAsgiMiddleware:
                     )
 
                     method = scope.get("method", "").upper()
-                    transaction = None
-                    if ty in ("http", "websocket"):
-                        if ty == "websocket" or method in self.http_methods_to_capture:
-                            transaction = continue_trace(
-                                _get_headers(scope),
-                                op="{}.server".format(ty),
+                    span = None
+
+                    if span_streaming:
+                        if ty in ("http", "websocket"):
+                            if (
+                                ty == "websocket"
+                                or method in self.http_methods_to_capture
+                            ):
+                                sentry_sdk.traces.continue_trace(_get_headers(scope))
+                                span = sentry_sdk.traces.start_span(
+                                    name=transaction_name
+                                )
+                                span.set_op(f"{ty}.server")
+                        else:
+                            span = sentry_sdk.traces.start_span(
+                                name=transaction_name,
+                            )
+                            span.set_op(OP.HTTP_SERVER)
+
+                        if span is not None:
+                            span.set_source(transaction_source)
+                            span.set_origin(self.span_origin)
+
+                        span_context = span if span is not None else nullcontext()
+
+                    else:
+                        if ty in ("http", "websocket"):
+                            if (
+                                ty == "websocket"
+                                or method in self.http_methods_to_capture
+                            ):
+                                span = continue_trace(
+                                    _get_headers(scope),
+                                    op="{}.server".format(ty),
+                                    name=transaction_name,
+                                    source=transaction_source,
+                                    origin=self.span_origin,
+                                )
+                        else:
+                            span = Transaction(
+                                op=OP.HTTP_SERVER,
                                 name=transaction_name,
                                 source=transaction_source,
                                 origin=self.span_origin,
                             )
-                    else:
-                        transaction = Transaction(
-                            op=OP.HTTP_SERVER,
-                            name=transaction_name,
-                            source=transaction_source,
-                            origin=self.span_origin,
+
+                        if span:
+                            span.set_tag("asgi.type", ty)
+
+                        span_context = (
+                            sentry_sdk.start_transaction(
+                                span,
+                                custom_sampling_context={"asgi_scope": scope},
+                            )
+                            if span is not None
+                            else nullcontext()
                         )
 
-                    if transaction:
-                        transaction.set_tag("asgi.type", ty)
-
-                    transaction_context = (
-                        sentry_sdk.start_transaction(
-                            transaction,
-                            custom_sampling_context={"asgi_scope": scope},
-                        )
-                        if transaction is not None
-                        else nullcontext()
-                    )
-                    with transaction_context:
+                    with span_context:
                         try:
 
                             async def _sentry_wrapped_send(
                                 event: "Dict[str, Any]",
                             ) -> "Any":
-                                if transaction is not None:
+                                if span is not None:
                                     is_http_response = (
                                         event.get("type") == "http.response.start"
                                         and "status" in event
                                     )
                                     if is_http_response:
-                                        transaction.set_http_status(event["status"])
+                                        span.set_http_status(event["status"])
 
                                 return await send(event)
 
