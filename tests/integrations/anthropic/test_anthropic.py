@@ -1075,11 +1075,12 @@ def test_nonstreaming_create_message_with_system_prompt(
 
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-        system_instructions = span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert (
-            system_instructions
-            == '[{"type": "text", "content": "You are a helpful assistant."}]'
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
         )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -1158,11 +1159,12 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
 
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-        system_instructions = span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert (
-            system_instructions
-            == '[{"type": "text", "content": "You are a helpful assistant."}]'
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
         )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -1273,7 +1275,9 @@ def test_streaming_create_message_with_system_prompt(
 
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-        system_instructions = span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
         assert (
             system_instructions
             == '[{"type": "text", "content": "You are a helpful assistant."}]'
@@ -1392,11 +1396,12 @@ async def test_streaming_create_message_with_system_prompt_async(
 
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
-        system_instructions = span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert (
-            system_instructions
-            == '[{"type": "text", "content": "You are a helpful assistant."}]'
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
         )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
