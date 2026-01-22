@@ -257,25 +257,23 @@ def tiktoken_encoding_if_installed():
         pytest.param(
             [
                 {
-                    "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
-                {"type": "message", "role": "user", "content": "hello"},
+                {"role": "user", "content": "hello"},
             ],
             id="blocks",
         ),
         pytest.param(
             [
                 {
-                    "type": "message",
                     "role": "system",
                     "content": [
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
-                {"type": "message", "role": "user", "content": "hello"},
+                {"role": "user", "content": "hello"},
             ],
             id="parts",
         ),
@@ -404,25 +402,23 @@ def test_streaming_chat_completion(
         pytest.param(
             [
                 {
-                    "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
-                {"type": "message", "role": "user", "content": "hello"},
+                {"role": "user", "content": "hello"},
             ],
             id="blocks",
         ),
         pytest.param(
             [
                 {
-                    "type": "message",
                     "role": "system",
                     "content": [
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
-                {"type": "message", "role": "user", "content": "hello"},
+                {"role": "user", "content": "hello"},
             ],
             id="parts",
         ),
