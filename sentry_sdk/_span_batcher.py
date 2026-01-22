@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 class SpanBatcher(Batcher["StreamedSpan"]):
     # TODO[span-first]: size-based flushes
+    # TODO[span-first]: adjust flush/drop defaults
     MAX_BEFORE_FLUSH = 1000
     MAX_BEFORE_DROP = 5000
     FLUSH_WAIT_TIME = 5.0
