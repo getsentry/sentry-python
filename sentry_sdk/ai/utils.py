@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import sentry_sdk
 from sentry_sdk.utils import logger
 from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 # Maximum characters when only a single message is left after bytes truncation
@@ -532,7 +533,14 @@ def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str,
 
 
 def get_start_span_function() -> "Callable[..., Any]":
+    client = sentry_sdk.get_client()
+
     current_span = sentry_sdk.get_current_span()
+    if isinstance(current_span, StreamedSpan) or has_span_streaming_enabled(
+        client.options
+    ):
+        return sentry_sdk.traces.start_span
+
     transaction_exists = (
         current_span is not None and current_span.containing_transaction is not None
     )
