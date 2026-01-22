@@ -579,13 +579,6 @@ class Scope:
 
         # If we have an active span, return traceparent from there
         if has_tracing_enabled(client.options) and self.span is not None:
-            if isinstance(self.span, StreamedSpan):
-                warnings.warn(
-                    "Scope.get_traceparent is not available in streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                return None
             return self.span.to_traceparent()
 
         # else return traceparent from the propagation context
@@ -600,13 +593,6 @@ class Scope:
 
         # If we have an active span, return baggage from there
         if has_tracing_enabled(client.options) and self.span is not None:
-            if isinstance(self.span, StreamedSpan):
-                warnings.warn(
-                    "Scope.get_baggage is not available in streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                return None
             return self.span.to_baggage()
 
         # else return baggage from the propagation context
@@ -1226,6 +1212,7 @@ class Scope:
         # TODO: rename to start_span once we drop the old API
         if parent_span is None:
             # Get currently active span
+            # TODO[span-first]: should this be current scope?
             parent_span = self.span or self.get_isolation_scope().span
 
         # If no specific parent_span provided and there is no currently

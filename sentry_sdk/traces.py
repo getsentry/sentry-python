@@ -50,7 +50,6 @@ TODO[span-first] / notes
 - noop spans
 - iso
 - check where we're auto filtering out spans in integrations (health checks etc?)
-- two top-level start_spans: they'll share the same trace now, before: two start_transactions would each set their own scope
 
 Notes:
 - removed ability to provide a start_timestamp
@@ -63,9 +62,80 @@ def start_span(
     attributes: "Optional[Attributes]" = None,
     parent_span: "Optional[StreamedSpan]" = None,
 ) -> "StreamedSpan":
+    """
+    Start a span.
+
+    The span's parent, unless provided explicitly via the `parent_span` argument,
+    will be the currently active span, if any.
+
+    `start_span()` can either be used as context manager or you can use the span
+    object it returns and explicitly start and end it via the `span.start()` and
+    `span.end()` interface. The following is equivalent:
+
+    ```python
+    import sentry_sdk
+
+    with sentry_sdk.traces.start_span(name="My Span"):
+        # do something
+
+    # The span automatically finishes once the `with` block is exited
+    ```
+
+    ```python
+    import sentry_sdk
+
+    span = sentry_sdk.traces.start_span(name="My Span")
+    span.start()
+    # do something
+    span.end()
+    ```
+
+    To continue a trace from another service, call
+    sentry_sdk.traces.continue_trace() prior to creating the top-level span.
+
+    :param name: The name to identify this span by.
+    :type name: str
+    :param attributes: Key-value attributes to set on the span from the start.
+        When provided via the `start_span()` function, these will also be
+        accessible in the traces sampler.
+    :type attributes: "Optional[Attributes]"
+    :param parent_span: A span instance that the new span should be parented to.
+        If not provided, the parent will be set to the currently active span,
+        if any.
+    :type parent_span: "Optional[StreamedSpan]"
+    :return: A span.
+    :rtype: StreamedSpan
+    """
     return sentry_sdk.get_current_scope().start_streamed_span(
         name, attributes, parent_span
     )
+
+
+def continue_trace(incoming: "dict[str, Any]") -> None:
+    """
+    Continue a trace from headers or environment variables.
+
+    This function sets the propagation context on the scope. Any span started
+    in the updated scope will belong under the trace extracted from the
+    provided propagation headers or environment variables.
+
+    continue_trace() doesn't start any spans on its own.
+    """
+    return sentry_sdk.get_current_scope().generate_propagation_context(
+        incoming,
+    )
+
+
+def new_trace() -> None:
+    """
+    Resets the propagation context, forcing a new trace.
+
+    This function sets the propagation context on the scope. Any span started
+    in the updated scope will start its own trace.
+
+    new_trace() doesn't start any spans on its own.
+    """
+    sentry_sdk.get_current_scope().set_new_propagation_context()
 
 
 class SpanStatus(str, Enum):
@@ -252,6 +322,15 @@ class StreamedSpan:
             self._end(scope=scope)
             scope.span = old_span
 
+    def start(self):
+        """
+        Start this span.
+
+        Only usable if the span was not started via the `with start_span():`
+        context manager, since that starts it automatically.
+        """
+        self.__enter__()
+
     def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         """
         Finish this span and queue it for sending.
@@ -374,6 +453,25 @@ class StreamedSpan:
     def dynamic_sampling_context(self) -> "dict[str, str]":
         return self.segment._get_baggage().dynamic_sampling_context()
 
+    def to_traceparent(self) -> str:
+        if self.sampled is True:
+            sampled = "1"
+        elif self.sampled is False:
+            sampled = "0"
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
+
+    def to_baggage(self) -> "Optional[Baggage]":
+        if self.segment:
+            return self.segment._get_baggage()
+        return None
+
     def _update_active_thread(self) -> None:
         thread_id, thread_name = get_current_thread_meta()
         self._set_thread(thread_id, thread_name)
@@ -482,8 +580,3 @@ class StreamedSpan:
             self.set_attribute("sentry.segment.id", self.segment.span_id)
 
         self.set_attribute("sentry.segment.name", self.segment.name)
-
-
-def continue_trace(incoming: "dict[str, Any]") -> None:
-    # XXX[span-first]: conceptually, this should be set on the iso scope
-    sentry_sdk.get_current_scope().set_propagation_context(incoming)
