@@ -83,12 +83,13 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
         return
 
     system_instructions = _get_system_instructions(messages)
-    set_data_normalized(
-        span,
-        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-        _transform_system_instructions(system_instructions),
-        unpack=False,
-    )
+    if len(system_instructions) > 0:
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            _transform_system_instructions(system_instructions),
+            unpack=False,
+        )
 
     try:
         formatted_messages = []
