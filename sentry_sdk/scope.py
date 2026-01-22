@@ -1272,7 +1272,7 @@ class Scope:
                 # using the auto lifecycle, the profiler isn't running when the first
                 # segment is started. So make sure we update the profiler id on it.
                 if span._continuous_profile is not None:
-                    span._set_profiler_id(get_profiler_id())
+                    span._set_profile_id(get_profiler_id())
 
             return span
 

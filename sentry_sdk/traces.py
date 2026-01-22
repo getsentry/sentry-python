@@ -290,7 +290,7 @@ class StreamedSpan:
         self._continuous_profile = None
 
         self._update_active_thread()
-        self._set_profiler_id(get_profiler_id())
+        self._set_profile_id(get_profiler_id())
 
     def __repr__(self) -> str:
         return (
@@ -507,9 +507,9 @@ class StreamedSpan:
             if thread_name is not None:
                 self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
-    def _set_profiler_id(self, profiler_id: "Optional[str]") -> None:
+    def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
         if profiler_id is not None:
-            self.set_attribute(SPANDATA.PROFILER_ID, profiler_id)
+            self.set_attribute("sentry.profiler_id", profiler_id)
 
     def _set_http_status(self, http_status: int) -> None:
         self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
