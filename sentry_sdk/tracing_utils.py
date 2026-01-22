@@ -125,7 +125,8 @@ def record_sql_queries(
     span_origin: str = "manual",
 ) -> "Generator[sentry_sdk.tracing.Span, None, None]":
     # TODO: Bring back capturing of params by default
-    if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
+    client = sentry_sdk.get_client()
+    if client.options["_experiments"].get("record_sql_params", False):
         if not params_list or params_list == [None]:
             params_list = None
 
@@ -134,6 +135,8 @@ def record_sql_queries(
     else:
         params_list = None
         paramstyle = None
+
+    span_streaming = has_span_streaming_enabled(client.options)
 
     query = _format_sql(cursor, query)
 
@@ -150,13 +153,23 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    with sentry_sdk.start_span(
-        op=OP.DB,
-        name=query,
-        origin=span_origin,
-    ) as span:
+    if span_streaming:
+        span = sentry_sdk.traces.start_span(name=query)
+        span.set_op(OP.DB)
+        span.set_origin(span_origin)
+    else:
+        span = sentry_sdk.start_span(
+            op=OP.DB,
+            name=query,
+            origin=span_origin,
+        )
+
+    with span:
         for k, v in data.items():
-            span.set_data(k, v)
+            if span_streaming:
+                span.set_attribute(k, v)
+            else:
+                span.set_data(k, v)
         yield span
 
 
