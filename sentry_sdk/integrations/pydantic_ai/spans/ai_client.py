@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import TextPart as SentryTextPart
 
 try:
-    from pydantic_ai.messages import (  # type: ignore
+    from pydantic_ai.messages import (
         BaseToolCallPart,
         BaseToolReturnPart,
         SystemPromptPart,
