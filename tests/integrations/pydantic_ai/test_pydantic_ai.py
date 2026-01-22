@@ -1249,7 +1249,8 @@ async def test_invoke_agent_with_instructions(
     if send_default_pii and include_prompts:
         system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
         assert json.loads(system_instructions) == [
-            {"type": "text", "content": "System prompt"}
+            {"type": "text", "content": "System prompt"},
+            {"type": "text", "content": "Instruction 1\nInstruction 2"},
         ]
     else:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]

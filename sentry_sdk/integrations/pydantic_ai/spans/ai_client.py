@@ -51,29 +51,40 @@ except ImportError:
 
 
 def _transform_system_instructions(
-    system_instructions: "list[SystemPromptPart]",
+    permanent_instructions: "list[SystemPromptPart]",
+    current_instructions: "list[str]",
 ) -> "list[SentryTextPart]":
     return [
         {
             "type": "text",
             "content": instruction.content,
         }
-        for instruction in system_instructions
+        for instruction in permanent_instructions
+    ] + [
+        {
+            "type": "text",
+            "content": instruction,
+        }
+        for instruction in current_instructions
     ]
 
 
 def _get_system_instructions(
     messages: "list[ModelMessage]",
-) -> "list[SystemPromptPart]":
-    system_instructions = []
+) -> "tuple[list[SystemPromptPart], list[str]]":
+    permanent_instructions = []
+    current_instructions = []
 
     for msg in messages:
         if hasattr(msg, "parts"):
             for part in msg.parts:
                 if SystemPromptPart and isinstance(part, SystemPromptPart):
-                    system_instructions.append(part)
+                    permanent_instructions.append(part)
 
-    return system_instructions
+            if hasattr(msg, "instructions") and msg.instructions is not None:
+                current_instructions.append(msg.instructions)
+
+    return permanent_instructions, current_instructions
 
 
 def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
@@ -84,12 +95,14 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
     if not messages:
         return
 
-    system_instructions = _get_system_instructions(messages)
-    if len(system_instructions) > 0:
+    permanent_instructions, current_instructions = _get_system_instructions(messages)
+    if len(permanent_instructions) > 0 or len(current_instructions) > 0:
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            _transform_system_instructions(system_instructions),
+            _transform_system_instructions(
+                permanent_instructions, current_instructions
+            ),
             unpack=False,
         )
 
