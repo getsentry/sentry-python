@@ -192,7 +192,7 @@ def _transform_system_instructions(
     return [
         {
             "type": "text",
-            "content": instruction["text"],  # type: ignore
+            "content": instruction["text"],
         }
         for instruction in system_instructions
         if isinstance(instruction, dict) and "text" in instruction
