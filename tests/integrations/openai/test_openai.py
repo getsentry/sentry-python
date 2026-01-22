@@ -17,11 +17,16 @@ from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
-from openai.types.chat.chat_completion_message_tool_call import (
-    ChatCompletionMessageToolCall,
-    Function as ToolCallFunction,
-)
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
+
+SKIP_TOOL_CALL_TESTS = False
+try:
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCall,
+        Function as ToolCallFunction,
+    )
+except ImportError:
+    SKIP_TOOL_CALL_TESTS = True
 
 SKIP_RESPONSES_TESTS = False
 
@@ -1730,6 +1735,9 @@ def test_response_text_is_string_not_dict(sentry_init, capture_events):
         pass
 
 
+@pytest.mark.skipif(
+    SKIP_TOOL_CALL_TESTS, reason="Requires OpenAI types not available in older versions"
+)
 def test_chat_completion_with_tool_calls(sentry_init, capture_events):
     """Test that tool calls are properly extracted to gen_ai.response.tool_calls."""
     sentry_init(
@@ -1802,6 +1810,9 @@ def test_chat_completion_with_tool_calls(sentry_init, capture_events):
     assert parsed_tool_calls[0]["function"]["name"] == "get_weather"
 
 
+@pytest.mark.skipif(
+    SKIP_TOOL_CALL_TESTS, reason="Requires OpenAI types not available in older versions"
+)
 def test_chat_completion_with_content_and_tool_calls(sentry_init, capture_events):
     """Test that both content and tool calls are captured when both are present."""
     sentry_init(
