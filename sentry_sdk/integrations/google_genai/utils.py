@@ -725,6 +725,7 @@ def extract_finish_reasons(
 
 def _transform_system_instruction_one_level(
     system_instructions: "ContentUnionDict",
+    can_be_content: bool,
 ) -> "list[TextPart]":
     text_parts: "list[TextPart]" = []
 
@@ -734,7 +735,7 @@ def _transform_system_instruction_one_level(
     if isinstance(system_instructions, Part) and system_instructions.text:
         return [{"type": "text", "content": system_instructions.text}]
 
-    if isinstance(system_instructions, Content):
+    if can_be_content and isinstance(system_instructions, Content):
         for part in system_instructions.parts or []:
             if part.text:
                 text_parts.append({"type": "text", "content": part.text})
@@ -744,6 +745,7 @@ def _transform_system_instruction_one_level(
         if system_instructions.get("text"):
             return [{"type": "text", "content": system_instructions["text"]}]
 
+    elif can_be_content and isinstance(system_instructions, dict):
         parts = system_instructions.get("parts", [])
         for part in parts:
             if isinstance(part, Part) and part.text:
@@ -763,14 +765,18 @@ def _transform_system_instructions(
     if isinstance(system_instructions, list):
         text_parts = list(
             chain.from_iterable(
-                _transform_system_instruction_one_level(instructions)
+                _transform_system_instruction_one_level(
+                    instructions, can_be_content=False
+                )
                 for instructions in system_instructions
             )
         )
 
         return text_parts
 
-    return _transform_system_instruction_one_level(system_instructions)
+    return _transform_system_instruction_one_level(
+        system_instructions, can_be_content=True
+    )
 
 
 def set_span_data_for_request(

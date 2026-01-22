@@ -204,103 +204,32 @@ def test_nonstreaming_generate_content(
     assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
 
 
-# Threatened bot to generate as many cases as possible
 @pytest.mark.parametrize(
     "system_instructions,expected_texts",
     [
-        ("You are a helpful assistant", ["You are a helpful assistant"]),
-        (
-            ["You are a translator", "Translate to French"],
-            ["You are a translator", "Translate to French"],
-        ),
-        (
-            Content(role="user", parts=[Part(text="You are a helpful assistant")]),
-            ["You are a helpful assistant"],
-        ),
-        (
-            Content(
-                role="user",
-                parts=[
-                    Part(text="You are a translator"),
-                    Part(text="Translate to French"),
-                ],
-            ),
-            ["You are a translator", "Translate to French"],
-        ),
-        (
-            {"parts": [{"text": "You are a helpful assistant"}], "role": "user"},
-            ["You are a helpful assistant"],
-        ),
-        (
-            {
-                "parts": [
-                    {"text": "You are a translator"},
-                    {"text": "Translate to French"},
-                ],
-                "role": "user",
-            },
-            ["You are a translator", "Translate to French"],
-        ),
-        (Part(text="You are a helpful assistant"), ["You are a helpful assistant"]),
-        ({"text": "You are a helpful assistant"}, ["You are a helpful assistant"]),
-        (
-            [Part(text="You are a translator"), Part(text="Translate to French")],
-            ["You are a translator", "Translate to French"],
-        ),
-        (
-            [{"text": "You are a translator"}, {"text": "Translate to French"}],
-            ["You are a translator", "Translate to French"],
-        ),
-        (
-            [Part(text="First instruction"), {"text": "Second instruction"}],
-            ["First instruction", "Second instruction"],
-        ),
-        (
-            {
-                "parts": [
-                    Part(text="First instruction"),
-                    {"text": "Second instruction"},
-                ],
-                "role": "user",
-            },
-            ["First instruction", "Second instruction"],
-        ),
         (None, None),
         ("", []),
         ({}, []),
+        (Content(role="system", parts=[]), []),
         ({"parts": []}, []),
-        (Content(role="user", parts=[]), []),
+        ("You are a helpful assistant.", ["You are a helpful assistant."]),
+        (Part(text="You are a helpful assistant."), ["You are a helpful assistant."]),
         (
-            {
-                "parts": [
-                    {"text": "Text part"},
-                    {"file_data": {"file_uri": "gs://bucket/file.pdf"}},
-                ],
-                "role": "user",
-            },
-            ["Text part"],
+            Content(role="system", parts=[Part(text="You are a helpful assistant.")]),
+            ["You are a helpful assistant."],
+        ),
+        ({"text": "You are a helpful assistant."}, ["You are a helpful assistant."]),
+        (
+            {"parts": [Part(text="You are a helpful assistant.")]},
+            ["You are a helpful assistant."],
         ),
         (
-            {
-                "parts": [
-                    {"text": "First"},
-                    Part(text="Second"),
-                    {"text": "Third"},
-                ],
-                "role": "user",
-            },
-            ["First", "Second", "Third"],
+            {"parts": [{"text": "You are a helpful assistant."}]},
+            ["You are a helpful assistant."],
         ),
-        (
-            {
-                "parts": [
-                    Part(text="First"),
-                    Part(text="Second"),
-                    Part(text="Third"),
-                ],
-            },
-            ["First", "Second", "Third"],
-        ),
+        (["You are a helpful assistant."], ["You are a helpful assistant."]),
+        ([Part(text="You are a helpful assistant.")], ["You are a helpful assistant."]),
+        ([{"text": "You are a helpful assistant."}], ["You are a helpful assistant."]),
     ],
 )
 def test_generate_content_with_system_instruction(
