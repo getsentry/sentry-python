@@ -282,7 +282,10 @@ def _set_responses_api_input_data(
     explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
     system_instructions = _get_system_instructions_responses(messages)
     if (
-        (_is_given(explicit_instructions) or len(system_instructions) > 0)
+        (
+            (explicit_instructions is not None and _is_given(explicit_instructions))
+            or len(system_instructions) > 0
+        )
         and should_send_default_pii()
         and integration.include_prompts
     ):
@@ -393,6 +396,9 @@ def _set_completions_api_input_data(
                 set_data_normalized(
                     span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
                 )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    _commmon_set_input_data(span, kwargs)
 
 
 def _set_embeddings_input_data(
