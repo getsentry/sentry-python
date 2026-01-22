@@ -7,6 +7,7 @@ from sentry_sdk.tracing_utils import (
     should_propagate_trace,
     add_http_request_source,
     add_sentry_baggage_to_headers,
+    has_span_streaming_enabled,
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -47,27 +48,46 @@ class HttpxIntegration(Integration):
 def _install_httpx_client() -> None:
     real_send = Client.send
 
-    @ensure_integration_enabled(HttpxIntegration, real_send)
     def send(self: "Client", request: "Request", **kwargs: "Any") -> "Response":
+        client = sentry_sdk.get_client()
+        if client.get_integration(HttpxIntegration) is None:
+            return real_send(self, request, **kwargs)
+
+        span_streaming = has_span_streaming_enabled(client.options)
+
         parsed_url = None
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        with start_span(
-            op=OP.HTTP_CLIENT,
-            name="%s %s"
-            % (
-                request.method,
-                parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
-            ),
-            origin=HttpxIntegration.origin,
-        ) as span:
+        if span_streaming:
+            span = sentry_sdk.traces.start_span(
+                name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}"
+            )
+            span.set_op(OP.HTTP_CLIENT)
+            span.set_origin(HttpxIntegration.origin)
+
+            span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
+            if parsed_url is not None:
+                span.set_attribute("url", parsed_url.url)
+                span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
+                span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        else:
+            span = start_span(
+                op=OP.HTTP_CLIENT,
+                name="%s %s"
+                % (
+                    request.method,
+                    parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+                ),
+                origin=HttpxIntegration.origin,
+            )
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
                 span.set_data("url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
+        with span:
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
                     key,
@@ -87,7 +107,10 @@ def _install_httpx_client() -> None:
             rv = real_send(self, request, **kwargs)
 
             span.set_http_status(rv.status_code)
-            span.set_data("reason", rv.reason_phrase)
+            if span_streaming:
+                span.set_attribute("reason", rv.reason_phrase)
+            else:
+                span.set_data("reason", rv.reason_phrase)
 
         with capture_internal_exceptions():
             add_http_request_source(span)
@@ -103,28 +126,44 @@ def _install_httpx_async_client() -> None:
     async def send(
         self: "AsyncClient", request: "Request", **kwargs: "Any"
     ) -> "Response":
-        if sentry_sdk.get_client().get_integration(HttpxIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(HttpxIntegration) is None:
             return await real_send(self, request, **kwargs)
+
+        span_streaming = has_span_streaming_enabled(client.options)
 
         parsed_url = None
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        with start_span(
-            op=OP.HTTP_CLIENT,
-            name="%s %s"
-            % (
-                request.method,
-                parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
-            ),
-            origin=HttpxIntegration.origin,
-        ) as span:
+        if span_streaming:
+            span = sentry_sdk.traces.start_span(
+                name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}"
+            )
+            span.set_op(OP.HTTP_CLIENT)
+            span.set_origin(HttpxIntegration.origin)
+            span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
+            if parsed_url is not None:
+                span.set_attribute("url", parsed_url.url)
+                span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
+                span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        else:
+            span = start_span(
+                op=OP.HTTP_CLIENT,
+                name="%s %s"
+                % (
+                    request.method,
+                    parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+                ),
+                origin=HttpxIntegration.origin,
+            )
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
                 span.set_data("url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
+        with span:
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
                     key,
@@ -146,7 +185,10 @@ def _install_httpx_async_client() -> None:
             rv = await real_send(self, request, **kwargs)
 
             span.set_http_status(rv.status_code)
-            span.set_data("reason", rv.reason_phrase)
+            if span_streaming:
+                span.set_data("reason", rv.reason_phrase)
+            else:
+                span.set_attribute("reason", rv.reason_phrase)
 
         with capture_internal_exceptions():
             add_http_request_source(span)
