@@ -1693,6 +1693,8 @@ class Scope:
             self._gen_ai_original_message_count.update(
                 scope._gen_ai_original_message_count
             )
+        if scope._gen_ai_conversation_id:
+            self._gen_ai_conversation_id = scope._gen_ai_conversation_id
         if scope._span:
             self._span = scope._span
         if scope._attachments:
