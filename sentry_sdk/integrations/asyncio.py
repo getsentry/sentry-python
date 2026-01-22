@@ -64,9 +64,7 @@ def patch_asyncio() -> None:
                 integration = sentry_sdk.get_client().get_integration(
                     AsyncioIntegration
                 )
-                task_spans = (
-                    integration.task_spans if integration is not None else True
-                )
+                task_spans = integration.task_spans if integration else False
 
                 with sentry_sdk.isolation_scope():
                     with (

@@ -402,9 +402,6 @@ async def test_task_spans_false(
     capture_events,
     uninstall_integration,
 ):
-    """
-    Test that task_spans=False disables span creation but retains scope isolation.
-    """
     uninstall_integration("asyncio")
 
     sentry_init(
@@ -417,18 +414,14 @@ async def test_task_spans_false(
     events = capture_events()
 
     with sentry_sdk.start_transaction(name="test_no_spans"):
-        with sentry_sdk.start_span(op="root", name="root span"):
-            tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
-            await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+        tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     sentry_sdk.flush()
 
     (transaction_event,) = events
 
-    # Only the root span should be present, no asyncio spans
-    assert len(transaction_event["spans"]) == 1
-    assert transaction_event["spans"][0]["op"] == "root"
-    assert transaction_event["spans"][0]["description"] == "root span"
+    assert not transaction_event["spans"]
 
 
 @minimum_python_38
@@ -460,7 +453,6 @@ async def test_enable_asyncio_integration_with_task_spans_false(
     sentry_sdk.flush()
 
     (transaction,) = events
-    # No asyncio spans should be created
     assert not transaction["spans"]
 
 
