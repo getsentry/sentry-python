@@ -291,6 +291,16 @@ def test_nonstreaming_generate_content(
             },
             ["First", "Second", "Third"],
         ),
+        (
+            {
+                "parts": [
+                    Part(text="First"),
+                    Part(text="Second"),
+                    Part(text="Third"),
+                ],
+            },
+            ["First", "Second", "Third"],
+        ),
     ],
 )
 def test_generate_content_with_system_instruction(
