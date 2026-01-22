@@ -26,6 +26,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, List, Dict
     from pydantic_ai.usage import RequestUsage  # type: ignore
+    from pydantic_ai.messages import ModelMessage  # type: ignore
+    from sentry_sdk._types import TextPart as SentryTextPart
 
 try:
     from pydantic_ai.messages import (  # type: ignore
@@ -48,18 +50,28 @@ except ImportError:
     BinaryContent = None
 
 
-def _set_system_instruction(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
+def _transform_system_instructions(
+    system_instructions: "list[SystemPromptPart]",
+) -> "list[SentryTextPart]":
+    return [
+        {
+            "type": "text",
+            "content": instruction.content,
+        }
+        for instruction in system_instructions
+    ]
+
+
+def _get_system_instructions(messages: "list[ModelMessage]") -> "list[ModelMessage]":
+    system_instructions = []
+
     for msg in messages:
-        for part in msg.parts:
-            if SystemPromptPart and isinstance(part, SystemPromptPart):
-                system_prompt = part.content
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                    system_prompt,
-                    unpack=False,
-                )
-                return
+        if hasattr(msg, "parts"):
+            for part in msg.parts:
+                if SystemPromptPart and isinstance(part, SystemPromptPart):
+                    system_instructions.append(part)
+
+    return system_instructions
 
 
 def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
@@ -69,6 +81,14 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
 
     if not messages:
         return
+
+    system_instructions = _get_system_instructions(messages)
+    set_data_normalized(
+        span,
+        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+        _transform_system_instructions(system_instructions),
+        unpack=False,
+    )
 
     try:
         formatted_messages = []
@@ -236,7 +256,6 @@ def ai_client_span(
 
     # Set input messages (full conversation history)
     if messages:
-        _set_system_instruction(span, messages)
         _set_input_messages(span, messages)
 
     return span
