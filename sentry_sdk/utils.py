@@ -2060,9 +2060,6 @@ def format_attribute(val: "Any") -> "AttributeValue":
     they're serialized further into the actual format the protocol expects:
     https://develop.sentry.dev/sdk/telemetry/attributes/
     """
-    if isinstance(val, Enum):
-        val = val.value
-
     if isinstance(val, (bool, int, float, str)):
         return val
 

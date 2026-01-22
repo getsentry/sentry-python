@@ -123,7 +123,7 @@ def record_sql_queries(
     executemany: bool,
     record_cursor_repr: bool = False,
     span_origin: str = "manual",
-) -> "Generator[sentry_sdk.tracing.Span, None, None]":
+) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
     # TODO: Bring back capturing of params by default
     client = sentry_sdk.get_client()
     if client.options["_experiments"].get("record_sql_params", False):
@@ -153,8 +153,9 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
+    span: "Optional[Union[Span, StreamedSpan]]" = None
     if span_streaming:
-        span = sentry_sdk.traces.start_span(name=query)
+        span = sentry_sdk.traces.start_span(name=query or "query")
         span.set_op(OP.DB)
         span.set_origin(span_origin)
     else:
@@ -166,7 +167,7 @@ def record_sql_queries(
 
     with span:
         for k, v in data.items():
-            if span_streaming:
+            if isinstance(span, StreamedSpan):
                 span.set_attribute(k, v)
             else:
                 span.set_data(k, v)
@@ -233,7 +234,7 @@ def _should_be_included(
 
 
 def add_source(
-    span: "sentry_sdk.tracing.Span",
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
     project_root: "Optional[str]",
     in_app_include: "Optional[list[str]]",
     in_app_exclude: "Optional[list[str]]",
@@ -271,20 +272,25 @@ def add_source(
         frame = None
 
     # Set the data
+    if isinstance(span, StreamedSpan):
+        set_on_span = span.set_attribute
+    else:
+        set_on_span = span.set_data
+
     if frame is not None:
         try:
             lineno = frame.f_lineno
         except Exception:
             lineno = None
         if lineno is not None:
-            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+            set_on_span(SPANDATA.CODE_LINENO, frame.f_lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+            set_on_span(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -294,7 +300,7 @@ def add_source(
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
-            span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+            set_on_span(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -302,7 +308,7 @@ def add_source(
             code_function = None
 
         if code_function is not None:
-            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            set_on_span(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
@@ -335,7 +341,9 @@ def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
     )
 
 
-def add_http_request_source(span: "sentry_sdk.tracing.Span") -> None:
+def add_http_request_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+) -> None:
     """
     Adds OTel compatible source code information to a span for an outgoing HTTP request
     """
@@ -932,6 +940,14 @@ def create_span_decorator(
                 )
                 return await f(*args, **kwargs)
 
+            if isinstance(current_span, StreamedSpan):
+                warnings.warn(
+                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return await f(*args, **kwargs)
+
             span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
@@ -966,6 +982,14 @@ def create_span_decorator(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
                     qualname_from_function(f),
+                )
+                return f(*args, **kwargs)
+
+            if isinstance(current_span, StreamedSpan):
+                warnings.warn(
+                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
                 )
                 return f(*args, **kwargs)
 

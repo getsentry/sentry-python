@@ -8,6 +8,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.tracing import Span
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
     from typing import List
+    from typing import Union
 
     from sentry_sdk._types import Event, Hint
 
@@ -103,6 +105,7 @@ def _install_httplib() -> None:
         with capture_internal_exceptions():
             parsed_url = parse_url(real_url, sanitize=False)
 
+        span: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
             span = sentry_sdk.traces.start_span(
                 name=f"{method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}"
@@ -258,6 +261,7 @@ def _install_subprocess() -> None:
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
 
+        span: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
             span = sentry_sdk.traces.start_span(
                 name=description,
@@ -286,14 +290,14 @@ def _install_subprocess() -> None:
                 env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
             if cwd:
-                if span_streaming:
+                if isinstance(span, StreamedSpan):
                     span.set_attribute("subprocess.cwd", cwd)
                 else:
                     span.set_data("subprocess.cwd", cwd)
 
             rv = old_popen_init(self, *a, **kw)
 
-            if span_streaming:
+            if isinstance(span, StreamedSpan):
                 span.set_attribute("subprocess.pid", self.pid)
             else:
                 span.set_tag("subprocess.pid", self.pid)
@@ -311,11 +315,12 @@ def _install_subprocess() -> None:
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
 
+        span: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
             span = sentry_sdk.traces.start_span(name="subprocess popen")
             span.set_op(OP.SUBPROCESS_WAIT)
             span.set_origin("auto.subprocess.stdlib.subprocess")
-            span.set_tag("subprocess.pid", self.pid)
+            span.set_attribute("subprocess.pid", self.pid)
         else:
             span = sentry_sdk.start_span(
                 op=OP.SUBPROCESS_WAIT,
@@ -337,13 +342,14 @@ def _install_subprocess() -> None:
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
 
+        span: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
             span = sentry_sdk.traces.start_span(
                 name="subprocess communicate",
             )
             span.set_op(OP.SUBPROCESS_COMMUNICATE)
             span.set_origin("auto.subprocess.stdlib.subprocess")
-            span.set_tag("subprocess.pid", self.pid)
+            span.set_attribute("subprocess.pid", self.pid)
         else:
             span = sentry_sdk.start_span(
                 op=OP.SUBPROCESS_COMMUNICATE,

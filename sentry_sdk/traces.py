@@ -32,6 +32,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue, SamplingContext
+    from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
     from sentry_sdk.scope import Scope
 
     P = ParamSpec("P")
@@ -297,7 +298,7 @@ class StreamedSpan:
 
         self._flags: dict[str, bool] = {}
         self._profile = None
-        self._continuous_profile = None
+        self._continuous_profile: "Optional[ContinuousProfile]" = None
 
         self._update_active_thread()
         self._set_profile_id(get_profiler_id())
@@ -356,14 +357,14 @@ class StreamedSpan:
             self._end(scope=scope)
             scope.span = old_span
 
-    def start(self):
+    def start(self) -> "StreamedSpan":
         """
         Start this span.
 
         Only usable if the span was not started via the `with start_span():`
         context manager, since that starts it automatically.
         """
-        self.__enter__()
+        return self.__enter__()
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         """
@@ -380,7 +381,7 @@ class StreamedSpan:
         except AttributeError:
             pass
 
-        self.__exit__(ty=None, value=None, tb=None)
+        self.__exit__(None, None, None)
 
     def _end(
         self,
@@ -457,13 +458,16 @@ class StreamedSpan:
         if len(self._flags) < FLAGS_CAPACITY:
             self._flags[flag] = result
 
-    def set_op(self, op: "Union[OP, str]") -> None:
+    def set_op(self, op: str) -> None:
         self.set_attribute("sentry.op", op)
 
     def set_origin(self, origin: str) -> None:
         self.set_attribute("sentry.origin", origin)
 
-    def set_source(self, source: "SegmentSource") -> None:
+    def set_source(self, source: "Union[str, SegmentSource]") -> None:
+        if isinstance(source, Enum):
+            source = source.value
+
         self.set_attribute("sentry.span.source", source)
 
     def is_segment(self) -> bool:
@@ -626,7 +630,7 @@ class StreamedSpan:
                 f"[Tracing] Discarding {self.name} because it's not included in the random sample (sampling rate = {self.sample_rate})"
             )
 
-    def _set_segment_attributes(self):
+    def _set_segment_attributes(self) -> None:
         if not self.is_segment():
             self.set_attribute("sentry.segment.id", self.segment.span_id)
 

@@ -40,6 +40,8 @@ if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
 
     from sentry_sdk._types import Event, HttpStatusCodeRange
+    from sentry_sdk.tracing import Span
+    from sentry_sdk.traces import StreamedSpan
 
 try:
     import starlette  # type: ignore
@@ -169,6 +171,7 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
 
         middleware_name = app.__class__.__name__
 
+        middleware_span: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
             middleware_span = sentry_sdk.traces.start_span(name=middleware_name)
             middleware_span.set_op(OP.MIDDLEWARE_STARLETTE)
@@ -185,6 +188,7 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         with middleware_span:
             # Creating spans for the "receive" callback
             async def _sentry_receive(*args: "Any", **kwargs: "Any") -> "Any":
+                span: "Optional[Union[Span, StreamedSpan]]" = None
                 if span_streaming:
                     span = sentry_sdk.traces.start_span(
                         name=getattr(receive, "__qualname__", str(receive)),
@@ -209,6 +213,7 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
 
             # Creating spans for the "send" callback
             async def _sentry_send(*args: "Any", **kwargs: "Any") -> "Any":
+                span: "Optional[Union[Span, StreamedSpan]]" = None
                 if span_streaming:
                     span = sentry_sdk.traces.start_span(
                         name=getattr(send, "__qualname__", str(send)),
