@@ -60,19 +60,11 @@ def _install_httpx_client() -> None:
             parsed_url = parse_url(str(request.url), sanitize=False)
 
         if span_streaming:
-            span = sentry_sdk.traces.start_span(
+            span_ctx = sentry_sdk.traces.start_span(
                 name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}"
             )
-            span.set_op(OP.HTTP_CLIENT)
-            span.set_origin(HttpxIntegration.origin)
-
-            span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
-            if parsed_url is not None:
-                span.set_attribute("url", parsed_url.url)
-                span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
         else:
-            span = start_span(
+            span_ctx = start_span(
                 op=OP.HTTP_CLIENT,
                 name="%s %s"
                 % (
@@ -81,13 +73,23 @@ def _install_httpx_client() -> None:
                 ),
                 origin=HttpxIntegration.origin,
             )
-            span.set_data(SPANDATA.HTTP_METHOD, request.method)
-            if parsed_url is not None:
-                span.set_data("url", parsed_url.url)
-                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-        with span:
+        with span_ctx as span:
+            if span_streaming:
+                span.set_op(OP.HTTP_CLIENT)
+                span.set_origin(HttpxIntegration.origin)
+
+                span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
+                if parsed_url is not None:
+                    span.set_attribute("url", parsed_url.url)
+                    span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
+                    span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            else:
+                span.set_data(SPANDATA.HTTP_METHOD, request.method)
+                if parsed_url is not None:
+                    span.set_data("url", parsed_url.url)
+                    span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+                    span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
                     key,
