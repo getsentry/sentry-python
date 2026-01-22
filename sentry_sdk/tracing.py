@@ -1423,69 +1423,6 @@ def trace(
         return decorator
 
 
-def streaming_trace(
-    func: "Optional[Callable[P, R]]" = None,
-    *,
-    name: "Optional[str]" = None,
-    attributes: "Optional[dict[str, Any]]" = None,
-) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
-    """
-    Decorator to start a span around a function call.
-
-    This decorator automatically creates a new span when the decorated function
-    is called, and finishes the span when the function returns or raises an exception.
-
-    :param func: The function to trace. When used as a decorator without parentheses,
-        this is the function being decorated. When used with parameters (e.g.,
-        ``@trace(op="custom")``, this should be None.
-    :type func: Callable or None
-
-    :param name: The human-readable name/description for the span. If not provided,
-        defaults to the function name. This provides more specific details about
-        what the span represents (e.g., "GET /api/users", "process_user_data").
-    :type name: str or None
-
-    :param attributes: A dictionary of key-value pairs to add as attributes to the span.
-        Attribute values must be strings, integers, floats, or booleans. These
-        attributes provide additional context about the span's execution.
-    :type attributes: dict[str, Any] or None
-
-    :returns: When used as ``@trace``, returns the decorated function. When used as
-        ``@trace(...)`` with parameters, returns a decorator function.
-    :rtype: Callable or decorator function
-
-    Example::
-
-        import sentry_sdk
-
-        # Simple usage with default values
-        @sentry_sdk.trace
-        def process_data():
-            # Function implementation
-            pass
-
-        # With custom parameters
-        @sentry_sdk.trace(
-            name="Get user data",
-            attributes={"postgres": True}
-        )
-        def make_db_query(sql):
-            # Function implementation
-            pass
-    """
-    from sentry_sdk.tracing_utils import create_streaming_span_decorator
-
-    decorator = create_streaming_span_decorator(
-        name=name,
-        attributes=attributes,
-    )
-
-    if func:
-        return decorator(func)
-    else:
-        return decorator
-
-
 # Circular imports
 
 from sentry_sdk.tracing_utils import (

@@ -23,12 +23,56 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Callable, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue, SamplingContext
     from sentry_sdk.scope import Scope
 
+    P = ParamSpec("P")
+    R = TypeVar("R")
+
 
 FLAGS_CAPACITY = 10
+
+
+class SpanStatus(str, Enum):
+    OK = "ok"
+    ERROR = "error"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# Segment source, see
+# https://getsentry.github.io/sentry-conventions/generated/attributes/sentry.html#sentryspansource
+class SegmentSource(str, Enum):
+    COMPONENT = "component"
+    CUSTOM = "custom"
+    ROUTE = "route"
+    TASK = "task"
+    URL = "url"
+    VIEW = "view"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# These are typically high cardinality and the server hates them
+LOW_QUALITY_SEGMENT_SOURCES = [
+    SegmentSource.URL,
+]
+
+
+SOURCE_FOR_STYLE = {
+    "endpoint": SegmentSource.COMPONENT,
+    "function_name": SegmentSource.COMPONENT,
+    "handler_name": SegmentSource.COMPONENT,
+    "method_and_path_pattern": SegmentSource.ROUTE,
+    "path": SegmentSource.URL,
+    "route_name": SegmentSource.COMPONENT,
+    "route_pattern": SegmentSource.ROUTE,
+    "uri_template": SegmentSource.ROUTE,
+    "url": SegmentSource.ROUTE,
+}
 
 """
 TODO[span-first] / notes
@@ -136,47 +180,6 @@ def new_trace() -> None:
     new_trace() doesn't start any spans on its own.
     """
     sentry_sdk.get_current_scope().set_new_propagation_context()
-
-
-class SpanStatus(str, Enum):
-    OK = "ok"
-    ERROR = "error"
-
-    def __str__(self) -> str:
-        return self.value
-
-
-# Segment source, see
-# https://getsentry.github.io/sentry-conventions/generated/attributes/sentry.html#sentryspansource
-class SegmentSource(str, Enum):
-    COMPONENT = "component"
-    CUSTOM = "custom"
-    ROUTE = "route"
-    TASK = "task"
-    URL = "url"
-    VIEW = "view"
-
-    def __str__(self) -> str:
-        return self.value
-
-
-# These are typically high cardinality and the server hates them
-LOW_QUALITY_SEGMENT_SOURCES = [
-    SegmentSource.URL,
-]
-
-
-SOURCE_FOR_STYLE = {
-    "endpoint": SegmentSource.COMPONENT,
-    "function_name": SegmentSource.COMPONENT,
-    "handler_name": SegmentSource.COMPONENT,
-    "method_and_path_pattern": SegmentSource.ROUTE,
-    "path": SegmentSource.URL,
-    "route_name": SegmentSource.COMPONENT,
-    "route_pattern": SegmentSource.ROUTE,
-    "uri_template": SegmentSource.ROUTE,
-    "url": SegmentSource.ROUTE,
-}
 
 
 class NoOpStreamedSpan:
@@ -580,3 +583,66 @@ class StreamedSpan:
             self.set_attribute("sentry.segment.id", self.segment.span_id)
 
         self.set_attribute("sentry.segment.name", self.segment.name)
+
+
+def trace(
+    func: "Optional[Callable[P, R]]" = None,
+    *,
+    name: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Any]]" = None,
+) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
+    """
+    Decorator to start a span around a function call.
+
+    This decorator automatically creates a new span when the decorated function
+    is called, and finishes the span when the function returns or raises an exception.
+
+    :param func: The function to trace. When used as a decorator without parentheses,
+        this is the function being decorated. When used with parameters (e.g.,
+        ``@trace(op="custom")``, this should be None.
+    :type func: Callable or None
+
+    :param name: The human-readable name/description for the span. If not provided,
+        defaults to the function name. This provides more specific details about
+        what the span represents (e.g., "GET /api/users", "process_user_data").
+    :type name: str or None
+
+    :param attributes: A dictionary of key-value pairs to add as attributes to the span.
+        Attribute values must be strings, integers, floats, or booleans. These
+        attributes provide additional context about the span's execution.
+    :type attributes: dict[str, Any] or None
+
+    :returns: When used as ``@trace``, returns the decorated function. When used as
+        ``@trace(...)`` with parameters, returns a decorator function.
+    :rtype: Callable or decorator function
+
+    Example::
+
+        import sentry_sdk
+
+        # Simple usage with default values
+        @sentry_sdk.trace
+        def process_data():
+            # Function implementation
+            pass
+
+        # With custom parameters
+        @sentry_sdk.trace(
+            name="Get user data",
+            attributes={"postgres": True}
+        )
+        def make_db_query(sql):
+            # Function implementation
+            pass
+    """
+    from sentry_sdk.tracing_utils import create_streaming_span_decorator
+
+    decorator = create_streaming_span_decorator(
+        name=name,
+        attributes=attributes,
+    )
+
+    if func:
+        return decorator(func)
+    else:
+        return decorator
