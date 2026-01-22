@@ -214,7 +214,9 @@ def _set_input_data(
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        if system_instructions:
+        if isinstance(system_instructions, str) or isinstance(
+            system_instructions, Iterable
+        ):
             set_data_normalized(
                 span,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
