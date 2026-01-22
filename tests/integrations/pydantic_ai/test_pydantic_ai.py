@@ -555,11 +555,13 @@ async def test_system_prompt_attribute(
     chat_span = chat_spans[0]
 
     if send_default_pii and include_prompts:
-        system_instruction = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert (
-            system_instruction
-            == '[{"type": "text", "content": "You are a helpful assistant specialized in testing."}]'
-        )
+        system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        assert json.loads(system_instructions) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant specialized in testing.",
+            }
+        ]
     else:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
 
@@ -1245,8 +1247,10 @@ async def test_invoke_agent_with_instructions(
     chat_span = chat_spans[0]
 
     if send_default_pii and include_prompts:
-        system_instruction = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-        assert system_instruction == '[{"type": "text", "content": "System prompt"}]'
+        system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        assert json.loads(system_instructions) == [
+            {"type": "text", "content": "System prompt"}
+        ]
     else:
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
 
