@@ -312,7 +312,9 @@ def add_source(
             set_on_span(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
-def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
+def add_query_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+) -> None:
     """
     Adds OTel compatible source code information to a database query span
     """
