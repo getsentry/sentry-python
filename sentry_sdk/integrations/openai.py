@@ -39,6 +39,7 @@ if TYPE_CHECKING:
         Union,
     )
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
 
     from openai.types.responses import ResponseInputParam, ResponseInputItemParam
     from openai import Omit
@@ -289,16 +290,17 @@ def _set_responses_api_input_data(
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        # Deliberate use of function accepting completions API type because
-        # of shared structure FOR THIS PURPOSE ONLY.
-        instructions_text_parts = _transform_system_instructions(system_instructions)
+        instructions_text_parts: "list[TextPart]" = []
         if explicit_instructions is not None and _is_given(explicit_instructions):
             instructions_text_parts.append(
                 {
                     "type": "text",
-                    "content": explicit_instructions,  # type: ignore
+                    "content": explicit_instructions,
                 }
             )
+        # Deliberate use of function accepting completions API type because
+        # of shared structure FOR THIS PURPOSE ONLY.
+        instructions_text_parts += _transform_system_instructions(system_instructions)
 
         set_data_normalized(
             span,
