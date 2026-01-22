@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import TextPart
 
 
-def _is_system_instruction(message: "ChatCompletionMessageParam"):
+def _is_system_instruction(message: "ChatCompletionMessageParam") -> bool:
     return isinstance(message, dict) and message.get("role") == "system"
 
 
@@ -29,7 +29,7 @@ def _get_system_instructions(
 def _transform_system_instructions(
     system_instructions: "list[ChatCompletionSystemMessageParam]",
 ) -> "list[TextPart]":
-    instruction_text_parts = []
+    instruction_text_parts: "list[TextPart]" = []
 
     for instruction in system_instructions:
         if not isinstance(instruction, dict):

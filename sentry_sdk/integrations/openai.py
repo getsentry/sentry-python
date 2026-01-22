@@ -199,7 +199,7 @@ def _calculate_token_usage(
     )
 
 
-def _is_system_instruction_responses(message: "ResponseInputItemParam"):
+def _is_system_instruction_responses(message: "ResponseInputItemParam") -> bool:
     return (
         isinstance(message, dict)
         and message.get("type") == "message"
@@ -288,12 +288,12 @@ def _set_responses_api_input_data(
     ):
         # Deliberate use of function accepting completions API type because
         # of shared structure FOR THIS PURPOSE ONLY.
-        instructions_text_parts = _transform_system_instructions(system_instructions)  # type: ignore
+        instructions_text_parts = _transform_system_instructions(system_instructions)
         if _is_given(explicit_instructions):
             instructions_text_parts.append(
                 {
                     "type": "text",
-                    "content": explicit_instructions,
+                    "content": explicit_instructions,  # type: ignore
                 }
             )
 
