@@ -54,19 +54,23 @@ def _transform_system_instructions(
     permanent_instructions: "list[SystemPromptPart]",
     current_instructions: "list[str]",
 ) -> "list[SentryTextPart]":
-    return [
+    text_parts: "list[SentryTextPart]" = [
         {
             "type": "text",
             "content": instruction.content,
         }
         for instruction in permanent_instructions
-    ] + [
+    ]
+
+    text_parts.extend(
         {
             "type": "text",
             "content": instruction,
         }
         for instruction in current_instructions
-    ]
+    )
+
+    return text_parts
 
 
 def _get_system_instructions(
@@ -81,8 +85,8 @@ def _get_system_instructions(
                 if SystemPromptPart and isinstance(part, SystemPromptPart):
                     permanent_instructions.append(part)
 
-            if hasattr(msg, "instructions") and msg.instructions is not None:
-                current_instructions.append(msg.instructions)
+        if hasattr(msg, "instructions") and msg.instructions is not None:
+            current_instructions.append(msg.instructions)
 
     return permanent_instructions, current_instructions
 
