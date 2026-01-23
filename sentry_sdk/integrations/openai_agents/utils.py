@@ -152,8 +152,8 @@ def _set_input_data(
     ]
     for message in non_system_messages:
         if "role" in message:
-            normalized_role = normalize_message_role(message.get("role"))
-            content = message.get("content")
+            normalized_role = normalize_message_role(message.get("role"))  # type: ignore
+            content = message.get("content")  # type: ignore
             request_messages.append(
                 {
                     "role": normalized_role,
@@ -165,14 +165,14 @@ def _set_input_data(
                 }
             )
         else:
-            if message.get("type") == "function_call":
+            if message.get("type") == "function_call":  # type: ignore
                 request_messages.append(
                     {
                         "role": GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT,
                         "content": [message],
                     }
                 )
-            elif message.get("type") == "function_call_output":
+            elif message.get("type") == "function_call_output":  # type: ignore
                 request_messages.append(
                     {
                         "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
