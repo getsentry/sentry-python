@@ -802,7 +802,10 @@ class Baggage:
             if client.parsed_dsn.org_id:
                 sentry_items["org_id"] = client.parsed_dsn.org_id
 
-        if segment.get_attributes().get("source") not in LOW_QUALITY_SEGMENT_SOURCES:
+        if (
+            segment.get_attributes().get("sentry.span.source")
+            not in LOW_QUALITY_SEGMENT_SOURCES
+        ):
             sentry_items["transaction"] = segment.name
 
         if segment.sample_rate is not None:
@@ -1473,6 +1476,3 @@ from sentry_sdk.traces import (
     start_span as start_streaming_span,
     StreamedSpan,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.traces import StreamedSpan

@@ -100,8 +100,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             envelopes = []
             for trace_id, spans in self._span_buffer.items():
                 if spans:
-                    for span in spans:
-                        print(span.name)
                     dsc = spans[0].dynamic_sampling_context()
 
                     envelope = Envelope(
