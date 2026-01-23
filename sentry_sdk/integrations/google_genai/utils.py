@@ -45,6 +45,7 @@ if TYPE_CHECKING:
         Tool,
         Model,
         EmbedContentResponse,
+        ContentUnion,
     )
 
 
@@ -724,7 +725,7 @@ def extract_finish_reasons(
 
 
 def _transform_system_instruction_one_level(
-    system_instructions: "ContentUnionDict",
+    system_instructions: "Union[ContentUnionDict, ContentUnion]",
     can_be_content: bool,
 ) -> "list[TextPart]":
     text_parts: "list[TextPart]" = []
@@ -757,7 +758,7 @@ def _transform_system_instruction_one_level(
 
 
 def _transform_system_instructions(
-    system_instructions: "ContentUnionDict",
+    system_instructions: "Union[ContentUnionDict, ContentUnion]",
 ) -> "list[TextPart]":
     text_parts: "list[TextPart]" = []
 
@@ -799,16 +800,19 @@ def set_span_data_for_request(
         messages = []
 
         # Add system instruction if present
+        system_instructions = None
         if config and hasattr(config, "system_instruction"):
-            system_instruction = config.system_instruction
+            system_instructions = config.system_instruction
+        elif isinstance(config, dict) and "system_instruction" in config:
+            system_instructions = config.get("system_instruction")
 
-            if system_instruction is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                    _transform_system_instructions(system_instruction),
-                    unpack=False,
-                )
+        if system_instructions is not None:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                _transform_system_instructions(system_instructions),
+                unpack=False,
+            )
 
         # Extract messages from contents
         contents_messages = extract_contents_messages(contents)

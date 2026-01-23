@@ -107,11 +107,6 @@ def create_test_config(
     if seed is not None:
         config_dict["seed"] = seed
     if system_instruction is not None:
-        # Convert string to Content for system instruction
-        if isinstance(system_instruction, str):
-            system_instruction = genai_types.Content(
-                parts=[genai_types.Part(text=system_instruction)], role="system"
-            )
         config_dict["system_instruction"] = system_instruction
     if tools is not None:
         config_dict["tools"] = tools
@@ -204,11 +199,11 @@ def test_nonstreaming_generate_content(
     assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
 
 
+@pytest.mark.parametrize("generate_content_config", (False, True))
 @pytest.mark.parametrize(
     "system_instructions,expected_texts",
     [
         (None, None),
-        ("", []),
         ({}, []),
         (Content(role="system", parts=[]), []),
         ({"parts": []}, []),
@@ -233,7 +228,12 @@ def test_nonstreaming_generate_content(
     ],
 )
 def test_generate_content_with_system_instruction(
-    sentry_init, capture_events, mock_genai_client, system_instructions, expected_texts
+    sentry_init,
+    capture_events,
+    mock_genai_client,
+    generate_content_config,
+    system_instructions,
+    expected_texts,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
@@ -248,12 +248,18 @@ def test_generate_content_with_system_instruction(
         mock_genai_client._api_client, "request", return_value=mock_http_response
     ):
         with start_transaction(name="google_genai"):
-            config = create_test_config(
-                system_instruction=system_instructions,
-                temperature=0.5,
-            )
+            config = {
+                "system_instruction": system_instructions,
+                "temperature": 0.5,
+            }
+
+            if generate_content_config:
+                config = create_test_config(**config)
+
             mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents="What is 2+2?", config=config
+                model="gemini-1.5-flash",
+                contents="What is 2+2?",
+                config=config,
             )
 
     (event,) = events
@@ -268,12 +274,9 @@ def test_generate_content_with_system_instruction(
         invoke_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
 
-    if isinstance(expected_texts, str):
-        assert system_instructions == [{"type": "text", "content": expected_texts}]
-    else:
-        assert system_instructions == [
-            {"type": "text", "content": text} for text in expected_texts
-        ]
+    assert system_instructions == [
+        {"type": "text", "content": text} for text in expected_texts
+    ]
 
 
 def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):
