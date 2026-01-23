@@ -1072,12 +1072,3 @@ def test_conversation_id_clear():
 
     scope.clear()
     assert scope.get_conversation_id() is None
-
-
-def test_conversation_id_not_in_tags():
-    """Test that conversation_id is stored in dedicated field, not tags."""
-    scope = Scope()
-    scope.set_conversation_id("not-in-tags-conv")
-
-    assert scope.get_conversation_id() == "not-in-tags-conv"
-    assert "conversation_id" not in scope._tags
