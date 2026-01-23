@@ -97,7 +97,6 @@ TODO[span-first] / notes
 - maybe: use getters/setter OR properties but not both
 - add size-based flushing to buffer(s)
 - migrate transaction sample_rand logic
-- remove deprecated profiler impl
 - custom_sampling_context?
   - store on scope/propagation context instead?
   - function to set on propagation context

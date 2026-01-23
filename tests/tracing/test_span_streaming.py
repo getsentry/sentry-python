@@ -198,6 +198,32 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes)
     assert span["attributes"]["my_attribute"] == "my_value"
 
 
+def test_sampling_context(sentry_init, capture_envelopes):
+    def traces_sampler(sampling_context):
+        assert "transaction_context" in sampling_context
+        assert "trace_id" in sampling_context["transaction_context"]
+        assert "span_id" in sampling_context["transaction_context"]
+        assert "parent_span_id" in sampling_context["transaction_context"]
+        assert "parent_sampled" in sampling_context
+        assert "attributes" in sampling_context
+        return 1.0
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+
+
 def test_span_attributes(sentry_init, capture_envelopes):
     sentry_init(
         traces_sample_rate=1.0,
@@ -606,6 +632,28 @@ def test_set_span_source(sentry_init, capture_envelopes):
 
     assert span["name"] == "span"
     assert span["attributes"]["sentry.span.source"] == SegmentSource.TASK.value
+
+
+def test_set_span_origin(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        span.set_origin("redis")
+        assert span.get_attributes()["sentry.origin"] == "redis"
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
+    assert span["attributes"]["sentry.origin"] == "redis"
 
 
 def test_transport_format(sentry_init, capture_envelopes):
