@@ -9,6 +9,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     truncate_and_annotate_messages,
     transform_openai_content_part,
+    truncate_and_annotate_embedding_inputs,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -118,7 +119,9 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                     if isinstance(embedding_input, list)
                     else [embedding_input]
                 )
-                messages_data = truncate_and_annotate_messages(input_list, span, scope)
+                messages_data = truncate_and_annotate_embedding_inputs(
+                    input_list, span, scope
+                )
                 if messages_data is not None:
                     set_data_normalized(
                         span,

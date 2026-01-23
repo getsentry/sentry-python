@@ -344,7 +344,11 @@ def test_embeddings_create_with_list_input(
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
         # Check that list of embeddings input is captured (it's JSON serialized)
         embeddings_input = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-        assert json.loads(embeddings_input) == ["Third text"]
+        assert json.loads(embeddings_input) == [
+            "First text",
+            "Second text",
+            "Third text",
+        ]
 
 
 def test_embeddings_no_pii(sentry_init, capture_events, clear_litellm_cache):
