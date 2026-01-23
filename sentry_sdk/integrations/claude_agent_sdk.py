@@ -19,11 +19,6 @@ try:
     from claude_agent_sdk import (
         query as original_query,
         ClaudeSDKClient,
-        AssistantMessage,
-        ResultMessage,
-        TextBlock,
-        ToolUseBlock,
-        ToolResultBlock,
     )
 except ImportError:
     raise DidNotEnable("claude-agent-sdk not installed")
@@ -34,6 +29,38 @@ if TYPE_CHECKING:
 
 AGENT_NAME = "claude-agent"
 GEN_AI_SYSTEM = "claude-agent-sdk-python"
+
+
+def _is_assistant_message(message: "Any") -> bool:
+    """Check if message is an AssistantMessage using duck typing."""
+    return hasattr(message, "content") and hasattr(message, "model")
+
+
+def _is_result_message(message: "Any") -> bool:
+    """Check if message is a ResultMessage using duck typing."""
+    return hasattr(message, "usage") and hasattr(message, "total_cost_usd")
+
+
+def _is_text_block(block: "Any") -> bool:
+    """Check if block is a TextBlock using duck typing."""
+    # TextBlock has 'text' but not 'tool_use_id' or 'name'
+    return (
+        hasattr(block, "text")
+        and not hasattr(block, "tool_use_id")
+        and not hasattr(block, "name")
+    )
+
+
+def _is_tool_use_block(block: "Any") -> bool:
+    """Check if block is a ToolUseBlock using duck typing."""
+    # ToolUseBlock has 'id', 'name', and 'input'
+    return hasattr(block, "id") and hasattr(block, "name") and hasattr(block, "input")
+
+
+def _is_tool_result_block(block: "Any") -> bool:
+    """Check if block is a ToolResultBlock using duck typing."""
+    # ToolResultBlock has 'tool_use_id'
+    return hasattr(block, "tool_use_id")
 
 
 class ClaudeAgentSDKIntegration(Integration):
@@ -101,22 +128,20 @@ def _set_span_input_data(
 
 
 def _extract_text_from_message(message: "Any") -> "Optional[str]":
-    if not isinstance(message, AssistantMessage):
+    if not _is_assistant_message(message):
         return None
     text_parts = [
-        block.text
-        for block in getattr(message, "content", [])
-        if isinstance(block, TextBlock) and hasattr(block, "text")
+        block.text for block in getattr(message, "content", []) if _is_text_block(block)
     ]
     return "".join(text_parts) if text_parts else None
 
 
 def _extract_tool_calls(message: "Any") -> "Optional[list]":
-    if not isinstance(message, AssistantMessage):
+    if not _is_assistant_message(message):
         return None
     tool_calls = []
     for block in getattr(message, "content", []):
-        if isinstance(block, ToolUseBlock):
+        if _is_tool_use_block(block):
             tool_call = {"name": getattr(block, "name", "unknown")}
             tool_input = getattr(block, "input", None)
             if tool_input is not None:
@@ -138,7 +163,7 @@ def _extract_message_data(messages: list) -> dict:
     }
 
     for message in messages:
-        if isinstance(message, AssistantMessage):
+        if _is_assistant_message(message):
             text = _extract_text_from_message(message)
             if text:
                 data["response_texts"].append(text)
@@ -150,7 +175,7 @@ def _extract_message_data(messages: list) -> dict:
             if not data["response_model"]:
                 data["response_model"] = getattr(message, "model", None)
 
-        elif isinstance(message, ResultMessage):
+        elif _is_result_message(message):
             data["total_cost"] = getattr(message, "total_cost_usd", None)
             usage = getattr(message, "usage", None)
             if isinstance(usage, dict):
@@ -264,8 +289,8 @@ def _end_invoke_agent_span(
 
 
 def _create_execute_tool_span(
-    tool_use: "ToolUseBlock",
-    tool_result: "Optional[ToolResultBlock]",
+    tool_use: "Any",
+    tool_result: "Optional[Any]",
     integration: "ClaudeAgentSDKIntegration",
 ) -> "Span":
     tool_name = getattr(tool_use, "name", "unknown")
@@ -306,14 +331,14 @@ def _process_tool_executions(
     tool_results = {}
 
     for message in messages:
-        if not isinstance(message, AssistantMessage):
+        if not _is_assistant_message(message):
             continue
         for block in getattr(message, "content", []):
-            if isinstance(block, ToolUseBlock):
+            if _is_tool_use_block(block):
                 tool_id = getattr(block, "id", None)
                 if tool_id:
                     tool_uses[tool_id] = block
-            elif isinstance(block, ToolResultBlock):
+            elif _is_tool_result_block(block):
                 tool_use_id = getattr(block, "tool_use_id", None)
                 if tool_use_id:
                     tool_results[tool_use_id] = block
