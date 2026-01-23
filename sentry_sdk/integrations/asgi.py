@@ -275,7 +275,7 @@ class SentryAsgiMiddleware:
                             else nullcontext()
                         )
 
-                    with span_ctx:
+                    with span_ctx as span:
                         try:
 
                             async def _sentry_wrapped_send(
