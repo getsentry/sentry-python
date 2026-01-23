@@ -213,9 +213,10 @@ class SentryAsgiMiddleware:
                     )
 
                     method = scope.get("method", "").upper()
-                    span = None
+
                     span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
                     if span_streaming:
+                        span = None
                         if ty in ("http", "websocket"):
                             if (
                                 ty == "websocket"
@@ -241,6 +242,7 @@ class SentryAsgiMiddleware:
                         span_ctx = span or nullcontext()
 
                     else:
+                        transaction = None
                         if ty in ("http", "websocket"):
                             if (
                                 ty == "websocket"
