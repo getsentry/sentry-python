@@ -1,6 +1,5 @@
 import sys
 from functools import wraps
-from collections.abc import Iterable
 
 import sentry_sdk
 from sentry_sdk import consts
@@ -41,6 +40,7 @@ if TYPE_CHECKING:
         AsyncIterator,
         Iterator,
         Union,
+        Iterable,
     )
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
