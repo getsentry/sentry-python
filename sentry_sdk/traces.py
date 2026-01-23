@@ -230,7 +230,6 @@ class StreamedSpan:
         "_scope",
         "_flags",
         "_context_manager_state",
-        "_profile",
         "_continuous_profile",
         "_baggage",
         "sample_rate",
@@ -296,7 +295,6 @@ class StreamedSpan:
             self._sample_rand = _generate_sample_rand(self.trace_id)
 
         self._flags: dict[str, bool] = {}
-        self._profile = None
         self._continuous_profile: "Optional[ContinuousProfile]" = None
 
         self._update_active_thread()
@@ -320,7 +318,7 @@ class StreamedSpan:
 
         if self.is_segment():
             sampling_context = {
-                "transaction_context": {
+                "transaction_context": {  # XXX[span-first]: rename?
                     "trace_id": self.trace_id,
                     "span_id": self.span_id,
                     "parent_span_id": self.parent_span_id,
@@ -341,9 +339,6 @@ class StreamedSpan:
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
         if self.is_segment():
-            if self._profile is not None:
-                self._profile.__exit__(ty, value, tb)
-
             if self._continuous_profile is not None:
                 self._continuous_profile.stop()
 
@@ -439,6 +434,12 @@ class StreamedSpan:
 
     def set_attribute(self, key: str, value: "AttributeValue") -> None:
         self.attributes[key] = format_attribute(value)
+
+    def remove_attribute(self, key: str) -> None:
+        try:
+            del self.attributes[key]
+        except KeyError:
+            pass
 
     def set_attributes(self, attributes: "Attributes") -> None:
         for key, value in attributes.items():

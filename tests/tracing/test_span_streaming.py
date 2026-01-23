@@ -6,6 +6,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+from sentry_sdk.traces import SegmentSource
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
@@ -43,9 +44,9 @@ def test_start_span(sentry_init, capture_envelopes):
 
     events = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="segment"):
-        with sentry_sdk.traces.start_span(name="child"):
-            ...
+    with sentry_sdk.traces.start_span(name="segment") as segment:
+        with sentry_sdk.traces.start_span(name="child") as child:
+            assert child.segment == segment
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -85,6 +86,7 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
     segment.start()
     child = sentry_sdk.traces.start_span(name="child")
     child.start()
+    assert child.segment == segment
     child.finish()
     segment.finish()
 
@@ -111,6 +113,37 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
 
     assert child["status"] == "ok"
     assert segment["status"] == "ok"
+
+
+def test_span_sampled_at_start(sentry_init, capture_envelopes):
+    # Test that if a span is created without the context manager, it is sampled
+    # at .start() time rather then creation time
+
+    def traces_sampler(sampling_context):
+        assert "delayed_attribute" in sampling_context["attributes"]
+        assert sampling_context["attributes"]["delayed_attribute"] == 12
+        return 1.0
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    segment = sentry_sdk.traces.start_span(name="segment")
+    segment.set_attribute("delayed_attribute", 12)
+    segment.start()
+    segment.finish()
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (segment,) = spans
+
+    assert segment["name"] == "segment"
+    assert segment["attributes"]["delayed_attribute"] == 12
 
 
 def test_start_span_attributes(sentry_init, capture_envelopes):
@@ -163,6 +196,79 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes)
 
     assert span["name"] == "segment"
     assert span["attributes"]["my_attribute"] == "my_value"
+
+
+def test_span_attributes(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    class Class:
+        pass
+
+    with sentry_sdk.traces.start_span(
+        name="segment", attributes={"attribute1": "value"}
+    ) as span:
+        assert span.get_attributes()["attribute1"] == "value"
+        span.set_attribute("attribute2", 47)
+        span.remove_attribute("attribute1")
+        span.set_attributes({"attribute3": 4.5, "attribute4": False})
+        assert "attribute1" not in span.get_attributes()
+        attributes = span.get_attributes()
+        assert attributes["attribute2"] == 47
+        assert attributes["attribute3"] == 4.5
+        assert attributes["attribute4"] is False
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "segment"
+    assert "attribute1" not in span["attributes"]
+    assert span["attributes"]["attribute2"] == 47
+    assert span["attributes"]["attribute3"] == 4.5
+    assert span["attributes"]["attribute4"] is False
+
+
+def test_span_attributes_serialize_early(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    class Class:
+        pass
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        span.set_attributes(
+            {
+                # arrays of different types will be serialized
+                "attribute1": [123, "text"],
+                # so will custom class instances
+                "attribute2": Class(),
+            }
+        )
+        attributes = span.get_attributes()
+        assert isinstance(attributes["attribute1"], str)
+        assert attributes["attribute1"] == "[123, 'text']"
+        assert isinstance(attributes["attribute2"], str)
+        assert "Class" in attributes["attribute2"]
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["attributes"]["attribute1"] == "[123, 'text']"
+    assert "Class" in span["attributes"]["attribute2"]
 
 
 def test_traces_sampler_drops_span(sentry_init, capture_envelopes):
@@ -432,7 +538,6 @@ def test_trace_decorator(sentry_init, capture_envelopes):
 
 
 @minimum_python_38
-@pytest.mark.asyncio
 def test_trace_decorator_async(sentry_init, capture_envelopes):
     sentry_init(
         traces_sample_rate=1.0,
@@ -457,6 +562,50 @@ def test_trace_decorator_async(sentry_init, capture_envelopes):
         == "test_span_streaming.test_trace_decorator_async.<locals>.traced_function"
     )
     assert span["status"] == "ok"
+
+
+def test_set_span_op(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        span.set_op("function")
+        assert span.get_attributes()["sentry.op"] == "function"
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
+    assert span["attributes"]["sentry.op"] == "function"
+
+
+def test_set_span_source(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        span.set_source(SegmentSource.TASK)
+        assert span.get_attributes()["sentry.span.source"] == SegmentSource.TASK.value
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
+    assert span["attributes"]["sentry.span.source"] == SegmentSource.TASK.value
 
 
 def test_transport_format(sentry_init, capture_envelopes):
