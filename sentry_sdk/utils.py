@@ -14,7 +14,6 @@ import time
 from collections import namedtuple
 from datetime import datetime, timezone
 from decimal import Decimal
-from enum import Enum
 from functools import partial, partialmethod, wraps
 from numbers import Real
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
