@@ -200,12 +200,13 @@ def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[str]"
                 system_instructions.append(message.content)
 
             elif message.type == "system" and isinstance(message.content, list):
-                # content_blocks accessor standardizes string and dict elements
-                for block in message.content_blocks:
-                    if block.get("type") == "text":
-                        text = block.get("text", None)
-                        if text is not None:
-                            system_instructions.append(text)
+                for item in message.content:
+                    if isinstance(item, str):
+                        system_instructions.append(item)
+
+                    elif isinstance(item, dict) and item.get("type") == "text":
+                        if "text" in item:
+                            system_instructions.append(item.get("text"))
 
     return system_instructions
 
