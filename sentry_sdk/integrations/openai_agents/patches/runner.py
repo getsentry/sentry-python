@@ -16,7 +16,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, AsyncIterator, Callable
 
 
 def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., Any]":
@@ -124,7 +124,7 @@ def _create_run_streamed_wrapper(
             @wraps(original_stream_events)
             async def wrapped_stream_events(
                 *stream_args: "Any", **stream_kwargs: "Any"
-            ):
+            ) -> "AsyncIterator[Any]":
                 try:
                     async for event in original_stream_events(
                         *stream_args, **stream_kwargs
