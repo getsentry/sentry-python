@@ -1471,6 +1471,7 @@ from sentry_sdk.tracing import (
 from sentry_sdk.traces import (
     LOW_QUALITY_SEGMENT_SOURCES,
     start_span as start_streaming_span,
+    StreamedSpan,
 )
 
 if TYPE_CHECKING:
