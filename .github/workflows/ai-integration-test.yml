@@ -34,11 +34,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Python SDK Tests
-        uses: getsentry/testing-ai-sdk-integrations@1c6853a3a46ff1217248bf2b61e3ca5c4fcafdca
+        uses: getsentry/testing-ai-sdk-integrations@dba21cbfb57482556338983d8c35e6b09b534667
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           language: py
+          sentry-python-path: ${{ github.workspace }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           google-api-key:  ${{ secrets.GOOGLE_API_KEY }}

@@ -26,9 +26,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, List, Dict
     from pydantic_ai.usage import RequestUsage  # type: ignore
+    from pydantic_ai.messages import ModelMessage, SystemPromptPart  # type: ignore
+    from sentry_sdk._types import TextPart as SentryTextPart
 
 try:
-    from pydantic_ai.messages import (  # type: ignore
+    from pydantic_ai.messages import (
         BaseToolCallPart,
         BaseToolReturnPart,
         SystemPromptPart,
@@ -48,6 +50,47 @@ except ImportError:
     BinaryContent = None
 
 
+def _transform_system_instructions(
+    permanent_instructions: "list[SystemPromptPart]",
+    current_instructions: "list[str]",
+) -> "list[SentryTextPart]":
+    text_parts: "list[SentryTextPart]" = [
+        {
+            "type": "text",
+            "content": instruction.content,
+        }
+        for instruction in permanent_instructions
+    ]
+
+    text_parts.extend(
+        {
+            "type": "text",
+            "content": instruction,
+        }
+        for instruction in current_instructions
+    )
+
+    return text_parts
+
+
+def _get_system_instructions(
+    messages: "list[ModelMessage]",
+) -> "tuple[list[SystemPromptPart], list[str]]":
+    permanent_instructions = []
+    current_instructions = []
+
+    for msg in messages:
+        if hasattr(msg, "parts"):
+            for part in msg.parts:
+                if SystemPromptPart and isinstance(part, SystemPromptPart):
+                    permanent_instructions.append(part)
+
+        if hasattr(msg, "instructions") and msg.instructions is not None:
+            current_instructions.append(msg.instructions)
+
+    return permanent_instructions, current_instructions
+
+
 def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     """Set input messages data on a span."""
     if not _should_send_prompts():
@@ -56,21 +99,19 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
     if not messages:
         return
 
+    permanent_instructions, current_instructions = _get_system_instructions(messages)
+    if len(permanent_instructions) > 0 or len(current_instructions) > 0:
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            _transform_system_instructions(
+                permanent_instructions, current_instructions
+            ),
+            unpack=False,
+        )
+
     try:
         formatted_messages = []
-        system_prompt = None
-
-        # Extract system prompt from any ModelRequest with instructions
-        for msg in messages:
-            if hasattr(msg, "instructions") and msg.instructions:
-                system_prompt = msg.instructions
-                break
-
-        # Add system prompt as first message if present
-        if system_prompt:
-            formatted_messages.append(
-                {"role": "system", "content": [{"type": "text", "text": system_prompt}]}
-            )
 
         for msg in messages:
             if hasattr(msg, "parts"):
@@ -78,7 +119,7 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                     role = "user"
                     # Use isinstance checks with proper base classes
                     if SystemPromptPart and isinstance(part, SystemPromptPart):
-                        role = "system"
+                        continue
                     elif (
                         (TextPart and isinstance(part, TextPart))
                         or (ThinkingPart and isinstance(part, ThinkingPart))
