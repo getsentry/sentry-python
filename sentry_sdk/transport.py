@@ -445,6 +445,7 @@ class BaseHttpTransport(Transport):
             envelope.items.append(client_report_item)
 
         content_encoding, body = self._serialize_envelope(envelope)
+
         assert self.parsed_dsn is not None
         logger.debug(
             "Sending envelope [%s] project:%s host:%s",
