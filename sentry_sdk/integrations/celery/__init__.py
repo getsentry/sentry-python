@@ -14,7 +14,7 @@ from sentry_sdk.integrations.celery.beat import (
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, SpanStatus
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TransactionSource
 from sentry_sdk.tracing_utils import Baggage, has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -101,7 +101,10 @@ def _set_status(status: str) -> None:
     with capture_internal_exceptions():
         scope = sentry_sdk.get_current_scope()
         if scope.span is not None:
-            scope.span.set_status(status)
+            if isinstance(scope.span, StreamedSpan):
+                scope.span.set_status(SpanStatus.ERROR)
+            else:
+                scope.span.set_status(status)
 
 
 def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
@@ -161,7 +164,9 @@ def _make_event_processor(
 
 
 def _update_celery_task_headers(
-    original_headers: "dict[str, Any]", span: "Optional[Span]", monitor_beat_tasks: bool
+    original_headers: "dict[str, Any]",
+    span: "Optional[Union[StreamedSpan, Span]]",
+    monitor_beat_tasks: bool,
 ) -> "dict[str, Any]":
     """
     Updates the headers of the Celery task with the tracing information
@@ -315,7 +320,8 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            transaction = None
+            transaction: "Optional[Union[Span, StreamedSpan]]" = None
+            span_ctx: "Union[Span, StreamedSpan]"
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
