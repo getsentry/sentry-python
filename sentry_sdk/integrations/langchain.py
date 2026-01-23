@@ -205,8 +205,9 @@ def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[str]"
                         system_instructions.append(item)
 
                     elif isinstance(item, dict) and item.get("type") == "text":
-                        if "text" in item:
-                            system_instructions.append(item.get("text"))
+                        instruction = item.get("text")
+                        if isinstance(instruction, str):
+                            system_instructions.append(instruction)
 
     return system_instructions
 
