@@ -145,12 +145,11 @@ def _create_get_model_wrapper(
                 if len(args) > 1:
                     span_kwargs["input"] = args[1]
 
-                span = ai_client_span(agent, span_kwargs)
-                span.__enter__()
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+                with ai_client_span(agent, span_kwargs) as span:
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-                streaming_response = None
-                try:
+                    streaming_response = None
+
                     async for event in original_stream_response(*args, **kwargs):
                         # Capture the full response from ResponseCompletedEvent
                         if hasattr(event, "response"):
@@ -167,8 +166,6 @@ def _create_get_model_wrapper(
                         )
                         _set_response_model_on_agent_span(agent, response_model)
                         update_ai_client_span(span, streaming_response)
-                finally:
-                    span.__exit__(*sys.exc_info())
 
             model.stream_response = wrapped_stream_response
 
