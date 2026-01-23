@@ -39,13 +39,14 @@ try:
     from anthropic.resources import AsyncMessages, Messages
 
     if TYPE_CHECKING:
-        from anthropic.types import MessageStreamEvent
+        from anthropic.types import MessageStreamEvent, TextBlockParam
 except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Iterator, List, Optional, Union
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
 
 
 class AnthropicIntegration(Integration):
@@ -177,6 +178,27 @@ def _transform_anthropic_content_block(
     return result if result is not None else content_block
 
 
+def _transform_system_instructions(
+    system_instructions: "Union[str, Iterable[TextBlockParam]]",
+) -> "list[TextPart]":
+    if isinstance(system_instructions, str):
+        return [
+            {
+                "type": "text",
+                "content": system_instructions,
+            }
+        ]
+
+    return [
+        {
+            "type": "text",
+            "content": instruction["text"],
+        }
+        for instruction in system_instructions
+        if isinstance(instruction, dict) and "text" in instruction
+    ]
+
+
 def _set_input_data(
     span: "Span", kwargs: "dict[str, Any]", integration: "AnthropicIntegration"
 ) -> None:
@@ -184,7 +206,7 @@ def _set_input_data(
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-    system_prompt = kwargs.get("system")
+    system_instructions: "Union[str, Iterable[TextBlockParam]]" = kwargs.get("system")  # type: ignore
     messages = kwargs.get("messages")
     if (
         messages is not None
@@ -192,29 +214,17 @@ def _set_input_data(
         and should_send_default_pii()
         and integration.include_prompts
     ):
+        if isinstance(system_instructions, str) or isinstance(
+            system_instructions, Iterable
+        ):
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                _transform_system_instructions(system_instructions),
+                unpack=False,
+            )
+
         normalized_messages = []
-        if system_prompt:
-            system_prompt_content: "Optional[Union[str, List[dict[str, Any]]]]" = None
-            if isinstance(system_prompt, str):
-                system_prompt_content = system_prompt
-            elif isinstance(system_prompt, Iterable):
-                system_prompt_content = []
-                for item in system_prompt:
-                    if (
-                        isinstance(item, dict)
-                        and item.get("type") == "text"
-                        and item.get("text")
-                    ):
-                        system_prompt_content.append(item.copy())
-
-            if system_prompt_content:
-                normalized_messages.append(
-                    {
-                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM,
-                        "content": system_prompt_content,
-                    }
-                )
-
         for message in messages:
             if (
                 message.get("role") == GEN_AI_ALLOWED_MESSAGE_ROLES.USER
