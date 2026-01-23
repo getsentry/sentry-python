@@ -15,16 +15,13 @@ def _is_system_instruction(message: "ChatCompletionMessageParam") -> bool:
     return isinstance(message, dict) and message.get("role") == "system"
 
 
-def _get_system_instructions(
+def _get_system_instructions_completions(
     messages: "Iterable[ChatCompletionMessageParam]",
-) -> "list[ChatCompletionSystemMessageParam]":
-    system_instructions = []
+) -> "list[ChatCompletionMessageParam]":
+    if not isinstance(messages, Iterable):
+        return []
 
-    for message in messages:
-        if _is_system_instruction(message):
-            system_instructions.append(message)
-
-    return system_instructions
+    return [message for message in messages if _is_system_instruction(message)]
 
 
 def _transform_system_instructions(

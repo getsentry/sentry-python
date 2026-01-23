@@ -14,16 +14,10 @@ def _is_system_instruction(message: "ResponseInputItemParam") -> bool:
     )
 
 
-def _get_system_instructions(
+def _get_system_instructions_responses(
     messages: "Union[str, ResponseInputParam]",
 ) -> "list[ResponseInputItemParam]":
-    if isinstance(messages, str):
+    if not isinstance(messages, list):
         return []
 
-    system_instructions = []
-
-    for message in messages:
-        if _is_system_instruction(message):
-            system_instructions.append(message)
-
-    return system_instructions
+    return [message for message in messages if _is_system_instruction(message)]
