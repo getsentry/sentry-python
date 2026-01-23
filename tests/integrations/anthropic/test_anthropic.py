@@ -1074,17 +1074,22 @@ def test_nonstreaming_create_message_with_system_prompt(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
+
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert len(stored_messages) == 2
-        # System message should be first
-        assert stored_messages[0]["role"] == "system"
-        assert stored_messages[0]["content"] == "You are a helpful assistant."
-        # User message should be second
-        assert stored_messages[1]["role"] == "user"
-        assert stored_messages[1]["content"] == "Hello, Claude"
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -1153,17 +1158,22 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
+
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert len(stored_messages) == 2
-        # System message should be first
-        assert stored_messages[0]["role"] == "system"
-        assert stored_messages[0]["content"] == "You are a helpful assistant."
-        # User message should be second
-        assert stored_messages[1]["role"] == "user"
-        assert stored_messages[1]["content"] == "Hello, Claude"
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -1264,18 +1274,23 @@ def test_streaming_create_message_with_system_prompt(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
+
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert len(stored_messages) == 2
-        # System message should be first
-        assert stored_messages[0]["role"] == "system"
-        assert stored_messages[0]["content"] == "You are a helpful assistant."
-        # User message should be second
-        assert stored_messages[1]["role"] == "user"
-        assert stored_messages[1]["content"] == "Hello, Claude"
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -1379,18 +1394,23 @@ async def test_streaming_create_message_with_system_prompt_async(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
+
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
         stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert len(stored_messages) == 2
-        # System message should be first
-        assert stored_messages[0]["role"] == "system"
-        assert stored_messages[0]["content"] == "You are a helpful assistant."
-        # User message should be second
-        assert stored_messages[1]["role"] == "user"
-        assert stored_messages[1]["content"] == "Hello, Claude"
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
@@ -1437,21 +1457,23 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
     (span,) = event["spans"]
 
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
+    system_instructions = json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+
+    # System content should be a list of text blocks
+    assert isinstance(system_instructions, list)
+    assert system_instructions == [
+        {"type": "text", "content": "You are a helpful assistant."},
+        {"type": "text", "content": "Be concise and clear."},
+    ]
+
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
-    # Should have system message first, then user message
-    assert len(stored_messages) == 2
-    assert stored_messages[0]["role"] == "system"
-    # System content should be a list of text blocks
-    assert isinstance(stored_messages[0]["content"], list)
-    assert len(stored_messages[0]["content"]) == 2
-    assert stored_messages[0]["content"][0]["type"] == "text"
-    assert stored_messages[0]["content"][0]["text"] == "You are a helpful assistant."
-    assert stored_messages[0]["content"][1]["type"] == "text"
-    assert stored_messages[0]["content"][1]["text"] == "Be concise and clear."
-    assert stored_messages[1]["role"] == "user"
-    assert stored_messages[1]["content"] == "Hello"
+    assert len(stored_messages) == 1
+    assert stored_messages[0]["role"] == "user"
+    assert stored_messages[0]["content"] == "Hello"
 
 
 # Tests for transform_content_part (shared) and _transform_anthropic_content_block helper functions
