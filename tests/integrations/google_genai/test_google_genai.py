@@ -4,6 +4,7 @@ from unittest import mock
 
 from google import genai
 from google.genai import types as genai_types
+from google.genai.types import Content, Part
 
 from sentry_sdk import start_transaction
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -106,11 +107,6 @@ def create_test_config(
     if seed is not None:
         config_dict["seed"] = seed
     if system_instruction is not None:
-        # Convert string to Content for system instruction
-        if isinstance(system_instruction, str):
-            system_instruction = genai_types.Content(
-                parts=[genai_types.Part(text=system_instruction)], role="system"
-            )
         config_dict["system_instruction"] = system_instruction
     if tools is not None:
         config_dict["tools"] = tools
@@ -186,6 +182,7 @@ def test_nonstreaming_generate_content(
         response_texts = json.loads(response_text)
         assert response_texts == ["Hello! How can I help you today?"]
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_span["data"]
 
@@ -202,8 +199,41 @@ def test_nonstreaming_generate_content(
     assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
 
 
+@pytest.mark.parametrize("generate_content_config", (False, True))
+@pytest.mark.parametrize(
+    "system_instructions,expected_texts",
+    [
+        (None, None),
+        ({}, []),
+        (Content(role="system", parts=[]), []),
+        ({"parts": []}, []),
+        ("You are a helpful assistant.", ["You are a helpful assistant."]),
+        (Part(text="You are a helpful assistant."), ["You are a helpful assistant."]),
+        (
+            Content(role="system", parts=[Part(text="You are a helpful assistant.")]),
+            ["You are a helpful assistant."],
+        ),
+        ({"text": "You are a helpful assistant."}, ["You are a helpful assistant."]),
+        (
+            {"parts": [Part(text="You are a helpful assistant.")]},
+            ["You are a helpful assistant."],
+        ),
+        (
+            {"parts": [{"text": "You are a helpful assistant."}]},
+            ["You are a helpful assistant."],
+        ),
+        (["You are a helpful assistant."], ["You are a helpful assistant."]),
+        ([Part(text="You are a helpful assistant.")], ["You are a helpful assistant."]),
+        ([{"text": "You are a helpful assistant."}], ["You are a helpful assistant."]),
+    ],
+)
 def test_generate_content_with_system_instruction(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init,
+    capture_events,
+    mock_genai_client,
+    generate_content_config,
+    system_instructions,
+    expected_texts,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
@@ -218,25 +248,35 @@ def test_generate_content_with_system_instruction(
         mock_genai_client._api_client, "request", return_value=mock_http_response
     ):
         with start_transaction(name="google_genai"):
-            config = create_test_config(
-                system_instruction="You are a helpful assistant",
-                temperature=0.5,
-            )
+            config = {
+                "system_instruction": system_instructions,
+                "temperature": 0.5,
+            }
+
+            if generate_content_config:
+                config = create_test_config(**config)
+
             mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents="What is 2+2?", config=config
+                model="gemini-1.5-flash",
+                contents="What is 2+2?",
+                config=config,
             )
 
     (event,) = events
     invoke_span = event["spans"][0]
 
-    # Check that system instruction is included in messages
+    if expected_texts is None:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["data"]
+        return
+
     # (PII is enabled and include_prompts is True in this test)
-    messages_str = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    # Parse the JSON string to verify content
-    messages = json.loads(messages_str)
-    assert len(messages) == 2
-    assert messages[0] == {"role": "system", "content": "You are a helpful assistant"}
-    assert messages[1] == {"role": "user", "content": "What is 2+2?"}
+    system_instructions = json.loads(
+        invoke_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+    )
+
+    assert system_instructions == [
+        {"type": "text", "content": text} for text in expected_texts
+    ]
 
 
 def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):
@@ -933,10 +973,8 @@ def test_google_genai_message_truncation(
         with start_transaction(name="google_genai"):
             mock_genai_client.models.generate_content(
                 model="gemini-1.5-flash",
-                contents=small_content,
-                config=create_test_config(
-                    system_instruction=large_content,
-                ),
+                contents=[large_content, small_content],
+                config=create_test_config(),
             )
 
     (event,) = events
