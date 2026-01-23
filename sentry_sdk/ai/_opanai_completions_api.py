@@ -1,8 +1,8 @@
+from collections.abc import Iterable
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Iterable
-
     from sentry_sdk._types import TextPart
 
     from openai.types.chat import (
