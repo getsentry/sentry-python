@@ -359,3 +359,7 @@ if TYPE_CHECKING:
     )
 
     HttpStatusCodeRange = Union[int, Container[int]]
+
+    class TextPart(TypedDict):
+        type: Literal["text"]
+        content: str

@@ -514,6 +514,59 @@ async def test_model_settings(sentry_init, capture_events, test_agent_with_setti
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_system_prompt_attribute(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
+    """
+    Test that system prompts are included as the first message.
+    """
+    agent = Agent(
+        "test",
+        name="test_system",
+        system_prompt="You are a helpful assistant specialized in testing.",
+    )
+
+    sentry_init(
+        integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+
+    events = capture_events()
+
+    await agent.run("Hello")
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # The transaction IS the invoke_agent span, check for messages in chat spans instead
+    chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+    assert len(chat_spans) >= 1
+
+    chat_span = chat_spans[0]
+
+    if send_default_pii and include_prompts:
+        system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        assert json.loads(system_instructions) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant specialized in testing.",
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
+
+
+@pytest.mark.asyncio
 async def test_error_handling(sentry_init, capture_events):
     """
     Test error handling in agent execution.
@@ -1144,6 +1197,63 @@ async def test_invoke_agent_with_list_user_prompt(sentry_init, capture_events):
         ]
         assert "First part" in messages_str
         assert "Second part" in messages_str
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_invoke_agent_with_instructions(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
+    """
+    Test that invoke_agent span handles instructions correctly.
+    """
+    from pydantic_ai import Agent
+
+    # Create agent with instructions (can be string or list)
+    agent = Agent(
+        "test",
+        name="test_instructions",
+    )
+
+    # Add instructions via _instructions attribute (internal API)
+    agent._instructions = ["Instruction 1", "Instruction 2"]
+    agent._system_prompts = ["System prompt"]
+
+    sentry_init(
+        integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+
+    events = capture_events()
+
+    await agent.run("Test input")
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # The transaction IS the invoke_agent span, check for messages in chat spans instead
+    chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+    assert len(chat_spans) >= 1
+
+    chat_span = chat_spans[0]
+
+    if send_default_pii and include_prompts:
+        system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        assert json.loads(system_instructions) == [
+            {"type": "text", "content": "System prompt"},
+            {"type": "text", "content": "Instruction 1\nInstruction 2"},
+        ]
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
 
 
 @pytest.mark.asyncio

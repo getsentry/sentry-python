@@ -32,16 +32,20 @@ from sentry_sdk.utils import (
     event_from_exception,
     safe_serialize,
 )
-from google.genai.types import GenerateContentConfig
+from google.genai.types import GenerateContentConfig, Part, Content
+from itertools import chain
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
     from google.genai.types import (
         GenerateContentResponse,
         ContentListUnion,
+        ContentUnionDict,
         Tool,
         Model,
         EmbedContentResponse,
+        ContentUnion,
     )
 
 
@@ -720,6 +724,62 @@ def extract_finish_reasons(
     return finish_reasons if finish_reasons else None
 
 
+def _transform_system_instruction_one_level(
+    system_instructions: "Union[ContentUnionDict, ContentUnion]",
+    can_be_content: bool,
+) -> "list[TextPart]":
+    text_parts: "list[TextPart]" = []
+
+    if isinstance(system_instructions, str):
+        return [{"type": "text", "content": system_instructions}]
+
+    if isinstance(system_instructions, Part) and system_instructions.text:
+        return [{"type": "text", "content": system_instructions.text}]
+
+    if can_be_content and isinstance(system_instructions, Content):
+        if isinstance(system_instructions.parts, list):
+            for part in system_instructions.parts:
+                if isinstance(part.text, str):
+                    text_parts.append({"type": "text", "content": part.text})
+        return text_parts
+
+    if isinstance(system_instructions, dict) and system_instructions.get("text"):
+        return [{"type": "text", "content": system_instructions["text"]}]
+
+    elif can_be_content and isinstance(system_instructions, dict):
+        parts = system_instructions.get("parts", [])
+        for part in parts:
+            if isinstance(part, Part) and isinstance(part.text, str):
+                text_parts.append({"type": "text", "content": part.text})
+            elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                text_parts.append({"type": "text", "content": part["text"]})
+        return text_parts
+
+    return text_parts
+
+
+def _transform_system_instructions(
+    system_instructions: "Union[ContentUnionDict, ContentUnion]",
+) -> "list[TextPart]":
+    text_parts: "list[TextPart]" = []
+
+    if isinstance(system_instructions, list):
+        text_parts = list(
+            chain.from_iterable(
+                _transform_system_instruction_one_level(
+                    instructions, can_be_content=False
+                )
+                for instructions in system_instructions
+            )
+        )
+
+        return text_parts
+
+    return _transform_system_instruction_one_level(
+        system_instructions, can_be_content=True
+    )
+
+
 def set_span_data_for_request(
     span: "Span",
     integration: "Any",
@@ -741,27 +801,19 @@ def set_span_data_for_request(
         messages = []
 
         # Add system instruction if present
+        system_instructions = None
         if config and hasattr(config, "system_instruction"):
-            system_instruction = config.system_instruction
-            if system_instruction:
-                system_messages = extract_contents_messages(system_instruction)
-                # System instruction should be a single system message
-                # Extract text from all messages and combine into one system message
-                system_texts = []
-                for msg in system_messages:
-                    content = msg.get("content")
-                    if isinstance(content, list):
-                        # Extract text from content parts
-                        for part in content:
-                            if isinstance(part, dict) and part.get("type") == "text":
-                                system_texts.append(part.get("text", ""))
-                    elif isinstance(content, str):
-                        system_texts.append(content)
+            system_instructions = config.system_instruction
+        elif isinstance(config, dict) and "system_instruction" in config:
+            system_instructions = config.get("system_instruction")
 
-                if system_texts:
-                    messages.append(
-                        {"role": "system", "content": " ".join(system_texts)}
-                    )
+        if system_instructions is not None:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                _transform_system_instructions(system_instructions),
+                unpack=False,
+            )
 
         # Extract messages from contents
         contents_messages = extract_contents_messages(contents)
