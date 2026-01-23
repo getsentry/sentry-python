@@ -1,7 +1,15 @@
+import asyncio
 import time
+import sys
 from unittest import mock
 
+import pytest
+
 import sentry_sdk
+
+minimum_python_38 = pytest.mark.skipif(
+    sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
+)
 
 
 def envelopes_to_spans(envelopes):
@@ -320,6 +328,135 @@ def test_sibling_segments_new_trace(sentry_init, capture_envelopes):
     assert segment2["parent_span_id"] is None
 
     assert segment1["trace_id"] != segment2["trace_id"]
+
+
+def test_continue_trace_sampled(sentry_init, capture_envelopes):
+    sentry_init(
+        # parent sampling decision takes precedence over traces_sample_rate
+        traces_sample_rate=0.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+    sample_rand = "0.222222"
+    sampled = "1"
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
+            "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5,sentry-sample_rand={sample_rand}",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="segment") as span:
+        ...
+
+    assert span.sampled is True
+    assert span.trace_id == trace_id
+    assert span.parent_span_id == parent_span_id
+    assert span._sample_rand == float(sample_rand)
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (segment,) = spans
+
+    assert segment["is_segment"] is True
+    assert segment["parent_span_id"] == parent_span_id
+    assert segment["trace_id"] == trace_id
+
+
+def test_continue_trace_unsampled(sentry_init, capture_envelopes):
+    sentry_init(
+        # parent sampling decision takes precedence over traces_sample_rate
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+    sample_rand = "0.999999"
+    sampled = "0"
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
+            "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5,sentry-sample_rand={sample_rand}",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="segment") as span:
+        ...
+
+    assert span.sampled is False
+    assert span.trace_id == trace_id
+    assert span.parent_span_id == parent_span_id
+    assert span._sample_rand == float(sample_rand)
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 0
+
+
+def test_trace_decorator(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    @sentry_sdk.traces.trace
+    def traced_function(): ...
+
+    traced_function()
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert (
+        span["name"]
+        == "test_span_streaming.test_trace_decorator.<locals>.traced_function"
+    )
+    assert span["status"] == "ok"
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+def test_trace_decorator_async(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    @sentry_sdk.traces.trace
+    async def traced_function(): ...
+
+    asyncio.run(traced_function())
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert (
+        span["name"]
+        == "test_span_streaming.test_trace_decorator_async.<locals>.traced_function"
+    )
+    assert span["status"] == "ok"
 
 
 def test_transport_format(sentry_init, capture_envelopes):
