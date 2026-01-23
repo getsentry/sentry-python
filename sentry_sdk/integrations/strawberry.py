@@ -8,6 +8,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -55,7 +56,6 @@ if TYPE_CHECKING:
     from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext
     from sentry_sdk._types import Event, EventProcessor
-    from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span
 
 
