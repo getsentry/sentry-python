@@ -216,30 +216,30 @@ class SentryAsgiMiddleware:
 
                     span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
                     if span_streaming:
-                        span = None
+                        segment: "Optional[StreamedSpan]" = None
                         if ty in ("http", "websocket"):
                             if (
                                 ty == "websocket"
                                 or method in self.http_methods_to_capture
                             ):
                                 sentry_sdk.traces.continue_trace(_get_headers(scope))
-                                span = sentry_sdk.traces.start_span(
+                                segment = sentry_sdk.traces.start_span(
                                     name=transaction_name
                                 )
-                                span.set_op(f"{ty}.server")
+                                segment.set_op(f"{ty}.server")
                         else:
                             sentry_sdk.traces.new_trace()
-                            span = sentry_sdk.traces.start_span(
+                            segment = sentry_sdk.traces.start_span(
                                 name=transaction_name,
                             )
-                            span.set_op(OP.HTTP_SERVER)
+                            segment.set_op(OP.HTTP_SERVER)
 
-                        if span is not None:
-                            span.set_source(transaction_source)
-                            span.set_origin(self.span_origin)
-                            span.set_attribute("asgi.type", ty)
+                        if segment is not None:
+                            segment.set_source(transaction_source)
+                            segment.set_origin(self.span_origin)
+                            segment.set_attribute("asgi.type", ty)
 
-                        span_ctx = span or nullcontext()
+                        span_ctx = segment or nullcontext()
 
                     else:
                         transaction = None
