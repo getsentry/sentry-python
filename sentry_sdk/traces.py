@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue, SamplingContext
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
-    from sentry_sdk.scope import Scope
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -243,7 +242,7 @@ class StreamedSpan:
         self,
         *,
         name: str,
-        scope: "Scope",
+        scope: "sentry_sdk.Scope",
         attributes: "Optional[Attributes]" = None,
         # TODO[span-first]: would be good to actually take this propagation
         # context stuff directly from the PropagationContext, but for that
