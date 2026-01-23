@@ -190,24 +190,33 @@ def _get_current_agent() -> "Optional[str]":
     return None
 
 
-def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[TextPart]":
+def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[str]":
     system_instructions = []
 
     for list_ in messages:
         for message in list_:
-            if message.type == "system":
-                system_instructions.append(message)
+            # type of content: str | list[str | dict] | None
+            if message.type == "system" and isinstance(message.content, str):
+                system_instructions.append(message.content)
+
+            elif message.type == "system" and isinstance(message.content, list):
+                # content_blocks accessor standardizes string and dict elements
+                for block in message.content_blocks:
+                    if block.get("type") == "text":
+                        text = block.get("text", None)
+                        if text is not None:
+                            system_instructions.append(text)
 
     return system_instructions
 
 
 def _transform_system_instructions(
-    system_instructions: "List[BaseMessage]",
+    system_instructions: "List[str]",
 ) -> "List[TextPart]":
     return [
         {
             "type": "text",
-            "content": instruction.content,
+            "content": instruction,
         }
         for instruction in system_instructions
     ]
