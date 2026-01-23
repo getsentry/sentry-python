@@ -1,5 +1,6 @@
 import sys
 from functools import wraps
+from collections.abc import Iterable
 
 import sentry_sdk
 from sentry_sdk import consts
@@ -31,7 +32,6 @@ if TYPE_CHECKING:
         AsyncIterator,
         Iterator,
         Union,
-        Iterable,
     )
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
@@ -205,14 +205,13 @@ def _is_system_instruction_completions(message: "ChatCompletionMessageParam") ->
 
 def _get_system_instructions_completions(
     messages: "Iterable[ChatCompletionMessageParam]",
-) -> "list[ChatCompletionSystemMessageParam]":
-    system_instructions = []
+) -> "list[ChatCompletionMessageParam]":
+    if not isinstance(messages, Iterable):
+        return []
 
-    for message in messages:
-        if _is_system_instruction_completions(message):
-            system_instructions.append(message)
-
-    return system_instructions
+    return [
+        message for message in messages if _is_system_instruction_completions(message)
+    ]
 
 
 def _is_system_instruction_responses(message: "ResponseInputItemParam") -> bool:
@@ -226,20 +225,16 @@ def _is_system_instruction_responses(message: "ResponseInputItemParam") -> bool:
 def _get_system_instructions_responses(
     messages: "Union[str, ResponseInputParam]",
 ) -> "list[ResponseInputItemParam]":
-    if isinstance(messages, str):
+    if not isinstance(messages, list):
         return []
 
-    system_instructions = []
-
-    for message in messages:
-        if _is_system_instruction_responses(message):
-            system_instructions.append(message)
-
-    return system_instructions
+    return [
+        message for message in messages if _is_system_instruction_responses(message)
+    ]
 
 
 def _transform_system_instructions(
-    system_instructions: "list[ChatCompletionSystemMessageParam]",
+    system_instructions: "list[ChatCompletionMessageParam]",
 ) -> "list[TextPart]":
     instruction_text_parts: "list[TextPart]" = []
 
