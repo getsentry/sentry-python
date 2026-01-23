@@ -9,6 +9,15 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     truncate_and_annotate_messages,
 )
+from sentry_sdk.ai._opanai_completions_api import (
+    _is_system_instruction as _is_system_instruction_completions,
+    _get_system_instructions as _get_system_instructions_completions,
+    _transform_system_instructions,
+)
+from sentry_sdk.ai._openai_responses_api import (
+    _is_system_instruction as _is_system_instruction_responses,
+    _get_system_instructions as _get_system_instructions_responses,
+)
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -36,7 +45,7 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
-    from openai.types.responses import ResponseInputParam, ResponseInputItemParam
+    from openai.types.responses import ResponseInputParam
     from openai import Omit
 
 try:
@@ -197,69 +206,6 @@ def _calculate_token_usage(
         output_tokens_reasoning=output_tokens_reasoning,
         total_tokens=total_tokens,
     )
-
-
-def _is_system_instruction_completions(message: "ChatCompletionMessageParam") -> bool:
-    return isinstance(message, dict) and message.get("role") == "system"
-
-
-def _get_system_instructions_completions(
-    messages: "Iterable[ChatCompletionMessageParam]",
-) -> "list[ChatCompletionSystemMessageParam]":
-    system_instructions = []
-
-    for message in messages:
-        if _is_system_instruction_completions(message):
-            system_instructions.append(message)
-
-    return system_instructions
-
-
-def _is_system_instruction_responses(message: "ResponseInputItemParam") -> bool:
-    return (
-        isinstance(message, dict)
-        and message.get("type") == "message"
-        and message.get("role") == "system"
-    )
-
-
-def _get_system_instructions_responses(
-    messages: "Union[str, ResponseInputParam]",
-) -> "list[ResponseInputItemParam]":
-    if isinstance(messages, str):
-        return []
-
-    system_instructions = []
-
-    for message in messages:
-        if _is_system_instruction_responses(message):
-            system_instructions.append(message)
-
-    return system_instructions
-
-
-def _transform_system_instructions(
-    system_instructions: "list[ChatCompletionSystemMessageParam]",
-) -> "list[TextPart]":
-    instruction_text_parts: "list[TextPart]" = []
-
-    for instruction in system_instructions:
-        if not isinstance(instruction, dict):
-            continue
-
-        content = instruction.get("content")
-
-        if isinstance(content, str):
-            instruction_text_parts.append({"type": "text", "content": content})
-
-        elif isinstance(content, list):
-            for part in content:
-                if isinstance(part, dict) and part.get("type") == "text":
-                    text = part.get("text", "")
-                    if text:
-                        instruction_text_parts.append({"type": "text", "content": text})
-
-    return instruction_text_parts
 
 
 def _get_input_messages(

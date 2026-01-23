@@ -498,7 +498,43 @@ async def test_max_turns_before_handoff_span(sentry_init, capture_events, mock_u
 
 
 @pytest.mark.asyncio
-async def test_tool_execution_span(sentry_init, capture_events, test_agent):
+@pytest.mark.parametrize(
+    "input",
+    [
+        pytest.param(
+            "Please use the simple test tool",
+            id="string",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": "You are very powerful assistant, but don't know current events",
+                },
+                {"role": "user", "content": "Please use the simple test tool"},
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {"role": "user", "content": "Please use the simple test tool"},
+            ],
+            id="parts",
+        ),
+    ],
+)
+async def test_tool_execution_span(
+    sentry_init, capture_events, test_agent, input, request
+):
     """
     Test tool execution span creation.
     """
@@ -569,7 +605,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
 
             await agents.Runner.run(
                 agent_with_tool,
-                "Please use the simple test tool",
+                input,
                 run_config=test_run_config,
             )
 
@@ -625,20 +661,39 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span1["data"]["gen_ai.request.available_tools"] == available_tools
     assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
+
+    param_id = request.node.callspec.id
+    if "string" in param_id:
+        assert ai_client_span1["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [{"type": "text", "content": "You are a helpful test assistant."}]
+        )
+    elif "blocks" in param_id:
+        assert ai_client_span1["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful test assistant."},
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                },
+            ]
+        )
+    else:
+        assert ai_client_span1["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful test assistant."},
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+
     assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
         [
-            {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
             {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": "Please use the simple test tool"}
                 ],
-            },
+            }
         ]
     )
     assert ai_client_span1["data"]["gen_ai.request.model"] == "gpt-4"
@@ -696,14 +751,31 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         == available_tools
     )
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
+    if "string" in param_id:
+        assert ai_client_span2["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [{"type": "text", "content": "You are a helpful test assistant."}]
+        )
+    elif "blocks" in param_id:
+        assert ai_client_span1["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful test assistant."},
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                },
+            ]
+        )
+    else:
+        assert ai_client_span1["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful test assistant."},
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+
     assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
         [
-            {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
             {
                 "role": "user",
                 "content": [
@@ -950,7 +1022,43 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_error_captures_input_data(sentry_init, capture_events, test_agent):
+@pytest.mark.parametrize(
+    "input",
+    [
+        pytest.param(
+            "Test input",
+            id="string",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": "You are very powerful assistant, but don't know current events",
+                },
+                {"role": "user", "content": "Test input"},
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {"role": "user", "content": "Test input"},
+            ],
+            id="parts",
+        ),
+    ],
+)
+async def test_error_captures_input_data(
+    sentry_init, capture_events, test_agent, input, request
+):
     """
     Test that input data is captured even when the API call raises an exception.
     This verifies that _set_input_data is called before the API call.
@@ -970,9 +1078,7 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
             events = capture_events()
 
             with pytest.raises(Exception, match="API Error"):
-                await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
-                )
+                await agents.Runner.run(test_agent, input, run_config=test_run_config)
 
     (
         error_event,
@@ -989,15 +1095,33 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
     assert ai_client_span["status"] == "internal_error"
     assert ai_client_span["tags"]["status"] == "internal_error"
 
+    param_id = request.node.callspec.id
+    if "string" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [{"type": "text", "content": "You are a helpful test assistant."}]
+        )
+    elif "blocks" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful test assistant."},
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                },
+            ]
+        )
+    else:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful test assistant."},
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+
     assert "gen_ai.request.messages" in ai_client_span["data"]
     request_messages = safe_serialize(
         [
-            {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
             {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
         ]
     )
