@@ -151,8 +151,12 @@ def test_agent_custom_model():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "send_default_pii",
+    (True, False),
+)
 async def test_agent_invocation_span(
-    sentry_init, capture_events, test_agent, mock_model_response
+    sentry_init, capture_events, test_agent, mock_model_response, send_default_pii
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -167,7 +171,7 @@ async def test_agent_invocation_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                send_default_pii=True,
+                send_default_pii=send_default_pii,
             )
 
             events = capture_events()
@@ -187,21 +191,27 @@ async def test_agent_invocation_span(
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
-    assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
-        [
-            {
-                "content": [
-                    {"text": "You are a helpful test assistant.", "type": "text"}
-                ],
-                "role": "system",
-            },
-            {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
-        ]
-    )
-    assert (
-        invoke_agent_span["data"]["gen_ai.response.text"]
-        == "Hello, how can I help you?"
-    )
+
+    if send_default_pii:
+        assert invoke_agent_span["data"][
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS
+        ] == safe_serialize(
+            [{"type": "text", "content": "You are a helpful test assistant."}]
+        )
+        assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
+            [
+                {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
+            ]
+        )
+        assert (
+            invoke_agent_span["data"]["gen_ai.response.text"]
+            == "Hello, how can I help you?"
+        )
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["data"]
+        assert "gen_ai.request.messages" not in invoke_agent_span["data"]
+        assert "gen_ai.response.text" not in invoke_agent_span["data"]
+
     assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
     assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
     assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
