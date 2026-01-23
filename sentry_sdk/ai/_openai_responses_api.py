@@ -14,7 +14,7 @@ def _is_system_instruction(message: "ResponseInputItemParam") -> bool:
     )
 
 
-def _get_system_instructions_responses(
+def _get_system_instructions(
     messages: "Union[str, ResponseInputParam]",
 ) -> "list[ResponseInputItemParam]":
     if not isinstance(messages, list):

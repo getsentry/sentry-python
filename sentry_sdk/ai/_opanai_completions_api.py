@@ -15,7 +15,7 @@ def _is_system_instruction(message: "ChatCompletionMessageParam") -> bool:
     return isinstance(message, dict) and message.get("role") == "system"
 
 
-def _get_system_instructions_completions(
+def _get_system_instructions(
     messages: "Iterable[ChatCompletionMessageParam]",
 ) -> "list[ChatCompletionMessageParam]":
     if not isinstance(messages, Iterable):
