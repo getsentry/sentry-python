@@ -379,7 +379,7 @@ def _set_responses_api_input_data(
         message for message in messages if not _is_system_instruction_responses(message)
     ]
     if len(non_system_messages) > 0:
-        normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
+        normalized_messages = normalize_message_roles(non_system_messages)
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
         if messages_data is not None:
