@@ -214,24 +214,6 @@ def _get_system_instructions_completions(
     ]
 
 
-def _is_system_instruction_responses(message: "ResponseInputItemParam") -> bool:
-    if not isinstance(message, dict) or not message.get("role") == "system":
-        return False
-
-    return "type" not in message or message["type"] == "message"
-
-
-def _get_system_instructions_responses(
-    messages: "Union[str, ResponseInputParam]",
-) -> "list[ResponseInputItemParam]":
-    if not isinstance(messages, list):
-        return []
-
-    return [
-        message for message in messages if _is_system_instruction_responses(message)
-    ]
-
-
 def _transform_system_instructions(
     system_instructions: "list[ChatCompletionSystemMessageParam]",
 ) -> "list[TextPart]":
