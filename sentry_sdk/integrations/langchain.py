@@ -1,6 +1,7 @@
 import contextvars
 import itertools
 import sys
+import json
 import warnings
 from collections import OrderedDict
 from functools import wraps
@@ -469,7 +470,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 if len(system_instructions) > 0:
                     span.set_data(
                         SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                        _transform_system_instructions(system_instructions),
+                        json.dumps(_transform_system_instructions(system_instructions)),
                     )
 
                 normalized_messages = []

@@ -1,3 +1,5 @@
+import json
+
 import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.utils import (
@@ -103,8 +105,10 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
     if len(permanent_instructions) > 0 or len(current_instructions) > 0:
         span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            _transform_system_instructions(
-                permanent_instructions, current_instructions
+            json.dumps(
+                _transform_system_instructions(
+                    permanent_instructions, current_instructions
+                )
             ),
         )
 

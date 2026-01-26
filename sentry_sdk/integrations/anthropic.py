@@ -1,4 +1,5 @@
 import sys
+import json
 from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING
@@ -219,7 +220,7 @@ def _set_input_data(
         ):
             span.set_data(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                _transform_system_instructions(system_instructions),
+                json.dumps(_transform_system_instructions(system_instructions)),
             )
 
         normalized_messages = []

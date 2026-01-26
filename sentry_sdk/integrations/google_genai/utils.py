@@ -1,4 +1,5 @@
 import copy
+import json
 import inspect
 from functools import wraps
 from .consts import ORIGIN, TOOL_ATTRIBUTES_MAP, GEN_AI_SYSTEM
@@ -810,7 +811,7 @@ def set_span_data_for_request(
         if system_instructions is not None:
             span.set_data(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                _transform_system_instructions(system_instructions),
+                json.dumps(_transform_system_instructions(system_instructions)),
             )
 
         # Extract messages from contents

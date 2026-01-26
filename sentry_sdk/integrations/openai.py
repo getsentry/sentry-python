@@ -1,4 +1,5 @@
 import sys
+import json
 from functools import wraps
 
 import sentry_sdk
@@ -273,12 +274,14 @@ def _set_responses_api_input_data(
     ):
         span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            [
-                {
-                    "type": "text",
-                    "content": explicit_instructions,
-                }
-            ],
+            json.dumps(
+                [
+                    {
+                        "type": "text",
+                        "content": explicit_instructions,
+                    }
+                ]
+            ),
         )
 
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
@@ -307,7 +310,7 @@ def _set_responses_api_input_data(
     if len(instructions_text_parts) > 0:
         span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            _transform_system_instructions(system_instructions),
+            json.dumps(_transform_system_instructions(system_instructions)),
         )
 
     if isinstance(messages, str):
@@ -362,7 +365,7 @@ def _set_completions_api_input_data(
     if len(system_instructions) > 0:
         span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            _transform_system_instructions(system_instructions),
+            json.dumps(_transform_system_instructions(system_instructions)),
         )
 
     if isinstance(messages, str):
