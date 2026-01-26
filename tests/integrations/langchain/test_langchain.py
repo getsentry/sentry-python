@@ -75,8 +75,26 @@ class MockOpenAI(ChatOpenAI):
         (False, False, True),
     ],
 )
+@pytest.mark.parametrize(
+    "system_instructions_content",
+    [
+        "You are very powerful assistant, but don't know current events",
+        ["You are a helpful assistant.", "Be concise and clear."],
+        [
+            {"type": "text", "text": "You are a helpful assistant."},
+            {"type": "text", "text": "Be concise and clear."},
+        ],
+    ],
+    ids=["string", "list", "blocks"],
+)
 def test_langchain_agent(
-    sentry_init, capture_events, send_default_pii, include_prompts, use_unknown_llm_type
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    use_unknown_llm_type,
+    system_instructions_content,
+    request,
 ):
     global llm_type
     llm_type = "acme-llm" if use_unknown_llm_type else "openai-chat"
@@ -96,7 +114,7 @@ def test_langchain_agent(
         [
             (
                 "system",
-                "You are very powerful assistant, but don't know current events",
+                system_instructions_content,
             ),
             ("user", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -217,17 +235,30 @@ def test_langchain_agent(
         assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
     if send_default_pii and include_prompts:
-        assert (
-            "You are very powerful"
-            in chat_spans[0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
         assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
-        assert (
-            "You are very powerful"
-            in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
+
+        param_id = request.node.callspec.id
+        if "string" in param_id:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        else:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+
         assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
         # Verify tool calls are recorded when PII is enabled
@@ -243,8 +274,10 @@ def test_langchain_agent(
             tool_call_str = str(tool_calls_data)
             assert "get_word_length" in tool_call_str
     else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})

@@ -514,7 +514,18 @@ async def test_model_settings(sentry_init, capture_events, test_agent_with_setti
 
 
 @pytest.mark.asyncio
-async def test_system_prompt_in_messages(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_system_prompt_attribute(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
     """
     Test that system prompts are included as the first message.
     """
@@ -525,9 +536,9 @@ async def test_system_prompt_in_messages(sentry_init, capture_events):
     )
 
     sentry_init(
-        integrations=[PydanticAIIntegration()],
+        integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        send_default_pii=send_default_pii,
     )
 
     events = capture_events()
@@ -542,12 +553,17 @@ async def test_system_prompt_in_messages(sentry_init, capture_events):
     assert len(chat_spans) >= 1
 
     chat_span = chat_spans[0]
-    messages_str = chat_span["data"]["gen_ai.request.messages"]
 
-    # Messages is serialized as a string
-    # Should contain system role and helpful assistant text
-    assert "system" in messages_str
-    assert "helpful assistant" in messages_str
+    if send_default_pii and include_prompts:
+        system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        assert json.loads(system_instructions) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant specialized in testing.",
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
 
 
 @pytest.mark.asyncio
@@ -1184,7 +1200,18 @@ async def test_invoke_agent_with_list_user_prompt(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_invoke_agent_with_instructions(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_invoke_agent_with_instructions(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
     """
     Test that invoke_agent span handles instructions correctly.
     """
@@ -1201,9 +1228,9 @@ async def test_invoke_agent_with_instructions(sentry_init, capture_events):
     agent._system_prompts = ["System prompt"]
 
     sentry_init(
-        integrations=[PydanticAIIntegration()],
+        integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        send_default_pii=send_default_pii,
     )
 
     events = capture_events()
@@ -1211,14 +1238,22 @@ async def test_invoke_agent_with_instructions(sentry_init, capture_events):
     await agent.run("Test input")
 
     (transaction,) = events
+    spans = transaction["spans"]
 
-    # Check that the invoke_agent transaction has messages data
-    if "gen_ai.request.messages" in transaction["contexts"]["trace"]["data"]:
-        messages_str = transaction["contexts"]["trace"]["data"][
-            "gen_ai.request.messages"
+    # The transaction IS the invoke_agent span, check for messages in chat spans instead
+    chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+    assert len(chat_spans) >= 1
+
+    chat_span = chat_spans[0]
+
+    if send_default_pii and include_prompts:
+        system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        assert json.loads(system_instructions) == [
+            {"type": "text", "content": "System prompt"},
+            {"type": "text", "content": "Instruction 1\nInstruction 2"},
         ]
-        # Should contain both instructions and system prompts
-        assert "Instruction" in messages_str or "System prompt" in messages_str
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
 
 
 @pytest.mark.asyncio
