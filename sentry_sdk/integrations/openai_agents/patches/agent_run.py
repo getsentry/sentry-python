@@ -137,8 +137,10 @@ def _patch_agent_run() -> None:
         try:
             result = await original_execute_handoffs(*args, **kwargs)
         except Exception:
-            _close_streaming_workflow_span(agent)
-            raise
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _close_streaming_workflow_span(agent)
+            reraise(*exc_info)
         finally:
             # End span for current agent after handoff processing is complete
             if agent and context_wrapper and _has_active_agent_span(context_wrapper):
@@ -163,10 +165,15 @@ def _patch_agent_run() -> None:
         try:
             result = await original_execute_final_output(*args, **kwargs)
         finally:
-            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-                end_invoke_agent_span(context_wrapper, agent, final_output)
-            # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
-            _close_streaming_workflow_span(agent)
+            with capture_internal_exceptions():
+                if (
+                    agent
+                    and context_wrapper
+                    and _has_active_agent_span(context_wrapper)
+                ):
+                    end_invoke_agent_span(context_wrapper, agent, final_output)
+                # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
+                _close_streaming_workflow_span(agent)
 
         return result
 
