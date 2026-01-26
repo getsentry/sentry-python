@@ -19,6 +19,15 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
+SKIP_TOOL_CALL_TESTS = False
+try:
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCall,
+        Function as ToolCallFunction,
+    )
+except ImportError:
+    SKIP_TOOL_CALL_TESTS = True
+
 SKIP_RESPONSES_TESTS = False
 
 try:
@@ -44,7 +53,7 @@ from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
 )
-from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
+from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES, transform_message_content
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.serializer import serialize
 
@@ -1509,6 +1518,127 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     assert "ai" not in roles
 
 
+def test_transform_message_content_image_url_to_blob():
+    """Test that OpenAI image_url message parts are correctly converted to blob format"""
+    content = [
+        {
+            "text": "How many ponies do you see in the image?",
+            "type": "text",
+        },
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+                "detail": "high",
+            },
+        },
+    ]
+
+    converted = transform_message_content(content)
+
+    assert isinstance(converted, list)
+    assert len(converted) == 2
+
+    # First item (text) should remain unchanged
+    assert converted[0] == {
+        "text": "How many ponies do you see in the image?",
+        "type": "text",
+    }
+
+    # Second item (image_url) should be converted to blob format
+    blob_item = converted[1]
+    assert blob_item["type"] == "blob"
+    assert blob_item["modality"] == "image"
+    assert blob_item["mime_type"] == "image/jpeg"
+    assert blob_item["content"] == "/9j/4AAQSkZJRg=="
+    # Verify the original image_url structure is replaced
+    assert "image_url" not in blob_item
+
+
+def test_transform_message_content_image_url_to_uri():
+    """Test that OpenAI image_url with non-data URLs are converted to uri format"""
+    content = [
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": "https://example.com/image.jpg",
+                "detail": "low",
+            },
+        },
+    ]
+
+    converted = transform_message_content(content)
+
+    assert len(converted) == 1
+    uri_item = converted[0]
+    assert uri_item["type"] == "uri"
+    assert uri_item["uri"] == "https://example.com/image.jpg"
+    # Verify the original image_url structure is replaced
+    assert "image_url" not in uri_item
+
+
+def test_transform_message_content_malformed_data_uri():
+    """Test that malformed data URIs are handled gracefully without crashing"""
+    content = [
+        {
+            "type": "image_url",
+            "image_url": {
+                # Malformed: missing ;base64, and comma separator
+                "url": "data:image/jpeg",
+            },
+        },
+    ]
+
+    # Should not raise an exception
+    converted = transform_message_content(content)
+
+    assert len(converted) == 1
+    # Malformed data URI should fall back to uri type
+    item = converted[0]
+    assert item["type"] == "uri"
+    assert item["uri"] == "data:image/jpeg"
+    assert item["modality"] == "image"
+
+
+def test_transform_message_content_image_url_as_string():
+    """Test that image_url as a string (instead of dict) is handled gracefully"""
+    content = [
+        {
+            "type": "image_url",
+            # Some implementations pass image_url as a string directly
+            "image_url": "https://example.com/image.jpg",
+        },
+    ]
+
+    # Should not raise an exception
+    converted = transform_message_content(content)
+
+    assert len(converted) == 1
+    item = converted[0]
+    assert item["type"] == "uri"
+    assert item["modality"] == "image"
+    assert item["uri"] == "https://example.com/image.jpg"
+
+
+def test_transform_message_content_image_url_as_string_data_uri():
+    """Test that image_url as a data URI string is correctly converted to blob"""
+    content = [
+        {
+            "type": "image_url",
+            "image_url": "data:image/png;base64,iVBORw0KGgo=",
+        },
+    ]
+
+    converted = transform_message_content(content)
+
+    assert len(converted) == 1
+    item = converted[0]
+    assert item["type"] == "blob"
+    assert item["modality"] == "image"
+    assert item["mime_type"] == "image/png"
+    assert item["content"] == "iVBORw0KGgo="
+
+
 def test_openai_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in OpenAI integration."""
     sentry_init(
@@ -1559,3 +1689,268 @@ def test_openai_message_truncation(sentry_init, capture_events):
             if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_meta:
                 messages_meta = span_meta[SPANDATA.GEN_AI_REQUEST_MESSAGES]
                 assert "len" in messages_meta.get("", {})
+
+
+def test_response_text_is_string_not_dict(sentry_init, capture_events):
+    """Test that gen_ai.response.text is a string, not a message dict.
+
+    With set_data_normalized, a single-element list is unpacked to the element,
+    so ["the model response"] becomes just "the model response".
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model", messages=[{"role": "system", "content": "hello"}]
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Verify response text is in span data
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
+
+    response_text = span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+    # For a single response, set_data_normalized unpacks the list, so it's the string directly
+    assert isinstance(response_text, str)
+    assert response_text == "the model response"
+
+    # Make sure it's NOT a JSON string containing a dict (the old buggy format)
+    # The old format was like '{"content": "...", "role": "assistant", ...}'
+    try:
+        parsed = json.loads(response_text)
+        # If it parses as JSON, it should NOT be a dict
+        assert not isinstance(parsed, dict), "Response text should not be a dict"
+    except json.JSONDecodeError:
+        # If it's not valid JSON, that's fine - it's just the raw string
+        pass
+
+
+@pytest.mark.skipif(
+    SKIP_TOOL_CALL_TESTS, reason="Requires OpenAI types not available in older versions"
+)
+def test_chat_completion_with_tool_calls(sentry_init, capture_events):
+    """Test that tool calls are properly extracted to gen_ai.response.tool_calls."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    # Create a response with tool calls using proper OpenAI types
+    tool_call_response = ChatCompletion(
+        id="chat-id",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="tool_calls",
+                message=ChatCompletionMessage(
+                    role="assistant",
+                    content=None,  # Content is None when there are tool calls
+                    tool_calls=[
+                        ChatCompletionMessageToolCall(
+                            id="call_123",
+                            type="function",
+                            function=ToolCallFunction(
+                                name="get_weather",
+                                arguments='{"location": "Paris"}',
+                            ),
+                        ),
+                    ],
+                ),
+            )
+        ],
+        created=10000000,
+        model="response-model-id",
+        object="chat.completion",
+        usage=CompletionUsage(
+            completion_tokens=10,
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=tool_call_response)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "user", "content": "What's the weather in Paris?"}],
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Response text should NOT be present when content is None
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    # Tool calls should be extracted
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in span["data"]
+    tool_calls_data = span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+
+    # Should be serialized as JSON
+    assert isinstance(tool_calls_data, str)
+    parsed_tool_calls = json.loads(tool_calls_data)
+
+    assert isinstance(parsed_tool_calls, list)
+    assert len(parsed_tool_calls) == 1
+    assert parsed_tool_calls[0]["id"] == "call_123"
+    assert parsed_tool_calls[0]["type"] == "function"
+    assert parsed_tool_calls[0]["function"]["name"] == "get_weather"
+
+
+@pytest.mark.skipif(
+    SKIP_TOOL_CALL_TESTS, reason="Requires OpenAI types not available in older versions"
+)
+def test_chat_completion_with_content_and_tool_calls(sentry_init, capture_events):
+    """Test that both content and tool calls are captured when both are present."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    # Create a response with both content and tool calls using proper OpenAI types
+    response_with_both = ChatCompletion(
+        id="chat-id",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="tool_calls",
+                message=ChatCompletionMessage(
+                    role="assistant",
+                    content="I'll check the weather for you.",
+                    tool_calls=[
+                        ChatCompletionMessageToolCall(
+                            id="call_456",
+                            type="function",
+                            function=ToolCallFunction(
+                                name="get_weather",
+                                arguments='{"location": "London"}',
+                            ),
+                        ),
+                    ],
+                ),
+            )
+        ],
+        created=10000000,
+        model="response-model-id",
+        object="chat.completion",
+        usage=CompletionUsage(
+            completion_tokens=15,
+            prompt_tokens=25,
+            total_tokens=40,
+        ),
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=response_with_both)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "user", "content": "What's the weather in London?"}],
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    # Both should be present
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in span["data"]
+
+    # Verify response text - single element list gets unpacked to the element
+    response_text = span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert response_text == "I'll check the weather for you."
+
+    # Verify tool calls - single element list gets unpacked, then re-serialized as JSON
+    tool_calls_data = span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    assert isinstance(tool_calls_data, str)
+    tool_calls = json.loads(tool_calls_data)
+    assert isinstance(tool_calls, list)
+    assert len(tool_calls) == 1
+    assert tool_calls[0]["function"]["name"] == "get_weather"
+
+
+def test_chat_completion_multiple_choices(sentry_init, capture_events):
+    """Test that multiple choices are all captured in the response text."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    # Create a response with multiple choices
+    multi_choice_response = ChatCompletion(
+        id="chat-id",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="stop",
+                message=ChatCompletionMessage(
+                    role="assistant", content="Response option 1"
+                ),
+            ),
+            Choice(
+                index=1,
+                finish_reason="stop",
+                message=ChatCompletionMessage(
+                    role="assistant", content="Response option 2"
+                ),
+            ),
+            Choice(
+                index=2,
+                finish_reason="stop",
+                message=ChatCompletionMessage(
+                    role="assistant", content="Response option 3"
+                ),
+            ),
+        ],
+        created=10000000,
+        model="response-model-id",
+        object="chat.completion",
+        usage=CompletionUsage(
+            completion_tokens=30,
+            prompt_tokens=20,
+            total_tokens=50,
+        ),
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=multi_choice_response)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "user", "content": "Give me options"}],
+            n=3,
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
+    response_text = json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])
+
+    # Should have all 3 responses as strings
+    assert len(response_text) == 3
+    assert response_text[0] == "Response option 1"
+    assert response_text[1] == "Response option 2"
+    assert response_text[2] == "Response option 3"
+
+    # All should be strings
+    for item in response_text:
+        assert isinstance(item, str)
