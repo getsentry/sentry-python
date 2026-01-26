@@ -978,11 +978,10 @@ def test_google_genai_message_truncation(
             )
 
     (event,) = events
-    _, chat_span = event["spans"]
+    invoke_span = event["spans"][0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
 
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
-
-    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
     parsed_messages = json.loads(messages_data)
@@ -991,7 +990,7 @@ def test_google_genai_message_truncation(
     assert parsed_messages[0]["role"] == "user"
     assert small_content in parsed_messages[0]["content"]
 
-    assert chat_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 2
+    assert invoke_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 2
     assert (
         event["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 2
     )
