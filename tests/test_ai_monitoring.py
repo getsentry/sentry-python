@@ -320,7 +320,7 @@ class TestTruncateMessagesBySize:
 
 
 class TestTruncateAndAnnotateMessages:
-    def test_no_truncation_returns_list(self, sample_messages):
+    def test_only_keeps_last_message(self, sample_messages):
         class MockSpan:
             def __init__(self):
                 self.span_id = "test_span_id"
@@ -339,9 +339,8 @@ class TestTruncateAndAnnotateMessages:
 
         assert isinstance(result, list)
         assert not isinstance(result, AnnotatedValue)
-        assert len(result) == len(sample_messages)
-        assert result == sample_messages
-        assert span.span_id not in scope._gen_ai_original_message_count
+        assert len(result) == 1
+        assert result[0] == sample_messages[-1]
 
     def test_truncation_sets_metadata_on_scope(self, large_messages):
         class MockSpan:
@@ -361,7 +360,7 @@ class TestTruncateAndAnnotateMessages:
         scope = MockScope()
         original_count = len(large_messages)
         result = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
+            large_messages, span, scope, max_single_message_chars=small_limit
         )
 
         assert isinstance(result, list)
@@ -388,7 +387,7 @@ class TestTruncateAndAnnotateMessages:
         scope = MockScope()
 
         result = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
+            large_messages, span, scope, max_single_message_chars=small_limit
         )
 
         assert scope._gen_ai_original_message_count[span.span_id] == original_count
@@ -432,7 +431,7 @@ class TestTruncateAndAnnotateMessages:
         span = MockSpan()
         scope = MockScope()
         result = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
+            large_messages, span, scope, max_single_message_chars=small_limit
         )
 
         assert isinstance(result, list)
@@ -507,7 +506,7 @@ class TestClientAnnotation:
 
         # Simulate what integrations do
         truncated_messages = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
+            large_messages, span, scope, max_single_message_chars=small_limit
         )
         span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, truncated_messages)
 
@@ -563,7 +562,7 @@ class TestClientAnnotation:
         original_message_count = len(large_messages)
 
         truncated_messages = truncate_and_annotate_messages(
-            large_messages, span, scope, max_bytes=small_limit
+            large_messages, span, scope, max_single_message_chars=small_limit
         )
 
         assert len(truncated_messages) < original_message_count
