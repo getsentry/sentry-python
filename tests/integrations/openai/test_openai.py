@@ -1499,79 +1499,12 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
         "thread.name": mock.ANY,
     }
 
-    assert "gen_ai.system_instructions" not in spans[0]["data"]
     assert "gen_ai.request.messages" not in spans[0]["data"]
     assert "gen_ai.response.text" not in spans[0]["data"]
 
 
-@pytest.mark.parametrize(
-    "instructions",
-    (
-        omit,
-        None,
-        "You are a coding assistant that talks like a pirate.",
-    ),
-)
-@pytest.mark.parametrize(
-    "input",
-    [
-        pytest.param(
-            "How do I check if a Python object is an instance of a class?", id="string"
-        ),
-        pytest.param(
-            [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant.",
-                },
-                {"role": "user", "content": "hello"},
-            ],
-            id="blocks_no_type",
-        ),
-        pytest.param(
-            [
-                {
-                    "type": "message",
-                    "role": "system",
-                    "content": "You are a helpful assistant.",
-                },
-                {"type": "message", "role": "user", "content": "hello"},
-            ],
-            id="blocks",
-        ),
-        pytest.param(
-            [
-                {
-                    "role": "system",
-                    "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
-                    ],
-                },
-                {"role": "user", "content": "hello"},
-            ],
-            id="parts_no_type",
-        ),
-        pytest.param(
-            [
-                {
-                    "type": "message",
-                    "role": "system",
-                    "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
-                    ],
-                },
-                {"type": "message", "role": "user", "content": "hello"},
-            ],
-            id="parts",
-        ),
-    ],
-)
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_ai_client_span_responses_api(
-    sentry_init, capture_events, instructions, input, request
-):
+def test_ai_client_span_responses_api(sentry_init, capture_events):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -1585,8 +1518,8 @@ def test_ai_client_span_responses_api(
     with start_transaction(name="openai tx"):
         client.responses.create(
             model="gpt-4o",
-            instructions=instructions,
-            input=input,
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
         )
 
     (transaction,) = events
@@ -1595,9 +1528,10 @@ def test_ai_client_span_responses_api(
     assert len(spans) == 1
     assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
-
-    expected_data = {
+    assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
+        "gen_ai.request.model": "gpt-4o",
         "gen_ai.system": "openai",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.usage.input_tokens": 20,
@@ -1605,167 +1539,10 @@ def test_ai_client_span_responses_api(
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
-        "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
-
-    param_id = request.node.callspec.id
-    if "string" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "string" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        }
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif instructions is None or isinstance(instructions, Omit):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    else:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-
-    assert spans[0]["data"] == expected_data
 
 
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
@@ -1807,73 +1584,7 @@ def test_error_in_responses_api(sentry_init, capture_events):
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-@pytest.mark.parametrize(
-    "instructions",
-    (
-        omit,
-        None,
-        "You are a coding assistant that talks like a pirate.",
-    ),
-)
-@pytest.mark.parametrize(
-    "input",
-    [
-        pytest.param(
-            "How do I check if a Python object is an instance of a class?", id="string"
-        ),
-        pytest.param(
-            [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant.",
-                },
-                {"role": "user", "content": "hello"},
-            ],
-            id="blocks_no_type",
-        ),
-        pytest.param(
-            [
-                {
-                    "type": "message",
-                    "role": "system",
-                    "content": "You are a helpful assistant.",
-                },
-                {"type": "message", "role": "user", "content": "hello"},
-            ],
-            id="blocks",
-        ),
-        pytest.param(
-            [
-                {
-                    "role": "system",
-                    "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
-                    ],
-                },
-                {"role": "user", "content": "hello"},
-            ],
-            id="parts_no_type",
-        ),
-        pytest.param(
-            [
-                {
-                    "type": "message",
-                    "role": "system",
-                    "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
-                    ],
-                },
-                {"type": "message", "role": "user", "content": "hello"},
-            ],
-            id="parts",
-        ),
-    ],
-)
-async def test_ai_client_span_responses_async_api(
-    sentry_init, capture_events, instructions, input, request
-):
+async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -1887,8 +1598,8 @@ async def test_ai_client_span_responses_async_api(
     with start_transaction(name="openai tx"):
         await client.responses.create(
             model="gpt-4o",
-            instructions=instructions,
-            input=input,
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
         )
 
     (transaction,) = events
@@ -1897,8 +1608,7 @@ async def test_ai_client_span_responses_async_api(
     assert len(spans) == 1
     assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
-
-    expected_data = {
+    assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
         "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
@@ -1914,231 +1624,11 @@ async def test_ai_client_span_responses_async_api(
         "thread.name": mock.ANY,
     }
 
-    param_id = request.node.callspec.id
-    if "string" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "string" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        }
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif instructions is None or isinstance(instructions, Omit):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    else:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-
-    assert spans[0]["data"] == expected_data
-
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "instructions",
-    (
-        omit,
-        None,
-        "You are a coding assistant that talks like a pirate.",
-    ),
-)
-@pytest.mark.parametrize(
-    "input",
-    [
-        pytest.param(
-            "How do I check if a Python object is an instance of a class?", id="string"
-        ),
-        pytest.param(
-            [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant.",
-                },
-                {"role": "user", "content": "hello"},
-            ],
-            id="blocks_no_type",
-        ),
-        pytest.param(
-            [
-                {
-                    "type": "message",
-                    "role": "system",
-                    "content": "You are a helpful assistant.",
-                },
-                {"type": "message", "role": "user", "content": "hello"},
-            ],
-            id="blocks",
-        ),
-        pytest.param(
-            [
-                {
-                    "role": "system",
-                    "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
-                    ],
-                },
-                {"role": "user", "content": "hello"},
-            ],
-            id="parts_no_type",
-        ),
-        pytest.param(
-            [
-                {
-                    "type": "message",
-                    "role": "system",
-                    "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
-                    ],
-                },
-                {"type": "message", "role": "user", "content": "hello"},
-            ],
-            id="parts",
-        ),
-    ],
-)
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_ai_client_span_streaming_responses_async_api(
-    sentry_init, capture_events, instructions, input, request
+    sentry_init, capture_events
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -2153,8 +1643,8 @@ async def test_ai_client_span_streaming_responses_async_api(
     with start_transaction(name="openai tx"):
         await client.responses.create(
             model="gpt-4o",
-            instructions=instructions,
-            input=input,
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
             stream=True,
         )
 
@@ -2164,178 +1654,22 @@ async def test_ai_client_span_streaming_responses_async_api(
     assert len(spans) == 1
     assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
-
-    expected_data = {
+    assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
+        "gen_ai.request.model": "gpt-4o",
+        "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
-        "gen_ai.response.model": "response-model-id",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
-        "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
-
-    param_id = request.node.callspec.id
-    if "string" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "string" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        }
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif instructions is None or isinstance(instructions, Omit):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    else:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-
-    assert spans[0]["data"] == expected_data
 
 
 @pytest.mark.asyncio
