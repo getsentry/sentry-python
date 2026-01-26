@@ -310,7 +310,7 @@ def _set_responses_api_input_data(
     if len(instructions_text_parts) > 0:
         span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            json.dumps(_transform_system_instructions(system_instructions)),
+            json.dumps(instructions_text_parts),
         )
 
     if isinstance(messages, str):
