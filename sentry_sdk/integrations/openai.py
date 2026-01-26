@@ -10,7 +10,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.ai._opanai_completions_api import (
+from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
     _get_system_instructions as _get_system_instructions_completions,
     _transform_system_instructions,
