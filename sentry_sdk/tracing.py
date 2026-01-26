@@ -680,7 +680,7 @@ class Span:
         # Copy conversation_id from scope to span data if this is an AI span
         conversation_id = scope.get_conversation_id()
         if conversation_id:
-            has_ai_op = "gen_ai.operation.name" in self._data
+            has_ai_op = SPANDATA.GEN_AI_OPERATION_NAME in self._data
             is_ai_span_op = self.op is not None and (
                 self.op.startswith("ai.") or self.op.startswith("gen_ai.")
             )
