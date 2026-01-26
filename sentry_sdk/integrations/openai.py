@@ -1,5 +1,6 @@
 import sys
 from functools import wraps
+from collections.abc import Iterable
 
 import sentry_sdk
 from sentry_sdk import consts
@@ -31,7 +32,6 @@ if TYPE_CHECKING:
         AsyncIterator,
         Iterator,
         Union,
-        Iterable,
     )
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
@@ -322,10 +322,12 @@ def _set_responses_api_input_data(
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            {
-                "type": "text",
-                "content": explicit_instructions,
-            },
+            [
+                {
+                    "type": "text",
+                    "content": explicit_instructions,
+                }
+            ],
             unpack=False,
         )
 

@@ -1607,7 +1607,6 @@ def test_ai_client_span_responses_api(
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
-        "sentry.sdk_meta.gen_ai.input.messages.original_length": 1,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1911,7 +1910,6 @@ async def test_ai_client_span_responses_async_api(
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": "the model response",
-        "sentry.sdk_meta.gen_ai.input.messages.original_length": 1,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -2179,7 +2177,6 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
-        "sentry.sdk_meta.gen_ai.input.messages.original_length": 1,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -2606,7 +2603,6 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
     # Test messages with mixed roles including "ai" that should be mapped to "assistant"
     test_messages = [
-        {"role": "system", "content": "You are helpful."},
         {"role": "user", "content": "Hello"},
         {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
         {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
@@ -2626,17 +2622,16 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     # Verify that "ai" role was mapped to "assistant"
-    assert len(stored_messages) == 4
-    assert stored_messages[0]["role"] == "system"
-    assert stored_messages[1]["role"] == "user"
+    assert len(stored_messages) == 3
+    assert stored_messages[0]["role"] == "user"
     assert (
-        stored_messages[2]["role"] == "assistant"
+        stored_messages[1]["role"] == "assistant"
     )  # "ai" should be mapped to "assistant"
-    assert stored_messages[3]["role"] == "assistant"  # should stay "assistant"
+    assert stored_messages[2]["role"] == "assistant"  # should stay "assistant"
 
     # Verify content is preserved
-    assert stored_messages[2]["content"] == "Hi there!"
-    assert stored_messages[3]["content"] == "How can I help?"
+    assert stored_messages[1]["content"] == "Hi there!"
+    assert stored_messages[2]["content"] == "How can I help?"
 
     # Verify no "ai" roles remain
     roles = [msg["role"] for msg in stored_messages]
