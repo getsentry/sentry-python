@@ -1009,6 +1009,60 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
     assert isinstance(parsed_messages, list)
     assert len(parsed_messages) == 1
     assert "small message 5" in str(parsed_messages[0])
+
+    assert chat_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 5
+    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
+
+
+@pytest.mark.asyncio
+async def test_anthropic_message_truncation_async(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Anthropic integration."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = AsyncAnthropic(api_key="z")
+    client.messages._post = mock.AsyncMock(return_value=EXAMPLE_MESSAGE)
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    messages = [
+        {"role": "user", "content": "small message 1"},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": "small message 4"},
+        {"role": "user", "content": "small message 5"},
+    ]
+
+    with start_transaction():
+        await client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    chat_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
+    ]
+    assert len(chat_spans) > 0
+
+    chat_span = chat_spans[0]
+    assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
+
+    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
+
+    assert chat_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 5
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
