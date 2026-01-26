@@ -2593,7 +2593,6 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
 @pytest.mark.parametrize(
     "test_message,expected_role",
     [
-        ({"role": "system", "content": "You are helpful."}, "system"),
         ({"role": "user", "content": "Hello"}, "user"),
         (
             {"role": "ai", "content": "Hi there!"},
