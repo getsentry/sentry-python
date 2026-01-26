@@ -467,11 +467,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if should_send_default_pii() and self.include_prompts:
                 system_instructions = _get_system_instructions(messages)
                 if len(system_instructions) > 0:
-                    set_data_normalized(
-                        span,
+                    span.set_data(
                         SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                         _transform_system_instructions(system_instructions),
-                        unpack=False,
                     )
 
                 normalized_messages = []

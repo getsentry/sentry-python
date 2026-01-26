@@ -808,11 +808,9 @@ def set_span_data_for_request(
             system_instructions = config.get("system_instruction")
 
         if system_instructions is not None:
-            set_data_normalized(
-                span,
+            span.set_data(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 _transform_system_instructions(system_instructions),
-                unpack=False,
             )
 
         # Extract messages from contents

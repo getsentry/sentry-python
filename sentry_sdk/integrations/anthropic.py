@@ -217,11 +217,9 @@ def _set_input_data(
         if isinstance(system_instructions, str) or isinstance(
             system_instructions, Iterable
         ):
-            set_data_normalized(
-                span,
+            span.set_data(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 _transform_system_instructions(system_instructions),
-                unpack=False,
             )
 
         normalized_messages = []

@@ -140,11 +140,9 @@ def _set_input_data(
     instructions_text_parts += _transform_system_instructions(system_instructions)
 
     if len(instructions_text_parts) > 0:
-        set_data_normalized(
-            span,
+        span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
             instructions_text_parts,
-            unpack=False,
         )
 
     non_system_messages = [
