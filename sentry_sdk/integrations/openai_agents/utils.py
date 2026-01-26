@@ -123,23 +123,23 @@ def _set_input_data(
 
     messages: "str | list[TResponseInputItem]" = get_response_kwargs.get("input", [])
 
+    instructions_text_parts: "list[TextPart]" = []
     explicit_instructions = get_response_kwargs.get("system_instructions")
+    if explicit_instructions is not None:
+        instructions_text_parts.append(
+            {
+                "type": "text",
+                "content": explicit_instructions,
+            }
+        )
+
     system_instructions = _get_system_instructions(messages)
 
-    if system_instructions is not None or len(system_instructions) > 0:
-        instructions_text_parts: "list[TextPart]" = []
-        if explicit_instructions is not None:
-            instructions_text_parts.append(
-                {
-                    "type": "text",
-                    "content": explicit_instructions,
-                }
-            )
+    # Deliberate use of function accepting completions API type because
+    # of shared structure FOR THIS PURPOSE ONLY.
+    instructions_text_parts += _transform_system_instructions(system_instructions)
 
-        # Deliberate use of function accepting completions API type because
-        # of shared structure FOR THIS PURPOSE ONLY.
-        instructions_text_parts += _transform_system_instructions(system_instructions)
-
+    if len(instructions_text_parts) > 0:
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,

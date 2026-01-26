@@ -258,35 +258,55 @@ def _set_responses_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
+    explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
     messages: "Optional[Union[str, ResponseInputParam]]" = kwargs.get("input")
+
+    if not should_send_default_pii() or not integration.include_prompts:
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    if (
+        messages is None
+        and explicit_instructions is not None
+        and _is_given(explicit_instructions)
+    ):
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            [
+                {
+                    "type": "text",
+                    "content": explicit_instructions,
+                }
+            ],
+            unpack=False,
+        )
+
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        _commmon_set_input_data(span, kwargs)
+        return
 
     if messages is None:
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         _commmon_set_input_data(span, kwargs)
         return
 
-    explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
-    system_instructions = _get_system_instructions_responses(messages)
-    if (
-        (
-            (explicit_instructions is not None and _is_given(explicit_instructions))
-            or len(system_instructions) > 0
+    instructions_text_parts: "list[TextPart]" = []
+    if explicit_instructions is not None and _is_given(explicit_instructions):
+        instructions_text_parts.append(
+            {
+                "type": "text",
+                "content": explicit_instructions,
+            }
         )
-        and should_send_default_pii()
-        and integration.include_prompts
-    ):
-        instructions_text_parts: "list[TextPart]" = []
-        if explicit_instructions is not None and _is_given(explicit_instructions):
-            instructions_text_parts.append(
-                {
-                    "type": "text",
-                    "content": explicit_instructions,
-                }
-            )
-        # Deliberate use of function accepting completions API type because
-        # of shared structure FOR THIS PURPOSE ONLY.
-        instructions_text_parts += _transform_system_instructions(system_instructions)
 
+    system_instructions = _get_system_instructions_responses(messages)
+    # Deliberate use of function accepting completions API type because
+    # of shared structure FOR THIS PURPOSE ONLY.
+    instructions_text_parts += _transform_system_instructions(system_instructions)
+
+    if len(instructions_text_parts) > 0:
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -294,11 +314,7 @@ def _set_responses_api_input_data(
             unpack=False,
         )
 
-    if (
-        isinstance(messages, str)
-        and should_send_default_pii()
-        and integration.include_prompts
-    ):
+    if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -307,22 +323,21 @@ def _set_responses_api_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
-    elif should_send_default_pii() and integration.include_prompts:
-        non_system_messages = [
-            message
-            for message in messages
-            if not _is_system_instruction_responses(message)
-        ]
-        if len(non_system_messages) > 0:
-            normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
-            scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    non_system_messages = [
+        message for message in messages if not _is_system_instruction_responses(message)
+    ]
+    if len(non_system_messages) > 0:
+        normalized_messages = normalize_message_roles(non_system_messages)
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
-            if messages_data is not None:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-                )
 
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
     _commmon_set_input_data(span, kwargs)
@@ -337,17 +352,18 @@ def _set_completions_api_input_data(
         "messages"
     )
 
+    if not should_send_default_pii() or not integration.include_prompts:
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        _commmon_set_input_data(span, kwargs)
+        return
+
     if messages is None:
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         _commmon_set_input_data(span, kwargs)
         return
 
     system_instructions = _get_system_instructions_completions(messages)
-    if (
-        len(system_instructions) > 0
-        and should_send_default_pii()
-        and integration.include_prompts
-    ):
+    if len(system_instructions) > 0:
         set_data_normalized(
             span,
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -355,11 +371,7 @@ def _set_completions_api_input_data(
             unpack=False,
         )
 
-    if (
-        isinstance(messages, str)
-        and should_send_default_pii()
-        and integration.include_prompts
-    ):
+    if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -367,22 +379,23 @@ def _set_completions_api_input_data(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
-    elif should_send_default_pii() and integration.include_prompts:
-        non_system_messages = [
-            message
-            for message in messages
-            if not _is_system_instruction_completions(message)
-        ]
-        if len(non_system_messages) > 0:
-            normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
-            scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    non_system_messages = [
+        message
+        for message in messages
+        if not _is_system_instruction_completions(message)
+    ]
+    if len(non_system_messages) > 0:
+        normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
-            if messages_data is not None:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-                )
 
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
     _commmon_set_input_data(span, kwargs)

@@ -7,11 +7,10 @@ if TYPE_CHECKING:
 
 
 def _is_system_instruction(message: "ResponseInputItemParam") -> bool:
-    return (
-        isinstance(message, dict)
-        and message.get("type") == "message"
-        and message.get("role") == "system"
-    )
+    if not isinstance(message, dict) or not message.get("role") == "system":
+        return False
+
+    return "type" not in message or message["type"] == "message"
 
 
 def _get_system_instructions(
