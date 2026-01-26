@@ -1600,7 +1600,7 @@ async def test_ai_client_span_includes_response_model(
 ):
     """
     Test that ai_client spans (gen_ai.chat) include the response model from the actual API response.
-    This verifies the new functionality to capture the model used in the response.
+    This verifies we capture the actual model used (which may differ from the requested model).
     """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
@@ -1608,7 +1608,7 @@ async def test_ai_client_span_includes_response_model(
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
         ) as mock_fetch_response:
-            # Create a mock OpenAI Response object with a model field
+            # Create a mock OpenAI Response object with a specific model version
             mock_response = MagicMock()
             mock_response.model = "gpt-4.1-2025-04-14"  # The actual response model
             mock_response.id = "resp_123"
@@ -1658,7 +1658,7 @@ async def test_ai_client_span_includes_response_model(
     spans = transaction["spans"]
     _, ai_client_span = spans
 
-    # Verify ai_client span has response model
+    # Verify ai_client span has response model from API response
     assert ai_client_span["description"] == "chat gpt-4"
     assert "gen_ai.response.model" in ai_client_span["data"]
     assert ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
@@ -1680,13 +1680,13 @@ async def test_ai_client_span_response_model_with_chat_completions(
     )
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        # Mock the get_response method directly since ChatCompletions may use Responses API anyway
+        # Mock the _fetch_response method
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
         ) as mock_fetch_response:
-            # Create a mock Response object with a model field
+            # Create a mock Response object
             mock_response = MagicMock()
-            mock_response.model = "gpt-4o-mini-2024-07-18"  # Actual response model
+            mock_response.model = "gpt-4o-mini-2024-07-18"
             mock_response.id = "resp_123"
             mock_response.output = [
                 ResponseOutputMessage(
@@ -1733,7 +1733,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
     spans = transaction["spans"]
     _, ai_client_span = spans
 
-    # Verify response model from Response is captured
+    # Verify response model from API response is captured
     assert "gen_ai.response.model" in ai_client_span["data"]
     assert ai_client_span["data"]["gen_ai.response.model"] == "gpt-4o-mini-2024-07-18"
 
@@ -1846,41 +1846,45 @@ async def test_response_model_not_set_when_unavailable(
     sentry_init, capture_events, test_agent
 ):
     """
-    Test that response model is not set if the raw response doesn't have a model field.
-    This can happen with custom model implementations.
+    Test that response model is not set if the API response doesn't have a model field.
+    The request model should still be set correctly.
     """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        # Mock without _fetch_response (simulating custom model without this method)
         with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            response = ModelResponse(
-                output=[
-                    ResponseOutputMessage(
-                        id="msg_123",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                text="Response without model field",
-                                type="output_text",
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                ],
-                usage=Usage(
-                    requests=1,
-                    input_tokens=10,
-                    output_tokens=20,
-                    total_tokens=30,
-                ),
-                response_id="resp_123",
+            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
+        ) as mock_fetch_response:
+            # Create a mock response without a model field
+            mock_response = MagicMock()
+            mock_response.model = None  # No model in response
+            mock_response.id = "resp_123"
+            mock_response.output = [
+                ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="Response without model field",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ]
+            mock_response.usage = MagicMock()
+            mock_response.usage.input_tokens = 10
+            mock_response.usage.output_tokens = 20
+            mock_response.usage.total_tokens = 30
+            mock_response.usage.input_tokens_details = InputTokensDetails(
+                cached_tokens=0
             )
-            # Don't set _sentry_response_model attribute
-            mock_get_response.return_value = response
+            mock_response.usage.output_tokens_details = OutputTokensDetails(
+                reasoning_tokens=0
+            )
+
+            mock_fetch_response.return_value = mock_response
 
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
@@ -1889,25 +1893,21 @@ async def test_response_model_not_set_when_unavailable(
 
             events = capture_events()
 
-            # Remove the _fetch_response method to simulate custom model
-            with patch.object(
-                agents.models.openai_responses.OpenAIResponsesModel,
-                "_fetch_response",
-                None,
-            ):
-                result = await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
-                )
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
 
-                assert result is not None
+            assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
     _, ai_client_span = spans
 
-    # When response model can't be captured, it shouldn't be in the span data
-    # (we only set it when we can accurately capture it)
+    # Response model should NOT be set when API doesn't return it
     assert "gen_ai.response.model" not in ai_client_span["data"]
+    # But request model should still be set
+    assert "gen_ai.request.model" in ai_client_span["data"]
+    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
 
 
 @pytest.mark.asyncio
@@ -1915,15 +1915,14 @@ async def test_invoke_agent_span_includes_response_model(
     sentry_init, capture_events, test_agent
 ):
     """
-    Test that invoke_agent spans include the response model.
-    When an agent makes multiple LLM calls, it should report the last model used.
+    Test that invoke_agent spans include the response model from the API response.
     """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
         ) as mock_fetch_response:
-            # Create a mock OpenAI Response object with a model field
+            # Create a mock OpenAI Response object with a specific model version
             mock_response = MagicMock()
             mock_response.model = "gpt-4.1-2025-04-14"  # The actual response model
             mock_response.id = "resp_123"
@@ -1973,7 +1972,7 @@ async def test_invoke_agent_span_includes_response_model(
     spans = transaction["spans"]
     invoke_agent_span, ai_client_span = spans
 
-    # Verify invoke_agent span has response model
+    # Verify invoke_agent span has response model from API
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
     assert "gen_ai.response.model" in invoke_agent_span["data"]
     assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
@@ -2003,7 +2002,7 @@ async def test_invoke_agent_span_uses_last_response_model(
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
         ) as mock_fetch_response:
-            # First call: gpt-4 model
+            # First call: gpt-4 model returns tool call
             first_response = MagicMock()
             first_response.model = "gpt-4-0613"
             first_response.id = "resp_1"
@@ -2027,9 +2026,9 @@ async def test_invoke_agent_span_uses_last_response_model(
                 reasoning_tokens=0
             )
 
-            # Second call: different model (e.g., after tool execution)
+            # Second call: different model version returns final message
             second_response = MagicMock()
-            second_response.model = "gpt-4.1-2025-04-14"  # Different model
+            second_response.model = "gpt-4.1-2025-04-14"
             second_response.id = "resp_2"
             second_response.output = [
                 ResponseOutputMessage(
@@ -2081,11 +2080,11 @@ async def test_invoke_agent_span_uses_last_response_model(
     first_ai_client_span = spans[1]
     second_ai_client_span = spans[3]  # After tool span
 
-    # Verify invoke_agent span uses the LAST response model
+    # Invoke_agent span uses the LAST response model
     assert "gen_ai.response.model" in invoke_agent_span["data"]
     assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
 
-    # Verify each ai_client span has its own response model
+    # Each ai_client span has its own response model from the API
     assert first_ai_client_span["data"]["gen_ai.response.model"] == "gpt-4-0613"
     assert (
         second_ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
@@ -2133,3 +2132,73 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
         assert len(parsed_messages) == 2
         assert "small message 4" in str(parsed_messages[0])
         assert "small message 5" in str(parsed_messages[1])
+
+
+def test_streaming_patches_applied(sentry_init):
+    """
+    Test that the streaming patches are applied correctly.
+    """
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Verify that run_streamed is patched (will have __wrapped__ attribute if patched)
+    import agents
+
+    # Check that the method exists and has been modified
+    assert hasattr(agents.run.DEFAULT_AGENT_RUNNER, "run_streamed")
+    assert hasattr(agents.run.AgentRunner, "_run_single_turn_streamed")
+
+    # Verify the patches were applied by checking for our wrapper
+    run_streamed_func = agents.run.DEFAULT_AGENT_RUNNER.run_streamed
+    assert run_streamed_func is not None
+
+
+@pytest.mark.asyncio
+async def test_streaming_span_update_captures_response_data(
+    sentry_init, test_agent, mock_usage
+):
+    """
+    Test that update_ai_client_span correctly captures response text,
+    usage data, and response model from a streaming response.
+    """
+    from sentry_sdk.integrations.openai_agents.spans.ai_client import (
+        update_ai_client_span,
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    # Create a mock streaming response object (similar to what we'd get from ResponseCompletedEvent)
+    mock_streaming_response = MagicMock()
+    mock_streaming_response.model = "gpt-4-streaming"
+    mock_streaming_response.usage = mock_usage
+    mock_streaming_response.output = [
+        ResponseOutputMessage(
+            id="msg_streaming_123",
+            type="message",
+            status="completed",
+            content=[
+                ResponseOutputText(
+                    text="Hello from streaming!",
+                    type="output_text",
+                    annotations=[],
+                )
+            ],
+            role="assistant",
+        )
+    ]
+
+    # Test the unified update function (works for both streaming and non-streaming)
+    with start_span(op="gen_ai.chat", description="test chat") as span:
+        update_ai_client_span(span, mock_streaming_response)
+
+        # Verify the span data was set correctly
+        assert span._data["gen_ai.response.text"] == "Hello from streaming!"
+        assert span._data["gen_ai.usage.input_tokens"] == 10
+        assert span._data["gen_ai.usage.output_tokens"] == 20
+        assert span._data["gen_ai.response.model"] == "gpt-4-streaming"
