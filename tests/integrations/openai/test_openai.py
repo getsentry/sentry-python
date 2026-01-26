@@ -1607,6 +1607,7 @@ def test_ai_client_span_responses_api(
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
+        "sentry.sdk_meta.gen_ai.input.messages.original_length": 1,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1910,6 +1911,7 @@ async def test_ai_client_span_responses_async_api(
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": "the model response",
+        "sentry.sdk_meta.gen_ai.input.messages.original_length": 1,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -2177,6 +2179,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
+        "sentry.sdk_meta.gen_ai.input.messages.original_length": 1,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
