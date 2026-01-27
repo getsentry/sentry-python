@@ -73,7 +73,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             "trace_id": item.trace_id,
             "span_id": item.span_id,
             "name": item.get_name(),
-            "status": item.status.value,
+            "status": item.status,
             "is_segment": item.is_segment(),
             "start_timestamp": item.start_timestamp.timestamp(),  # TODO[span-first]
         }

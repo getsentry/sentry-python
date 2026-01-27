@@ -6,7 +6,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentSource, SpanStatus
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
@@ -562,6 +562,30 @@ def test_trace_decorator(sentry_init, capture_envelopes):
     assert span["status"] == "ok"
 
 
+def test_trace_decorator_arguments(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    @sentry_sdk.traces.trace(name="traced", attributes={"traced.attribute": 123})
+    def traced_function(): ...
+
+    traced_function()
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "traced"
+    assert span["attributes"]["traced.attribute"] == 123
+    assert span["status"] == "ok"
+
+
 @minimum_python_38
 def test_trace_decorator_async(sentry_init, capture_envelopes):
     sentry_init(
@@ -587,6 +611,76 @@ def test_trace_decorator_async(sentry_init, capture_envelopes):
         == "test_span_streaming.test_trace_decorator_async.<locals>.traced_function"
     )
     assert span["status"] == "ok"
+
+
+@minimum_python_38
+def test_trace_decorator_async_arguments(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    @sentry_sdk.traces.trace(name="traced", attributes={"traced.attribute": 123})
+    async def traced_function(): ...
+
+    asyncio.run(traced_function())
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "traced"
+    assert span["attributes"]["traced.attribute"] == 123
+    assert span["status"] == "ok"
+
+
+def test_set_span_status(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        span.set_status(SpanStatus.ERROR)
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        span.set_status("error")
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 2
+    (span1, span2) = spans
+
+    assert span1["status"] == "error"
+    assert span2["status"] == "error"
+
+
+def test_set_span_status_on_error(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    with pytest.raises(ValueError):
+        with sentry_sdk.traces.start_span(name="span") as span:
+            raise ValueError("oh no!")
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["status"] == "error"
 
 
 def test_set_span_op(sentry_init, capture_envelopes):

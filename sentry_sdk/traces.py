@@ -444,7 +444,10 @@ class StreamedSpan:
         for key, value in attributes.items():
             self.set_attribute(key, value)
 
-    def set_status(self, status: SpanStatus) -> None:
+    def set_status(self, status: "Union[SpanStatus, str]") -> None:
+        if isinstance(status, Enum):
+            status = status.value
+
         self.status = status
 
     def get_name(self) -> str:
