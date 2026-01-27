@@ -4,6 +4,7 @@ import functools
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations._wsgi_common import nullcontext
 from sentry_sdk.utils import event_from_exception, logger, reraise
 
 try:
@@ -60,11 +61,20 @@ def patch_asyncio() -> None:
             async def _task_with_sentry_span_creation() -> "Any":
                 result = None
 
+                integration = sentry_sdk.get_client().get_integration(
+                    AsyncioIntegration
+                )
+                task_spans = integration.task_spans if integration else False
+
                 with sentry_sdk.isolation_scope():
-                    with sentry_sdk.start_span(
-                        op=OP.FUNCTION,
-                        name=get_name(coro),
-                        origin=AsyncioIntegration.origin,
+                    with (
+                        sentry_sdk.start_span(
+                            op=OP.FUNCTION,
+                            name=get_name(coro),
+                            origin=AsyncioIntegration.origin,
+                        )
+                        if task_spans
+                        else nullcontext()
                     ):
                         try:
                             result = await coro
@@ -139,6 +149,9 @@ def _capture_exception() -> "ExcInfo":
 class AsyncioIntegration(Integration):
     identifier = "asyncio"
     origin = f"auto.function.{identifier}"
+
+    def __init__(self, task_spans: bool = True) -> None:
+        self.task_spans = task_spans
 
     @staticmethod
     def setup_once() -> None:

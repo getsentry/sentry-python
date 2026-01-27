@@ -548,6 +548,12 @@ class SPANDATA:
     Example: 2048
     """
 
+    GEN_AI_SYSTEM_INSTRUCTIONS = "gen_ai.system_instructions"
+    """
+    The system instructions passed to the model.
+    Example: [{"type": "text", "text": "You are a helpful assistant."},{"type": "text", "text": "Be concise and clear."}]
+    """
+
     GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
     """
     The messages passed to the model. The "content" can be a string or an array of objects.
@@ -1477,4 +1483,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.49.0"
+VERSION = "2.50.0"
