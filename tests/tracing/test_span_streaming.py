@@ -536,6 +536,31 @@ def test_continue_trace_unsampled(sentry_init, capture_envelopes):
     assert len(spans) == 0
 
 
+def test_outgoing_traceparent_and_baggage(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.traces.new_trace()
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        assert span.sampled is True
+
+        trace_id = span._trace_id
+        span_id = span._span_id
+
+        traceparent = sentry_sdk.get_traceparent()
+        assert traceparent == f"{trace_id}-{span_id}-1"
+
+        baggage = sentry_sdk.get_baggage()
+        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert "sentry-trace_id" in baggage_items
+        assert baggage_items["sentry-trace_id"] == trace_id
+        assert "sentry-sampled" in baggage_items
+        assert baggage_items["sentry-sampled"] == "true"
+
+
 def test_trace_decorator(sentry_init, capture_envelopes):
     sentry_init(
         traces_sample_rate=1.0,
