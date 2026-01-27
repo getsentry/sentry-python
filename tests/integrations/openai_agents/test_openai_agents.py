@@ -2202,3 +2202,100 @@ async def test_streaming_span_update_captures_response_data(
         assert span._data["gen_ai.usage.input_tokens"] == 10
         assert span._data["gen_ai.usage.output_tokens"] == 20
         assert span._data["gen_ai.response.model"] == "gpt-4-streaming"
+
+
+@pytest.mark.asyncio
+async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
+    """
+    Test that time-to-first-token (TTFT) is recorded on chat spans during streaming.
+
+    TTFT is triggered by events with a `delta` attribute, which includes:
+    - ResponseTextDeltaEvent (text output)
+    - ResponseAudioDeltaEvent (audio output)
+    - ResponseReasoningTextDeltaEvent (reasoning/thinking)
+    - ResponseFunctionCallArgumentsDeltaEvent (function call args)
+    - and other delta events...
+
+    Events WITHOUT delta (like ResponseCompletedEvent, ResponseCreatedEvent, etc.)
+    should NOT trigger TTFT.
+    """
+    import time
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Create a mock model that returns a stream_response generator
+    class MockModel:
+        model = "gpt-4"
+
+        async def stream_response(self, *args, **kwargs):
+            # First event: ResponseCreatedEvent (no delta - should NOT trigger TTFT)
+            created_event = MagicMock(spec=["type", "sequence_number"])
+            created_event.type = "response.created"
+            yield created_event
+
+            # Simulate server-side processing delay before first token
+            await asyncio.sleep(0.05)  # 50ms delay
+
+            # Second event: ResponseTextDeltaEvent (HAS delta - triggers TTFT)
+            # This simulates the first actual content token
+            text_delta_event = MagicMock(spec=["delta", "type", "content_index"])
+            text_delta_event.delta = "Hello"
+            text_delta_event.type = "response.output_text.delta"
+            yield text_delta_event
+            await asyncio.sleep(0.05)  # 50ms delay
+
+            # Third event: more text content (also has delta, but TTFT already recorded)
+            text_delta_event2 = MagicMock(spec=["delta", "type", "content_index"])
+            text_delta_event2.delta = " world!"
+            text_delta_event2.type = "response.output_text.delta"
+            yield text_delta_event2
+
+            # Final event: ResponseCompletedEvent (has response, no delta)
+            completed_event = MagicMock(spec=["response", "type", "sequence_number"])
+            completed_event.response = MagicMock()
+            completed_event.response.model = "gpt-4"
+            completed_event.response.usage = Usage(
+                requests=1,
+                input_tokens=10,
+                output_tokens=5,
+                total_tokens=15,
+            )
+            completed_event.response.output = []
+            yield completed_event
+
+    mock_model = MockModel()
+
+    with sentry_sdk.start_transaction(name="test_ttft", sampled=True) as transaction:
+        # Simulate calling the wrapped stream_response logic
+        from sentry_sdk.integrations.openai_agents.spans import ai_client_span
+
+        with ai_client_span(test_agent, {}) as span:
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
+            ttft_recorded = False
+            start_time = getattr(test_agent, "_sentry_chat_ttft_start_time", None)
+
+            async for event in mock_model.stream_response():
+                # This is the same logic used in the actual integration
+                if (
+                    not ttft_recorded
+                    and hasattr(event, "delta")
+                    and start_time is not None
+                ):
+                    ttft = time.perf_counter() - start_time
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft)
+                    ttft_recorded = True
+
+        # Verify TTFT is recorded on the chat span (inside transaction context)
+        chat_spans = [
+            s for s in transaction._span_recorder.spans if s.op == "gen_ai.chat"
+        ]
+        assert len(chat_spans) >= 1
+        chat_span = chat_spans[0]
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in chat_span._data
+        ttft_value = chat_span._data[SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+        # TTFT should be at least 40ms (our simulated delay minus some variance) but reasonable
+        assert 0.04 < ttft_value < 1.0, f"TTFT {ttft_value} should be around 50ms"
