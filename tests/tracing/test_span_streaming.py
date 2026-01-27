@@ -119,7 +119,7 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
 
 def test_span_sampled_at_start(sentry_init, capture_envelopes):
     # Test that if a span is created without the context manager, it is sampled
-    # at .start() time rather then creation time
+    # at .start() time rather than creation time
 
     def traces_sampler(sampling_context):
         assert "delayed_attribute" in sampling_context["attributes"]
@@ -233,9 +233,6 @@ def test_span_attributes(sentry_init, capture_envelopes):
     )
 
     events = capture_envelopes()
-
-    class Class:
-        pass
 
     with sentry_sdk.traces.start_span(
         name="segment", attributes={"attribute1": "value"}
