@@ -4,4 +4,5 @@ from .utils import (
     GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING,
     normalize_message_role,
     normalize_message_roles,
+    set_conversation_id,
 )  # noqa: F401

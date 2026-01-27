@@ -1,4 +1,5 @@
 import sys
+import time
 from functools import wraps
 from collections.abc import Iterable
 
@@ -479,6 +480,7 @@ def _set_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
+    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     if hasattr(response, "model"):
@@ -492,6 +494,8 @@ def _set_output_data(
 
     if messages is not None and isinstance(messages, str):
         messages = [messages]
+
+    ttft: "Optional[float]" = None
 
     if hasattr(response, "choices"):
         if should_send_default_pii() and integration.include_prompts:
@@ -550,6 +554,7 @@ def _set_output_data(
         old_iterator = response._iterator
 
         def new_iterator() -> "Iterator[ChatCompletionChunk]":
+            nonlocal ttft
             count_tokens_manually = True
             for x in old_iterator:
                 with capture_internal_exceptions():
@@ -560,6 +565,8 @@ def _set_output_data(
                             if hasattr(choice, "delta") and hasattr(
                                 choice.delta, "content"
                             ):
+                                if start_time is not None and ttft is None:
+                                    ttft = time.perf_counter() - start_time
                                 content = choice.delta.content
                                 if len(data_buf) <= choice_index:
                                     data_buf.append([])
@@ -568,6 +575,8 @@ def _set_output_data(
 
                     # OpenAI responses API
                     elif hasattr(x, "delta"):
+                        if start_time is not None and ttft is None:
+                            ttft = time.perf_counter() - start_time
                         if len(data_buf) == 0:
                             data_buf.append([])
                         data_buf[0].append(x.delta or "")
@@ -586,6 +595,10 @@ def _set_output_data(
                 yield x
 
             with capture_internal_exceptions():
+                if ttft is not None:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                    )
                 if len(data_buf) > 0:
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
@@ -605,6 +618,7 @@ def _set_output_data(
                 span.__exit__(None, None, None)
 
         async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
+            nonlocal ttft
             count_tokens_manually = True
             async for x in old_iterator:
                 with capture_internal_exceptions():
@@ -615,6 +629,8 @@ def _set_output_data(
                             if hasattr(choice, "delta") and hasattr(
                                 choice.delta, "content"
                             ):
+                                if start_time is not None and ttft is None:
+                                    ttft = time.perf_counter() - start_time
                                 content = choice.delta.content
                                 if len(data_buf) <= choice_index:
                                     data_buf.append([])
@@ -623,6 +639,8 @@ def _set_output_data(
 
                     # OpenAI responses API
                     elif hasattr(x, "delta"):
+                        if start_time is not None and ttft is None:
+                            ttft = time.perf_counter() - start_time
                         if len(data_buf) == 0:
                             data_buf.append([])
                         data_buf[0].append(x.delta or "")
@@ -641,6 +659,10 @@ def _set_output_data(
                 yield x
 
             with capture_internal_exceptions():
+                if ttft is not None:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                    )
                 if len(data_buf) > 0:
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
@@ -694,9 +716,10 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     _set_completions_api_input_data(span, kwargs, integration)
 
+    start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    _set_output_data(span, response, kwargs, integration, finish_span=True)
+    _set_output_data(span, response, kwargs, integration, start_time, finish_span=True)
 
     return response
 
@@ -872,9 +895,10 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
 
     _set_responses_api_input_data(span, kwargs, integration)
 
+    start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    _set_output_data(span, response, kwargs, integration, finish_span=True)
+    _set_output_data(span, response, kwargs, integration, start_time, finish_span=True)
 
     return response
 
