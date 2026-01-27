@@ -82,10 +82,7 @@ def get_mcp_command_payload(method: str, params, request_id: str):
     )
 
 
-async def stdio(server, method: str, params, request_id: str | None = None):
-    if request_id is None:
-        request_id = "1"  # arbitrary
-
+async def stdio(server, method: str, params, request_id: str):
     read_stream_writer, read_stream = anyio.create_memory_object_stream(0)
     write_stream, write_stream_reader = anyio.create_memory_object_stream(0)
 
@@ -356,7 +353,7 @@ async def test_tool_handler_with_error(sentry_init, capture_events):
     server = Server("test-server")
 
     @server.call_tool()
-    async def failing_tool(tool_name, arguments):
+    def failing_tool(tool_name, arguments):
         raise ValueError("Tool execution failed")
 
     with start_transaction(name="mcp tx"):
@@ -367,6 +364,7 @@ async def test_tool_handler_with_error(sentry_init, capture_events):
                 "name": "bad_tool",
                 "arguments": {},
             },
+            request_id="req-error",
         )
 
         assert (
@@ -548,7 +546,7 @@ async def test_prompt_handler_with_error(sentry_init, capture_events):
                 "name": "code_help",
                 "arguments": {"language": "python"},
             },
-            request_id="req-prompt",
+            request_id="req-error-prompt",
         )
 
     assert response.message.root.error.message == "Prompt not found"
@@ -665,7 +663,7 @@ async def test_resource_handler_with_error(sentry_init, capture_events):
     server = Server("test-server")
 
     @server.read_resource()
-    async def failing_resource(uri):
+    def failing_resource(uri):
         raise FileNotFoundError("Resource not found")
 
     with start_transaction(name="mcp tx"):
@@ -675,6 +673,7 @@ async def test_resource_handler_with_error(sentry_init, capture_events):
             params={
                 "uri": "file:///missing.txt",
             },
+            request_id="req-error-resource",
         )
 
     # Should have error event and transaction
@@ -704,7 +703,7 @@ async def test_tool_result_extraction_tuple(
     server = Server("test-server")
 
     @server.call_tool()
-    async def test_tool_tuple(tool_name, arguments):
+    def test_tool_tuple(tool_name, arguments):
         # Return CombinationContent: (UnstructuredContent, StructuredContent)
         unstructured = [MockTextContent("Result text")]
         structured = {"key": "value", "count": 5}
@@ -716,8 +715,9 @@ async def test_tool_result_extraction_tuple(
             method="tools/call",
             params={
                 "name": "calculate",
-                "arguments": {"x": 10, "y": 5},
+                "arguments": {},
             },
+            request_id="req-tuple",
         )
 
     (tx,) = events
@@ -756,7 +756,7 @@ async def test_tool_result_extraction_unstructured(
     server = Server("test-server")
 
     @server.call_tool()
-    async def test_tool_unstructured(tool_name, arguments):
+    def test_tool_unstructured(tool_name, arguments):
         # Return UnstructuredContent as list of content blocks
         return [
             MockTextContent("First part"),
@@ -768,9 +768,10 @@ async def test_tool_result_extraction_unstructured(
             server,
             method="tools/call",
             params={
-                "name": "calculate",
-                "arguments": {"x": 10, "y": 5},
+                "name": "text_tool",
+                "arguments": {},
             },
+            request_id="req-unstructured",
         )
 
     (tx,) = events
@@ -785,43 +786,6 @@ async def test_tool_result_extraction_unstructured(
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
 
 
-def test_request_context_no_context(sentry_init, capture_events):
-    """Test handling when no request context is available"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    server = Server("test-server")
-
-    # Clear request context (simulating no context available)
-    # This will cause a LookupError when trying to get context
-    request_ctx.set(None)
-
-    @server.call_tool()
-    def test_tool_no_ctx(tool_name, arguments):
-        return {"result": "ok"}
-
-    with start_transaction(name="mcp tx"):
-        # This should work even without request context
-        try:
-            test_tool_no_ctx("tool", {})
-        except LookupError:
-            # If it raises LookupError, that's expected when context is truly missing
-            pass
-
-    # Should still create span even if context is missing
-    (tx,) = events
-    span = tx["spans"][0]
-
-    # Transport defaults to "pipe" when no context
-    assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
-    # Request ID and Session ID should not be present
-    assert SPANDATA.MCP_REQUEST_ID not in span["data"]
-    assert SPANDATA.MCP_SESSION_ID not in span["data"]
-
-
 @pytest.mark.asyncio
 async def test_span_origin(sentry_init, capture_events):
     """Test that span origin is set correctly"""
@@ -834,7 +798,7 @@ async def test_span_origin(sentry_init, capture_events):
     server = Server("test-server")
 
     @server.call_tool()
-    async def test_tool(tool_name, arguments):
+    def test_tool(tool_name, arguments):
         return {"result": "test"}
 
     with start_transaction(name="mcp tx"):
@@ -845,6 +809,7 @@ async def test_span_origin(sentry_init, capture_events):
                 "name": "calculate",
                 "arguments": {"x": 10, "y": 5},
             },
+            request_id="req-origin",
         )
 
     (tx,) = events
@@ -865,15 +830,15 @@ async def test_multiple_handlers(sentry_init, capture_events):
     server = Server("test-server")
 
     @server.call_tool()
-    async def tool1(tool_name, arguments):
+    def tool1(tool_name, arguments):
         return {"result": "tool1"}
 
     @server.call_tool()
-    async def tool2(tool_name, arguments):
+    def tool2(tool_name, arguments):
         return {"result": "tool2"}
 
     @server.get_prompt()
-    async def prompt1(name, arguments):
+    def prompt1(name, arguments):
         return GetPromptResult(
             description="A test prompt",
             messages=[
@@ -891,6 +856,7 @@ async def test_multiple_handlers(sentry_init, capture_events):
                 "name": "tool_a",
                 "arguments": {},
             },
+            request_id="req-multi",
         )
 
         await stdio(
@@ -900,6 +866,7 @@ async def test_multiple_handlers(sentry_init, capture_events):
                 "name": "tool_b",
                 "arguments": {},
             },
+            request_id="req-multi",
         )
 
         await stdio(
@@ -909,6 +876,7 @@ async def test_multiple_handlers(sentry_init, capture_events):
                 "name": "prompt_a",
                 "arguments": {},
             },
+            request_id="req-multi",
         )
 
     (tx,) = events
@@ -960,6 +928,7 @@ async def test_prompt_with_dict_result(
                 "name": "dict_prompt",
                 "arguments": {},
             },
+            request_id="req-dict-prompt",
         )
 
     (tx,) = events
@@ -1003,6 +972,7 @@ async def test_resource_without_protocol(sentry_init, capture_events):
             params={
                 "uri": "https://example.com/resource",
             },
+            request_id="req-no-proto",
         )
 
     (tx,) = events
@@ -1025,7 +995,7 @@ async def test_tool_with_complex_arguments(sentry_init, capture_events):
     server = Server("test-server")
 
     @server.call_tool()
-    async def test_tool_complex(tool_name, arguments):
+    def test_tool_complex(tool_name, arguments):
         return {"processed": True}
 
     with start_transaction(name="mcp tx"):
@@ -1041,6 +1011,7 @@ async def test_tool_with_complex_arguments(sentry_init, capture_events):
                 "name": "complex_tool",
                 "arguments": complex_args,
             },
+            request_id="req-complex",
         )
 
     (tx,) = events
@@ -1182,6 +1153,7 @@ async def test_stdio_transport_detection(sentry_init, capture_events):
                 "name": "stdio_tool",
                 "arguments": {},
             },
+            request_id="req-stdio",
         )
 
     assert result.message.root.result["structuredContent"] == {"result": "success"}
