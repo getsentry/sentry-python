@@ -33,6 +33,7 @@ from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.server import request_ctx
 from mcp.types import (
     JSONRPCMessage,
+    JSONRPCNotification,
     JSONRPCRequest,
     GetPromptResult,
     PromptMessage,
@@ -68,6 +69,17 @@ def get_initialization_payload(request_id: str):
     )
 
 
+def get_initialized_notification_payload():
+    return SessionMessage(
+        message=JSONRPCMessage(
+            root=JSONRPCNotification(
+                jsonrpc="2.0",
+                method="notifications/initialized",
+            )
+        )
+    )
+
+
 def get_mcp_command_payload(method: str, params, request_id: str):
     return SessionMessage(
         message=JSONRPCMessage(
@@ -97,6 +109,9 @@ async def stdio(server, method: str, params, request_id: str):
         await read_stream_writer.send(init_request)
 
         await write_stream_reader.receive()
+
+        initialized_notification = get_initialized_notification_payload()
+        await read_stream_writer.send(initialized_notification)
 
         request = get_mcp_command_payload(method, params=params, request_id=request_id)
         await read_stream_writer.send(request)
