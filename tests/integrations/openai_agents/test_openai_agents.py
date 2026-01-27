@@ -2219,16 +2219,22 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
     Events WITHOUT delta (like ResponseCompletedEvent, ResponseCreatedEvent, etc.)
     should NOT trigger TTFT.
     """
-    import time
+    from sentry_sdk.integrations.openai_agents.patches.models import (
+        _create_get_model_wrapper,
+    )
 
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # Create a mock model that returns a stream_response generator
+    # Create a mock model with stream_response and get_response
     class MockModel:
         model = "gpt-4"
+
+        async def get_response(self, *args, **kwargs):
+            # Not used in this test, but required by the wrapper
+            pass
 
         async def stream_response(self, *args, **kwargs):
             # First event: ResponseCreatedEvent (no delta - should NOT trigger TTFT)
@@ -2240,12 +2246,10 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
             await asyncio.sleep(0.05)  # 50ms delay
 
             # Second event: ResponseTextDeltaEvent (HAS delta - triggers TTFT)
-            # This simulates the first actual content token
             text_delta_event = MagicMock(spec=["delta", "type", "content_index"])
             text_delta_event.delta = "Hello"
             text_delta_event.type = "response.output_text.delta"
             yield text_delta_event
-            await asyncio.sleep(0.05)  # 50ms delay
 
             # Third event: more text content (also has delta, but TTFT already recorded)
             text_delta_event2 = MagicMock(spec=["delta", "type", "content_index"])
@@ -2266,33 +2270,32 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
             completed_event.response.output = []
             yield completed_event
 
-    mock_model = MockModel()
+    # Create a mock original _get_model that returns our mock model
+    def mock_get_model(agent, run_config):
+        return MockModel()
+
+    # Wrap it with our integration wrapper
+    wrapped_get_model = _create_get_model_wrapper(mock_get_model)
 
     with sentry_sdk.start_transaction(name="test_ttft", sampled=True) as transaction:
-        # Simulate calling the wrapped stream_response logic
-        from sentry_sdk.integrations.openai_agents.spans import ai_client_span
+        # Get the wrapped model (this applies the stream_response wrapper)
+        wrapped_model = wrapped_get_model(None, test_agent, MagicMock())
 
-        with ai_client_span(test_agent, {}) as span:
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        # Call the wrapped stream_response and consume all events
+        async for _event in wrapped_model.stream_response():
+            pass
 
-            ttft_recorded = False
-            # Capture start time locally (same as production code after race condition fix)
-            start_time = time.perf_counter()
-
-            async for event in mock_model.stream_response():
-                # This is the same logic used in the actual integration
-                if not ttft_recorded and hasattr(event, "delta"):
-                    ttft = time.perf_counter() - start_time
-                    span.set_data(SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft)
-                    ttft_recorded = True
-
-        # Verify TTFT is recorded on the chat span (inside transaction context)
+        # Verify TTFT is recorded on the chat span (must be inside transaction context)
         chat_spans = [
             s for s in transaction._span_recorder.spans if s.op == "gen_ai.chat"
         ]
         assert len(chat_spans) >= 1
         chat_span = chat_spans[0]
+
         assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in chat_span._data
         ttft_value = chat_span._data[SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
         # TTFT should be at least 40ms (our simulated delay minus some variance) but reasonable
         assert 0.04 < ttft_value < 1.0, f"TTFT {ttft_value} should be around 50ms"
+
+        # Verify streaming flag is set
+        assert chat_span._data.get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
