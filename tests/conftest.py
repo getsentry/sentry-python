@@ -1,3 +1,4 @@
+import anyio
 import json
 import os
 import socket
@@ -52,6 +53,7 @@ try:
     from anyio import create_memory_object_stream, create_task_group
     from mcp.types import (
         JSONRPCMessage,
+        JSONRPCNotification,
         JSONRPCRequest,
     )
     from mcp.shared.message import SessionMessage
@@ -628,6 +630,21 @@ def get_initialization_payload():
 
 
 @pytest.fixture
+def get_initialized_notification_payload():
+    def inner():
+        return SessionMessage(  # type: ignore
+            message=JSONRPCMessage(  # type: ignore
+                root=JSONRPCNotification(  # type: ignore
+                    jsonrpc="2.0",
+                    method="notifications/initialized",
+                )
+            )
+        )
+
+    return inner
+
+
+@pytest.fixture
 def get_mcp_command_payload():
     def inner(method: str, params, request_id: str):
         return SessionMessage(  # type: ignore
@@ -645,13 +662,14 @@ def get_mcp_command_payload():
 
 
 @pytest.fixture
-def stdio(get_initialization_payload, get_mcp_command_payload):
-    async def inner(server, method: str, params, request_id: str | None = None):
-        if request_id is None:
-            request_id = "1"  # arbitrary
-
-        read_stream_writer, read_stream = create_memory_object_stream(0)  # type: ignore
-        write_stream, write_stream_reader = create_memory_object_stream(0)  # type: ignore
+def stdio(
+    get_initialization_payload,
+    get_initialized_notification_payload,
+    get_mcp_command_payload,
+):
+    async def inner(server, method: str, params, request_id: str):
+        read_stream_writer, read_stream = anyio.create_memory_object_stream(0)
+        write_stream, write_stream_reader = anyio.create_memory_object_stream(0)
 
         result = {}
 
@@ -666,6 +684,9 @@ def stdio(get_initialization_payload, get_mcp_command_payload):
 
             await write_stream_reader.receive()
 
+            initialized_notification = get_initialized_notification_payload()
+            await read_stream_writer.send(initialized_notification)
+
             request = get_mcp_command_payload(
                 method, params=params, request_id=request_id
             )
@@ -675,7 +696,7 @@ def stdio(get_initialization_payload, get_mcp_command_payload):
 
             tg.cancel_scope.cancel()
 
-        async with create_task_group() as tg:  # type: ignore
+        async with anyio.create_task_group() as tg:
             tg.start_soon(run_server)
             tg.start_soon(simulate_client, tg, result)
 

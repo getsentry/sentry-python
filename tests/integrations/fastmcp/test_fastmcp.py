@@ -445,7 +445,7 @@ async def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP, std
                 "name": "failing_tool",
                 "arguments": {"value": 42},
             },
-            request_id="req-123",
+            request_id="req-error",
         )
         # If no exception raised, check if result indicates error
         assert result.message.root.result["isError"] is True
@@ -503,7 +503,7 @@ async def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP, stdi
                 "name": "tool_one",
                 "arguments": {"x": 5},
             },
-            request_id="req-123",
+            request_id="req-multi",
         )
 
         result2 = await stdio(
@@ -515,7 +515,7 @@ async def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP, stdi
                     "y": int(result1.message.root.result["content"][0]["text"])
                 },
             },
-            request_id="req-123",
+            request_id="req-multi",
         )
 
         result3 = await stdio(
@@ -527,7 +527,7 @@ async def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP, stdi
                     "z": int(result2.message.root.result["content"][0]["text"])
                 },
             },
-            request_id="req-123",
+            request_id="req-multi",
         )
 
     assert result1.message.root.result["content"][0]["text"] == "10"
@@ -578,6 +578,7 @@ async def test_fastmcp_tool_with_complex_return(
                 "name": "get_user_data",
                 "arguments": {"user_id": 123},
             },
+            request_id="req-complex",
         )
 
     if (
@@ -677,6 +678,7 @@ async def test_fastmcp_prompt_sync(
                         "name": "code_help_prompt",
                         "arguments": {"language": "python"},
                     },
+                    request_id="req-prompt",
                 )
 
             assert result.message.root.result["messages"][0]["role"] == "user"
@@ -907,6 +909,7 @@ async def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP, stdio):
                 "name": "test_tool",
                 "arguments": {"value": 21},
             },
+            request_id="req-origin",
         )
 
     (tx,) = events
@@ -1055,6 +1058,7 @@ async def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP, std
                 "name": "stdio_tool",
                 "arguments": {"n": 7},
             },
+            request_id="req-stdio",
         )
 
     if (
@@ -1240,6 +1244,7 @@ async def test_fastmcp_mixed_sync_async_tools(
                 "name": "sync_add",
                 "arguments": {"a": 3, "b": 4},
             },
+            request_id="req-mixed",
         )
         result2 = await stdio(
             mcp._mcp_server,
@@ -1248,6 +1253,7 @@ async def test_fastmcp_mixed_sync_async_tools(
                 "name": "async_multiply",
                 "arguments": {"x": 5, "y": 6},
             },
+            request_id="req-mixed",
         )
 
     assert result1.message.root.result["content"][0]["text"] == "7"

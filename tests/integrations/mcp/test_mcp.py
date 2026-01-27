@@ -15,8 +15,6 @@ The tests mock the MCP server components and request context to verify
 that the integration properly instruments MCP handlers with Sentry spans.
 """
 
-import asyncio
-import anyio
 import pytest
 import json
 from unittest import mock
@@ -51,81 +49,6 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
-
-
-def get_initialization_payload(request_id: str):
-    return SessionMessage(
-        message=JSONRPCMessage(
-            root=JSONRPCRequest(
-                jsonrpc="2.0",
-                id=request_id,
-                method="initialize",
-                params={
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {},
-                    "clientInfo": {"name": "test-client", "version": "1.0.0"},
-                },
-            )
-        )
-    )
-
-
-def get_initialized_notification_payload():
-    return SessionMessage(
-        message=JSONRPCMessage(
-            root=JSONRPCNotification(
-                jsonrpc="2.0",
-                method="notifications/initialized",
-            )
-        )
-    )
-
-
-def get_mcp_command_payload(method: str, params, request_id: str):
-    return SessionMessage(
-        message=JSONRPCMessage(
-            root=JSONRPCRequest(
-                jsonrpc="2.0",
-                id=request_id,
-                method=method,
-                params=params,
-            )
-        )
-    )
-
-
-async def stdio(server, method: str, params, request_id: str):
-    read_stream_writer, read_stream = anyio.create_memory_object_stream(0)
-    write_stream, write_stream_reader = anyio.create_memory_object_stream(0)
-
-    result = {}
-
-    async def run_server():
-        await server.run(
-            read_stream, write_stream, server.create_initialization_options()
-        )
-
-    async def simulate_client(tg, result):
-        init_request = get_initialization_payload("1")
-        await read_stream_writer.send(init_request)
-
-        await write_stream_reader.receive()
-
-        initialized_notification = get_initialized_notification_payload()
-        await read_stream_writer.send(initialized_notification)
-
-        request = get_mcp_command_payload(method, params=params, request_id=request_id)
-        await read_stream_writer.send(request)
-
-        result["response"] = await write_stream_reader.receive()
-
-        tg.cancel_scope.cancel()
-
-    async with anyio.create_task_group() as tg:
-        tg.start_soon(run_server)
-        tg.start_soon(simulate_client, tg, result)
-
-    return result["response"]
 
 
 @pytest.fixture(autouse=True)
@@ -234,7 +157,7 @@ def test_integration_patches_server(sentry_init):
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_tool_handler_stdio(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test that synchronous tool handlers create proper spans"""
     sentry_init(
@@ -357,7 +280,7 @@ async def test_tool_handler_async(
 
 
 @pytest.mark.asyncio
-async def test_tool_handler_with_error(sentry_init, capture_events):
+async def test_tool_handler_with_error(sentry_init, capture_events, stdio):
     """Test that tool handler errors are captured properly"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -412,7 +335,7 @@ async def test_tool_handler_with_error(sentry_init, capture_events):
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_prompt_handler_sync(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test that synchronous prompt handlers create proper spans"""
     sentry_init(
@@ -539,7 +462,7 @@ async def test_prompt_handler_async(
 
 
 @pytest.mark.asyncio
-async def test_prompt_handler_with_error(sentry_init, capture_events):
+async def test_prompt_handler_with_error(sentry_init, capture_events, stdio):
     """Test that prompt handler errors are captured"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -575,7 +498,7 @@ async def test_prompt_handler_with_error(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_sync(sentry_init, capture_events):
+async def test_resource_handler_sync(sentry_init, capture_events, stdio):
     """Test that synchronous resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -667,7 +590,7 @@ async def test_resource_handler_async(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_with_error(sentry_init, capture_events):
+async def test_resource_handler_with_error(sentry_init, capture_events, stdio):
     """Test that resource handler errors are captured"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -705,7 +628,7 @@ async def test_resource_handler_with_error(sentry_init, capture_events):
     [(True, True), (False, False)],
 )
 async def test_tool_result_extraction_tuple(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test extraction of tool results from tuple format (UnstructuredContent, StructuredContent)"""
     sentry_init(
@@ -758,7 +681,7 @@ async def test_tool_result_extraction_tuple(
     [(True, True), (False, False)],
 )
 async def test_tool_result_extraction_unstructured(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test extraction of tool results from UnstructuredContent (list of content blocks)"""
     sentry_init(
@@ -802,7 +725,7 @@ async def test_tool_result_extraction_unstructured(
 
 
 @pytest.mark.asyncio
-async def test_span_origin(sentry_init, capture_events):
+async def test_span_origin(sentry_init, capture_events, stdio):
     """Test that span origin is set correctly"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -834,7 +757,7 @@ async def test_span_origin(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_multiple_handlers(sentry_init, capture_events):
+async def test_multiple_handlers(sentry_init, capture_events, stdio):
     """Test that multiple handler calls create multiple spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -914,7 +837,7 @@ async def test_multiple_handlers(sentry_init, capture_events):
     [(True, True), (False, False)],
 )
 async def test_prompt_with_dict_result(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test prompt handler with dict result instead of GetPromptResult object"""
     sentry_init(
@@ -966,7 +889,7 @@ async def test_prompt_with_dict_result(
 
 @pytest.mark.asyncio
 @pytest.mark.skip
-async def test_resource_without_protocol(sentry_init, capture_events):
+async def test_resource_without_protocol(sentry_init, capture_events, stdio):
     """Test resource handler with URI without protocol scheme"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -999,7 +922,7 @@ async def test_resource_without_protocol(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_tool_with_complex_arguments(sentry_init, capture_events):
+async def test_tool_with_complex_arguments(sentry_init, capture_events, stdio):
     """Test tool handler with complex nested arguments"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1146,7 +1069,7 @@ def test_streamable_http_transport_detection(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_stdio_transport_detection(sentry_init, capture_events):
+async def test_stdio_transport_detection(sentry_init, capture_events, stdio):
     """Test that stdio transport is correctly detected when no HTTP request"""
     sentry_init(
         integrations=[MCPIntegration()],
