@@ -9,8 +9,10 @@ except ImportError:
     NOT_GIVEN = None
 try:
     from openai import omit
+    from openai import Omit
 except ImportError:
     omit = None
+    Omit = None
 
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
@@ -44,9 +46,9 @@ from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
 )
-from sentry_sdk.ai.utils import MAX_GEN_AI_MESSAGE_BYTES
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.serializer import serialize
+from sentry_sdk.utils import safe_serialize
 
 from unittest import mock  # python 3.3 and above
 
@@ -129,9 +131,13 @@ async def async_iterator(values):
 
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    [
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
 )
-def test_nonstreaming_chat_completion(
+def test_nonstreaming_chat_completion_no_prompts(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     sentry_init(
@@ -147,7 +153,11 @@ def test_nonstreaming_chat_completion(
     with start_transaction(name="openai tx"):
         response = (
             client.chat.completions.create(
-                model="some-model", messages=[{"role": "system", "content": "hello"}]
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
             )
             .choices[0]
             .message.content
@@ -159,12 +169,92 @@ def test_nonstreaming_chat_completion(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
 
-    if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"]["gen_ai.usage.output_tokens"] == 10
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.parametrize(
+    "messages",
+    [
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            id="parts",
+        ),
+    ],
+)
+def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, request):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        response = (
+            client.chat.completions.create(
+                model="some-model",
+                messages=messages,
+            )
+            .choices[0]
+            .message.content
+        )
+
+    assert response == "the model response"
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+
+    param_id = request.node.callspec.id
+    if "blocks" in param_id:
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            }
+        ]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            },
+            {
+                "type": "text",
+                "content": "Be concise and clear.",
+            },
+        ]
+
+    assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
@@ -174,9 +264,13 @@ def test_nonstreaming_chat_completion(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    [
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
 )
-async def test_nonstreaming_chat_completion_async(
+async def test_nonstreaming_chat_completion_async_no_prompts(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     sentry_init(
@@ -187,11 +281,15 @@ async def test_nonstreaming_chat_completion_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
 
     with start_transaction(name="openai tx"):
         response = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+            model="some-model",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "hello"},
+            ],
         )
         response = response.choices[0].message.content
 
@@ -201,12 +299,92 @@ async def test_nonstreaming_chat_completion_async(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
 
-    if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"]["gen_ai.usage.output_tokens"] == 10
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "messages",
+    [
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            id="parts",
+        ),
+    ],
+)
+async def test_nonstreaming_chat_completion_async(
+    sentry_init, capture_events, messages, request
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        response = await client.chat.completions.create(
+            model="some-model",
+            messages=messages,
+        )
+        response = response.choices[0].message.content
+
+    assert response == "the model response"
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+
+    param_id = request.node.callspec.id
+    if "blocks" in param_id:
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            }
+        ]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            },
+            {
+                "type": "text",
+                "content": "Be concise and clear.",
+            },
+        ]
+
+    assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
@@ -225,9 +403,13 @@ def tiktoken_encoding_if_installed():
 # noinspection PyTypeChecker
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    [
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
 )
-def test_streaming_chat_completion(
+def test_streaming_chat_completion_no_prompts(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     sentry_init(
@@ -283,7 +465,11 @@ def test_streaming_chat_completion(
     client.chat.completions._post = mock.Mock(return_value=returned_stream)
     with start_transaction(name="openai tx"):
         response_stream = client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+            model="some-model",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "hello"},
+            ],
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -294,19 +480,149 @@ def test_streaming_chat_completion(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
 
-    if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
         assert span["data"]["gen_ai.usage.output_tokens"] == 2
-        assert span["data"]["gen_ai.usage.input_tokens"] == 1
-        assert span["data"]["gen_ai.usage.total_tokens"] == 3
+        assert span["data"]["gen_ai.usage.input_tokens"] == 7
+        assert span["data"]["gen_ai.usage.total_tokens"] == 9
+    except ImportError:
+        pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+
+
+# noinspection PyTypeChecker
+@pytest.mark.parametrize(
+    "messages",
+    [
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            id="parts",
+        ),
+    ],
+)
+def test_streaming_chat_completion(sentry_init, capture_events, messages, request):
+    sentry_init(
+        integrations=[
+            OpenAIIntegration(
+                include_prompts=True,
+                tiktoken_encoding_name=tiktoken_encoding_if_installed(),
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = [
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=2, delta=ChoiceDelta(content="world"), finish_reason="stop"
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+    ]
+
+    client.chat.completions._post = mock.Mock(return_value=returned_stream)
+    with start_transaction(name="openai tx"):
+        response_stream = client.chat.completions.create(
+            model="some-model",
+            messages=messages,
+        )
+        response_string = "".join(
+            map(lambda x: x.choices[0].delta.content, response_stream)
+        )
+    assert response_string == "hello world"
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+
+    param_id = request.node.callspec.id
+    if "blocks" in param_id:
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            }
+        ]
+    else:
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            },
+            {
+                "type": "text",
+                "content": "Be concise and clear.",
+            },
+        ]
+
+    assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+    try:
+        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+        if "blocks" in param_id:
+            assert span["data"]["gen_ai.usage.output_tokens"] == 2
+            assert span["data"]["gen_ai.usage.input_tokens"] == 7
+            assert span["data"]["gen_ai.usage.total_tokens"] == 9
+        else:
+            assert span["data"]["gen_ai.usage.output_tokens"] == 2
+            assert span["data"]["gen_ai.usage.input_tokens"] == 1
+            assert span["data"]["gen_ai.usage.total_tokens"] == 3
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
@@ -315,9 +631,13 @@ def test_streaming_chat_completion(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    [
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
 )
-async def test_streaming_chat_completion_async(
+async def test_streaming_chat_completion_async_no_prompts(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     sentry_init(
@@ -377,7 +697,11 @@ async def test_streaming_chat_completion_async(
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
     with start_transaction(name="openai tx"):
         response_stream = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+            model="some-model",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "hello"},
+            ],
         )
 
         response_string = ""
@@ -390,19 +714,160 @@ async def test_streaming_chat_completion_async(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
 
-    if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
         assert span["data"]["gen_ai.usage.output_tokens"] == 2
-        assert span["data"]["gen_ai.usage.input_tokens"] == 1
-        assert span["data"]["gen_ai.usage.total_tokens"] == 3
+        assert span["data"]["gen_ai.usage.input_tokens"] == 7
+        assert span["data"]["gen_ai.usage.total_tokens"] == 9
+
+    except ImportError:
+        pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+
+
+# noinspection PyTypeChecker
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "messages",
+    [
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            id="parts",
+        ),
+    ],
+)
+async def test_streaming_chat_completion_async(
+    sentry_init, capture_events, messages, request
+):
+    sentry_init(
+        integrations=[
+            OpenAIIntegration(
+                include_prompts=True,
+                tiktoken_encoding_name=tiktoken_encoding_if_installed(),
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = async_iterator(
+        [
+            ChatCompletionChunk(
+                id="1",
+                choices=[
+                    DeltaChoice(
+                        index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
+                    )
+                ],
+                created=100000,
+                model="model-id",
+                object="chat.completion.chunk",
+            ),
+            ChatCompletionChunk(
+                id="1",
+                choices=[
+                    DeltaChoice(
+                        index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
+                    )
+                ],
+                created=100000,
+                model="model-id",
+                object="chat.completion.chunk",
+            ),
+            ChatCompletionChunk(
+                id="1",
+                choices=[
+                    DeltaChoice(
+                        index=2,
+                        delta=ChoiceDelta(content="world"),
+                        finish_reason="stop",
+                    )
+                ],
+                created=100000,
+                model="model-id",
+                object="chat.completion.chunk",
+            ),
+        ]
+    )
+
+    client.chat.completions._post = AsyncMock(return_value=returned_stream)
+    with start_transaction(name="openai tx"):
+        response_stream = await client.chat.completions.create(
+            model="some-model",
+            messages=messages,
+        )
+
+        response_string = ""
+        async for x in response_stream:
+            response_string += x.choices[0].delta.content
+
+    assert response_string == "hello world"
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+
+    param_id = request.node.callspec.id
+    if "blocks" in param_id:
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            }
+        ]
+    else:
+        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            },
+            {
+                "type": "text",
+                "content": "Be concise and clear.",
+            },
+        ]
+
+    assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+    try:
+        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+        if "blocks" in param_id:
+            assert span["data"]["gen_ai.usage.output_tokens"] == 2
+            assert span["data"]["gen_ai.usage.input_tokens"] == 7
+            assert span["data"]["gen_ai.usage.total_tokens"] == 9
+        else:
+            assert span["data"]["gen_ai.usage.output_tokens"] == 2
+            assert span["data"]["gen_ai.usage.input_tokens"] == 1
+            assert span["data"]["gen_ai.usage.total_tokens"] == 3
+
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
@@ -1472,7 +1937,6 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
     # Test messages with mixed roles including "ai" that should be mapped to "assistant"
     test_messages = [
-        {"role": "system", "content": "You are helpful."},
         {"role": "user", "content": "Hello"},
         {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
         {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
@@ -1492,17 +1956,16 @@ def test_openai_message_role_mapping(sentry_init, capture_events):
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     # Verify that "ai" role was mapped to "assistant"
-    assert len(stored_messages) == 4
-    assert stored_messages[0]["role"] == "system"
-    assert stored_messages[1]["role"] == "user"
+    assert len(stored_messages) == 3
+    assert stored_messages[0]["role"] == "user"
     assert (
-        stored_messages[2]["role"] == "assistant"
+        stored_messages[1]["role"] == "assistant"
     )  # "ai" should be mapped to "assistant"
-    assert stored_messages[3]["role"] == "assistant"  # should stay "assistant"
+    assert stored_messages[2]["role"] == "assistant"  # should stay "assistant"
 
     # Verify content is preserved
-    assert stored_messages[2]["content"] == "Hi there!"
-    assert stored_messages[3]["content"] == "How can I help?"
+    assert stored_messages[1]["content"] == "Hi there!"
+    assert stored_messages[2]["content"] == "How can I help?"
 
     # Verify no "ai" roles remain
     roles = [msg["role"] for msg in stored_messages]
