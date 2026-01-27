@@ -397,7 +397,7 @@ def test_envelope_too_large_response(capturing_server, make_client):
     assert len(capturing_server.captured) == 3
     report = parse_json(capturing_server.captured[2].envelope.items[0].get_bytes())
 
-    # Client reports for transaction and included span
+    # Client reports for error, transaction and included span
     assert len(report["discarded_events"]) == 3
     assert {"reason": "send_error", "category": "error", "quantity": 1} in report[
         "discarded_events"
