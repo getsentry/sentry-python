@@ -1,5 +1,3 @@
-import time
-
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
@@ -37,9 +35,6 @@ def ai_client_span(
     )
     # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-
-    # Store start time for TTFT calculation on the agent object
-    agent._sentry_chat_ttft_start_time = time.perf_counter()
 
     _set_agent_data(span, agent)
     _set_input_data(span, get_response_kwargs)

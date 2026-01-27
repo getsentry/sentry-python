@@ -2276,15 +2276,12 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
             ttft_recorded = False
-            start_time = getattr(test_agent, "_sentry_chat_ttft_start_time", None)
+            # Capture start time locally (same as production code after race condition fix)
+            start_time = time.perf_counter()
 
             async for event in mock_model.stream_response():
                 # This is the same logic used in the actual integration
-                if (
-                    not ttft_recorded
-                    and hasattr(event, "delta")
-                    and start_time is not None
-                ):
+                if not ttft_recorded and hasattr(event, "delta"):
                     ttft = time.perf_counter() - start_time
                     span.set_data(SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft)
                     ttft_recorded = True
