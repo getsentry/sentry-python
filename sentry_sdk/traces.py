@@ -276,7 +276,7 @@ class StreamedSpan:
         self._finished: bool = False
         self._span_id: "Optional[str]" = None
 
-        self.status: SpanStatus = SpanStatus.OK
+        self.status: str = SpanStatus.OK.value
         self.set_source(SegmentSource.CUSTOM)
         # XXX[span-first] ^ populate this correctly
 
