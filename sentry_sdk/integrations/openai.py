@@ -320,12 +320,11 @@ def _set_completions_api_input_data(
         "messages"
     )
 
-    if not should_send_default_pii() or not integration.include_prompts:
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
-        _commmon_set_input_data(span, kwargs)
-        return
-
-    if messages is None:
+    if (
+        not should_send_default_pii()
+        or not integration.include_prompts
+        or messages is None
+    ):
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         _commmon_set_input_data(span, kwargs)
         return
