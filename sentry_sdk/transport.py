@@ -340,7 +340,21 @@ class BaseHttpTransport(Transport):
         try:
             self._update_rate_limits(response)
 
-            if response.status == 429:
+            if response.status == 413:
+                size_exceeded_message = (
+                    "HTTP 413: Event dropped due to exceeded envelope size limit"
+                )
+                response_message = getattr(
+                    response, "data", getattr(response, "content", None)
+                )
+                if response_message is not None:
+                    size_exceeded_message += f" (body: {response_message})"
+
+                logger.error(size_exceeded_message)
+                self.on_dropped_event("status_413")
+                record_loss("send_error")
+
+            elif response.status == 429:
                 # if we hit a 429.  Something was rate limited but we already
                 # acted on this in `self._update_rate_limits`.  Note that we
                 # do not want to record event loss here as we will have recorded
