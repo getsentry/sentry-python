@@ -1,15 +1,16 @@
-import pytest
 import uuid
 
 import dramatiq
+import pytest
 from dramatiq.brokers.stub import StubBroker
+from dramatiq.middleware import Middleware, SkipMessage
 
 import sentry_sdk
-from sentry_sdk.tracing import TransactionSource
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.integrations.dramatiq import DramatiqIntegration
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.tracing import Transaction, TransactionSource
 
 ignore_logger("dramatiq.worker.WorkerThread")
 
@@ -386,3 +387,28 @@ def test_that_retry_exceptions_are_not_captured(
     worker.join()
 
     assert events == []
+
+
+@pytest.mark.parametrize("broker", [1.0], indirect=True)
+def test_that_skip_message_cleans_up_scope_and_transaction(
+    broker, worker, capture_events
+):
+    transactions: list[Transaction] = []
+
+    class SkipMessageMiddleware(Middleware):
+        def before_process_message(self, broker, message):
+            transactions.append(sentry_sdk.get_current_scope().transaction)
+            raise SkipMessage()
+
+    broker.add_middleware(SkipMessageMiddleware())
+
+    @dramatiq.actor(max_retries=0)
+    def skipped_actor(): ...
+
+    skipped_actor.send()
+
+    broker.join(skipped_actor.queue_name)
+    worker.join()
+
+    (transaction,) = transactions
+    assert transaction.timestamp is not None
