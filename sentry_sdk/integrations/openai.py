@@ -11,6 +11,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     normalize_message_roles,
     truncate_and_annotate_messages,
+    truncate_and_annotate_embedding_inputs,
 )
 from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
@@ -414,7 +415,9 @@ def _set_embeddings_input_data(
     ):
         normalized_messages = normalize_message_roles(messages)  # type: ignore
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = truncate_and_annotate_embedding_inputs(
+            normalized_messages, span, scope
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False

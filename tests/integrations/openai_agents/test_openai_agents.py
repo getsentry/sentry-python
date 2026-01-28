@@ -1146,24 +1146,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
         [
             {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Please use the simple test tool"}
-                ],
-            },
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "arguments": '{"message": "hello"}',
-                        "call_id": "call_123",
-                        "name": "simple_test_tool",
-                        "type": "function_call",
-                        "id": "call_123",
-                    }
-                ],
-            },
-            {
                 "role": "tool",
                 "content": [
                     {
@@ -1811,7 +1793,24 @@ async def test_multiple_agents_asyncio(
     assert txn3["transaction"] == "test_agent workflow"
 
 
-def test_openai_agents_message_role_mapping(sentry_init, capture_events):
+# Test input messages with mixed roles including "ai"
+@pytest.mark.parametrize(
+    "test_message,expected_role",
+    [
+        ({"role": "user", "content": "Hello"}, "user"),
+        (
+            {"role": "ai", "content": "Hi there!"},
+            "assistant",
+        ),  # Should be mapped to "assistant"
+        (
+            {"role": "assistant", "content": "How can I help?"},
+            "assistant",
+        ),  # Should stay "assistant"
+    ],
+)
+def test_openai_agents_message_role_mapping(
+    sentry_init, capture_events, test_message, expected_role
+):
     """Test that OpenAI Agents integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
@@ -1819,15 +1818,7 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
         send_default_pii=True,
     )
 
-    # Test input messages with mixed roles including "ai"
-    test_input = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hello"},
-        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
-        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
-    ]
-
-    get_response_kwargs = {"input": test_input}
+    get_response_kwargs = {"input": [test_message]}
 
     from sentry_sdk.integrations.openai_agents.utils import _set_input_data
     from sentry_sdk import start_span
@@ -1838,23 +1829,10 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
     # Verify that messages were processed and roles were mapped
     from sentry_sdk.consts import SPANDATA
 
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
-        import json
+    stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
-        stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
-        # Verify roles were properly mapped
-        found_assistant_roles = 0
-        for message in stored_messages:
-            if message["role"] == "assistant":
-                found_assistant_roles += 1
-
-        # Should have 2 assistant roles (1 from original "assistant", 1 from mapped "ai")
-        assert found_assistant_roles == 2
-
-        # Verify no "ai" roles remain in any message
-        for message in stored_messages:
-            assert message["role"] != "ai"
+    # Verify roles were properly mapped
+    assert stored_messages[0]["role"] == expected_role
 
 
 @pytest.mark.asyncio
@@ -2563,9 +2541,8 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
 
         parsed_messages = json.loads(messages_data)
         assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 2
-        assert "small message 4" in str(parsed_messages[0])
-        assert "small message 5" in str(parsed_messages[1])
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
 
 
 def test_streaming_patches_applied(sentry_init):

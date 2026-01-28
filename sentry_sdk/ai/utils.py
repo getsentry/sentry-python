@@ -685,6 +685,26 @@ def truncate_and_annotate_messages(
     messages: "Optional[List[Dict[str, Any]]]",
     span: "Any",
     scope: "Any",
+    max_single_message_chars: int = MAX_SINGLE_MESSAGE_CONTENT_CHARS,
+) -> "Optional[List[Dict[str, Any]]]":
+    if not messages:
+        return None
+
+    messages = redact_blob_message_parts(messages)
+
+    truncated_message = _truncate_single_message_content_if_present(
+        deepcopy(messages[-1]), max_chars=max_single_message_chars
+    )
+    if len(messages) > 1:
+        scope._gen_ai_original_message_count[span.span_id] = len(messages)
+
+    return [truncated_message]
+
+
+def truncate_and_annotate_embedding_inputs(
+    messages: "Optional[List[Dict[str, Any]]]",
+    span: "Any",
+    scope: "Any",
     max_bytes: int = MAX_GEN_AI_MESSAGE_BYTES,
 ) -> "Optional[List[Dict[str, Any]]]":
     if not messages:
