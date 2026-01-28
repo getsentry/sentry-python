@@ -707,10 +707,12 @@ def stdio(
 
         return result["response"]
 
+    return inner
+
 
 @pytest.fixture()
 def json_rpc():
-    def inner(app, method: str, params, request_id: str | None = None):
+    def inner(app, method: str, params, request_id: str):
         if request_id is None:
             request_id = "1"  # arbitrary
 
@@ -772,16 +774,13 @@ def json_rpc():
 
 
 @pytest.fixture()
-def select_transactions_with_mcp_spans():
-    def inner(events, method_name):
+def select_mcp_transactions():
+    def inner(events):
         return [
-            transaction
-            for transaction in events
-            if transaction["type"] == "transaction"
-            and any(
-                span["data"].get("mcp.method.name") == method_name
-                for span in transaction.get("spans", [])
-            )
+            event
+            for event in events
+            if event["type"] == "transaction"
+            and event["contexts"]["trace"]["op"] == "mcp.server"
         ]
 
     return inner

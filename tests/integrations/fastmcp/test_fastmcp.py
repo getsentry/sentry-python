@@ -382,7 +382,7 @@ async def test_fastmcp_tool_async(
     send_default_pii,
     include_prompts,
     json_rpc,
-    select_transactions_with_mcp_spans,
+    select_mcp_transactions,
 ):
     """Test that FastMCP async tool handlers create proper spans"""
     sentry_init(
@@ -442,26 +442,24 @@ async def test_fastmcp_tool_async(
             indent=2,
         )
 
-    transactions = select_transactions_with_mcp_spans(events, "tools/call")
+    transactions = select_mcp_transactions(events)
     assert len(transactions) == 1
     tx = transactions[0]
 
-    # Verify span structure
-    span = tx["spans"][0]
-    assert span["op"] == OP.MCP_SERVER
-    assert span["origin"] == "auto.ai.mcp"
-    assert span["description"] == "tools/call multiply_numbers"
-    assert span["data"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
-    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
-    assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
+    assert tx["contexts"]["trace"]["op"] == OP.MCP_SERVER
+    assert tx["contexts"]["trace"]["origin"] == "auto.ai.mcp"
+    assert tx["transaction"] == "tools/call multiply_numbers"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
     # Check PII-sensitive data
     if send_default_pii and include_prompts:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["data"]
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in tx["contexts"]["trace"]["data"]
     else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in tx["contexts"]["trace"]["data"]
 
 
 @pytest.mark.asyncio
@@ -759,7 +757,7 @@ async def test_fastmcp_prompt_async(
     capture_events,
     FastMCP,
     json_rpc,
-    select_transactions_with_mcp_spans,
+    select_mcp_transactions,
 ):
     """Test that FastMCP async prompt handlers create proper spans"""
     sentry_init(
@@ -810,11 +808,12 @@ async def test_fastmcp_prompt_async(
                     "name": "async_prompt",
                     "arguments": {"topic": "MCP"},
                 },
+                request_id="req-async-prompt",
             )
 
             assert len(result.json()["result"]["messages"]) == 2
 
-            transactions = select_transactions_with_mcp_spans(events, "prompts/get")
+            transactions = select_mcp_transactions(events)
             assert len(transactions) == 1
     except AttributeError:
         # Prompt handler not supported in this version
@@ -890,7 +889,7 @@ async def test_fastmcp_resource_async(
     capture_events,
     FastMCP,
     json_rpc,
-    select_transactions_with_mcp_spans,
+    select_mcp_transactions,
 ):
     """Test that FastMCP async resource handlers create proper spans"""
     sentry_init(
@@ -939,7 +938,7 @@ async def test_fastmcp_resource_async(
 
             assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
-            transactions = select_transactions_with_mcp_spans(events, "resources/read")
+            transactions = select_mcp_transactions(events, "resources/read")
             assert len(transactions) == 1
             tx = transactions[0]
 
@@ -1074,7 +1073,7 @@ def test_fastmcp_http_transport(
     capture_events,
     FastMCP,
     json_rpc,
-    select_transactions_with_mcp_spans,
+    select_mcp_transactions,
 ):
     """Test that FastMCP correctly detects HTTP transport"""
     sentry_init(
@@ -1109,6 +1108,7 @@ def test_fastmcp_http_transport(
             "name": "http_tool",
             "arguments": {"data": "test"},
         },
+        request_id="req-http",
     )
 
     if (
@@ -1129,16 +1129,12 @@ def test_fastmcp_http_transport(
             indent=2,
         )
 
-    transactions = select_transactions_with_mcp_spans(events, "tools/call")
+    transactions = select_mcp_transactions(events)
     assert len(transactions) == 1
     tx = transactions[0]
 
-    # Find MCP spans
-    mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(mcp_spans) >= 1
-    span = mcp_spans[0]
     # Check that HTTP transport is detected
-    assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
+    assert tx["contexts"]["trace"]["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
 
 
 @pytest.mark.asyncio

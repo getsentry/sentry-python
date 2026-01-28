@@ -47,15 +47,6 @@ from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
 
 
-def select_mcp_transactions(events):
-    return [
-        event
-        for event in events
-        if event["type"] == "transaction"
-        and event["contexts"]["trace"]["op"] == "mcp.server"
-    ]
-
-
 @pytest.fixture(autouse=True)
 def reset_request_ctx():
     """Reset request context before and after each test"""
@@ -236,7 +227,7 @@ async def test_tool_handler_async(
     send_default_pii,
     include_prompts,
     json_rpc,
-    select_transactions_with_mcp_spans,
+    select_mcp_transactions,
 ):
     """Test that async tool handlers create proper spans"""
     sentry_init(
@@ -455,7 +446,7 @@ async def test_prompt_handler_async(
     send_default_pii,
     include_prompts,
     json_rpc,
-    select_transactions_with_mcp_spans,
+    select_mcp_transactions,
 ):
     """Test that async prompt handlers create proper spans"""
     sentry_init(
@@ -622,7 +613,7 @@ async def test_resource_handler_async(
     sentry_init,
     capture_events,
     json_rpc,
-    select_transactions_with_mcp_spans,
+    select_mcp_transactions,
 ):
     """Test that async resource handlers create proper spans"""
     sentry_init(
@@ -1131,7 +1122,7 @@ def test_streamable_http_transport_detection(
     sentry_init,
     capture_events,
     json_rpc,
-    select_transactions_with_mcp_spans,
+    select_mcp_transactions,
 ):
     """Test that StreamableHTTP transport is correctly detected via header"""
     sentry_init(
