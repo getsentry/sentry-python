@@ -1,3 +1,5 @@
+import json
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
@@ -146,11 +148,9 @@ def _set_input_data(
     instructions_text_parts += _transform_system_instructions(system_instructions)
 
     if len(instructions_text_parts) > 0:
-        set_data_normalized(
-            span,
+        span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            instructions_text_parts,
-            unpack=False,
+            json.dumps(instructions_text_parts),
         )
 
     non_system_messages = [

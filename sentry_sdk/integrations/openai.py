@@ -1,4 +1,5 @@
 import sys
+import json
 import time
 from functools import wraps
 from collections.abc import Iterable
@@ -273,16 +274,16 @@ def _set_responses_api_input_data(
         and explicit_instructions is not None
         and _is_given(explicit_instructions)
     ):
-        set_data_normalized(
-            span,
+        span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            [
-                {
-                    "type": "text",
-                    "content": explicit_instructions,
-                }
-            ],
-            unpack=False,
+            json.dumps(
+                [
+                    {
+                        "type": "text",
+                        "content": explicit_instructions,
+                    }
+                ]
+            ),
         )
 
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
@@ -309,11 +310,9 @@ def _set_responses_api_input_data(
     instructions_text_parts += _transform_system_instructions(system_instructions)
 
     if len(instructions_text_parts) > 0:
-        set_data_normalized(
-            span,
+        span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            instructions_text_parts,
-            unpack=False,
+            json.dumps(instructions_text_parts),
         )
 
     if isinstance(messages, str):
@@ -365,11 +364,9 @@ def _set_completions_api_input_data(
 
     system_instructions = _get_system_instructions_completions(messages)
     if len(system_instructions) > 0:
-        set_data_normalized(
-            span,
+        span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            _transform_system_instructions(system_instructions),
-            unpack=False,
+            json.dumps(_transform_system_instructions(system_instructions)),
         )
 
     if isinstance(messages, str):
