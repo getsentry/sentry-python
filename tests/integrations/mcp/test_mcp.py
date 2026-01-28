@@ -28,8 +28,15 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
+from mcp.types import GetPromptResult, PromptMessage, TextContent
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.server import request_ctx
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+from starlette.routing import Mount
+from starlette.applications import Starlette
+from starlette.testclient import TestClient
 
 try:
     from mcp.server.lowlevel.server import request_ctx
@@ -39,6 +46,77 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
+
+
+def json_rpc(app, method: str, params, request_id: str | None = None):
+    if request_id is None:
+        request_id = "1"  # arbitrary
+
+    with TestClient(app) as client:
+        init_response = client.post(
+            "/mcp/",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "params": {
+                    "clientInfo": {"name": "test-client", "version": "1.0"},
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                },
+                "id": request_id,
+            },
+        )
+
+        session_id = init_response.headers["mcp-session-id"]
+
+        # Notification response is mandatory.
+        # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+        client.post(
+            "/mcp/",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+                "mcp-session-id": session_id,
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {},
+            },
+        )
+
+        response = client.post(
+            "/mcp/",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+                "mcp-session-id": session_id,
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": method,
+                "params": params,
+                "id": request_id,
+            },
+        )
+
+        return session_id, response
+
+
+def select_transactions_with_mcp_spans(events, method_name):
+    return [
+        transaction
+        for transaction in events
+        if transaction["type"] == "transaction"
+        and any(
+            span["data"].get("mcp.method.name") == method_name
+            for span in transaction.get("spans", [])
+        )
+    ]
 
 
 @pytest.fixture(autouse=True)
@@ -221,22 +299,46 @@ async def test_tool_handler_async(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(
-        request_id="req-456", session_id="session-789", transport="http"
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
     )
-    request_ctx.set(mock_ctx)
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @server.call_tool()
     async def test_tool_async(tool_name, arguments):
-        return {"status": "completed"}
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps({"status": "completed"}),
+            )
+        ]
 
-    with start_transaction(name="mcp tx"):
-        result = await test_tool_async("process", {"data": "test"})
+    session_id, result = json_rpc(
+        app,
+        method="tools/call",
+        params={
+            "name": "process",
+            "arguments": {
+                "data": "test",
+            },
+        },
+        request_id="req-456",
+    )
+    assert result.json()["result"]["content"][0]["text"] == json.dumps(
+        {"status": "completed"}
+    )
 
-    assert result == {"status": "completed"}
+    transactions = select_transactions_with_mcp_spans(events, "tools/call")
+    assert len(transactions) == 1
+    tx = transactions[0]
 
-    (tx,) = events
     assert tx["type"] == "transaction"
     assert len(tx["spans"]) == 1
 
@@ -250,13 +352,16 @@ async def test_tool_handler_async(
     assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
     assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
     assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-789"
+    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
     assert span["data"]["mcp.request.argument.data"] == '"test"'
 
     # Check PII-sensitive data
     if send_default_pii and include_prompts:
+        # TODO: Investigate why tool result is double-serialized.
         assert span["data"][SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
-            {"status": "completed"}
+            json.dumps(
+                {"status": "completed"},
+            )
         )
     else:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
@@ -385,27 +490,49 @@ async def test_prompt_handler_async(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(
-        request_id="req-async-prompt", session_id="session-abc", transport="http"
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
     )
-    request_ctx.set(mock_ctx)
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @server.get_prompt()
     async def test_prompt_async(name, arguments):
-        return MockGetPromptResult(
-            [
-                MockPromptMessage("system", "You are a helpful assistant"),
-                MockPromptMessage("user", "What is MCP?"),
-            ]
+        return GetPromptResult(
+            description="A helpful test prompt",
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=TextContent(
+                        type="text", text="You are a helpful assistant"
+                    ),
+                ),
+                PromptMessage(
+                    role="user", content=TextContent(type="text", text="What is MCP?")
+                ),
+            ],
         )
 
-    with start_transaction(name="mcp tx"):
-        result = await test_prompt_async("mcp_info", {})
+    _, result = json_rpc(
+        app,
+        method="prompts/get",
+        params={
+            "name": "mcp_info",
+            "arguments": {},
+        },
+    )
+    assert len(result.json()["result"]["messages"]) == 2
 
-    assert len(result.messages) == 2
+    transactions = select_transactions_with_mcp_spans(events, "prompts/get")
+    assert len(transactions) == 1
+    tx = transactions[0]
 
-    (tx,) = events
     assert tx["type"] == "transaction"
     assert len(tx["spans"]) == 1
 
@@ -504,23 +631,42 @@ async def test_resource_handler_async(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(
-        request_id="req-async-resource", session_id="session-res", transport="http"
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
     )
-    request_ctx.set(mock_ctx)
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @server.read_resource()
     async def test_resource_async(uri):
-        return {"data": "resource data"}
+        return [
+            ReadResourceContents(
+                content=json.dumps({"data": "resource data"}), mime_type="text/plain"
+            )
+        ]
 
-    with start_transaction(name="mcp tx"):
-        uri = MockURI("https://example.com/resource")
-        result = await test_resource_async(uri)
+    session_id, result = json_rpc(
+        app,
+        method="resources/read",
+        params={
+            "uri": "https://example.com/resource",
+        },
+    )
 
-    assert result["data"] == "resource data"
+    assert result.json()["result"]["contents"][0]["text"] == json.dumps(
+        {"data": "resource data"}
+    )
 
-    (tx,) = events
+    transactions = select_transactions_with_mcp_spans(events, "resources/read")
+    assert len(transactions) == 1
+    tx = transactions[0]
+
     assert tx["type"] == "transaction"
     assert len(tx["spans"]) == 1
 
@@ -530,7 +676,7 @@ async def test_resource_handler_async(sentry_init, capture_events):
 
     assert span["data"][SPANDATA.MCP_RESOURCE_URI] == "https://example.com/resource"
     assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-res"
+    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
 
 def test_resource_handler_with_error(sentry_init, capture_events):
@@ -964,28 +1110,49 @@ def test_streamable_http_transport_detection(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context with StreamableHTTP transport
-    mock_ctx = MockRequestContext(
-        request_id="req-http", session_id="session-http-456", transport="http"
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
     )
-    request_ctx.set(mock_ctx)
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @server.call_tool()
-    def test_tool(tool_name, arguments):
-        return {"result": "success"}
+    async def test_tool(tool_name, arguments):
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps({"status": "success"}),
+            )
+        ]
 
-    with start_transaction(name="mcp tx"):
-        result = test_tool("http_tool", {})
+    _, result = json_rpc(
+        app,
+        method="tools/call",
+        params={
+            "name": "http_tool",
+            "arguments": {},
+        },
+    )
+    assert result.json()["result"]["content"][0]["text"] == json.dumps(
+        {"status": "success"}
+    )
 
-    assert result == {"result": "success"}
+    transactions = select_transactions_with_mcp_spans(events, "tools/call")
+    assert len(transactions) == 1
+    tx = transactions[0]
 
-    (tx,) = events
     span = tx["spans"][0]
 
     # Check that HTTP transport is detected
     assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
     assert span["data"][SPANDATA.NETWORK_TRANSPORT] == "tcp"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-http-456"
+    assert len(span["data"][SPANDATA.MCP_SESSION_ID]) == 32
 
 
 def test_stdio_transport_detection(sentry_init, capture_events):

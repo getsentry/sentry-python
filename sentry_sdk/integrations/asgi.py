@@ -19,7 +19,6 @@ from sentry_sdk.integrations._asgi_common import (
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    nullcontext,
 )
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import (
@@ -34,6 +33,7 @@ from sentry_sdk.utils import (
     logger,
     transaction_from_function,
     _get_installed_modules,
+    nullcontext,
 )
 from sentry_sdk.tracing import Transaction
 
