@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.51.0a1
+
+### New Features ✨
+
+#### Integrations
+
+- feat(integrations): OpenAI/OpenAI Agents detect and report the time to first token metric (TTFT) as `gen_ai.response.time_to_first_token` by @constantinius in [#5348](https://github.com/getsentry/sentry-python/pull/5348)
+- feat(integrations): openai-agents streaming support by @constantinius in [#5291](https://github.com/getsentry/sentry-python/pull/5291)
+
+#### Other
+
+- feat(anthropic): Set system instruction attribute by @alexander-alderman-webb in [#5353](https://github.com/getsentry/sentry-python/pull/5353)
+- feat(asyncio): Allow to turn task spans off by @sentrivana in [#5367](https://github.com/getsentry/sentry-python/pull/5367)
+- feat(gen_ai): add function `set_conversation_id` and managing functions on the Scope and apply it on the Span on `.finish()` by @constantinius in [#5362](https://github.com/getsentry/sentry-python/pull/5362)
+- feat(google-genai): Set system instruction attribute by @alexander-alderman-webb in [#5354](https://github.com/getsentry/sentry-python/pull/5354)
+- feat(langchain): Set system instruction attribute by @alexander-alderman-webb in [#5357](https://github.com/getsentry/sentry-python/pull/5357)
+- feat(openai-agents): Set system instruction attribute by @alexander-alderman-webb in [#5355](https://github.com/getsentry/sentry-python/pull/5355)
+- feat(pydantic-ai): Set system instruction attribute by @alexander-alderman-webb in [#5356](https://github.com/getsentry/sentry-python/pull/5356)
+
+### Internal Changes 🔧
+
+- ci(release): Fix changelog-preview permissions by @BYK in [#5368](https://github.com/getsentry/sentry-python/pull/5368)
+- ci: Fix path in AI integration tests by @alexander-alderman-webb in [#5347](https://github.com/getsentry/sentry-python/pull/5347)
+
+### Other
+
+- [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
+
 ## 2.50.0
 
 ### New Features ✨
