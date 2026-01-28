@@ -1,3 +1,5 @@
+import json
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
@@ -69,8 +71,14 @@ def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "agents.Agent") -> N
             SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
         )
 
+    # Get model name from agent.model or fall back to request model (for when agent.model is None/default)
+    model_name = None
     if agent.model:
         model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
+    elif hasattr(agent, "_sentry_request_model"):
+        model_name = agent._sentry_request_model
+
+    if model_name:
         span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
     if agent.model_settings.presence_penalty:
@@ -140,11 +148,9 @@ def _set_input_data(
     instructions_text_parts += _transform_system_instructions(system_instructions)
 
     if len(instructions_text_parts) > 0:
-        set_data_normalized(
-            span,
+        span.set_data(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            instructions_text_parts,
-            unpack=False,
+            json.dumps(instructions_text_parts),
         )
 
     non_system_messages = [
