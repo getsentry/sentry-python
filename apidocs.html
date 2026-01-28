@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.50.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.51.0a1 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=e1a1ceaf" />
@@ -119,6 +119,7 @@ data-aria-dark="Switch to auto color mode">
 <li><a class="reference internal" href="#sentry_sdk.Scope.generate_propagation_context"><code class="docutils literal notranslate">generate_propagation_context()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.get_baggage"><code class="docutils literal notranslate">get_baggage()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.get_client"><code class="docutils literal notranslate">get_client()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_conversation_id"><code class="docutils literal notranslate">get_conversation_id()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.get_current_scope"><code class="docutils literal notranslate">get_current_scope()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.get_dynamic_sampling_context"><code class="docutils literal notranslate">get_dynamic_sampling_context()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.get_global_scope"><code class="docutils literal notranslate">get_global_scope()</span></code></a></li>
@@ -131,6 +132,7 @@ data-aria-dark="Switch to auto color mode">
 <li><a class="reference internal" href="#sentry_sdk.Scope.level"><code class="docutils literal notranslate">level</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.remove_attribute"><code class="docutils literal notranslate">remove_attribute()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.remove_context"><code class="docutils literal notranslate">remove_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.remove_conversation_id"><code class="docutils literal notranslate">remove_conversation_id()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.remove_extra"><code class="docutils literal notranslate">remove_extra()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.remove_tag"><code class="docutils literal notranslate">remove_tag()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.resume_auto_session_tracking"><code class="docutils literal notranslate">resume_auto_session_tracking()</span></code></a></li>
@@ -139,6 +141,7 @@ data-aria-dark="Switch to auto color mode">
 <li><a class="reference internal" href="#sentry_sdk.Scope.set_attribute"><code class="docutils literal notranslate">set_attribute()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.set_client"><code class="docutils literal notranslate">set_client()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.set_context"><code class="docutils literal notranslate">set_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_conversation_id"><code class="docutils literal notranslate">set_conversation_id()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.set_current_scope"><code class="docutils literal notranslate">set_current_scope()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.set_extra"><code class="docutils literal notranslate">set_extra()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.Scope.set_isolation_scope"><code class="docutils literal notranslate">set_isolation_scope()</span></code></a></li>
@@ -985,6 +988,20 @@ If no client is available a <a class="reference internal" href="#sentry_sdk.clie
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.Scope.get_conversation_id">
+<span class="sig-name descname"><span class="pre">get_conversation_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.get_conversation_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.get_conversation_id" title="Link to this definition">¶</a></dt>
+<dd><p>Gets the conversation ID for gen_ai spans.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The conversation ID, or None if not set.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.get_current_scope">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_current_scope</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.get_current_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.get_current_scope" title="Link to this definition">¶</a></dt>
 <dd><dl class="field-list simple">
@@ -1144,6 +1161,17 @@ various other reasons.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.Scope.remove_conversation_id">
+<span class="sig-name descname"><span class="pre">remove_conversation_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.remove_conversation_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.remove_conversation_id" title="Link to this definition">¶</a></dt>
+<dd><p>Removes the conversation ID.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.remove_extra">
 <span class="sig-name descname"><span class="pre">remove_extra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.remove_extra"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.remove_extra" title="Link to this definition">¶</a></dt>
 <dd><p>Removes a specific extra key.</p>
@@ -1241,6 +1269,20 @@ If <cite>None</cite> the client of the scope will be replaced by a <code class="
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.Scope.set_conversation_id">
+<span class="sig-name descname"><span class="pre">set_conversation_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conversation_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_conversation_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_conversation_id" title="Link to this definition">¶</a></dt>
+<dd><p>Sets the conversation ID for gen_ai spans.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>conversation_id</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – The conversation ID to set.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1376,7 +1418,7 @@ be added to the scope.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.span">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">span</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><span class="pre">Span</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></em><a class="headerlink" href="#sentry_sdk.Scope.span" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">span</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><span class="pre">Span</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">StreamedSpan</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></em><a class="headerlink" href="#sentry_sdk.Scope.span" title="Link to this definition">¶</a></dt>
 <dd><p>Get/set current tracing span or transaction.</p>
 </dd></dl>
 
@@ -2235,7 +2277,7 @@ each envelope may have at most one Item with type “event” or “transaction�
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=2c8afa5e"></script>
+      <script src="_static/documentation_options.js?v=8f820c86"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=cac61aee"></script></body>
