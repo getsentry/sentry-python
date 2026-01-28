@@ -1901,6 +1901,7 @@ async def test_ai_client_span_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.response.streaming": True,
         "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
@@ -2179,7 +2180,6 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
-        "sentry.sdk_meta.gen_ai.input.messages.original_length": 1,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -2684,3 +2684,203 @@ def test_openai_message_truncation(sentry_init, capture_events):
     span_meta = meta_path["spans"]["0"]["data"]
     messages_meta = span_meta[SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert "len" in messages_meta.get("", {})
+
+
+# noinspection PyTypeChecker
+def test_streaming_chat_completion_ttft(sentry_init, capture_events):
+    """
+    Test that streaming chat completions capture time-to-first-token (TTFT).
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = [
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=0, delta=ChoiceDelta(content="Hello"), finish_reason=None
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=0, delta=ChoiceDelta(content=" world"), finish_reason="stop"
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+    ]
+
+    client.chat.completions._post = mock.Mock(return_value=returned_stream)
+
+    with start_transaction(name="openai tx"):
+        response_stream = client.chat.completions.create(
+            model="some-model", messages=[{"role": "user", "content": "Say hello"}]
+        )
+        # Consume the stream
+        for _ in response_stream:
+            pass
+
+    (tx,) = events
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+
+    # Verify TTFT is captured
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
+    ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    assert isinstance(ttft, float)
+    assert ttft > 0
+
+
+# noinspection PyTypeChecker
+@pytest.mark.asyncio
+async def test_streaming_chat_completion_ttft_async(sentry_init, capture_events):
+    """
+    Test that async streaming chat completions capture time-to-first-token (TTFT).
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = async_iterator(
+        [
+            ChatCompletionChunk(
+                id="1",
+                choices=[
+                    DeltaChoice(
+                        index=0, delta=ChoiceDelta(content="Hello"), finish_reason=None
+                    )
+                ],
+                created=100000,
+                model="model-id",
+                object="chat.completion.chunk",
+            ),
+            ChatCompletionChunk(
+                id="1",
+                choices=[
+                    DeltaChoice(
+                        index=0,
+                        delta=ChoiceDelta(content=" world"),
+                        finish_reason="stop",
+                    )
+                ],
+                created=100000,
+                model="model-id",
+                object="chat.completion.chunk",
+            ),
+        ]
+    )
+
+    client.chat.completions._post = AsyncMock(return_value=returned_stream)
+
+    with start_transaction(name="openai tx"):
+        response_stream = await client.chat.completions.create(
+            model="some-model", messages=[{"role": "user", "content": "Say hello"}]
+        )
+        # Consume the stream
+        async for _ in response_stream:
+            pass
+
+    (tx,) = events
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+
+    # Verify TTFT is captured
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
+    ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    assert isinstance(ttft, float)
+    assert ttft > 0
+
+
+# noinspection PyTypeChecker
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_streaming_responses_api_ttft(sentry_init, capture_events):
+    """
+    Test that streaming responses API captures time-to-first-token (TTFT).
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = EXAMPLE_RESPONSES_STREAM
+    client.responses._post = mock.Mock(return_value=returned_stream)
+
+    with start_transaction(name="openai tx"):
+        response_stream = client.responses.create(
+            model="some-model",
+            input="hello",
+            stream=True,
+        )
+        # Consume the stream
+        for _ in response_stream:
+            pass
+
+    (tx,) = events
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.responses"
+
+    # Verify TTFT is captured
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
+    ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    assert isinstance(ttft, float)
+    assert ttft > 0
+
+
+# noinspection PyTypeChecker
+@pytest.mark.asyncio
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+async def test_streaming_responses_api_ttft_async(sentry_init, capture_events):
+    """
+    Test that async streaming responses API captures time-to-first-token (TTFT).
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
+    client.responses._post = AsyncMock(return_value=returned_stream)
+
+    with start_transaction(name="openai tx"):
+        response_stream = await client.responses.create(
+            model="some-model",
+            input="hello",
+            stream=True,
+        )
+        # Consume the stream
+        async for _ in response_stream:
+            pass
+
+    (tx,) = events
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.responses"
+
+    # Verify TTFT is captured
+    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
+    ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    assert isinstance(ttft, float)
+    assert ttft > 0

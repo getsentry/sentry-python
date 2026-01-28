@@ -41,8 +41,8 @@ def _transform_system_instructions(
         elif isinstance(content, list):
             for part in content:
                 if isinstance(part, dict) and part.get("type") == "text":
-                    text = part.get("text", "")
-                    if text:
+                    text = part.get("text", None)
+                    if text is not None:
                         instruction_text_parts.append({"type": "text", "content": text})
 
     return instruction_text_parts
