@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     import agents
     from typing import Any, Optional
 
-    from sentry_sdk._types import TextPart
-
 
 def invoke_agent_span(
     context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"

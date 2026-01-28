@@ -697,3 +697,11 @@ def truncate_and_annotate_messages(
         scope._gen_ai_original_message_count[span.span_id] = len(messages)
 
     return truncated_messages
+
+
+def set_conversation_id(conversation_id: str) -> None:
+    """
+    Set the conversation_id in the scope.
+    """
+    scope = sentry_sdk.get_current_scope()
+    scope.set_conversation_id(conversation_id)
