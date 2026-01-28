@@ -1901,7 +1901,6 @@ async def test_ai_client_span_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
-        "gen_ai.response.streaming": True,
         "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
@@ -2180,6 +2179,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.text": "the model response",
+        "sentry.sdk_meta.gen_ai.input.messages.original_length": 1,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
