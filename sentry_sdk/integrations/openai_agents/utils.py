@@ -9,13 +9,14 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Union
     from agents import Usage
 
     from sentry_sdk.tracing import Span
@@ -38,17 +39,24 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _record_exception_on_span(span: "Span", error: Exception) -> "Any":
+def _record_exception_on_span(
+    span: "Union[StreamedSpan, Span]", error: Exception
+) -> "Any":
     set_span_errored(span)
-    span.set_data("span.status", "error")
+    if isinstance(span, StreamedSpan):
+        set_on_span = span.set_attribute
+    else:
+        set_on_span = span.set_data
+
+    set_on_span("span.status", "error")
 
     # Optionally capture the error details if we have them
     if hasattr(error, "__class__"):
-        span.set_data("error.type", error.__class__.__name__)
+        set_on_span("error.type", error.__class__.__name__)
     if hasattr(error, "__str__"):
         error_message = str(error)
         if error_message:
-            span.set_data("error.message", error_message)
+            set_on_span("error.message", error_message)
 
 
 def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "agents.Agent") -> None:

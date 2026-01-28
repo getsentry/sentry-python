@@ -29,9 +29,11 @@ from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
+    has_span_streaming_enabled,
     normalize_incoming_data,
     PropagationContext,
 )
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -604,6 +606,14 @@ class Scope:
         Returns the Sentry "trace" context from the Propagation Context.
         """
         if has_tracing_enabled(self.get_client().options) and self._span is not None:
+            if isinstance(self._span, StreamedSpan):
+                warnings.warn(
+                    "Scope.get_trace_context is not available in streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return {}
+
             return self._span.get_trace_context()
 
         # if we are tracing externally (otel), those values take precedence
@@ -709,7 +719,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture: bool = True
 
-        self._span: "Optional[Span]" = None
+        self._span: "Optional[Union[Span, StreamedSpan]]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
 
@@ -763,6 +773,14 @@ class Scope:
         if self._span is None:
             return None
 
+        if isinstance(self._span, StreamedSpan):
+            warnings.warn(
+                "Scope.transaction is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return None
+
         # there is an orphan span on the scope
         if self._span.containing_transaction is None:
             return None
@@ -792,17 +810,31 @@ class Scope:
             "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
         )
         self._transaction = value
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = value
+        if self._span:
+            if isinstance(self._span, StreamedSpan):
+                warnings.warn(
+                    "Scope.transaction is not available in streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return None
+
+            if self._span.containing_transaction:
+                self._span.containing_transaction.name = value
 
     def set_transaction_name(self, name: str, source: "Optional[str]" = None) -> None:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
+        if self._span:
+            if isinstance(self._span, StreamedSpan):
+                self._span.segment.name = name
+                if source:
+                    self._span.segment.set_source(source)
 
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = name
-            if source:
-                self._span.containing_transaction.source = source
+            elif self._span.containing_transaction:
+                self._span.containing_transaction.name = name
+                if source:
+                    self._span.containing_transaction.source = source
 
         if source:
             self._transaction_info["source"] = source
@@ -825,12 +857,12 @@ class Scope:
             session.update(user=value)
 
     @property
-    def span(self) -> "Optional[Span]":
+    def span(self) -> "Optional[Union[Span, StreamedSpan]]":
         """Get/set current tracing span or transaction."""
         return self._span
 
     @span.setter
-    def span(self, span: "Optional[Span]") -> None:
+    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -1139,6 +1171,15 @@ class Scope:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        client = sentry_sdk.get_client()
+        if has_span_streaming_enabled(client.options):
+            warnings.warn(
+                "Scope.start_span is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return NoOpSpan()
+
         if kwargs.get("description") is not None:
             warnings.warn(
                 "The `description` parameter is deprecated. Please use `name` instead.",
@@ -1158,6 +1199,9 @@ class Scope:
 
             # get current span or transaction
             span = self.span or self.get_isolation_scope().span
+            if isinstance(span, StreamedSpan):
+                # make mypy happy
+                return NoOpSpan()
 
             if span is None:
                 # New spans get the `trace_id` from the scope
@@ -1171,6 +1215,74 @@ class Scope:
                 span = span.start_child(**kwargs)
 
             return span
+
+    def start_streamed_span(
+        self,
+        name: str,
+        attributes: "Optional[Attributes]" = None,
+        parent_span: "Optional[StreamedSpan]" = None,
+    ) -> "StreamedSpan":
+        # TODO: rename to start_span once we drop the old API
+        if parent_span is None:
+            # Get currently active span
+            # TODO[span-first]: should this be current scope?
+            parent_span = self.span or self.get_isolation_scope().span  # type: ignore
+
+        # If no specific parent_span provided and there is no currently
+        # active span, this is a segment
+        if parent_span is None:
+            propagation_context = self.get_active_propagation_context()
+
+            span = StreamedSpan(
+                name=name,
+                attributes=attributes,
+                scope=self,
+                segment=None,
+                trace_id=propagation_context.trace_id,
+                parent_span_id=propagation_context.parent_span_id,
+                parent_sampled=propagation_context.parent_sampled,
+                baggage=propagation_context.baggage,
+            )
+
+            return span
+
+        # This is a child span; take propagation context from the parent span
+        with new_scope():
+            span = StreamedSpan(
+                name=name,
+                attributes=attributes,
+                scope=self,
+                trace_id=parent_span.trace_id,
+                parent_span_id=parent_span.span_id,
+                parent_sampled=parent_span.sampled,
+                segment=parent_span.segment,
+                # XXX[span-first]: baggage?
+            )
+
+            return span
+
+    def _start_profile_on_segment(self, span: "StreamedSpan") -> None:
+        try_autostart_continuous_profiler()
+
+        if not span.sampled:
+            return
+
+        span._continuous_profile = try_profile_lifecycle_trace_start()
+
+        # Typically, the profiler is set when the segment is created. But when
+        # using the auto lifecycle, the profiler isn't running when the first
+        # segment is started. So make sure we update the profiler id on it.
+        if span._continuous_profile is not None:
+            span._set_profile_id(get_profiler_id())
+
+    def _update_sample_rate_from_segment(self, span: "StreamedSpan") -> None:
+        # If we had to adjust the sample rate when setting the sampling decision
+        # for the spans, it needs to be updated in the propagation context too
+        propagation_context = self.get_active_propagation_context()
+        baggage = propagation_context.baggage
+
+        if baggage is not None:
+            baggage.sentry_items["sample_rate"] = str(span.sample_rate)
 
     def continue_trace(
         self,
@@ -1204,6 +1316,9 @@ class Scope:
             same_process_as_parent=False,
             **optional_kwargs,
         )
+
+    def set_propagation_context(self, environ_or_headers: "dict[str, Any]") -> None:
+        self.generate_propagation_context(environ_or_headers)
 
     def capture_event(
         self,
@@ -1277,6 +1392,17 @@ class Scope:
             )
 
         client._capture_metric(metric, scope=merged_scope)
+
+    def _capture_span(self, span: "Optional[StreamedSpan]") -> None:
+        if span is None:
+            return
+
+        client = self.get_client()
+        if not has_span_streaming_enabled(client.options):
+            return
+
+        merged_scope = self._merge_scopes()
+        client._capture_span(span, scope=merged_scope)
 
     def capture_message(
         self,
@@ -1522,16 +1648,25 @@ class Scope:
             )
 
     def _apply_scope_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
+        self, telemetry: "Union[Log, Metric, StreamedSpan]"
     ) -> None:
+        # TODO: turn Logs, Metrics into actual classes
+        if isinstance(telemetry, dict):
+            attributes = telemetry["attributes"]
+        else:
+            attributes = telemetry.attributes
+
         for attribute, value in self._attributes.items():
-            if attribute not in telemetry["attributes"]:
-                telemetry["attributes"][attribute] = value
+            if attribute not in attributes:
+                attributes[attribute] = value
 
     def _apply_user_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
+        self, telemetry: "Union[Log, Metric, StreamedSpan]"
     ) -> None:
-        attributes = telemetry["attributes"]
+        if isinstance(telemetry, dict):
+            attributes = telemetry["attributes"]
+        else:
+            attributes = telemetry.attributes
 
         if not should_send_default_pii() or self._user is None:
             return
@@ -1651,16 +1786,19 @@ class Scope:
         return event
 
     @_disable_capture
-    def apply_to_telemetry(self, telemetry: "Union[Log, Metric]") -> None:
+    def apply_to_telemetry(self, telemetry: "Union[Log, Metric, StreamedSpan]") -> None:
         # Attributes-based events and telemetry go through here (logs, metrics,
         # spansV2)
-        trace_context = self.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        if telemetry.get("trace_id") is None:
-            telemetry["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
-        span_id = trace_context.get("span_id")
-        if telemetry.get("span_id") is None and span_id:
-            telemetry["span_id"] = span_id
+        if not isinstance(telemetry, StreamedSpan):
+            trace_context = self.get_trace_context()
+            trace_id = trace_context.get("trace_id")
+            if telemetry.get("trace_id") is None:
+                telemetry["trace_id"] = (
+                    trace_id or "00000000-0000-0000-0000-000000000000"
+                )
+            span_id = trace_context.get("span_id")
+            if telemetry.get("span_id") is None and span_id:
+                telemetry["span_id"] = span_id
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)

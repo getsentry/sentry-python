@@ -8,6 +8,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANNAME
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
@@ -720,14 +721,21 @@ def install_sql_hook() -> None:
 
 
 def _set_db_data(
-    span: "Span", cursor_or_db: "Any", db_operation: "Optional[str]" = None
+    span: "Union[StreamedSpan, Span]",
+    cursor_or_db: "Any",
+    db_operation: "Optional[str]" = None,
 ) -> None:
+    if isinstance(span, StreamedSpan):
+        set_on_span = span.set_attribute
+    else:
+        set_on_span = span.set_data
+
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
-    span.set_data(SPANDATA.DB_SYSTEM, vendor)
+    set_on_span(SPANDATA.DB_SYSTEM, vendor)
 
     if db_operation is not None:
-        span.set_data(SPANDATA.DB_OPERATION, db_operation)
+        set_on_span(SPANDATA.DB_OPERATION, db_operation)
 
     # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
     # actually has a `connection` and the `connection` has a `get_dsn_parameters`
@@ -760,19 +768,19 @@ def _set_db_data(
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
-        span.set_data(SPANDATA.DB_NAME, db_name)
+        set_on_span(SPANDATA.DB_NAME, db_name)
 
     server_address = connection_params.get("host")
     if server_address is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+        set_on_span(SPANDATA.SERVER_ADDRESS, server_address)
 
     server_port = connection_params.get("port")
     if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, str(server_port))
+        set_on_span(SPANDATA.SERVER_PORT, str(server_port))
 
     server_socket_address = connection_params.get("unix_socket")
     if server_socket_address is not None:
-        span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
+        set_on_span(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
 
 
 def add_template_context_repr_sequence() -> None:
