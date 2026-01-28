@@ -4,20 +4,17 @@
 
 ### New Features ✨
 
-#### Integrations
-
-- feat(integrations): OpenAI/OpenAI Agents detect and report the time to first token metric (TTFT) as `gen_ai.response.time_to_first_token` by @constantinius in [#5348](https://github.com/getsentry/sentry-python/pull/5348)
-- feat(integrations): openai-agents streaming support by @constantinius in [#5291](https://github.com/getsentry/sentry-python/pull/5291)
-
 #### Openai
 
 - feat(openai): Set system instruction attribute for Responses API by @alexander-alderman-webb in [#5376](https://github.com/getsentry/sentry-python/pull/5376)
 - feat(openai): Set system instruction attribute for Completions API by @alexander-alderman-webb in [#5358](https://github.com/getsentry/sentry-python/pull/5358)
+- feat(integrations): OpenAI/OpenAI Agents detect and report the time to first token metric (TTFT) as `gen_ai.response.time_to_first_token` by @constantinius in [#5348](https://github.com/getsentry/sentry-python/pull/5348)
 
 #### Openai Agents
 
 - feat(openai-agents): Set system instruction attribute on `gen_ai.chat` spans by @alexander-alderman-webb in [#5370](https://github.com/getsentry/sentry-python/pull/5370)
 - feat(openai-agents): Set system instruction attribute by @alexander-alderman-webb in [#5355](https://github.com/getsentry/sentry-python/pull/5355)
+- feat(integrations): openai-agents streaming support by @constantinius in [#5291](https://github.com/getsentry/sentry-python/pull/5291)
 
 #### Other
 
