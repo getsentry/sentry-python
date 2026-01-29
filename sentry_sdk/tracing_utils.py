@@ -10,6 +10,7 @@ from collections.abc import Mapping, MutableMapping
 from datetime import timedelta
 from random import Random
 from urllib.parse import quote, unquote
+from typing import Pattern
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
@@ -40,6 +41,8 @@ if TYPE_CHECKING:
     from typing import Tuple
 
     from types import FrameType
+
+    from sentry_sdk._types import Attributes
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -1469,6 +1472,40 @@ def add_sentry_baggage_to_headers(
     headers[BAGGAGE_HEADER_NAME] = (
         stripped_existing_baggage + separator + sentry_baggage
     )
+
+
+def is_ignored_span(name: str, attributes: "Attributes") -> bool:
+    client = sentry_sdk.get_client()
+    ignore_spans = (client.options.get("_experiments") or {}).get("ignore_spans")
+
+    if not ignore_spans:
+        return False
+
+    def _match_name(rule: "Union[str, Pattern]") -> bool:
+        if isinstance(rule, Pattern):
+            return bool(rule.match(name))
+        return rule == name
+
+    for rule in ignore_spans:
+        if isinstance(rule, (str, Pattern)):
+            if _match_name(rule):
+                return True
+
+        elif isinstance(rule, dict):
+            name_matches = True
+            attributes_match = True
+
+            if "name" in rule:
+                name_matches = _match_name(rule["name"])
+
+            if "attributes" in rule:
+                for attribute, value in rule["attributes"].items():
+                    if attribute not in attributes:
+                        attributes_match = False
+                        break
+
+            if name_matches and attributes_match:
+                return True
 
 
 # Circular imports

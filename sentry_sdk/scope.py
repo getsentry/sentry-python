@@ -30,10 +30,11 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
     has_span_streaming_enabled,
+    is_ignored_span,
     normalize_incoming_data,
     PropagationContext,
 )
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, NoOpStreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -1239,31 +1240,36 @@ class Scope:
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
-            span = StreamedSpan(
-                name=name,
-                attributes=attributes,
-                scope=self,
-                segment=None,
-                trace_id=propagation_context.trace_id,
-                parent_span_id=propagation_context.parent_span_id,
-                parent_sampled=propagation_context.parent_sampled,
-                baggage=propagation_context.baggage,
-            )
+            if is_ignored_span(name, attributes):
+                span = NoOpStreamedSpan(name=name, scope=self)
+            else:
+                span = StreamedSpan(
+                    name=name,
+                    attributes=attributes,
+                    scope=self,
+                    segment=None,
+                    trace_id=propagation_context.trace_id,
+                    parent_span_id=propagation_context.parent_span_id,
+                    parent_sampled=propagation_context.parent_sampled,
+                    baggage=propagation_context.baggage,
+                )
 
             return span
 
         # This is a child span; take propagation context from the parent span
         with new_scope():
-            span = StreamedSpan(
-                name=name,
-                attributes=attributes,
-                scope=self,
-                trace_id=parent_span.trace_id,
-                parent_span_id=parent_span.span_id,
-                parent_sampled=parent_span.sampled,
-                segment=parent_span.segment,
-                # XXX[span-first]: baggage?
-            )
+            if is_ignored_span(name, attributes):
+                span = NoOpStreamedSpan(name=name, scope=self)
+            else:
+                span = StreamedSpan(
+                    name=name,
+                    attributes=attributes,
+                    scope=self,
+                    trace_id=parent_span.trace_id,
+                    parent_span_id=parent_span.span_id,
+                    parent_sampled=parent_span.sampled,
+                    segment=parent_span.segment,
+                )
 
             return span
 

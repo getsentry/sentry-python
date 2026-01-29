@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, TypeVar, Union
+from typing import TYPE_CHECKING, Pattern, TypeVar, Union
 
 
 # Re-exported for compat, since code out there in the wild might use this variable.
@@ -363,3 +363,11 @@ if TYPE_CHECKING:
     class TextPart(TypedDict):
         type: Literal["text"]
         content: str
+
+    IgnoreSpansName = Union[str, Pattern]
+    IgnoreSpansContext = TypedDict(
+        "IgnoreSpansContext",
+        {"name": IgnoreSpansName, "attributes": Attributes},
+        total=False,
+    )
+    IgnoreSpansConfig = list[Union[IgnoreSpansName, IgnoreSpansContext]]

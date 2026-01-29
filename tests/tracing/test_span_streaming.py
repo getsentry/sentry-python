@@ -1,4 +1,5 @@
 import asyncio
+import re
 import time
 import sys
 from unittest import mock
@@ -845,6 +846,145 @@ def test_set_span_origin(sentry_init, capture_envelopes):
 
     assert span["name"] == "span"
     assert span["attributes"]["sentry.origin"] == "redis"
+
+
+@pytest.mark.parametrize(
+    ("ignore_spans", "name", "attributes", "ignored"),
+    [
+        ([], "/health", {}, False),
+        (["/health"], "/health", {}, True),
+        (["/health"], "/health", {"custom": "custom"}, True),
+        ([{"name": "/health"}], "/health", {}, True),
+        ([{"name": "/health"}], "/health", {"custom": "custom"}, True),
+        ([{"attributes": {"custom": "custom"}}], "/health", {"custom": "custom"}, True),
+        ([{"attributes": {"custom": "custom"}}], "/health", {}, False),
+        (
+            [{"name": "/nothealth", "attributes": {"custom": "custom"}}],
+            "/health",
+            {"custom": "custom"},
+            False,
+        ),
+        (
+            [{"name": "/health", "attributes": {"notcustom": "notcustom"}}],
+            "/health",
+            {"custom": "custom"},
+            False,
+        ),
+        (
+            [{"name": "/health", "attributes": {"custom": "custom"}}],
+            "/health",
+            {"custom": "custom"},
+            True,
+        ),
+        ([re.compile("/hea.*")], "/health", {}, True),
+        ([re.compile("/hea.*")], "/health", {"custom": "custom"}, True),
+        ([{"name": re.compile("/hea.*")}], "/health", {}, True),
+        ([{"name": re.compile("/hea.*")}], "/health", {"custom": "custom"}, True),
+        ([{"attributes": {"custom": "custom"}}], "/health", {"custom": "custom"}, True),
+        ([{"attributes": {"custom": "custom"}}], "/health", {}, False),
+        (
+            [{"name": re.compile("/nothea.*"), "attributes": {"custom": "custom"}}],
+            "/health",
+            {"custom": "custom"},
+            False,
+        ),
+        (
+            [{"name": re.compile("/hea.*"), "attributes": {"notcustom": "notcustom"}}],
+            "/health",
+            {"custom": "custom"},
+            False,
+        ),
+        (
+            [{"name": re.compile("/hea.*"), "attributes": {"custom": "custom"}}],
+            "/health",
+            {"custom": "custom"},
+            True,
+        ),
+    ],
+)
+def test_ignore_spans(
+    sentry_init, capture_envelopes, ignore_spans, name, attributes, ignored
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "ignore_spans": ignore_spans,
+        },
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name=name, attributes=attributes) as span:
+        assert span.sampled is not ignored
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    if ignored:
+        assert len(spans) == 0
+    else:
+        assert len(spans) == 1
+        (span,) = spans
+        assert span["name"] == name
+
+
+def test_ignore_spans_promoting(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "ignore_spans": ["ignored"],
+        },
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="ignored") as span:
+        assert span.sampled is False
+
+        with sentry_sdk.traces.start_span(name="not ignored 1") as span1:
+            assert span1.sampled is True
+        with sentry_sdk.traces.start_span(name="not ignored 2") as span2:
+            assert span2.sampled is True
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 2
+    (span1, span2) = spans
+    assert span1["name"] == "not ignored 1"
+    assert span2["name"] == "not ignored 2"
+
+
+def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "ignore_spans": ["ignored"],
+        },
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="not ignored segment") as span1:
+        assert span1.sampled is True
+
+        with sentry_sdk.traces.start_span(name="ignored") as span2:
+            assert span2.sampled is False
+
+            with sentry_sdk.traces.start_span(name="not ignored child") as span3:
+                assert span3.sampled is True
+                assert span3.parent_span_id == span1._span_id
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 2
+    (span3, span1) = spans
+    assert span1["name"] == "not ignored segment"
+    assert span3["name"] == "not ignored child"
 
 
 def test_transport_format(sentry_init, capture_envelopes):

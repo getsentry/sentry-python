@@ -6,9 +6,10 @@ sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
 import uuid
+import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Pattern
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -189,10 +190,6 @@ def new_trace() -> None:
     new_trace() doesn't start any spans on its own.
     """
     sentry_sdk.get_current_scope().set_new_propagation_context()
-
-
-class NoOpStreamedSpan:
-    pass
 
 
 class StreamedSpan:
@@ -566,9 +563,7 @@ class StreamedSpan:
         return self._baggage
 
     def _set_sampling_decision(self, sampling_context: "SamplingContext") -> None:
-        """
-        Set the segment's sampling decision, inherited by all child spans.
-        """
+        """Set a segment's sampling decision."""
         client = sentry_sdk.get_client()
 
         # nothing to do if tracing is disabled
@@ -634,6 +629,19 @@ class StreamedSpan:
             self.set_attribute("sentry.segment.id", self.segment.span_id)
 
         self.set_attribute("sentry.segment.name", self.segment.name)
+
+
+class NoOpStreamedSpan(StreamedSpan):
+    def __init__(self, *args, **kwargs):
+        self._sampled = False
+
+    def __enter__(self) -> "NoOpStreamedSpan":
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        return self
 
 
 def trace(
