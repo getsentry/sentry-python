@@ -188,6 +188,8 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         transaction.__exit__(type(exception), exception, None)
         scope_manager.__exit__(type(exception), exception, None)
 
+    after_skip_message = after_process_message
+
 
 def _make_message_event_processor(
     message: "Message[R]", integration: "DramatiqIntegration"

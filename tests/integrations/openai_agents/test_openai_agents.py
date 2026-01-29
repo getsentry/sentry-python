@@ -133,6 +133,26 @@ def test_agent():
 
 
 @pytest.fixture
+def test_agent_with_instructions():
+    def inner(instructions):
+        """Create a real Agent instance for testing."""
+        return Agent(
+            name="test_agent",
+            instructions=instructions,
+            model="gpt-4",
+            model_settings=ModelSettings(
+                max_tokens=100,
+                temperature=0.7,
+                top_p=1.0,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+            ),
+        )
+
+    return inner
+
+
+@pytest.fixture
 def test_agent_custom_model():
     """Create a real Agent instance for testing."""
     return Agent(
@@ -151,17 +171,9 @@ def test_agent_custom_model():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "send_default_pii",
-    (True, False),
-)
-async def test_agent_invocation_span(
-    sentry_init, capture_events, test_agent, mock_model_response, send_default_pii
+async def test_agent_invocation_span_no_pii(
+    sentry_init, capture_events, test_agent, mock_model_response
 ):
-    """
-    Test that the integration creates spans for agent invocations.
-    """
-
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
@@ -171,7 +183,7 @@ async def test_agent_invocation_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                send_default_pii=send_default_pii,
+                send_default_pii=False,
             )
 
             events = capture_events()
@@ -192,25 +204,242 @@ async def test_agent_invocation_span(
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
 
-    if send_default_pii:
-        assert invoke_agent_span["data"][
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS
-        ] == safe_serialize(
-            [{"type": "text", "content": "You are a helpful test assistant."}]
-        )
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["data"]
+    assert "gen_ai.request.messages" not in invoke_agent_span["data"]
+    assert "gen_ai.response.text" not in invoke_agent_span["data"]
+
+    assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+    assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+    assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "instructions",
+    (
+        None,
+        "You are a coding assistant that talks like a pirate.",
+    ),
+)
+@pytest.mark.parametrize(
+    "input",
+    [
+        pytest.param("Test input", id="string"),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="blocks_no_type",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="parts_no_type",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="parts",
+        ),
+    ],
+)
+async def test_agent_invocation_span(
+    sentry_init,
+    capture_events,
+    test_agent_with_instructions,
+    mock_model_response,
+    instructions,
+    input,
+    request,
+):
+    """
+    Test that the integration creates spans for agent invocations.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                test_agent_with_instructions(instructions),
+                input,
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+
+    # Only first case checks "gen_ai.request.messages" until further input handling work.
+    param_id = request.node.callspec.id
+    if "string" in param_id and instructions is None:  # type: ignore
+        assert "gen_ai.system_instructions" not in ai_client_span["data"]
+
         assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
             [
                 {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
             ]
         )
-        assert (
-            invoke_agent_span["data"]["gen_ai.response.text"]
-            == "Hello, how can I help you?"
+
+    elif "string" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+            ]
+        )
+    elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks_no_type" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks" in param_id and instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "parts_no_type" in param_id and instructions is None:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    elif "parts_no_type" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    elif instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
         )
     else:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["data"]
-        assert "gen_ai.request.messages" not in invoke_agent_span["data"]
-        assert "gen_ai.response.text" not in invoke_agent_span["data"]
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+
+    assert (
+        invoke_agent_span["data"]["gen_ai.response.text"]
+        == "Hello, how can I help you?"
+    )
 
     assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
     assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
@@ -266,8 +495,11 @@ async def test_client_span_custom_model(
     assert ai_client_span["data"]["gen_ai.request.model"] == "my-custom-model"
 
 
-def test_agent_invocation_span_sync(
-    sentry_init, capture_events, test_agent, mock_model_response
+def test_agent_invocation_span_sync_no_pii(
+    sentry_init,
+    capture_events,
+    test_agent,
+    mock_model_response,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -282,6 +514,7 @@ def test_agent_invocation_span_sync(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
+                send_default_pii=False,
             )
 
             events = capture_events()
@@ -317,6 +550,226 @@ def test_agent_invocation_span_sync(
     assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["data"]
+
+
+@pytest.mark.parametrize(
+    "instructions",
+    (
+        None,
+        "You are a coding assistant that talks like a pirate.",
+    ),
+)
+@pytest.mark.parametrize(
+    "input",
+    [
+        pytest.param("Test input", id="string"),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="blocks_no_type",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="parts_no_type",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="parts",
+        ),
+    ],
+)
+def test_agent_invocation_span_sync(
+    sentry_init,
+    capture_events,
+    test_agent_with_instructions,
+    mock_model_response,
+    instructions,
+    input,
+    request,
+):
+    """
+    Test that the integration creates spans for agent invocations.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = agents.Runner.run_sync(
+                test_agent_with_instructions(instructions),
+                input,
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+    assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+    assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    param_id = request.node.callspec.id
+    if "string" in param_id and instructions is None:  # type: ignore
+        assert "gen_ai.system_instructions" not in ai_client_span["data"]
+    elif "string" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+            ]
+        )
+    elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks_no_type" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks" in param_id and instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "parts_no_type" in param_id and instructions is None:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    elif "parts_no_type" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    elif instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    else:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
 
 
 @pytest.mark.asyncio
@@ -628,12 +1081,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
         [
             {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
-            {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": "Please use the simple test tool"}
@@ -698,30 +1145,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
     assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
         [
-            {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Please use the simple test tool"}
-                ],
-            },
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "arguments": '{"message": "hello"}',
-                        "call_id": "call_123",
-                        "name": "simple_test_tool",
-                        "type": "function_call",
-                        "id": "call_123",
-                    }
-                ],
-            },
             {
                 "role": "tool",
                 "content": [
@@ -992,12 +1415,6 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
     assert "gen_ai.request.messages" in ai_client_span["data"]
     request_messages = safe_serialize(
         [
-            {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
             {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
         ]
     )
@@ -1376,7 +1793,24 @@ async def test_multiple_agents_asyncio(
     assert txn3["transaction"] == "test_agent workflow"
 
 
-def test_openai_agents_message_role_mapping(sentry_init, capture_events):
+# Test input messages with mixed roles including "ai"
+@pytest.mark.parametrize(
+    "test_message,expected_role",
+    [
+        ({"role": "user", "content": "Hello"}, "user"),
+        (
+            {"role": "ai", "content": "Hi there!"},
+            "assistant",
+        ),  # Should be mapped to "assistant"
+        (
+            {"role": "assistant", "content": "How can I help?"},
+            "assistant",
+        ),  # Should stay "assistant"
+    ],
+)
+def test_openai_agents_message_role_mapping(
+    sentry_init, capture_events, test_message, expected_role
+):
     """Test that OpenAI Agents integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
@@ -1384,15 +1818,7 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
         send_default_pii=True,
     )
 
-    # Test input messages with mixed roles including "ai"
-    test_input = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hello"},
-        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
-        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
-    ]
-
-    get_response_kwargs = {"input": test_input}
+    get_response_kwargs = {"input": [test_message]}
 
     from sentry_sdk.integrations.openai_agents.utils import _set_input_data
     from sentry_sdk import start_span
@@ -1403,23 +1829,10 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
     # Verify that messages were processed and roles were mapped
     from sentry_sdk.consts import SPANDATA
 
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
-        import json
+    stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
-        stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
-        # Verify roles were properly mapped
-        found_assistant_roles = 0
-        for message in stored_messages:
-            if message["role"] == "assistant":
-                found_assistant_roles += 1
-
-        # Should have 2 assistant roles (1 from original "assistant", 1 from mapped "ai")
-        assert found_assistant_roles == 2
-
-        # Verify no "ai" roles remain in any message
-        for message in stored_messages:
-            assert message["role"] != "ai"
+    # Verify roles were properly mapped
+    assert stored_messages[0]["role"] == expected_role
 
 
 @pytest.mark.asyncio
@@ -2105,7 +2518,6 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
     )
 
     test_messages = [
-        {"role": "system", "content": "small message 1"},
         {"role": "user", "content": large_content},
         {"role": "assistant", "content": large_content},
         {"role": "user", "content": "small message 4"},
@@ -2119,8 +2531,8 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
         _set_input_data(span, get_response_kwargs)
         if hasattr(scope, "_gen_ai_original_message_count"):
             truncated_count = scope._gen_ai_original_message_count.get(span.span_id)
-            assert truncated_count == 5, (
-                f"Expected 5 original messages, got {truncated_count}"
+            assert truncated_count == 4, (
+                f"Expected 4 original messages, got {truncated_count}"
             )
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data
@@ -2129,9 +2541,8 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
 
         parsed_messages = json.loads(messages_data)
         assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 2
-        assert "small message 4" in str(parsed_messages[0])
-        assert "small message 5" in str(parsed_messages[1])
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
 
 
 def test_streaming_patches_applied(sentry_init):

@@ -1,6 +1,8 @@
 import sys
-from functools import wraps
+import json
 import time
+from functools import wraps
+from collections.abc import Iterable
 
 import sentry_sdk
 from sentry_sdk import consts
@@ -9,6 +11,16 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     normalize_message_roles,
     truncate_and_annotate_messages,
+    truncate_and_annotate_embedding_inputs,
+)
+from sentry_sdk.ai._openai_completions_api import (
+    _is_system_instruction as _is_system_instruction_completions,
+    _get_system_instructions as _get_system_instructions_completions,
+    _transform_system_instructions,
+)
+from sentry_sdk.ai._openai_responses_api import (
+    _is_system_instruction as _is_system_instruction_responses,
+    _get_system_instructions as _get_system_instructions_responses,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -24,8 +36,21 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Iterable, List, Optional, Callable, AsyncIterator, Iterator
+    from typing import (
+        Any,
+        List,
+        Optional,
+        Callable,
+        AsyncIterator,
+        Iterator,
+        Union,
+        Iterable,
+    )
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
+
+    from openai.types.responses import ResponseInputParam
+    from openai import Omit
 
 try:
     try:
@@ -42,7 +67,11 @@ try:
     from openai.resources import Embeddings, AsyncEmbeddings
 
     if TYPE_CHECKING:
-        from openai.types.chat import ChatCompletionMessageParam, ChatCompletionChunk
+        from openai.types.chat import (
+            ChatCompletionMessageParam,
+            ChatCompletionChunk,
+            ChatCompletionSystemMessageParam,
+        )
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
 
@@ -183,12 +212,9 @@ def _calculate_token_usage(
     )
 
 
-def _set_input_data(
-    span: "Span",
+def _get_input_messages(
     kwargs: "dict[str, Any]",
-    operation: str,
-    integration: "OpenAIIntegration",
-) -> None:
+) -> "Optional[Union[Iterable[Any], list[str]]]":
     # Input messages (the prompt or data sent to the model)
     messages = kwargs.get("messages")
     if messages is None:
@@ -197,29 +223,15 @@ def _set_input_data(
     if isinstance(messages, str):
         messages = [messages]
 
-    if (
-        messages is not None
-        and len(messages) > 0
-        and should_send_default_pii()
-        and integration.include_prompts
-    ):
-        normalized_messages = normalize_message_roles(messages)
-        scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
-        if messages_data is not None:
-            # Use appropriate field based on operation type
-            if operation == "embeddings":
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
-                )
-            else:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-                )
+    return messages
 
+
+def _commmon_set_input_data(
+    span: "Span",
+    kwargs: "dict[str, Any]",
+) -> None:
     # Input attributes: Common
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Input attributes: Optional
     kwargs_keys_to_attributes = {
@@ -243,6 +255,176 @@ def _set_input_data(
         set_data_normalized(
             span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
         )
+
+
+def _set_responses_api_input_data(
+    span: "Span",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+) -> None:
+    explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
+    messages: "Optional[Union[str, ResponseInputParam]]" = kwargs.get("input")
+
+    if not should_send_default_pii() or not integration.include_prompts:
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    if (
+        messages is None
+        and explicit_instructions is not None
+        and _is_given(explicit_instructions)
+    ):
+        span.set_data(
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(
+                [
+                    {
+                        "type": "text",
+                        "content": explicit_instructions,
+                    }
+                ]
+            ),
+        )
+
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    if messages is None:
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    instructions_text_parts: "list[TextPart]" = []
+    if explicit_instructions is not None and _is_given(explicit_instructions):
+        instructions_text_parts.append(
+            {
+                "type": "text",
+                "content": explicit_instructions,
+            }
+        )
+
+    system_instructions = _get_system_instructions_responses(messages)
+    # Deliberate use of function accepting completions API type because
+    # of shared structure FOR THIS PURPOSE ONLY.
+    instructions_text_parts += _transform_system_instructions(system_instructions)
+
+    if len(instructions_text_parts) > 0:
+        span.set_data(
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(instructions_text_parts),
+        )
+
+    if isinstance(messages, str):
+        normalized_messages = normalize_message_roles([messages])  # type: ignore
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
+
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    non_system_messages = [
+        message for message in messages if not _is_system_instruction_responses(message)
+    ]
+    if len(non_system_messages) > 0:
+        normalized_messages = normalize_message_roles(non_system_messages)
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+    _commmon_set_input_data(span, kwargs)
+
+
+def _set_completions_api_input_data(
+    span: "Span",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+) -> None:
+    messages: "Optional[Union[str, Iterable[ChatCompletionMessageParam]]]" = kwargs.get(
+        "messages"
+    )
+
+    if (
+        not should_send_default_pii()
+        or not integration.include_prompts
+        or messages is None
+    ):
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    system_instructions = _get_system_instructions_completions(messages)
+    if len(system_instructions) > 0:
+        span.set_data(
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(_transform_system_instructions(system_instructions)),
+        )
+
+    if isinstance(messages, str):
+        normalized_messages = normalize_message_roles([messages])  # type: ignore
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    non_system_messages = [
+        message
+        for message in messages
+        if not _is_system_instruction_completions(message)
+    ]
+    if len(non_system_messages) > 0:
+        normalized_messages = normalize_message_roles(non_system_messages)  # type: ignore
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    _commmon_set_input_data(span, kwargs)
+
+
+def _set_embeddings_input_data(
+    span: "Span",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+) -> None:
+    messages = _get_input_messages(kwargs)
+
+    if (
+        messages is not None
+        and len(messages) > 0  # type: ignore
+        and should_send_default_pii()
+        and integration.include_prompts
+    ):
+        normalized_messages = normalize_message_roles(messages)  # type: ignore
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_embedding_inputs(
+            normalized_messages, span, scope
+        )
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
+            )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+    _commmon_set_input_data(span, kwargs)
 
 
 def _set_output_data(
@@ -476,16 +658,15 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
-    operation = "chat"
 
     span = sentry_sdk.start_span(
         op=consts.OP.GEN_AI_CHAT,
-        name=f"{operation} {model}",
+        name=f"chat {model}",
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
 
-    _set_input_data(span, kwargs, operation, integration)
+    _set_completions_api_input_data(span, kwargs, integration)
 
     start_time = time.perf_counter()
     response = yield f, args, kwargs
@@ -569,14 +750,13 @@ def _new_embeddings_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
-    operation = "embeddings"
 
     with sentry_sdk.start_span(
         op=consts.OP.GEN_AI_EMBEDDINGS,
-        name=f"{operation} {model}",
+        name=f"embeddings {model}",
         origin=OpenAIIntegration.origin,
     ) as span:
-        _set_input_data(span, kwargs, operation, integration)
+        _set_embeddings_input_data(span, kwargs, integration)
 
         response = yield f, args, kwargs
 
@@ -657,16 +837,15 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
-    operation = "responses"
 
     span = sentry_sdk.start_span(
         op=consts.OP.GEN_AI_RESPONSES,
-        name=f"{operation} {model}",
+        name=f"responses {model}",
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
 
-    _set_input_data(span, kwargs, operation, integration)
+    _set_responses_api_input_data(span, kwargs, integration)
 
     start_time = time.perf_counter()
     response = yield f, args, kwargs
