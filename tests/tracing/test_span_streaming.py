@@ -382,6 +382,34 @@ def test_traces_sampler_receives_custom_sampling_context(sentry_init):
         ...
 
 
+def test_traces_sampler_receives_correct_custom_sampling_context(sentry_init):
+    def traces_sampler(sampling_context):
+        if sampling_context["attributes"]["first"] is True:
+            assert sampling_context["custom_value"] == 1
+        else:
+            assert sampling_context["custom_value"] == 2
+        return 1.0
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.traces.new_trace()
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 1})
+
+    with sentry_sdk.traces.start_span(name="span", attributes={"first": True}):
+        ...
+
+    sentry_sdk.traces.new_trace()
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 2})
+
+    with sentry_sdk.traces.start_span(name="span", attributes={"first": False}):
+        ...
+
+
 def test_start_span_override_parent(sentry_init, capture_envelopes):
     sentry_init(
         traces_sample_rate=1.0,
