@@ -57,6 +57,7 @@ def test_integration_deactivates_map_exists():
     assert "langchain" in _INTEGRATION_DEACTIVATES
     assert "openai" in _INTEGRATION_DEACTIVATES["langchain"]
     assert "anthropic" in _INTEGRATION_DEACTIVATES["langchain"]
+    assert "google_genai" in _INTEGRATION_DEACTIVATES["langchain"]
     assert "openai_agents" in _INTEGRATION_DEACTIVATES
     assert "openai" in _INTEGRATION_DEACTIVATES["openai_agents"]
     assert "pydantic_ai" in _INTEGRATION_DEACTIVATES
