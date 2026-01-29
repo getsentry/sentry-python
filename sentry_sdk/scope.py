@@ -1232,8 +1232,7 @@ class Scope:
         # TODO: rename to start_span once we drop the old API
         if parent_span is None:
             # Get currently active span
-            # TODO[span-first]: should this be current scope?
-            parent_span = self.span or self.get_isolation_scope().span  # type: ignore
+            parent_span = self.span or self.get_current_scope().span  # type: ignore
 
         # If no specific parent_span provided and there is no currently
         # active span, this is a segment

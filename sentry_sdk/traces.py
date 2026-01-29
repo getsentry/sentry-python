@@ -86,10 +86,7 @@ SOURCE_FOR_STYLE = {
 
 """
 TODO[span-first] / notes
-- redis, http, subprocess breadcrumbs (maybe_create_breadcrumbs_from_span) work
-  on op, change or ignore?
 - tags
-- initial status: OK? or unset?  -> OK
 - dropped spans are not migrated
 - recheck transaction.finish <-> Streamedspan.end
 - profiling: drop transaction based
@@ -97,11 +94,6 @@ TODO[span-first] / notes
 - maybe: use getters/setter OR properties but not both
 - add size-based flushing to buffer(s)
 - migrate transaction sample_rand logic
-- custom_sampling_context?
-  - store on scope/propagation context instead?
-  - function to set on propagation context
-- noop spans
-- iso
 - check where we're auto filtering out spans in integrations (health checks etc?)
 
 Notes:
