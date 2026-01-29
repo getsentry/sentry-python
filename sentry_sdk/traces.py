@@ -177,8 +177,8 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
     # This is set both on the isolation and the current scope for compatibility
     # reasons. Conceptually, it belongs on the isolation scope, and it also
     # used to be set there in non-span-first mode. But in span first mode, we
-    # start segments on the current span, like JS does, so we need to set the
-    # propagation context there.
+    # start spans on the current scope, regardless of type, like JS does, so we
+    # need to set the propagation context there.
     sentry_sdk.get_isolation_scope().generate_propagation_context(
         incoming,
     )
@@ -325,6 +325,12 @@ class StreamedSpan:
                 "parent_sampled": self.parent_sampled,
                 "attributes": self.attributes,
             }
+            custom_sampling_context = (
+                scope.get_active_propagation_context()._custom_sampling_context
+            )
+            if custom_sampling_context:
+                sampling_context.update(custom_sampling_context)
+
             # Use traces_sample_rate, traces_sampler, and/or inheritance to make a
             # sampling decision
             self._set_sampling_decision(sampling_context=sampling_context)

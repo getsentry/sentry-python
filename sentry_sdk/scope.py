@@ -703,6 +703,13 @@ class Scope:
             isolation_scope._propagation_context = PropagationContext()
         return isolation_scope._propagation_context
 
+    def set_custom_sampling_context(
+        self, custom_sampling_context: "dict[str, Any]"
+    ) -> None:
+        self.get_active_propagation_context()._set_custom_sampling_context(
+            custom_sampling_context
+        )
+
     def clear(self) -> None:
         """Clears the entire scope."""
         self._level: "Optional[LogLevelStr]" = None

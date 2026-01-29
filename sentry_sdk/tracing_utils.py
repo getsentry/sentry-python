@@ -438,6 +438,7 @@ class PropagationContext:
         "parent_span_id",
         "parent_sampled",
         "baggage",
+        "_custom_sampling_context",
     )
 
     def __init__(
@@ -470,6 +471,8 @@ class PropagationContext:
         """DEPRECATED this only exists for backwards compat of constructor."""
         if baggage is None and dynamic_sampling_context is not None:
             self.baggage = Baggage(dynamic_sampling_context)
+
+        self._custom_sampling_context: "Optional[dict[str, Any]]" = None
 
     @classmethod
     def from_incoming_data(
@@ -557,6 +560,11 @@ class PropagationContext:
                 setattr(self, key, value)
             except AttributeError:
                 pass
+
+    def _set_custom_sampling_context(
+        self, custom_sampling_context: "dict[str, Any]"
+    ) -> None:
+        self._custom_sampling_context = custom_sampling_context
 
     def __repr__(self) -> str:
         return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} baggage={}>".format(

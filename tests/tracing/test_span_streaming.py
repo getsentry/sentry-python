@@ -354,6 +354,34 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
     assert span_id_in_traces_sampler == segment.span_id
 
 
+def test_traces_sampler_receives_custom_sampling_context(sentry_init):
+    class MyClass: ...
+
+    my_class = MyClass()
+
+    def traces_sampler(sampling_context):
+        assert "class" in sampling_context
+        assert "string" in sampling_context
+        assert sampling_context["class"] == my_class
+        assert sampling_context["string"] == "my string"
+        return 1.0
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context(
+        {
+            "class": my_class,
+            "string": "my string",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+
 def test_start_span_override_parent(sentry_init, capture_envelopes):
     sentry_init(
         traces_sample_rate=1.0,
