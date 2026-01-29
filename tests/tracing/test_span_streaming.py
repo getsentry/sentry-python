@@ -201,13 +201,26 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes)
 
 
 def test_sampling_context(sentry_init, capture_envelopes):
+    received_trace_id = None
+    received_span_id = None
+
     def traces_sampler(sampling_context):
-        assert "transaction_context" in sampling_context
-        assert "trace_id" in sampling_context["transaction_context"]
-        assert "span_id" in sampling_context["transaction_context"]
-        assert "parent_span_id" in sampling_context["transaction_context"]
+        nonlocal received_span_id, received_trace_id
+
+        assert "trace_id" in sampling_context
+        received_trace_id = sampling_context["trace_id"]
+
+        assert "span_id" in sampling_context
+        received_span_id = sampling_context["span_id"]
+
+        assert "parent_span_id" in sampling_context
+        assert sampling_context["parent_span_id"] is None
+
         assert "parent_sampled" in sampling_context
+        assert sampling_context["parent_sampled"] is None
+
         assert "attributes" in sampling_context
+
         return 1.0
 
     sentry_init(
@@ -217,13 +230,73 @@ def test_sampling_context(sentry_init, capture_envelopes):
 
     events = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="span"):
-        ...
+    with sentry_sdk.traces.start_span(name="span") as span:
+        trace_id = span._trace_id
+        span_id = span._span_id
+
+    assert received_trace_id == trace_id
+    assert received_span_id == span_id
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
 
     assert len(spans) == 1
+
+
+def test_custom_sampling_context(sentry_init):
+    class MyClass: ...
+
+    my_class = MyClass()
+
+    def traces_sampler(sampling_context):
+        assert "class" in sampling_context
+        assert "string" in sampling_context
+        assert sampling_context["class"] == my_class
+        assert sampling_context["string"] == "my string"
+        return 1.0
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context(
+        {
+            "class": my_class,
+            "string": "my string",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+
+def test_new_custom_sampling_context(sentry_init):
+    def traces_sampler(sampling_context):
+        if sampling_context["attributes"]["first"] is True:
+            assert sampling_context["custom_value"] == 1
+        else:
+            assert sampling_context["custom_value"] == 2
+        return 1.0
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.traces.new_trace()
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 1})
+
+    with sentry_sdk.traces.start_span(name="span", attributes={"first": True}):
+        ...
+
+    sentry_sdk.traces.new_trace()
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 2})
+
+    with sentry_sdk.traces.start_span(name="span", attributes={"first": False}):
+        ...
 
 
 def test_span_attributes(sentry_init, capture_envelopes):
@@ -335,7 +408,7 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
     def traces_sampler(sampling_context):
         nonlocal traces_sampler_called, span_id_in_traces_sampler
         traces_sampler_called += 1
-        span_id_in_traces_sampler = sampling_context["transaction_context"]["span_id"]
+        span_id_in_traces_sampler = sampling_context["span_id"]
         return 1.0
 
     sentry_init(
@@ -352,62 +425,6 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
 
     assert traces_sampler_called == 1
     assert span_id_in_traces_sampler == segment.span_id
-
-
-def test_traces_sampler_receives_custom_sampling_context(sentry_init):
-    class MyClass: ...
-
-    my_class = MyClass()
-
-    def traces_sampler(sampling_context):
-        assert "class" in sampling_context
-        assert "string" in sampling_context
-        assert sampling_context["class"] == my_class
-        assert sampling_context["string"] == "my string"
-        return 1.0
-
-    sentry_init(
-        traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    sentry_sdk.get_current_scope().set_custom_sampling_context(
-        {
-            "class": my_class,
-            "string": "my string",
-        }
-    )
-
-    with sentry_sdk.traces.start_span(name="span"):
-        ...
-
-
-def test_traces_sampler_receives_correct_custom_sampling_context(sentry_init):
-    def traces_sampler(sampling_context):
-        if sampling_context["attributes"]["first"] is True:
-            assert sampling_context["custom_value"] == 1
-        else:
-            assert sampling_context["custom_value"] == 2
-        return 1.0
-
-    sentry_init(
-        traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    sentry_sdk.traces.new_trace()
-
-    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 1})
-
-    with sentry_sdk.traces.start_span(name="span", attributes={"first": True}):
-        ...
-
-    sentry_sdk.traces.new_trace()
-
-    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 2})
-
-    with sentry_sdk.traces.start_span(name="span", attributes={"first": False}):
-        ...
 
 
 def test_start_span_override_parent(sentry_init, capture_envelopes):

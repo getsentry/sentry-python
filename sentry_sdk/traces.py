@@ -309,11 +309,10 @@ class StreamedSpan:
 
         if self.is_segment():
             sampling_context = {
-                "transaction_context": {  # XXX[span-first]: rename?
-                    "trace_id": self.trace_id,
-                    "span_id": self.span_id,
-                    "parent_span_id": self.parent_span_id,
-                },
+                "name": self.name,
+                "trace_id": self.trace_id,
+                "span_id": self.span_id,
+                "parent_span_id": self.parent_span_id,
                 "parent_sampled": self.parent_sampled,
                 "attributes": self.attributes,
             }
