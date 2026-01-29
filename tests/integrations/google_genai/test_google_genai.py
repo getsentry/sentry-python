@@ -545,25 +545,24 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
     assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
     assert invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
 
-    # Verify token counts - should reflect accumulated values
-    # Input tokens: max of all chunks = 10
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 30
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 30
+    # Verify token counts
+    # Input tokens: last non-zero value (prompt doesn't change during streaming) = 10
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
 
-    # Output tokens: candidates (2 + 3 + 7 = 12) + reasoning (3) = 15
-    # Note: output_tokens includes both candidates and reasoning tokens
+    # Output tokens: sum of candidates (2 + 3 + 7 = 12) + last reasoning (3) = 15
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
     assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
 
-    # Total tokens: from the last chunk
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 50
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 50
+    # Total tokens: last non-zero value from final chunk = 25
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
 
-    # Cached tokens: max of all chunks = 5
+    # Cached tokens: last non-zero value = 5
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
     assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
 
-    # Reasoning tokens: sum of thoughts_token_count = 3
+    # Reasoning tokens: last non-zero value = 3
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
     assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
 

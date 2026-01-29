@@ -37,20 +37,27 @@ class AccumulatedResponse(TypedDict):
 def accumulate_streaming_response(
     chunks: "List[GenerateContentResponse]",
 ) -> "AccumulatedResponse":
-    """Accumulate streaming chunks into a single response-like object."""
+    """Accumulate streaming chunks into a single response-like object.
+
+    Token usage handling:
+    - input_tokens: Use last non-zero value (prompt doesn't change during streaming)
+    - input_tokens_cached: Use last non-zero value
+    - output_tokens: Sum across chunks (incremental output)
+    - output_tokens_reasoning: Use last non-zero value
+    - total_tokens: Use last non-zero value (cumulative in final chunk)
+    """
     accumulated_text = []
     finish_reasons = []
     tool_calls = []
-    total_input_tokens = 0
     total_output_tokens = 0
-    total_tokens = 0
-    total_cached_tokens = 0
-    total_reasoning_tokens = 0
+    last_input_tokens = 0
+    last_cached_tokens = 0
+    last_reasoning_tokens = 0
+    last_total_tokens = 0
     response_id = None
     model = None
 
     for chunk in chunks:
-        # Extract text and tool calls
         if getattr(chunk, "candidates", None):
             for candidate in getattr(chunk, "candidates", []):
                 if hasattr(candidate, "content") and getattr(
@@ -68,24 +75,29 @@ def accumulate_streaming_response(
         if extracted_tool_calls:
             tool_calls.extend(extracted_tool_calls)
 
-        # Accumulate token usage
         extracted_usage_data = extract_usage_data(chunk)
-        total_input_tokens += extracted_usage_data["input_tokens"]
+
+        if extracted_usage_data["input_tokens"]:
+            last_input_tokens = extracted_usage_data["input_tokens"]
+        if extracted_usage_data["input_tokens_cached"]:
+            last_cached_tokens = extracted_usage_data["input_tokens_cached"]
+        if extracted_usage_data["output_tokens_reasoning"]:
+            last_reasoning_tokens = extracted_usage_data["output_tokens_reasoning"]
+        if extracted_usage_data["total_tokens"]:
+            last_total_tokens = extracted_usage_data["total_tokens"]
+
         total_output_tokens += extracted_usage_data["output_tokens"]
-        total_cached_tokens += extracted_usage_data["input_tokens_cached"]
-        total_reasoning_tokens += extracted_usage_data["output_tokens_reasoning"]
-        total_tokens += extracted_usage_data["total_tokens"]
 
     accumulated_response = AccumulatedResponse(
         text="".join(accumulated_text),
         finish_reasons=finish_reasons,
         tool_calls=tool_calls,
         usage_metadata=UsageData(
-            input_tokens=total_input_tokens,
+            input_tokens=last_input_tokens,
             output_tokens=total_output_tokens,
-            input_tokens_cached=total_cached_tokens,
-            output_tokens_reasoning=total_reasoning_tokens,
-            total_tokens=total_tokens,
+            input_tokens_cached=last_cached_tokens,
+            output_tokens_reasoning=last_reasoning_tokens,
+            total_tokens=last_total_tokens,
         ),
         id=response_id,
         model=model,
