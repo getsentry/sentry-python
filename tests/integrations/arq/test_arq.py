@@ -131,9 +131,58 @@ def init_arq_with_dict_settings(sentry_init):
     return inner
 
 
+@pytest.fixture
+def init_arq_with_kwarg_settings(sentry_init):
+    """Test fixture that passes settings_cls as keyword argument only."""
+
+    def inner(
+        cls_functions=None,
+        cls_cron_jobs=None,
+        kw_functions=None,
+        kw_cron_jobs=None,
+        allow_abort_jobs_=False,
+    ):
+        cls_functions = cls_functions or []
+        cls_cron_jobs = cls_cron_jobs or []
+
+        kwargs = {}
+        if kw_functions is not None:
+            kwargs["functions"] = kw_functions
+        if kw_cron_jobs is not None:
+            kwargs["cron_jobs"] = kw_cron_jobs
+
+        sentry_init(
+            integrations=[ArqIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
+
+        server = FakeRedis()
+        pool = ArqRedis(pool_or_conn=server.connection_pool)
+
+        class WorkerSettings:
+            functions = cls_functions
+            cron_jobs = cls_cron_jobs
+            redis_pool = pool
+            allow_abort_jobs = allow_abort_jobs_
+
+        if not WorkerSettings.functions:
+            del WorkerSettings.functions
+        if not WorkerSettings.cron_jobs:
+            del WorkerSettings.cron_jobs
+
+        # Pass settings_cls as keyword argument (not positional)
+        worker = arq.worker.create_worker(settings_cls=WorkerSettings, **kwargs)
+
+        return pool, worker
+
+    return inner
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
+    "init_arq_settings",
+    ["init_arq", "init_arq_with_dict_settings", "init_arq_with_kwarg_settings"],
 )
 async def test_job_result(init_arq_settings, request):
     async def increase(ctx, num):

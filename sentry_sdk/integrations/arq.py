@@ -185,7 +185,7 @@ def patch_create_worker() -> None:
 
     @ensure_integration_enabled(ArqIntegration, old_create_worker)
     def _sentry_create_worker(*args: "Any", **kwargs: "Any") -> "Worker":
-        settings_cls = args[0]
+        settings_cls = args[0] if args else kwargs.get("settings_cls")
 
         if isinstance(settings_cls, dict):
             if "functions" in settings_cls:
