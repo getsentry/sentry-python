@@ -219,7 +219,7 @@ def _transform_system_instructions(
     return [
         {
             "type": "text",
-            "content": instruction,
+            "text": instruction,
         }
         for instruction in system_instructions
     ]

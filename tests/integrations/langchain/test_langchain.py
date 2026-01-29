@@ -244,18 +244,18 @@ def test_langchain_agent(
             assert [
                 {
                     "type": "text",
-                    "content": "You are very powerful assistant, but don't know current events",
+                    "text": "You are very powerful assistant, but don't know current events",
                 }
             ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
         else:
             assert [
                 {
                     "type": "text",
-                    "content": "You are a helpful assistant.",
+                    "text": "You are a helpful assistant.",
                 },
                 {
                     "type": "text",
-                    "content": "Be concise and clear.",
+                    "text": "Be concise and clear.",
                 },
             ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
 
