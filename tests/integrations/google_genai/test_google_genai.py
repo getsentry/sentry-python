@@ -472,6 +472,7 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
             "promptTokenCount": 10,
             "candidatesTokenCount": 3,
             "totalTokenCount": 13,
+            "thoughtsTokenCount": 1,
         },
     }
 
@@ -550,9 +551,9 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
 
-    # Output tokens: sum of candidates (2 + 3 + 7 = 12) + last reasoning (3) = 15
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 15
+    # Output tokens: sum of candidates (2 + 3 + 7 = 12) +  reasoning (0 + 1 + 3) = 16
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 16
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 16
 
     # Total tokens: last non-zero value from final chunk = 25
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
@@ -562,9 +563,9 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
     assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
 
-    # Reasoning tokens: last non-zero value = 3
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
+    # Reasoning tokens: sum across chunks = 4
+    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 4
+    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 4
 
     # Verify model name
     assert chat_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"

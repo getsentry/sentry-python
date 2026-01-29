@@ -43,16 +43,16 @@ def accumulate_streaming_response(
     - input_tokens: Use last non-zero value (prompt doesn't change during streaming)
     - input_tokens_cached: Use last non-zero value
     - output_tokens: Sum across chunks (incremental output)
-    - output_tokens_reasoning: Use last non-zero value
+    - output_tokens_reasoning: Sum across chunks (incremental reasoning)
     - total_tokens: Use last non-zero value (cumulative in final chunk)
     """
     accumulated_text = []
     finish_reasons = []
     tool_calls = []
     total_output_tokens = 0
+    total_reasoning_tokens = 0
     last_input_tokens = 0
     last_cached_tokens = 0
-    last_reasoning_tokens = 0
     last_total_tokens = 0
     response_id = None
     model = None
@@ -81,12 +81,11 @@ def accumulate_streaming_response(
             last_input_tokens = extracted_usage_data["input_tokens"]
         if extracted_usage_data["input_tokens_cached"]:
             last_cached_tokens = extracted_usage_data["input_tokens_cached"]
-        if extracted_usage_data["output_tokens_reasoning"]:
-            last_reasoning_tokens = extracted_usage_data["output_tokens_reasoning"]
         if extracted_usage_data["total_tokens"]:
             last_total_tokens = extracted_usage_data["total_tokens"]
 
         total_output_tokens += extracted_usage_data["output_tokens"]
+        total_reasoning_tokens += extracted_usage_data["output_tokens_reasoning"]
 
     accumulated_response = AccumulatedResponse(
         text="".join(accumulated_text),
@@ -96,7 +95,7 @@ def accumulate_streaming_response(
             input_tokens=last_input_tokens,
             output_tokens=total_output_tokens,
             input_tokens_cached=last_cached_tokens,
-            output_tokens_reasoning=last_reasoning_tokens,
+            output_tokens_reasoning=total_reasoning_tokens,
             total_tokens=last_total_tokens,
         ),
         id=response_id,
