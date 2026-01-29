@@ -364,7 +364,7 @@ if TYPE_CHECKING:
         type: Literal["text"]
         content: str
 
-    IgnoreSpansName = Union[str, Pattern]
+    IgnoreSpansName = Union[str, Pattern[str]]
     IgnoreSpansContext = TypedDict(
         "IgnoreSpansContext",
         {"name": IgnoreSpansName, "attributes": Attributes},

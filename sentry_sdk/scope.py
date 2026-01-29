@@ -1235,13 +1235,19 @@ class Scope:
             # Get currently active span
             parent_span = self.span or self.get_current_scope().span  # type: ignore
 
+        if isinstance(parent_span, NoOpStreamedSpan):
+            # If the parent is an ignored span, attempt to reparent to the
+            # first non-ignored ancestor
+            parent_span = parent_span.last_valid_parent
+
         # If no specific parent_span provided and there is no currently
         # active span, this is a segment
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
+            span: "Union[StreamedSpan, NoOpStreamedSpan]"
             if is_ignored_span(name, attributes):
-                span = NoOpStreamedSpan(name=name, scope=self)
+                span = NoOpStreamedSpan(name=name, scope=self, last_valid_parent=None)
             else:
                 span = StreamedSpan(
                     name=name,
@@ -1259,7 +1265,9 @@ class Scope:
         # This is a child span; take propagation context from the parent span
         with new_scope():
             if is_ignored_span(name, attributes):
-                span = NoOpStreamedSpan(name=name, scope=self)
+                span = NoOpStreamedSpan(
+                    name=name, scope=self, last_valid_parent=parent_span
+                )
             else:
                 span = StreamedSpan(
                     name=name,

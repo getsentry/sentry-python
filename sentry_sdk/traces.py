@@ -632,8 +632,15 @@ class StreamedSpan:
 
 
 class NoOpStreamedSpan(StreamedSpan):
-    def __init__(self, *args, **kwargs):
+    # XXX[span-first]: make this actually no-op
+    def __init__(
+        self,
+        *args: "Any",
+        last_valid_parent: "Optional[StreamedSpan]" = None,
+        **kwargs: "Any",
+    ):
         self._sampled = False
+        self.last_valid_parent = last_valid_parent
 
     def __enter__(self) -> "NoOpStreamedSpan":
         return self
@@ -641,7 +648,7 @@ class NoOpStreamedSpan(StreamedSpan):
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        return self
+        return
 
 
 def trace(
