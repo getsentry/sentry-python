@@ -71,6 +71,12 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _to_transport_format(item: "StreamedSpan") -> "Any":
         # TODO[span-first]
         res: "dict[str, Any]" = {}
+
+        if item._attributes:
+            res["attributes"] = {
+                k: serialize_attribute(v) for (k, v) in item.attributes.items()
+            }
+
         return res
 
     def _flush(self) -> None:

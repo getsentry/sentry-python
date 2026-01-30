@@ -1541,7 +1541,7 @@ class Scope:
         if isinstance(telemetry, dict):
             attributes = telemetry["attributes"]
         else:
-            attributes = telemetry.attributes
+            attributes = telemetry._attributes
 
         for attribute, value in self._attributes.items():
             if attribute not in attributes:
