@@ -1483,7 +1483,11 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
 
     def _matches(rule: "Any", value: "Any") -> bool:
         if isinstance(rule, Pattern):
-            return bool(rule.match(value))
+            if isinstance(value, str):
+                return bool(rule.match(value))
+            else:
+                return False
+
         return rule == value
 
     for rule in ignore_spans:

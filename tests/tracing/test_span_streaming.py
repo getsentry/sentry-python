@@ -851,6 +851,7 @@ def test_set_span_origin(sentry_init, capture_envelopes):
 @pytest.mark.parametrize(
     ("ignore_spans", "name", "attributes", "ignored"),
     [
+        # no regexes
         ([], "/health", {}, False),
         (["/health"], "/health", {}, True),
         (["/health"], "/health", {"custom": "custom"}, True),
@@ -876,6 +877,7 @@ def test_set_span_origin(sentry_init, capture_envelopes):
             {"custom": "custom"},
             True,
         ),
+        # test cases with regexes
         ([re.compile("/hea.*")], "/health", {}, True),
         ([re.compile("/hea.*")], "/health", {"custom": "custom"}, True),
         ([{"name": re.compile("/hea.*")}], "/health", {}, True),
@@ -919,6 +921,12 @@ def test_set_span_origin(sentry_init, capture_envelopes):
             "/health",
             {"custom": "custom"},
             True,
+        ),
+        (
+            [{"attributes": {"listattr": re.compile(r"\[.*\]")}}],
+            "/a",
+            {"listattr": [1, 2, 3]},
+            False,
         ),
     ],
 )
