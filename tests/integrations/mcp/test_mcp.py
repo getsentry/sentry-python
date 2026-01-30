@@ -82,21 +82,6 @@ class MockTextContent:
         self.text = text
 
 
-class MockPromptMessage:
-    """Mock PromptMessage object"""
-
-    def __init__(self, role, content_text):
-        self.role = role
-        self.content = MockTextContent(content_text)
-
-
-class MockGetPromptResult:
-    """Mock GetPromptResult object"""
-
-    def __init__(self, messages):
-        self.messages = messages
-
-
 async def json_rpc_sse(
     app, method: str, params, request_id: str, keep_sse_alive: "asyncio.Event"
 ):
