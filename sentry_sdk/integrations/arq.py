@@ -185,7 +185,7 @@ def patch_create_worker() -> None:
 
     @ensure_integration_enabled(ArqIntegration, old_create_worker)
     def _sentry_create_worker(*args: "Any", **kwargs: "Any") -> "Worker":
-        settings_cls = args[0]
+        settings_cls = args[0] if args else kwargs.get("settings_cls")
 
         if isinstance(settings_cls, dict):
             if "functions" in settings_cls:
@@ -200,13 +200,14 @@ def patch_create_worker() -> None:
                 ]
 
         if hasattr(settings_cls, "functions"):
-            settings_cls.functions = [
-                _get_arq_function(func) for func in settings_cls.functions
+            settings_cls.functions = [  # type: ignore[union-attr]
+                _get_arq_function(func)
+                for func in settings_cls.functions  # type: ignore[union-attr]
             ]
         if hasattr(settings_cls, "cron_jobs"):
-            settings_cls.cron_jobs = [
+            settings_cls.cron_jobs = [  # type: ignore[union-attr]
                 _get_arq_cron_job(cron_job)
-                for cron_job in (settings_cls.cron_jobs or [])
+                for cron_job in (settings_cls.cron_jobs or [])  # type: ignore[union-attr]
             ]
 
         if "functions" in kwargs:

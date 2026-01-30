@@ -1,6 +1,7 @@
 import contextvars
 import itertools
 import sys
+import json
 import warnings
 from collections import OrderedDict
 from functools import wraps
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
 
 
 try:
@@ -187,6 +189,40 @@ def _get_current_agent() -> "Optional[str]":
     if stack:
         return stack[-1]
     return None
+
+
+def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[str]":
+    system_instructions = []
+
+    for list_ in messages:
+        for message in list_:
+            # type of content: str | list[str | dict] | None
+            if message.type == "system" and isinstance(message.content, str):
+                system_instructions.append(message.content)
+
+            elif message.type == "system" and isinstance(message.content, list):
+                for item in message.content:
+                    if isinstance(item, str):
+                        system_instructions.append(item)
+
+                    elif isinstance(item, dict) and item.get("type") == "text":
+                        instruction = item.get("text")
+                        if isinstance(instruction, str):
+                            system_instructions.append(instruction)
+
+    return system_instructions
+
+
+def _transform_system_instructions(
+    system_instructions: "List[str]",
+) -> "List[TextPart]":
+    return [
+        {
+            "type": "text",
+            "content": instruction,
+        }
+        for instruction in system_instructions
+    ]
 
 
 class LangchainIntegration(Integration):
@@ -430,9 +466,19 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
+                system_instructions = _get_system_instructions(messages)
+                if len(system_instructions) > 0:
+                    span.set_data(
+                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                        json.dumps(_transform_system_instructions(system_instructions)),
+                    )
+
                 normalized_messages = []
                 for list_ in messages:
                     for message in list_:
+                        if message.type == "system":
+                            continue
+
                         normalized_messages.append(
                             self._normalize_langchain_message(message)
                         )
