@@ -1481,14 +1481,14 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
     if not ignore_spans:
         return False
 
-    def _match_string(rule: "Union[str, Pattern[str]]", string: str) -> bool:
+    def _matches(rule: "Any", value: "Any") -> bool:
         if isinstance(rule, Pattern):
-            return bool(rule.match(string))
-        return rule == string
+            return bool(rule.match(value))
+        return rule == value
 
     for rule in ignore_spans:
         if isinstance(rule, (str, Pattern)):
-            if _match_string(rule, name):
+            if _matches(rule, name):
                 return True
 
         elif isinstance(rule, dict):
@@ -1496,14 +1496,14 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
             attributes_match = True
 
             if "name" in rule:
-                name_matches = _match_string(rule["name"], name)
+                name_matches = _matches(rule["name"], name)
 
             if "attributes" in rule:
                 if not attributes:
                     attributes_match = False
                 else:
                     for attribute, value in rule["attributes"].items():
-                        if attribute not in attributes or not _match_string(
+                        if attribute not in attributes or not _matches(
                             value, attributes[attribute]
                         ):
                             attributes_match = False
