@@ -995,40 +995,6 @@ async def test_prompt_with_dict_result(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip
-async def test_resource_without_protocol(sentry_init, capture_events, stdio):
-    """Test resource handler with URI without protocol scheme"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    server = Server("test-server")
-
-    @server.read_resource()
-    def test_resource(uri):
-        return {"data": "test"}
-
-    with start_transaction(name="mcp tx"):
-        await stdio(
-            server,
-            method="resources/read",
-            params={
-                "uri": "https://example.com/resource",
-            },
-            request_id="req-no-proto",
-        )
-
-    (tx,) = events
-    span = tx["spans"][0]
-
-    assert span["data"][SPANDATA.MCP_RESOURCE_URI] == "simple-path"
-    # No protocol should be set
-    assert SPANDATA.MCP_RESOURCE_PROTOCOL not in span["data"]
-
-
-@pytest.mark.asyncio
 async def test_tool_with_complex_arguments(sentry_init, capture_events, stdio):
     """Test tool handler with complex nested arguments"""
     sentry_init(
