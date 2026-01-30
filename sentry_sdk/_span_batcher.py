@@ -69,26 +69,8 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
-        res: "dict[str, Any]" = {
-            "trace_id": item.trace_id,
-            "span_id": item.span_id,
-            "name": item.get_name(),
-            "status": item.status,
-            "is_segment": item.is_segment(),
-            "start_timestamp": item.start_timestamp.timestamp(),
-        }
-
-        if item.timestamp:
-            res["end_timestamp"] = item.timestamp.timestamp()
-
-        if item.parent_span_id:
-            res["parent_span_id"] = item.parent_span_id
-
-        if item.attributes:
-            res["attributes"] = {
-                k: serialize_attribute(v) for (k, v) in item.attributes.items()
-            }
-
+        # TODO[span-first]
+        res: "dict[str, Any]" = {}
         return res
 
     def _flush(self) -> None:
@@ -99,7 +81,9 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             envelopes = []
             for trace_id, spans in self._span_buffer.items():
                 if spans:
-                    dsc = spans[0].dynamic_sampling_context()
+                    # TODO[span-first]
+                    # dsc = spans[0].dynamic_sampling_context()
+                    dsc = None
 
                     envelope = Envelope(
                         headers={
