@@ -914,6 +914,7 @@ async def test_fastmcp_resource_async(
                 params={
                     "uri": "https://example.com/resource",
                 },
+                request_id="req-async-resource",
             )
             # Older FastMCP versions may not support this URI pattern
             if (
@@ -925,14 +926,13 @@ async def test_fastmcp_resource_async(
 
             assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
-            transactions = select_mcp_transactions(events, "resources/read")
+            transactions = select_mcp_transactions(events)
             assert len(transactions) == 1
             tx = transactions[0]
-
-            # Verify span was created
-            resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-            assert len(resource_spans) == 1
-            assert resource_spans[0]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+            assert (
+                tx["contexts"]["trace"]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL]
+                == "https"
+            )
     except (AttributeError, TypeError):
         # Resource handler not supported in this version
         pytest.skip("Resource handlers not supported in this FastMCP version")
