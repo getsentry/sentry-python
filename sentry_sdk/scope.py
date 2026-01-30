@@ -1553,7 +1553,7 @@ class Scope:
         if isinstance(telemetry, dict):
             attributes = telemetry["attributes"]
         else:
-            attributes = telemetry.attributes
+            attributes = telemetry._attributes
 
         if not should_send_default_pii() or self._user is None:
             return

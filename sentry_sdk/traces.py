@@ -27,7 +27,7 @@ class StreamedSpan:
 
     __slots__ = (
         "name",
-        "attributes",
+        "_attributes",
         "_trace_id",
     )
 
