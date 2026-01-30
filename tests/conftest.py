@@ -917,15 +917,15 @@ def json_rpc_sse(is_structured_content: bool = True):
                             and b"structuredContent" in chunk
                         ):
                             context["response"] = parse_sse_data_package(chunk)
-                            stream_complete.set()
                             break
                         elif (
                             "result" in parse_sse_data_package(chunk)
                             and "content" in parse_sse_data_package(chunk)["result"]
                         ):
                             context["response"] = parse_sse_data_package(chunk)
-                            stream_complete.set()
                             break
+
+                stream_complete.set()
 
             task = asyncio.create_task(parse_stream())
             await endpoint_parsed.wait()
