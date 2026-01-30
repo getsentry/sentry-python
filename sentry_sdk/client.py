@@ -69,6 +69,7 @@ if TYPE_CHECKING:
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
+    from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.transport import Transport, Item
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher
@@ -225,6 +226,9 @@ class BaseClient:
         pass
 
     def _capture_metric(self, metric: "Metric", scope: "Scope") -> None:
+        pass
+
+    def _capture_span(self, span: "StreamedSpan", scope: "Scope") -> None:
         pass
 
     def capture_session(self, *args: "Any", **kwargs: "Any") -> None:
@@ -920,7 +924,7 @@ class _Client(BaseClient):
 
     def _capture_telemetry(
         self,
-        telemetry: "Optional[Union[Log, Metric]]",
+        telemetry: "Optional[Union[Log, Metric, StreamedSpan]]",
         ty: str,
         scope: "Scope",
     ) -> None:
@@ -947,6 +951,8 @@ class _Client(BaseClient):
             batcher = self.log_batcher
         elif ty == "metric":
             batcher = self.metrics_batcher  # type: ignore
+        elif ty == "span":
+            batcher = self.span_batcher  # type: ignore
 
         if batcher is not None:
             batcher.add(telemetry)  # type: ignore
@@ -956,6 +962,9 @@ class _Client(BaseClient):
 
     def _capture_metric(self, metric: "Optional[Metric]", scope: "Scope") -> None:
         self._capture_telemetry(metric, "metric", scope)
+
+    def _capture_span(self, span: "Optional[StreamedSpan]", scope: "Scope") -> None:
+        self._capture_telemetry(span, "span", scope)
 
     def capture_session(
         self,
