@@ -569,49 +569,49 @@ def test_fastmcp_prompt_sync(
         request_ctx.set(mock_ctx)
 
     # Try to register a prompt handler (may not be supported in all versions)
-    try:
-        if hasattr(mcp, "prompt"):
+    if hasattr(mcp, "prompt"):
 
-            @mcp.prompt()
-            def code_help_prompt(language: str):
-                """Get help for a programming language"""
-                return [
-                    {
-                        "role": "user",
-                        "content": {
-                            "type": "text",
-                            "text": f"Tell me about {language}",
-                        },
-                    }
-                ]
+        @mcp.prompt()
+        def code_help_prompt(language: str):
+            """Get help for a programming language"""
+            return [
+                {
+                    "role": "user",
+                    "content": {
+                        "type": "text",
+                        "text": f"Tell me about {language}",
+                    },
+                }
+            ]
 
-            with start_transaction(name="fastmcp tx"):
+        with start_transaction(name="fastmcp tx"):
+            try:
                 result = call_prompt_through_mcp(
                     mcp, "code_help_prompt", {"language": "python"}
                 )
+            except AttributeError:
+                # Prompt handler not supported in this version
+                pytest.skip("Prompt handlers not supported in this FastMCP version")
 
-            assert result.messages[0].role == "user"
-            assert "python" in result.messages[0].content.text.lower()
+        assert result.messages[0].role == "user"
+        assert "python" in result.messages[0].content.text.lower()
 
-            (tx,) = events
-            assert tx["type"] == "transaction"
+        (tx,) = events
+        assert tx["type"] == "transaction"
 
-            # Verify prompt span was created
-            prompt_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-            assert len(prompt_spans) == 1
-            span = prompt_spans[0]
-            assert span["origin"] == "auto.ai.mcp"
-            assert span["description"] == "prompts/get code_help_prompt"
-            assert span["data"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
+        # Verify prompt span was created
+        prompt_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+        assert len(prompt_spans) == 1
+        span = prompt_spans[0]
+        assert span["origin"] == "auto.ai.mcp"
+        assert span["description"] == "prompts/get code_help_prompt"
+        assert span["data"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
 
-            # Check PII-sensitive data
-            if send_default_pii and include_prompts:
-                assert SPANDATA.MCP_PROMPT_CONTENT in span["data"]
-            else:
-                assert SPANDATA.MCP_PROMPT_CONTENT not in span["data"]
-    except AttributeError:
-        # Prompt handler not supported in this version
-        pytest.skip("Prompt handlers not supported in this FastMCP version")
+        # Check PII-sensitive data
+        if send_default_pii and include_prompts:
+            assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["data"]
+        else:
+            assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -634,38 +634,38 @@ async def test_fastmcp_prompt_async(sentry_init, capture_events, FastMCP):
         request_ctx.set(mock_ctx)
 
     # Try to register an async prompt handler
-    try:
-        if hasattr(mcp, "prompt"):
+    if hasattr(mcp, "prompt"):
 
-            @mcp.prompt()
-            async def async_prompt(topic: str):
-                """Get async prompt for a topic"""
-                return [
-                    {
-                        "role": "user",
-                        "content": {"type": "text", "text": f"What is {topic}?"},
+        @mcp.prompt()
+        async def async_prompt(topic: str):
+            """Get async prompt for a topic"""
+            return [
+                {
+                    "role": "user",
+                    "content": {"type": "text", "text": f"What is {topic}?"},
+                },
+                {
+                    "role": "assistant",
+                    "content": {
+                        "type": "text",
+                        "text": "Let me explain that",
                     },
-                    {
-                        "role": "assistant",
-                        "content": {
-                            "type": "text",
-                            "text": "Let me explain that",
-                        },
-                    },
-                ]
+                },
+            ]
 
-            with start_transaction(name="fastmcp tx"):
+        with start_transaction(name="fastmcp tx"):
+            try:
                 result = await call_prompt_through_mcp_async(
                     mcp, "async_prompt", {"topic": "MCP"}
                 )
+            except AttributeError:
+                # Prompt handler not supported in this version
+                pytest.skip("Prompt handlers not supported in this FastMCP version")
 
-            assert len(result.messages) == 2
+        assert len(result.messages) == 2
 
-            (tx,) = events
-            assert tx["type"] == "transaction"
-    except AttributeError:
-        # Prompt handler not supported in this version
-        pytest.skip("Prompt handlers not supported in this FastMCP version")
+        (tx,) = events
+        assert tx["type"] == "transaction"
 
 
 # =============================================================================

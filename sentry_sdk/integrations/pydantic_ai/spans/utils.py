@@ -28,6 +28,19 @@ def _set_usage_data(
     if hasattr(usage, "input_tokens") and usage.input_tokens is not None:
         span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
 
+    # Pydantic AI uses cache_read_tokens (not input_tokens_cached)
+    if hasattr(usage, "cache_read_tokens") and usage.cache_read_tokens is not None:
+        span.set_data(
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, usage.cache_read_tokens
+        )
+
+    # Pydantic AI uses cache_write_tokens (not input_tokens_cache_write)
+    if hasattr(usage, "cache_write_tokens") and usage.cache_write_tokens is not None:
+        span.set_data(
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+            usage.cache_write_tokens,
+        )
+
     if hasattr(usage, "output_tokens") and usage.output_tokens is not None:
         span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
 
