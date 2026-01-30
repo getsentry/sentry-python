@@ -81,11 +81,6 @@ try:
 except ImportError:
     FASTMCP_VERSION = None
 
-try:
-    from fastmcp import __version__ as FASTMCP_VERSION
-except ImportError:
-    FASTMCP_VERSION = None
-
 
 # Collect available FastMCP implementations for parametrization
 fastmcp_implementations = []
@@ -696,58 +691,54 @@ async def test_fastmcp_prompt_sync(
     mcp = FastMCP("Test Server")
 
     # Try to register a prompt handler (may not be supported in all versions)
-    try:
-        if hasattr(mcp, "prompt"):
+    if hasattr(mcp, "prompt"):
 
-            @mcp.prompt()
-            def code_help_prompt(language: str):
-                """Get help for a programming language"""
-                return [
-                    {
-                        "role": "user",
-                        "content": {
-                            "type": "text",
-                            "text": f"Tell me about {language}",
-                        },
-                    }
-                ]
-
-            with start_transaction(name="fastmcp tx"):
-                result = await stdio(
-                    mcp._mcp_server,
-                    method="prompts/get",
-                    params={
-                        "name": "code_help_prompt",
-                        "arguments": {"language": "python"},
+        @mcp.prompt()
+        def code_help_prompt(language: str):
+            """Get help for a programming language"""
+            return [
+                {
+                    "role": "user",
+                    "content": {
+                        "type": "text",
+                        "text": f"Tell me about {language}",
                     },
-                    request_id="req-prompt",
-                )
+                }
+            ]
 
-            assert result.message.root.result["messages"][0]["role"] == "user"
-            assert (
-                "python"
-                in result.message.root.result["messages"][0]["content"]["text"].lower()
+        with start_transaction(name="fastmcp tx"):
+            result = await stdio(
+                mcp._mcp_server,
+                method="prompts/get",
+                params={
+                    "name": "code_help_prompt",
+                    "arguments": {"language": "python"},
+                },
+                request_id="req-prompt",
             )
 
-            (tx,) = events
-            assert tx["type"] == "transaction"
+        assert result.message.root.result["messages"][0]["role"] == "user"
+        assert (
+            "python"
+            in result.message.root.result["messages"][0]["content"]["text"].lower()
+        )
 
-            # Verify prompt span was created
-            prompt_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-            assert len(prompt_spans) == 1
-            span = prompt_spans[0]
-            assert span["origin"] == "auto.ai.mcp"
-            assert span["description"] == "prompts/get code_help_prompt"
-            assert span["data"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
+        (tx,) = events
+        assert tx["type"] == "transaction"
 
-            # Check PII-sensitive data
-            if send_default_pii and include_prompts:
-                assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["data"]
-            else:
-                assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
-    except AttributeError:
-        # Prompt handler not supported in this version
-        pytest.skip("Prompt handlers not supported in this FastMCP version")
+        # Verify prompt span was created
+        prompt_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+        assert len(prompt_spans) == 1
+        span = prompt_spans[0]
+        assert span["origin"] == "auto.ai.mcp"
+        assert span["description"] == "prompts/get code_help_prompt"
+        assert span["data"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
+
+        # Check PII-sensitive data
+        if send_default_pii and include_prompts:
+            assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["data"]
+        else:
+            assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -781,43 +772,39 @@ async def test_fastmcp_prompt_async(
     )
 
     # Try to register an async prompt handler
-    try:
-        if hasattr(mcp, "prompt"):
+    if hasattr(mcp, "prompt"):
 
-            @mcp.prompt()
-            async def async_prompt(topic: str):
-                """Get async prompt for a topic"""
-                return [
-                    {
-                        "role": "user",
-                        "content": {"type": "text", "text": f"What is {topic}?"},
-                    },
-                    {
-                        "role": "assistant",
-                        "content": {
-                            "type": "text",
-                            "text": "Let me explain that",
-                        },
-                    },
-                ]
-
-            _, result = json_rpc(
-                app,
-                method="prompts/get",
-                params={
-                    "name": "async_prompt",
-                    "arguments": {"topic": "MCP"},
+        @mcp.prompt()
+        async def async_prompt(topic: str):
+            """Get async prompt for a topic"""
+            return [
+                {
+                    "role": "user",
+                    "content": {"type": "text", "text": f"What is {topic}?"},
                 },
-                request_id="req-async-prompt",
-            )
+                {
+                    "role": "assistant",
+                    "content": {
+                        "type": "text",
+                        "text": "Let me explain that",
+                    },
+                },
+            ]
 
-            assert len(result.json()["result"]["messages"]) == 2
+        _, result = json_rpc(
+            app,
+            method="prompts/get",
+            params={
+                "name": "async_prompt",
+                "arguments": {"topic": "MCP"},
+            },
+            request_id="req-async-prompt",
+        )
 
-            transactions = select_mcp_transactions(events)
-            assert len(transactions) == 1
-    except AttributeError:
-        # Prompt handler not supported in this version
-        pytest.skip("Prompt handlers not supported in this FastMCP version")
+        assert len(result.json()["result"]["messages"]) == 2
+
+        transactions = select_mcp_transactions(events)
+        assert len(transactions) == 1
 
 
 # =============================================================================
@@ -927,6 +914,7 @@ async def test_fastmcp_resource_async(
                 params={
                     "uri": "https://example.com/resource",
                 },
+                request_id="req-async-resource",
             )
             # Older FastMCP versions may not support this URI pattern
             if (
@@ -938,14 +926,13 @@ async def test_fastmcp_resource_async(
 
             assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
-            transactions = select_mcp_transactions(events, "resources/read")
+            transactions = select_mcp_transactions(events)
             assert len(transactions) == 1
             tx = transactions[0]
-
-            # Verify span was created
-            resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-            assert len(resource_spans) == 1
-            assert resource_spans[0]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+            assert (
+                tx["contexts"]["trace"]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL]
+                == "https"
+            )
     except (AttributeError, TypeError):
         # Resource handler not supported in this version
         pytest.skip("Resource handlers not supported in this FastMCP version")
@@ -1316,7 +1303,6 @@ def test_fastmcp_tool_with_none_return(sentry_init, capture_events, FastMCP):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-@pytest.mark.asyncio
 async def test_fastmcp_mixed_sync_async_tools(
     sentry_init, capture_events, FastMCP, stdio
 ):

@@ -167,7 +167,7 @@ _MIN_VERSIONS = {
 
 
 _INTEGRATION_DEACTIVATES = {
-    "langchain": {"openai", "anthropic"},
+    "langchain": {"openai", "anthropic", "google_genai"},
     "openai_agents": {"openai"},
     "pydantic_ai": {"openai", "anthropic"},
 }

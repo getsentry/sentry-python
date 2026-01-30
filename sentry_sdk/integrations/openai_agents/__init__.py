@@ -4,6 +4,7 @@ from .patches import (
     _create_get_model_wrapper,
     _create_get_all_tools_wrapper,
     _create_run_wrapper,
+    _create_run_streamed_wrapper,
     _patch_agent_run,
     _patch_error_tracing,
 )
@@ -25,12 +26,16 @@ def _patch_runner() -> None:
     # Create the root span for one full agent run (including eventual handoffs)
     # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
     # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
-    # TODO-anton: Also patch streaming runner: agents.Runner.run_streamed
     agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(
         agents.run.DEFAULT_AGENT_RUNNER.run
     )
 
-    # Creating the actual spans for each agent run.
+    # Patch streaming runner
+    agents.run.DEFAULT_AGENT_RUNNER.run_streamed = _create_run_streamed_wrapper(
+        agents.run.DEFAULT_AGENT_RUNNER.run_streamed
+    )
+
+    # Creating the actual spans for each agent run (works for both streaming and non-streaming).
     _patch_agent_run()
 
 
