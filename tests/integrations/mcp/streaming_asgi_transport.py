@@ -76,8 +76,6 @@ class StreamingASGITransport(ASGITransport):
                         yield chunk
                 except anyio.EndOfStream:
                     pass
-                finally:
-                    await self.task
 
         stream = StreamingBodyStream(body_receiver, asyncio.create_task(run_app()))
         response = Response(status_code=200, headers=[], stream=stream)

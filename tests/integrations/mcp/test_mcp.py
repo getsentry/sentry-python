@@ -75,47 +75,6 @@ def reset_request_ctx():
             pass
 
 
-# Mock MCP types and structures
-class MockURI:
-    """Mock URI object for resource testing"""
-
-    def __init__(self, uri_string):
-        self.scheme = uri_string.split("://")[0] if "://" in uri_string else ""
-        self.path = uri_string.split("://")[1] if "://" in uri_string else uri_string
-        self._uri_string = uri_string
-
-    def __str__(self):
-        return self._uri_string
-
-
-class MockRequestContext:
-    """Mock MCP request context"""
-
-    def __init__(self, request_id=None, session_id=None, transport="stdio"):
-        self.request_id = request_id
-        if transport in ("http", "sse"):
-            self.request = MockHTTPRequest(session_id, transport)
-        else:
-            self.request = None
-
-
-class MockHTTPRequest:
-    """Mock HTTP request for SSE/StreamableHTTP transport"""
-
-    def __init__(self, session_id=None, transport="http"):
-        self.headers = {}
-        self.query_params = {}
-
-        if transport == "sse":
-            # SSE transport uses query parameter
-            if session_id:
-                self.query_params["session_id"] = session_id
-        else:
-            # StreamableHTTP transport uses header
-            if session_id:
-                self.headers["mcp-session-id"] = session_id
-
-
 class MockTextContent:
     """Mock TextContent object"""
 
@@ -322,7 +281,7 @@ async def test_tool_handler_stdio(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_tool_handler_async(
+async def test_tool_handler_streamable_http(
     sentry_init,
     capture_events,
     send_default_pii,
@@ -462,7 +421,7 @@ async def test_tool_handler_with_error(sentry_init, capture_events, stdio):
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_prompt_handler_sync(
+async def test_prompt_handler_stdio(
     sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test that synchronous prompt handlers create proper spans"""
@@ -541,7 +500,7 @@ async def test_prompt_handler_sync(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_prompt_handler_async(
+async def test_prompt_handler_streamable_http(
     sentry_init,
     capture_events,
     send_default_pii,
@@ -658,7 +617,7 @@ async def test_prompt_handler_with_error(sentry_init, capture_events, stdio):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_sync(sentry_init, capture_events, stdio):
+async def test_resource_handler_stdio(sentry_init, capture_events, stdio):
     """Test that synchronous resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -710,7 +669,7 @@ async def test_resource_handler_sync(sentry_init, capture_events, stdio):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_async(
+async def test_resource_handler_streamble_http(
     sentry_init,
     capture_events,
     json_rpc,
@@ -1146,43 +1105,6 @@ async def test_tool_with_complex_arguments(sentry_init, capture_events, stdio):
     )
     assert span["data"]["mcp.request.argument.string"] == '"test"'
     assert span["data"]["mcp.request.argument.number"] == "42"
-
-
-@pytest.mark.asyncio
-async def test_async_handlers_mixed(sentry_init, capture_events):
-    """Test mixing sync and async handlers in the same transaction"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    server = Server("test-server")
-
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-mixed", transport="stdio")
-    request_ctx.set(mock_ctx)
-
-    @server.call_tool()
-    def sync_tool(tool_name, arguments):
-        return {"type": "sync"}
-
-    @server.call_tool()
-    async def async_tool(tool_name, arguments):
-        return {"type": "async"}
-
-    with start_transaction(name="mcp tx"):
-        sync_result = sync_tool("sync", {})
-        async_result = await async_tool("async", {})
-
-    assert sync_result["type"] == "sync"
-    assert async_result["type"] == "async"
-
-    (tx,) = events
-    assert len(tx["spans"]) == 2
-
-    # Both should be instrumented correctly
-    assert all(span["op"] == OP.MCP_SERVER for span in tx["spans"])
 
 
 @pytest.mark.asyncio
