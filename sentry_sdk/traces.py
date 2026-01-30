@@ -223,6 +223,8 @@ class StreamedSpan:
         "sample_rate",
         "_sample_rand",
         "_finished",
+        "_unsampled_reason",
+        "_last_valid_parent_id",
     )
 
     def __init__(
@@ -241,6 +243,9 @@ class StreamedSpan:
         parent_sampled: "Optional[bool]" = None,
         baggage: "Optional[Baggage]" = None,
         segment: "Optional[StreamedSpan]" = None,
+        sampled: "Optional[bool]" = None,
+        unsampled_reason: "Optional[str]" = None,
+        last_valid_parent_id: "Optional[str]" = None,
     ) -> None:
         self._scope = scope
 
@@ -269,8 +274,10 @@ class StreamedSpan:
         self.set_source(SegmentSource.CUSTOM)
         # XXX[span-first] ^ populate this correctly
 
-        self._sampled: "Optional[bool]" = None
+        self._sampled: "Optional[bool]" = sampled
+        self._unsampled_reason: "Optional[str]" = unsampled_reason
         self.sample_rate: "Optional[float]" = None
+        self._last_valid_parent_id: "Optional[str]" = last_valid_parent_id
 
         # XXX[span-first]: just do this for segments?
         self._baggage = baggage
@@ -394,6 +401,8 @@ class StreamedSpan:
             if client.transport and has_tracing_enabled(client.options):
                 if client.monitor and client.monitor.downsample_factor > 0:
                     reason = "backpressure"
+                elif self._unsampled_reason:
+                    reason = self._unsampled_reason
                 else:
                     reason = "sample_rate"
 
@@ -489,7 +498,7 @@ class StreamedSpan:
             return self._sampled
 
         if not self.is_segment():
-            self._sampled = self.parent_sampled
+            self._sampled = self.segment.sampled
 
         return self._sampled
 
@@ -566,12 +575,14 @@ class StreamedSpan:
         """Set a segment's sampling decision."""
         client = sentry_sdk.get_client()
 
-        # nothing to do if tracing is disabled
         if not has_tracing_enabled(client.options):
             self._sampled = False
             return
 
         if not self.is_segment():
+            return
+
+        if self._sampled is not None:
             return
 
         traces_sampler_defined = callable(client.options.get("traces_sampler"))
@@ -629,26 +640,6 @@ class StreamedSpan:
             self.set_attribute("sentry.segment.id", self.segment.span_id)
 
         self.set_attribute("sentry.segment.name", self.segment.name)
-
-
-class NoOpStreamedSpan(StreamedSpan):
-    # XXX[span-first]: make this actually no-op
-    def __init__(
-        self,
-        *args: "Any",
-        last_valid_parent: "Optional[StreamedSpan]" = None,
-        **kwargs: "Any",
-    ):
-        self._sampled = False
-        self.last_valid_parent = last_valid_parent
-
-    def __enter__(self) -> "NoOpStreamedSpan":
-        return self
-
-    def __exit__(
-        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
-    ) -> None:
-        return
 
 
 def trace(
