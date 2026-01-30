@@ -16,12 +16,8 @@ that the integration properly instruments MCP handlers with Sentry spans.
 """
 
 import sentry_sdk
-
-from urllib.parse import urlparse, parse_qs
 import anyio
 import asyncio
-import httpx
-from .streaming_asgi_transport import StreamingASGITransport
 
 import pytest
 import json
@@ -136,98 +132,6 @@ class MockGetPromptResult:
 
     def __init__(self, messages):
         self.messages = messages
-
-
-async def json_rpc_sse(
-    app, method: str, params, request_id: str, keep_sse_alive: "asyncio.Event"
-):
-    context = {}
-
-    stream_complete = asyncio.Event()
-    endpoint_parsed = asyncio.Event()
-
-    # https://github.com/Kludex/starlette/issues/104#issuecomment-729087925
-    async with httpx.AsyncClient(
-        transport=StreamingASGITransport(app=app, keep_sse_alive=keep_sse_alive),
-        base_url="http://test",
-    ) as client:
-
-        async def parse_stream():
-            async with client.stream("GET", "/sse") as stream:
-                # Read directly from stream.stream instead of aiter_bytes()
-                async for chunk in stream.stream:
-                    if b"event: endpoint" in chunk:
-                        sse_text = chunk.decode("utf-8")
-                        url = sse_text.split("data: ")[1]
-
-                        parsed = urlparse(url)
-                        query_params = parse_qs(parsed.query)
-                        context["session_id"] = query_params["session_id"][0]
-                        endpoint_parsed.set()
-                        continue
-
-                    if b"event: message" in chunk and b"structuredContent" in chunk:
-                        sse_text = chunk.decode("utf-8")
-
-                        json_str = sse_text.split("data: ")[1]
-                        context["response"] = json.loads(json_str)
-                        break
-
-            stream_complete.set()
-
-        task = asyncio.create_task(parse_stream())
-        await endpoint_parsed.wait()
-
-        await client.post(
-            f"/messages/?session_id={context['session_id']}",
-            headers={
-                "Content-Type": "application/json",
-            },
-            json={
-                "jsonrpc": "2.0",
-                "method": "initialize",
-                "params": {
-                    "clientInfo": {"name": "test-client", "version": "1.0"},
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {},
-                },
-                "id": request_id,
-            },
-        )
-
-        # Notification response is mandatory.
-        # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
-        await client.post(
-            f"/messages/?session_id={context['session_id']}",
-            headers={
-                "Content-Type": "application/json",
-                "mcp-session-id": context["session_id"],
-            },
-            json={
-                "jsonrpc": "2.0",
-                "method": "notifications/initialized",
-                "params": {},
-            },
-        )
-
-        await client.post(
-            f"/messages/?session_id={context['session_id']}",
-            headers={
-                "Content-Type": "application/json",
-                "mcp-session-id": context["session_id"],
-            },
-            json={
-                "jsonrpc": "2.0",
-                "method": method,
-                "params": params,
-                "id": request_id,
-            },
-        )
-
-        await stream_complete.wait()
-        keep_sse_alive.set()
-
-        return task, context["session_id"], context["response"]
 
 
 def test_integration_patches_server(sentry_init):
@@ -1186,7 +1090,7 @@ async def test_async_handlers_mixed(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_sse_transport_detection(sentry_init, capture_events):
+async def test_sse_transport_detection(sentry_init, capture_events, json_rpc_sse):
     """Test that SSE transport is correctly detected via query parameter"""
     sentry_init(
         integrations=[MCPIntegration()],
