@@ -15,8 +15,6 @@ The tests mock the MCP server components and request context to verify
 that the integration properly instruments MCP handlers with Sentry spans.
 """
 
-import sentry_sdk
-
 from urllib.parse import urlparse, parse_qs
 import anyio
 import asyncio
