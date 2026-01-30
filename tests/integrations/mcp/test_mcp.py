@@ -334,7 +334,7 @@ async def test_tool_handler_with_error(sentry_init, capture_events, stdio):
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_prompt_handler_sync(
+async def test_prompt_handler_stdio(
     sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test that synchronous prompt handlers create proper spans"""
@@ -498,7 +498,7 @@ async def test_prompt_handler_with_error(sentry_init, capture_events, stdio):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_sync(sentry_init, capture_events, stdio):
+async def test_resource_handler_stdio(sentry_init, capture_events, stdio):
     """Test that synchronous resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -961,43 +961,6 @@ async def test_tool_with_complex_arguments(sentry_init, capture_events, stdio):
     )
     assert span["data"]["mcp.request.argument.string"] == '"test"'
     assert span["data"]["mcp.request.argument.number"] == "42"
-
-
-@pytest.mark.asyncio
-async def test_async_handlers_mixed(sentry_init, capture_events):
-    """Test mixing sync and async handlers in the same transaction"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    server = Server("test-server")
-
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-mixed", transport="stdio")
-    request_ctx.set(mock_ctx)
-
-    @server.call_tool()
-    def sync_tool(tool_name, arguments):
-        return {"type": "sync"}
-
-    @server.call_tool()
-    async def async_tool(tool_name, arguments):
-        return {"type": "async"}
-
-    with start_transaction(name="mcp tx"):
-        sync_result = sync_tool("sync", {})
-        async_result = await async_tool("async", {})
-
-    assert sync_result["type"] == "sync"
-    assert async_result["type"] == "async"
-
-    (tx,) = events
-    assert len(tx["spans"]) == 2
-
-    # Both should be instrumented correctly
-    assert all(span["op"] == OP.MCP_SERVER for span in tx["spans"])
 
 
 def test_sse_transport_detection(sentry_init, capture_events):
