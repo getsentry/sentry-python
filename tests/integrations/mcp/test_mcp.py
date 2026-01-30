@@ -66,19 +66,6 @@ def reset_request_ctx():
             pass
 
 
-# Mock MCP types and structures
-class MockURI:
-    """Mock URI object for resource testing"""
-
-    def __init__(self, uri_string):
-        self.scheme = uri_string.split("://")[0] if "://" in uri_string else ""
-        self.path = uri_string.split("://")[1] if "://" in uri_string else uri_string
-        self._uri_string = uri_string
-
-    def __str__(self):
-        return self._uri_string
-
-
 class MockRequestContext:
     """Mock MCP request context"""
 
@@ -112,21 +99,6 @@ class MockTextContent:
 
     def __init__(self, text):
         self.text = text
-
-
-class MockPromptMessage:
-    """Mock PromptMessage object"""
-
-    def __init__(self, role, content_text):
-        self.role = role
-        self.content = MockTextContent(content_text)
-
-
-class MockGetPromptResult:
-    """Mock GetPromptResult object"""
-
-    def __init__(self, messages):
-        self.messages = messages
 
 
 def test_integration_patches_server(sentry_init):
