@@ -78,21 +78,6 @@ class MockTextContent:
         self.text = text
 
 
-class MockPromptMessage:
-    """Mock PromptMessage object"""
-
-    def __init__(self, role, content_text):
-        self.role = role
-        self.content = MockTextContent(content_text)
-
-
-class MockGetPromptResult:
-    """Mock GetPromptResult object"""
-
-    def __init__(self, messages):
-        self.messages = messages
-
-
 def test_integration_patches_server(sentry_init):
     """Test that MCPIntegration patches the Server class"""
     # Get original methods before integration
