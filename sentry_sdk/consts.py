@@ -82,6 +82,7 @@ if TYPE_CHECKING:
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
             "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
+            "trace_lifecycle": Optional[Literal["static", "stream"]],
         },
         total=False,
     )
