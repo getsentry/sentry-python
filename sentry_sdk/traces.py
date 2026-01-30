@@ -5,6 +5,12 @@ You can enable span streaming mode via
 sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
+import uuid
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional
+
 
 class StreamedSpan:
     """
@@ -16,4 +22,18 @@ class StreamedSpan:
     span implementation lives in tracing.Span.
     """
 
-    pass
+    __slots__ = ("_trace_id",)
+
+    def __init__(
+        self,
+        *,
+        trace_id: "Optional[str]" = None,
+    ):
+        self._trace_id = trace_id
+
+    @property
+    def trace_id(self) -> str:
+        if not self._trace_id:
+            self._trace_id = uuid.uuid4().hex
+
+        return self._trace_id
