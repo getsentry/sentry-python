@@ -66,6 +66,7 @@ except ImportError:
     create_memory_object_stream = None
     create_task_group = None
     JSONRPCMessage = None
+    JSONRPCNotification = None
     JSONRPCRequest = None
     SessionMessage = None
 
