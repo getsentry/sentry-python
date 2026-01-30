@@ -287,7 +287,7 @@ async def test_tool_handler_stdio(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_tool_handler_async(
+async def test_tool_handler_streamble_http(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     """Test that async tool handlers create proper spans"""
@@ -501,7 +501,7 @@ async def test_prompt_handler_sync(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_prompt_handler_async(
+async def test_prompt_handler_streamble_http(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     """Test that async prompt handlers create proper spans"""
@@ -665,7 +665,7 @@ async def test_resource_handler_sync(sentry_init, capture_events, stdio):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_async(sentry_init, capture_events):
+async def test_resource_handler_streamble_http(sentry_init, capture_events):
     """Test that async resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
