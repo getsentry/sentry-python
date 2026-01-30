@@ -410,7 +410,7 @@ async def test_tool_handler_with_error(sentry_init, capture_events):
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_prompt_handler_sync(
+async def test_prompt_handler_stdio(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     """Test that synchronous prompt handlers create proper spans"""
@@ -574,7 +574,7 @@ async def test_prompt_handler_with_error(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_sync(sentry_init, capture_events):
+async def test_resource_handler_stdio(sentry_init, capture_events):
     """Test that synchronous resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
