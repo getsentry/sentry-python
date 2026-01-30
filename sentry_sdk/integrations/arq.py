@@ -200,13 +200,14 @@ def patch_create_worker() -> None:
                 ]
 
         if hasattr(settings_cls, "functions"):
-            settings_cls.functions = [
-                _get_arq_function(func) for func in settings_cls.functions
+            settings_cls.functions = [  # type: ignore[union-attr]
+                _get_arq_function(func)
+                for func in settings_cls.functions  # type: ignore[union-attr]
             ]
         if hasattr(settings_cls, "cron_jobs"):
-            settings_cls.cron_jobs = [
+            settings_cls.cron_jobs = [  # type: ignore[union-attr]
                 _get_arq_cron_job(cron_job)
-                for cron_job in (settings_cls.cron_jobs or [])
+                for cron_job in (settings_cls.cron_jobs or [])  # type: ignore[union-attr]
             ]
 
         if "functions" in kwargs:
