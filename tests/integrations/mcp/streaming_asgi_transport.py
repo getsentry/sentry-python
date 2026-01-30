@@ -66,9 +66,8 @@ class StreamingASGITransport(ASGITransport):
             await self.app(scope, receive, send)
 
         class StreamingBodyStream(AsyncByteStream):
-            def __init__(self, receiver, task):
+            def __init__(self, receiver):
                 self.receiver = receiver
-                self.task = task
 
             async def __aiter__(self):
                 try:
@@ -77,7 +76,8 @@ class StreamingASGITransport(ASGITransport):
                 except anyio.EndOfStream:
                     pass
 
-        stream = StreamingBodyStream(body_receiver, asyncio.create_task(run_app()))
+        stream = StreamingBodyStream(body_receiver)
         response = Response(status_code=200, headers=[], stream=stream)
 
+        asyncio.create_task(run_app())
         return response
