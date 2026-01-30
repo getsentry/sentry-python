@@ -64,7 +64,13 @@ try:
         JSONRPCRequest,
     )
     from mcp.shared.message import SessionMessage
-    from httpx import ASGITransport, Request, Response, AsyncByteStream, AsyncClient
+    from httpx import (
+        ASGITransport,
+        Request as HttpxRequest,
+        Response as HttpxResponse,
+        AsyncByteStream,
+        AsyncClient,
+    )
 except ImportError:
     create_memory_object_stream = None
     create_task_group = None
@@ -76,8 +82,8 @@ except ImportError:
     SessionMessage = None
 
     ASGITransport = None
-    Request = None
-    Response = None
+    HttpxRequest = None
+    HttpxResponse = None
     AsyncByteStream = None
     AsyncClient = None
 
@@ -814,7 +820,9 @@ def json_rpc_sse(is_structured_content: bool = True):
             self.keep_sse_alive = keep_sse_alive
             super().__init__(app)
 
-        async def handle_async_request(self, request: "Request") -> "Response":
+        async def handle_async_request(
+            self, request: "HttpxRequest"
+        ) -> "HttpxResponse":
             scope = {
                 "type": "http",
                 "method": request.method,
@@ -873,7 +881,7 @@ def json_rpc_sse(is_structured_content: bool = True):
                         pass
 
             stream = StreamingBodyStream(body_receiver)
-            response = Response(status_code=200, headers=[], stream=stream)  # type: ignore
+            response = HttpxResponse(status_code=200, headers=[], stream=stream)  # type: ignore
 
             asyncio.create_task(run_app())
             return response
