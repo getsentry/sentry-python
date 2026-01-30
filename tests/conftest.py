@@ -71,6 +71,7 @@ except ImportError:
     EndOfStream = None
 
     JSONRPCMessage = None
+    JSONRPCNotification = None
     JSONRPCRequest = None
     SessionMessage = None
 
@@ -861,9 +862,8 @@ def json_rpc_sse(is_structured_content: bool = True):
                 await self.app(scope, receive, send)
 
             class StreamingBodyStream(AsyncByteStream):  # type: ignore
-                def __init__(self, receiver, task):
+                def __init__(self, receiver):
                     self.receiver = receiver
-                    self.task = task
 
                 async def __aiter__(self):
                     try:
@@ -872,9 +872,10 @@ def json_rpc_sse(is_structured_content: bool = True):
                     except EndOfStream:  # type: ignore
                         pass
 
-            stream = StreamingBodyStream(body_receiver, asyncio.create_task(run_app()))
+            stream = StreamingBodyStream(body_receiver)
             response = Response(status_code=200, headers=[], stream=stream)  # type: ignore
 
+            asyncio.create_task(run_app())
             return response
 
     def parse_sse_data_package(sse_chunk):
