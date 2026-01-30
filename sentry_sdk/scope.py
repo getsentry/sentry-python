@@ -221,6 +221,7 @@ class Scope:
         "_breadcrumbs",
         "_n_breadcrumbs_truncated",
         "_gen_ai_original_message_count",
+        "_gen_ai_conversation_id",
         "_event_processors",
         "_error_processors",
         "_should_capture",
@@ -302,6 +303,8 @@ class Scope:
         rv._flags = deepcopy(self._flags)
 
         rv._attributes = self._attributes.copy()
+
+        rv._gen_ai_conversation_id = self._gen_ai_conversation_id
 
         return rv
 
@@ -720,6 +723,8 @@ class Scope:
 
         self._attributes: "Attributes" = {}
 
+        self._gen_ai_conversation_id: "Optional[str]" = None
+
     @_attr_setter
     def level(self, value: "LogLevelStr") -> None:
         """
@@ -911,6 +916,26 @@ class Scope:
     ) -> None:
         """Removes a specific extra key."""
         self._extras.pop(key, None)
+
+    def set_conversation_id(self, conversation_id: str) -> None:
+        """
+        Sets the conversation ID for gen_ai spans.
+
+        :param conversation_id: The conversation ID to set.
+        """
+        self._gen_ai_conversation_id = conversation_id
+
+    def get_conversation_id(self) -> "Optional[str]":
+        """
+        Gets the conversation ID for gen_ai spans.
+
+        :returns: The conversation ID, or None if not set.
+        """
+        return self._gen_ai_conversation_id
+
+    def remove_conversation_id(self) -> None:
+        """Removes the conversation ID."""
+        self._gen_ai_conversation_id = None
 
     def clear_breadcrumbs(self) -> None:
         """Clears breadcrumb buffer."""
@@ -1668,6 +1693,8 @@ class Scope:
             self._gen_ai_original_message_count.update(
                 scope._gen_ai_original_message_count
             )
+        if scope._gen_ai_conversation_id:
+            self._gen_ai_conversation_id = scope._gen_ai_conversation_id
         if scope._span:
             self._span = scope._span
         if scope._attachments:
