@@ -71,6 +71,10 @@ except ImportError:
     GetPromptRequest = None
     ReadResourceRequest = None
 
+try:
+    from fastmcp import __version__ as FASTMCP_VERSION
+except ImportError:
+    FASTMCP_VERSION = None
 
 # Collect available FastMCP implementations for parametrization
 fastmcp_implementations = []
@@ -1163,7 +1167,14 @@ async def test_fastmcp_tool_with_none_return(
             },
         )
 
-    assert len(result.message.root.result["content"]) == 0
+    if (
+        isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION is not None
+    ) or isinstance(mcp, MCPFastMCP):
+        assert len(result.message.root.result["content"]) == 0
+    else:
+        assert result.message.root.result["content"] == [
+            {"type": "text", "text": "None"}
+        ]
 
     (tx,) = events
     assert tx["type"] == "transaction"
