@@ -74,34 +74,6 @@ def reset_request_ctx():
             pass
 
 
-class MockRequestContext:
-    """Mock MCP request context"""
-
-    def __init__(self, request_id=None, session_id=None, transport="stdio"):
-        self.request_id = request_id
-        if transport in ("http", "sse"):
-            self.request = MockHTTPRequest(session_id, transport)
-        else:
-            self.request = None
-
-
-class MockHTTPRequest:
-    """Mock HTTP request for SSE/StreamableHTTP transport"""
-
-    def __init__(self, session_id=None, transport="http"):
-        self.headers = {}
-        self.query_params = {}
-
-        if transport == "sse":
-            # SSE transport uses query parameter
-            if session_id:
-                self.query_params["session_id"] = session_id
-        else:
-            # StreamableHTTP transport uses header
-            if session_id:
-                self.headers["mcp-session-id"] = session_id
-
-
 class MockTextContent:
     """Mock TextContent object"""
 
