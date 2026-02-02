@@ -6,18 +6,16 @@ sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
 import uuid
-import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Pattern
+from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.tracing_utils import (
     Baggage,
     _generate_sample_rand,
-    has_span_streaming_enabled,
     has_tracing_enabled,
 )
 from sentry_sdk.utils import (
