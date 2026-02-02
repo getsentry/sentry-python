@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.52.0a2
+
+### New Features ✨
+
+#### Span Streaming
+
+- feat(span-streaming): Add spans to telemetry pipeline, add span name and attributes (3) by @sentrivana in [#5399](https://github.com/getsentry/sentry-python/pull/5399)
+- feat(span-streaming): Add span batcher (2) by @sentrivana in [#5398](https://github.com/getsentry/sentry-python/pull/5398)
+
+### Internal Changes 🔧
+
+- test(mcp): Simulate stdio transport with memory streams by @alexander-alderman-webb in [#5329](https://github.com/getsentry/sentry-python/pull/5329)
+
+### Other
+
+- [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
+
 ## 2.52.0a1
 
 ### New Features ✨
