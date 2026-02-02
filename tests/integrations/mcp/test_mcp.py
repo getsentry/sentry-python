@@ -35,11 +35,6 @@ from mcp.types import GetPromptResult, PromptMessage, TextContent
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.server import request_ctx
-from mcp.server.sse import SseServerTransport
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-
-from starlette.routing import Mount, Route, Response
-from starlette.applications import Starlette
 
 try:
     from mcp.server.lowlevel.server import request_ctx
@@ -49,6 +44,12 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
+
+from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from starlette.routing import Mount, Route
+from starlette.applications import Starlette
+from starlette.responses import Response
 
 
 @pytest.fixture(autouse=True)

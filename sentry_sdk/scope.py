@@ -29,9 +29,11 @@ from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
+    has_span_streaming_enabled,
     normalize_incoming_data,
     PropagationContext,
 )
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -1278,6 +1280,17 @@ class Scope:
 
         client._capture_metric(metric, scope=merged_scope)
 
+    def _capture_span(self, span: "Optional[StreamedSpan]") -> None:
+        if span is None:
+            return
+
+        client = self.get_client()
+        if not has_span_streaming_enabled(client.options):
+            return
+
+        merged_scope = self._merge_scopes()
+        client._capture_span(span, scope=merged_scope)
+
     def capture_message(
         self,
         message: str,
@@ -1522,16 +1535,25 @@ class Scope:
             )
 
     def _apply_scope_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
+        self, telemetry: "Union[Log, Metric, StreamedSpan]"
     ) -> None:
+        # TODO: turn Logs, Metrics into actual classes
+        if isinstance(telemetry, dict):
+            attributes = telemetry["attributes"]
+        else:
+            attributes = telemetry._attributes
+
         for attribute, value in self._attributes.items():
-            if attribute not in telemetry["attributes"]:
-                telemetry["attributes"][attribute] = value
+            if attribute not in attributes:
+                attributes[attribute] = value
 
     def _apply_user_attributes_to_telemetry(
-        self, telemetry: "Union[Log, Metric]"
+        self, telemetry: "Union[Log, Metric, StreamedSpan]"
     ) -> None:
-        attributes = telemetry["attributes"]
+        if isinstance(telemetry, dict):
+            attributes = telemetry["attributes"]
+        else:
+            attributes = telemetry._attributes
 
         if not should_send_default_pii() or self._user is None:
             return
@@ -1651,16 +1673,19 @@ class Scope:
         return event
 
     @_disable_capture
-    def apply_to_telemetry(self, telemetry: "Union[Log, Metric]") -> None:
+    def apply_to_telemetry(self, telemetry: "Union[Log, Metric, StreamedSpan]") -> None:
         # Attributes-based events and telemetry go through here (logs, metrics,
         # spansV2)
-        trace_context = self.get_trace_context()
-        trace_id = trace_context.get("trace_id")
-        if telemetry.get("trace_id") is None:
-            telemetry["trace_id"] = trace_id or "00000000-0000-0000-0000-000000000000"
-        span_id = trace_context.get("span_id")
-        if telemetry.get("span_id") is None and span_id:
-            telemetry["span_id"] = span_id
+        if not isinstance(telemetry, StreamedSpan):
+            trace_context = self.get_trace_context()
+            trace_id = trace_context.get("trace_id")
+            if telemetry.get("trace_id") is None:
+                telemetry["trace_id"] = (
+                    trace_id or "00000000-0000-0000-0000-000000000000"
+                )
+            span_id = trace_context.get("span_id")
+            if telemetry.get("span_id") is None and span_id:
+                telemetry["span_id"] = span_id
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)

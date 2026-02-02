@@ -40,12 +40,11 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
 
-from mcp.server.lowlevel import Server
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
-from starlette.routing import Mount, Route
 from starlette.responses import Response
+from starlette.routing import Mount, Route
 from starlette.applications import Starlette
 
 # Try to import both FastMCP implementations
