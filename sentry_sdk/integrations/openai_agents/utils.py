@@ -1,3 +1,5 @@
+import json
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
@@ -11,14 +13,20 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import event_from_exception, safe_serialize
+from sentry_sdk.ai._openai_completions_api import _transform_system_instructions
+from sentry_sdk.ai._openai_responses_api import (
+    _is_system_instruction,
+    _get_system_instructions,
+)
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from agents import Usage
+    from agents import Usage, TResponseInputItem
 
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
 
 try:
     import agents
@@ -121,19 +129,37 @@ def _set_input_data(
         return
     request_messages = []
 
-    system_instructions = get_response_kwargs.get("system_instructions")
-    if system_instructions:
-        request_messages.append(
+    messages: "str | list[TResponseInputItem]" = get_response_kwargs.get("input", [])
+
+    instructions_text_parts: "list[TextPart]" = []
+    explicit_instructions = get_response_kwargs.get("system_instructions")
+    if explicit_instructions is not None:
+        instructions_text_parts.append(
             {
-                "role": GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM,
-                "content": [{"type": "text", "text": system_instructions}],
+                "type": "text",
+                "content": explicit_instructions,
             }
         )
 
-    for message in get_response_kwargs.get("input", []):
+    system_instructions = _get_system_instructions(messages)
+
+    # Deliberate use of function accepting completions API type because
+    # of shared structure FOR THIS PURPOSE ONLY.
+    instructions_text_parts += _transform_system_instructions(system_instructions)
+
+    if len(instructions_text_parts) > 0:
+        span.set_data(
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(instructions_text_parts),
+        )
+
+    non_system_messages = [
+        message for message in messages if not _is_system_instruction(message)
+    ]
+    for message in non_system_messages:
         if "role" in message:
-            normalized_role = normalize_message_role(message.get("role"))
-            content = message.get("content")
+            normalized_role = normalize_message_role(message.get("role"))  # type: ignore
+            content = message.get("content")  # type: ignore
             request_messages.append(
                 {
                     "role": normalized_role,
@@ -145,14 +171,14 @@ def _set_input_data(
                 }
             )
         else:
-            if message.get("type") == "function_call":
+            if message.get("type") == "function_call":  # type: ignore
                 request_messages.append(
                     {
                         "role": GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT,
                         "content": [message],
                     }
                 )
-            elif message.get("type") == "function_call_output":
+            elif message.get("type") == "function_call_output":  # type: ignore
                 request_messages.append(
                     {
                         "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,

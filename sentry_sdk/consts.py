@@ -82,6 +82,7 @@ if TYPE_CHECKING:
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
             "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
+            "trace_lifecycle": Optional[Literal["static", "stream"]],
         },
         total=False,
     )
@@ -518,6 +519,12 @@ class SPANDATA:
     Example: ["The weather in Paris is rainy and overcast, with temperatures around 57°F", "The weather in London is sunny and warm, with temperatures around 65°F"]
     """
 
+    GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN = "gen_ai.response.time_to_first_token"
+    """
+    The time it took to receive the first token from the model.
+    Example: 0.1
+    """
+
     GEN_AI_RESPONSE_TOOL_CALLS = "gen_ai.response.tool_calls"
     """
     The tool calls in the model's response.
@@ -861,6 +868,14 @@ class SPANDATA:
     """
     The session identifier for the MCP connection.
     Example: "a1b2c3d4e5f6"
+    """
+
+    META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH = (
+        "sentry.sdk_meta.gen_ai.input.messages.original_length"
+    )
+    """
+    The original number of input non-system instruction messages, before SDK trimming.
+    Example: 4
     """
 
 
@@ -1477,4 +1492,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.50.0"
+VERSION = "2.51.0"

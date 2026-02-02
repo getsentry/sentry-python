@@ -899,7 +899,25 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
 
 
-def test_anthropic_message_role_mapping(sentry_init, capture_events):
+# Test messages with mixed roles including "ai" that should be mapped to "assistant"
+@pytest.mark.parametrize(
+    "test_message,expected_role",
+    [
+        ({"role": "system", "content": "You are helpful."}, "system"),
+        ({"role": "user", "content": "Hello"}, "user"),
+        (
+            {"role": "ai", "content": "Hi there!"},
+            "assistant",
+        ),  # Should be mapped to "assistant"
+        (
+            {"role": "assistant", "content": "How can I help?"},
+            "assistant",
+        ),  # Should stay "assistant"
+    ],
+)
+def test_anthropic_message_role_mapping(
+    sentry_init, capture_events, test_message, expected_role
+):
     """Test that Anthropic integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
@@ -924,13 +942,7 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
 
     client.messages._post = mock.Mock(return_value=mock_messages_create())
 
-    # Test messages with mixed roles including "ai" that should be mapped to "assistant"
-    test_messages = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hello"},
-        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
-        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
-    ]
+    test_messages = [test_message]
 
     with start_transaction(name="anthropic tx"):
         client.messages.create(
@@ -948,22 +960,7 @@ def test_anthropic_message_role_mapping(sentry_init, capture_events):
     # Parse the stored messages
     stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
-    # Verify that "ai" role was mapped to "assistant"
-    assert len(stored_messages) == 4
-    assert stored_messages[0]["role"] == "system"
-    assert stored_messages[1]["role"] == "user"
-    assert (
-        stored_messages[2]["role"] == "assistant"
-    )  # "ai" should be mapped to "assistant"
-    assert stored_messages[3]["role"] == "assistant"  # should stay "assistant"
-
-    # Verify content is preserved
-    assert stored_messages[2]["content"] == "Hi there!"
-    assert stored_messages[3]["content"] == "How can I help?"
-
-    # Verify no "ai" roles remain
-    roles = [msg["role"] for msg in stored_messages]
-    assert "ai" not in roles
+    assert stored_messages[0]["role"] == expected_role
 
 
 def test_anthropic_message_truncation(sentry_init, capture_events):
@@ -1010,9 +1007,62 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 2
-    assert "small message 4" in str(parsed_messages[0])
-    assert "small message 5" in str(parsed_messages[1])
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
+
+    assert chat_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 5
+    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
+
+
+@pytest.mark.asyncio
+async def test_anthropic_message_truncation_async(sentry_init, capture_events):
+    """Test that large messages are truncated properly in Anthropic integration."""
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = AsyncAnthropic(api_key="z")
+    client.messages._post = mock.AsyncMock(return_value=EXAMPLE_MESSAGE)
+
+    large_content = (
+        "This is a very long message that will exceed our size limits. " * 1000
+    )
+    messages = [
+        {"role": "user", "content": "small message 1"},
+        {"role": "assistant", "content": large_content},
+        {"role": "user", "content": large_content},
+        {"role": "assistant", "content": "small message 4"},
+        {"role": "user", "content": "small message 5"},
+    ]
+
+    with start_transaction():
+        await client.messages.create(max_tokens=1024, messages=messages, model="model")
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    chat_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
+    ]
+    assert len(chat_spans) > 0
+
+    chat_span = chat_spans[0]
+    assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
+
+    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
+
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
+
+    assert chat_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 5
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 

@@ -990,6 +990,7 @@ def test_google_genai_message_truncation(
     assert parsed_messages[0]["role"] == "user"
     assert small_content in parsed_messages[0]["content"]
 
+    assert invoke_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 2
     assert (
         event["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 2
     )
@@ -1497,60 +1498,6 @@ def test_generate_content_with_content_object(
     ]
 
 
-def test_generate_content_with_conversation_history(
-    sentry_init, capture_events, mock_genai_client
-):
-    """Test generate_content with list of Content objects (conversation history)."""
-    sentry_init(
-        integrations=[GoogleGenAIIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
-
-    # Create conversation history
-    contents = [
-        genai_types.Content(
-            role="user", parts=[genai_types.Part(text="What is the capital of France?")]
-        ),
-        genai_types.Content(
-            role="model",
-            parts=[genai_types.Part(text="The capital of France is Paris.")],
-        ),
-        genai_types.Content(
-            role="user", parts=[genai_types.Part(text="What about Germany?")]
-        ),
-    ]
-
-    with mock.patch.object(
-        mock_genai_client._api_client, "request", return_value=mock_http_response
-    ):
-        with start_transaction(name="google_genai"):
-            mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents=contents, config=create_test_config()
-            )
-
-    (event,) = events
-    invoke_span = event["spans"][0]
-
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-    assert len(messages) == 3
-    assert messages[0]["role"] == "user"
-    assert messages[0]["content"] == [
-        {"text": "What is the capital of France?", "type": "text"}
-    ]
-    assert (
-        messages[1]["role"] == "assistant"
-    )  # "model" should be normalized to "assistant"
-    assert messages[1]["content"] == [
-        {"text": "The capital of France is Paris.", "type": "text"}
-    ]
-    assert messages[2]["role"] == "user"
-    assert messages[2]["content"] == [{"text": "What about Germany?", "type": "text"}]
-
-
 def test_generate_content_with_dict_format(
     sentry_init, capture_events, mock_genai_client
 ):
@@ -1720,17 +1667,12 @@ def test_generate_content_with_function_response(
     invoke_span = event["spans"][0]
 
     messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-    assert len(messages) == 2
+    assert len(messages) == 1
     # First message is user message
-    assert messages[0]["role"] == "user"
-    assert messages[0]["content"] == [
-        {"text": "What's the weather in Paris?", "type": "text"}
-    ]
-    # Second message is tool message
-    assert messages[1]["role"] == "tool"
-    assert messages[1]["content"]["toolCallId"] == "call_123"
-    assert messages[1]["content"]["toolName"] == "get_weather"
-    assert messages[1]["content"]["output"] == '"Sunny, 72F"'
+    assert messages[0]["role"] == "tool"
+    assert messages[0]["content"]["toolCallId"] == "call_123"
+    assert messages[0]["content"]["toolName"] == "get_weather"
+    assert messages[0]["content"]["output"] == '"Sunny, 72F"'
 
 
 def test_generate_content_with_mixed_string_and_content(
@@ -1771,18 +1713,10 @@ def test_generate_content_with_mixed_string_and_content(
     invoke_span = event["spans"][0]
 
     messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-    assert len(messages) == 3
-    # String becomes user message
-    assert messages[0]["role"] == "user"
-    assert messages[0]["content"] == "Hello, this is a string message"
-    # Model role normalized to assistant
-    assert messages[1]["role"] == "assistant"
-    assert messages[1]["content"] == [
-        {"text": "Hi! How can I help you?", "type": "text"}
-    ]
+    assert len(messages) == 1
     # User message
-    assert messages[2]["role"] == "user"
-    assert messages[2]["content"] == [{"text": "Tell me a joke", "type": "text"}]
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == [{"text": "Tell me a joke", "type": "text"}]
 
 
 def test_generate_content_with_part_object_directly(
@@ -1850,13 +1784,9 @@ def test_generate_content_with_list_of_dicts(
     invoke_span = event["spans"][0]
 
     messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-    assert len(messages) == 3
+    assert len(messages) == 1
     assert messages[0]["role"] == "user"
-    assert messages[0]["content"] == [{"text": "First user message", "type": "text"}]
-    assert messages[1]["role"] == "assistant"
-    assert messages[1]["content"] == [{"text": "First model response", "type": "text"}]
-    assert messages[2]["role"] == "user"
-    assert messages[2]["content"] == [{"text": "Second user message", "type": "text"}]
+    assert messages[0]["content"] == [{"text": "Second user message", "type": "text"}]
 
 
 def test_generate_content_with_dict_inline_data(

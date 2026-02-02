@@ -1,5 +1,5 @@
 import copy
-import sys
+import time
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
@@ -149,8 +149,19 @@ def _create_get_model_wrapper(
                     span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
                     streaming_response = None
+                    ttft_recorded = False
+                    # Capture start time locally to avoid race conditions with concurrent requests
+                    start_time = time.perf_counter()
 
                     async for event in original_stream_response(*args, **kwargs):
+                        # Detect first content token (text delta event)
+                        if not ttft_recorded and hasattr(event, "delta"):
+                            ttft = time.perf_counter() - start_time
+                            span.set_data(
+                                SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                            )
+                            ttft_recorded = True
+
                         # Capture the full response from ResponseCompletedEvent
                         if hasattr(event, "response"):
                             streaming_response = event.response
