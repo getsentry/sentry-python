@@ -994,24 +994,9 @@ async def test_fastmcp_sse_transport(
     await sse_connection_closed.wait()
     await app_task
 
-    if (
-        isinstance(mcp, StandaloneFastMCP)
-        and FASTMCP_VERSION is not None
-        and FASTMCP_VERSION.startswith("2")
-    ):
-        assert result["result"]["content"][0]["text"] == json.dumps(
-            {"message": "Received: hello"}, separators=(",", ":")
-        )
-    elif (
-        isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION is not None
-    ):  # Checking for None is not precise.
-        assert result["result"]["content"][0]["text"] == json.dumps(
-            {"message": "Received: hello"}
-        )
-    else:
-        assert result["result"]["content"][0]["text"] == json.dumps(
-            {"message": "Received: hello"}, indent=2
-        )
+    assert json.loads(result["result"]["content"][0]["text"]) == {
+        "message": "Received: hello"
+    }
 
     transactions = [
         event
