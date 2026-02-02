@@ -21,6 +21,7 @@ to properly trigger Sentry instrumentation and span creation. This ensures
 accurate testing of the integration's behavior in real MCP Server scenarios.
 """
 
+import anyio
 import asyncio
 import json
 import pytest
@@ -38,6 +39,19 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
+
+from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+try:
+    from fastmcp.prompts import Message
+except ImportError:
+    Message = None
+
+
+from starlette.responses import Response
+from starlette.routing import Mount, Route
+from starlette.applications import Starlette
 
 # Try to import both FastMCP implementations
 try:
@@ -71,6 +85,10 @@ except ImportError:
     GetPromptRequest = None
     ReadResourceRequest = None
 
+try:
+    from fastmcp import __version__ as FASTMCP_VERSION
+except ImportError:
+    FASTMCP_VERSION = None
 
 # Collect available FastMCP implementations for parametrization
 fastmcp_implementations = []
@@ -245,46 +263,19 @@ def reset_request_ctx():
             pass
 
 
-class MockRequestContext:
-    """Mock MCP request context"""
-
-    def __init__(self, request_id=None, session_id=None, transport="stdio"):
-        self.request_id = request_id
-        if transport in ("http", "sse"):
-            self.request = MockHTTPRequest(session_id, transport)
-        else:
-            self.request = None
-
-
-class MockHTTPRequest:
-    """Mock HTTP request for SSE/StreamableHTTP transport"""
-
-    def __init__(self, session_id=None, transport="http"):
-        self.headers = {}
-        self.query_params = {}
-
-        if transport == "sse":
-            # SSE transport uses query parameter
-            if session_id:
-                self.query_params["session_id"] = session_id
-        else:
-            # StreamableHTTP transport uses header
-            if session_id:
-                self.headers["mcp-session-id"] = session_id
-
-
 # =============================================================================
 # Tool Handler Tests - Verifying Sentry Integration
 # =============================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-def test_fastmcp_tool_sync(
-    sentry_init, capture_events, FastMCP, send_default_pii, include_prompts
+async def test_fastmcp_tool_sync(
+    sentry_init, capture_events, FastMCP, send_default_pii, include_prompts, stdio
 ):
     """Test that FastMCP synchronous tool handlers create proper spans"""
     sentry_init(
@@ -296,11 +287,6 @@ def test_fastmcp_tool_sync(
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-123", transport="stdio")
-        request_ctx.set(mock_ctx)
-
     @mcp.tool()
     def add_numbers(a: int, b: int) -> dict:
         """Add two numbers together"""
@@ -308,9 +294,20 @@ def test_fastmcp_tool_sync(
 
     with start_transaction(name="fastmcp tx"):
         # Call through MCP protocol to trigger instrumentation
-        result = call_tool_through_mcp(mcp, "add_numbers", {"a": 10, "b": 5})
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "add_numbers",
+                "arguments": {"a": 10, "b": 5},
+            },
+            request_id="req-123",
+        )
 
-    assert result == {"result": 15, "operation": "addition"}
+    assert json.loads(result.message.root.result["content"][0]["text"]) == {
+        "result": 15,
+        "operation": "addition",
+    }
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -340,7 +337,13 @@ def test_fastmcp_tool_sync(
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_fastmcp_tool_async(
-    sentry_init, capture_events, FastMCP, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    FastMCP,
+    send_default_pii,
+    include_prompts,
+    json_rpc,
+    select_mcp_transactions,
 ):
     """Test that FastMCP async tool handlers create proper spans"""
     sentry_init(
@@ -352,49 +355,61 @@ async def test_fastmcp_tool_async(
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(
-            request_id="req-456", session_id="session-789", transport="http"
-        )
-        request_ctx.set(mock_ctx)
+    session_manager = StreamableHTTPSessionManager(
+        app=mcp._mcp_server,
+        json_response=True,
+    )
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @mcp.tool()
     async def multiply_numbers(x: int, y: int) -> dict:
         """Multiply two numbers together"""
         return {"result": x * y, "operation": "multiplication"}
 
-    with start_transaction(name="fastmcp tx"):
-        result = await call_tool_through_mcp_async(
-            mcp, "multiply_numbers", {"x": 7, "y": 6}
-        )
+    session_id, result = json_rpc(
+        app,
+        method="tools/call",
+        params={
+            "name": "multiply_numbers",
+            "arguments": {"x": 7, "y": 6},
+        },
+        request_id="req-456",
+    )
 
-    assert result == {"result": 42, "operation": "multiplication"}
+    assert json.loads(result.json()["result"]["content"][0]["text"]) == {
+        "result": 42,
+        "operation": "multiplication",
+    }
 
-    (tx,) = events
-    assert tx["type"] == "transaction"
-    assert len(tx["spans"]) == 1
+    transactions = select_mcp_transactions(events)
+    assert len(transactions) == 1
+    tx = transactions[0]
 
-    # Verify span structure
-    span = tx["spans"][0]
-    assert span["op"] == OP.MCP_SERVER
-    assert span["origin"] == "auto.ai.mcp"
-    assert span["description"] == "tools/call multiply_numbers"
-    assert span["data"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
-    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
-    assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-789"
+    assert tx["contexts"]["trace"]["op"] == OP.MCP_SERVER
+    assert tx["contexts"]["trace"]["origin"] == "auto.ai.mcp"
+    assert tx["transaction"] == "tools/call multiply_numbers"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
     # Check PII-sensitive data
     if send_default_pii and include_prompts:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["data"]
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in tx["contexts"]["trace"]["data"]
     else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in tx["contexts"]["trace"]["data"]
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP, stdio):
     """Test that FastMCP tool handler errors are captured properly"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -404,26 +419,23 @@ def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP):
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-error", transport="stdio")
-        request_ctx.set(mock_ctx)
-
     @mcp.tool()
     def failing_tool(value: int) -> int:
         """A tool that always fails"""
         raise ValueError("Tool execution failed")
 
     with start_transaction(name="fastmcp tx"):
-        # MCP protocol may raise the error or return it as an error result
-        try:
-            result = call_tool_through_mcp(mcp, "failing_tool", {"value": 42})
-            # If no exception raised, check if result indicates error
-            if hasattr(result, "isError"):
-                assert result.isError is True
-        except ValueError:
-            # Error was raised as expected
-            pass
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "failing_tool",
+                "arguments": {"value": 42},
+            },
+            request_id="req-error",
+        )
+        # If no exception raised, check if result indicates error
+        assert result.message.root.result["isError"] is True
 
     # Should have transaction and error events
     assert len(events) >= 1
@@ -443,8 +455,9 @@ def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP):
     assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP, stdio):
     """Test that multiple FastMCP tool calls create multiple spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -453,11 +466,6 @@ def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP):
     events = capture_events()
 
     mcp = FastMCP("Test Server")
-
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-multi", transport="stdio")
-        request_ctx.set(mock_ctx)
 
     @mcp.tool()
     def tool_one(x: int) -> int:
@@ -475,13 +483,43 @@ def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP):
         return z - 5
 
     with start_transaction(name="fastmcp tx"):
-        result1 = call_tool_through_mcp(mcp, "tool_one", {"x": 5})
-        result2 = call_tool_through_mcp(mcp, "tool_two", {"y": result1["result"]})
-        result3 = call_tool_through_mcp(mcp, "tool_three", {"z": result2["result"]})
+        result1 = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "tool_one",
+                "arguments": {"x": 5},
+            },
+            request_id="req-multi",
+        )
 
-    assert result1["result"] == 10
-    assert result2["result"] == 20
-    assert result3["result"] == 15
+        result2 = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "tool_two",
+                "arguments": {
+                    "y": int(result1.message.root.result["content"][0]["text"])
+                },
+            },
+            request_id="req-multi",
+        )
+
+        result3 = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "tool_three",
+                "arguments": {
+                    "z": int(result2.message.root.result["content"][0]["text"])
+                },
+            },
+            request_id="req-multi",
+        )
+
+    assert result1.message.root.result["content"][0]["text"] == "10"
+    assert result2.message.root.result["content"][0]["text"] == "20"
+    assert result3.message.root.result["content"][0]["text"] == "15"
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -494,8 +532,11 @@ def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP):
     assert tool_spans[2]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_three"
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_tool_with_complex_return(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_tool_with_complex_return(
+    sentry_init, capture_events, FastMCP, stdio
+):
     """Test FastMCP tool with complex nested return value"""
     sentry_init(
         integrations=[MCPIntegration(include_prompts=True)],
@@ -505,11 +546,6 @@ def test_fastmcp_tool_with_complex_return(sentry_init, capture_events, FastMCP):
     events = capture_events()
 
     mcp = FastMCP("Test Server")
-
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-complex", transport="stdio")
-        request_ctx.set(mock_ctx)
 
     @mcp.tool()
     def get_user_data(user_id: int) -> dict:
@@ -522,11 +558,22 @@ def test_fastmcp_tool_with_complex_return(sentry_init, capture_events, FastMCP):
         }
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "get_user_data", {"user_id": 123})
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "get_user_data",
+                "arguments": {"user_id": 123},
+            },
+            request_id="req-complex",
+        )
 
-    assert result["id"] == 123
-    assert result["name"] == "Alice"
-    assert result["nested"]["preferences"]["theme"] == "dark"
+    assert json.loads(result.message.root.result["content"][0]["text"]) == {
+        "id": 123,
+        "name": "Alice",
+        "nested": {"preferences": {"theme": "dark", "notifications": True}},
+        "tags": ["admin", "verified"],
+    }
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -545,13 +592,14 @@ def test_fastmcp_tool_with_complex_return(sentry_init, capture_events, FastMCP):
 # =============================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (False, False)],
 )
-def test_fastmcp_prompt_sync(
-    sentry_init, capture_events, FastMCP, send_default_pii, include_prompts
+async def test_fastmcp_prompt_sync(
+    sentry_init, capture_events, FastMCP, send_default_pii, include_prompts, stdio
 ):
     """Test that FastMCP synchronous prompt handlers create proper spans"""
     sentry_init(
@@ -563,38 +611,41 @@ def test_fastmcp_prompt_sync(
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-prompt", transport="stdio")
-        request_ctx.set(mock_ctx)
-
     # Try to register a prompt handler (may not be supported in all versions)
     if hasattr(mcp, "prompt"):
 
         @mcp.prompt()
         def code_help_prompt(language: str):
             """Get help for a programming language"""
-            return [
-                {
-                    "role": "user",
-                    "content": {
-                        "type": "text",
-                        "text": f"Tell me about {language}",
-                    },
-                }
-            ]
+            message = {
+                "role": "user",
+                "content": {
+                    "type": "text",
+                    "text": f"Tell me about {language}",
+                },
+            }
+
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+                message = Message(message)
+
+            return [message]
 
         with start_transaction(name="fastmcp tx"):
-            try:
-                result = call_prompt_through_mcp(
-                    mcp, "code_help_prompt", {"language": "python"}
-                )
-            except AttributeError:
-                # Prompt handler not supported in this version
-                pytest.skip("Prompt handlers not supported in this FastMCP version")
+            result = await stdio(
+                mcp._mcp_server,
+                method="prompts/get",
+                params={
+                    "name": "code_help_prompt",
+                    "arguments": {"language": "python"},
+                },
+                request_id="req-prompt",
+            )
 
-        assert result.messages[0].role == "user"
-        assert "python" in result.messages[0].content.text.lower()
+        assert result.message.root.result["messages"][0]["role"] == "user"
+        assert (
+            "python"
+            in result.message.root.result["messages"][0]["content"]["text"].lower()
+        )
 
         (tx,) = events
         assert tx["type"] == "transaction"
@@ -616,7 +667,13 @@ def test_fastmcp_prompt_sync(
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.asyncio
-async def test_fastmcp_prompt_async(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_prompt_async(
+    sentry_init,
+    capture_events,
+    FastMCP,
+    json_rpc,
+    select_mcp_transactions,
+):
     """Test that FastMCP async prompt handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -626,12 +683,17 @@ async def test_fastmcp_prompt_async(sentry_init, capture_events, FastMCP):
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(
-            request_id="req-async-prompt", session_id="session-abc", transport="http"
-        )
-        request_ctx.set(mock_ctx)
+    session_manager = StreamableHTTPSessionManager(
+        app=mcp._mcp_server,
+        json_response=True,
+    )
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     # Try to register an async prompt handler
     if hasattr(mcp, "prompt"):
@@ -639,33 +701,39 @@ async def test_fastmcp_prompt_async(sentry_init, capture_events, FastMCP):
         @mcp.prompt()
         async def async_prompt(topic: str):
             """Get async prompt for a topic"""
-            return [
-                {
-                    "role": "user",
-                    "content": {"type": "text", "text": f"What is {topic}?"},
+            message1 = {
+                "role": "user",
+                "content": {"type": "text", "text": f"What is {topic}?"},
+            }
+
+            message2 = {
+                "role": "assistant",
+                "content": {
+                    "type": "text",
+                    "text": "Let me explain that",
                 },
-                {
-                    "role": "assistant",
-                    "content": {
-                        "type": "text",
-                        "text": "Let me explain that",
-                    },
-                },
-            ]
+            }
 
-        with start_transaction(name="fastmcp tx"):
-            try:
-                result = await call_prompt_through_mcp_async(
-                    mcp, "async_prompt", {"topic": "MCP"}
-                )
-            except AttributeError:
-                # Prompt handler not supported in this version
-                pytest.skip("Prompt handlers not supported in this FastMCP version")
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+                message1 = Message(message1)
+                message2 = Message(message2)
 
-        assert len(result.messages) == 2
+            return [message1, message2]
 
-        (tx,) = events
-        assert tx["type"] == "transaction"
+        _, result = json_rpc(
+            app,
+            method="prompts/get",
+            params={
+                "name": "async_prompt",
+                "arguments": {"topic": "MCP"},
+            },
+            request_id="req-async-prompt",
+        )
+
+        assert len(result.json()["result"]["messages"]) == 2
+
+        transactions = select_mcp_transactions(events)
+        assert len(transactions) == 1
 
 
 # =============================================================================
@@ -673,8 +741,9 @@ async def test_fastmcp_prompt_async(sentry_init, capture_events, FastMCP):
 # =============================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP, stdio):
     """Test that FastMCP synchronous resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -683,11 +752,6 @@ def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP):
     events = capture_events()
 
     mcp = FastMCP("Test Server")
-
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-resource", transport="stdio")
-        request_ctx.set(mock_ctx)
 
     # Try to register a resource handler
     try:
@@ -700,7 +764,14 @@ def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP):
 
             with start_transaction(name="fastmcp tx"):
                 try:
-                    result = call_resource_through_mcp(mcp, "file:///test.txt")
+                    result = await stdio(
+                        mcp._mcp_server,
+                        method="resources/read",
+                        params={
+                            "uri": "file:///test.txt",
+                        },
+                        request_id="req-resource",
+                    )
                 except ValueError as e:
                     # Older FastMCP versions may not support this URI pattern
                     if "Unknown resource" in str(e):
@@ -710,7 +781,7 @@ def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP):
                     raise
 
             # Resource content is returned as-is
-            assert "file contents" in result.contents[0].text
+            assert "file contents" in result.message.root.result["contents"][0]["text"]
 
             (tx,) = events
             assert tx["type"] == "transaction"
@@ -729,7 +800,13 @@ def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP):
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.asyncio
-async def test_fastmcp_resource_async(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_resource_async(
+    sentry_init,
+    capture_events,
+    FastMCP,
+    json_rpc,
+    select_mcp_transactions,
+):
     """Test that FastMCP async resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -739,12 +816,17 @@ async def test_fastmcp_resource_async(sentry_init, capture_events, FastMCP):
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(
-            request_id="req-async-resource", session_id="session-res", transport="http"
-        )
-        request_ctx.set(mock_ctx)
+    session_manager = StreamableHTTPSessionManager(
+        app=mcp._mcp_server,
+        json_response=True,
+    )
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     # Try to register an async resource handler
     try:
@@ -755,28 +837,31 @@ async def test_fastmcp_resource_async(sentry_init, capture_events, FastMCP):
                 """Read a URL resource"""
                 return "resource data"
 
-            with start_transaction(name="fastmcp tx"):
-                try:
-                    result = await call_resource_through_mcp_async(
-                        mcp, "https://example.com/resource"
-                    )
-                except ValueError as e:
-                    # Older FastMCP versions may not support this URI pattern
-                    if "Unknown resource" in str(e):
-                        pytest.skip(
-                            f"Resource URI not supported in this FastMCP version: {e}"
-                        )
-                    raise
+            _, result = json_rpc(
+                app,
+                method="resources/read",
+                params={
+                    "uri": "https://example.com/resource",
+                },
+                request_id="req-async-resource",
+            )
+            # Older FastMCP versions may not support this URI pattern
+            if (
+                "error" in result.json()
+                and "Unknown resource" in result.json()["error"]["message"]
+            ):
+                pytest.skip("Resource URI not supported in this FastMCP version.")
+                return
 
-            assert "resource data" in result.contents[0].text
+            assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
-            (tx,) = events
-            assert tx["type"] == "transaction"
-
-            # Verify span was created
-            resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-            assert len(resource_spans) == 1
-            assert resource_spans[0]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+            transactions = select_mcp_transactions(events)
+            assert len(transactions) == 1
+            tx = transactions[0]
+            assert (
+                tx["contexts"]["trace"]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL]
+                == "https"
+            )
     except (AttributeError, TypeError):
         # Resource handler not supported in this version
         pytest.skip("Resource handlers not supported in this FastMCP version")
@@ -787,8 +872,9 @@ async def test_fastmcp_resource_async(sentry_init, capture_events, FastMCP):
 # =============================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP, stdio):
     """Test that FastMCP span origin is set correctly"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -798,18 +884,21 @@ def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP):
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-origin", transport="stdio")
-        request_ctx.set(mock_ctx)
-
     @mcp.tool()
     def test_tool(value: int) -> int:
         """Test tool for origin checking"""
         return value * 2
 
     with start_transaction(name="fastmcp tx"):
-        call_tool_through_mcp(mcp, "test_tool", {"value": 21})
+        await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "test_tool",
+                "arguments": {"value": 21},
+            },
+            request_id="req-origin",
+        )
 
     (tx,) = events
 
@@ -821,43 +910,16 @@ def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP):
     assert mcp_spans[0]["origin"] == "auto.ai.mcp"
 
 
-@pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_without_request_context(sentry_init, capture_events, FastMCP):
-    """Test FastMCP handling when no request context is available"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    mcp = FastMCP("Test Server")
-
-    # Clear request context
-    if request_ctx is not None:
-        request_ctx.set(None)
-
-    @mcp.tool()
-    def test_tool_no_ctx(x: int) -> dict:
-        """Test tool without context"""
-        return {"result": x + 1}
-
-    with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "test_tool_no_ctx", {"x": 99})
-
-    assert result == {"result": 100}
-
-    # Should still create transaction even if context is missing
-    (tx,) = events
-    assert tx["type"] == "transaction"
-
-
 # =============================================================================
 # Transport Detection Tests
 # =============================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_sse_transport(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_sse_transport(
+    sentry_init, capture_events, FastMCP, json_rpc_sse
+):
     """Test that FastMCP correctly detects SSE transport"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -866,25 +928,66 @@ def test_fastmcp_sse_transport(sentry_init, capture_events, FastMCP):
     events = capture_events()
 
     mcp = FastMCP("Test Server")
+    sse = SseServerTransport("/messages/")
 
-    # Set up mock request context with SSE transport
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(
-            request_id="req-sse", session_id="session-sse-123", transport="sse"
-        )
-        request_ctx.set(mock_ctx)
+    sse_connection_closed = asyncio.Event()
+
+    async def handle_sse(request):
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            async with anyio.create_task_group() as tg:
+
+                async def run_server():
+                    await mcp._mcp_server.run(
+                        streams[0],
+                        streams[1],
+                        mcp._mcp_server.create_initialization_options(),
+                    )
+
+                tg.start_soon(run_server)
+
+        sse_connection_closed.set()
+        return Response()
+
+    app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse, methods=["GET"]),
+            Mount("/messages/", app=sse.handle_post_message),
+        ],
+    )
 
     @mcp.tool()
     def sse_tool(value: str) -> dict:
         """Tool for SSE transport test"""
         return {"message": f"Received: {value}"}
 
-    with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "sse_tool", {"value": "hello"})
+    keep_sse_alive = asyncio.Event()
+    app_task, _, result = await json_rpc_sse(
+        app,
+        method="tools/call",
+        params={
+            "name": "sse_tool",
+            "arguments": {"value": "hello"},
+        },
+        request_id="req-sse",
+        keep_sse_alive=keep_sse_alive,
+    )
 
-    assert result == {"message": "Received: hello"}
+    await sse_connection_closed.wait()
+    await app_task
 
-    (tx,) = events
+    assert json.loads(result["result"]["content"][0]["text"]) == {
+        "message": "Received: hello"
+    }
+
+    transactions = [
+        event
+        for event in events
+        if event["type"] == "transaction" and event["transaction"] == "/sse"
+    ]
+    assert len(transactions) == 1
+    tx = transactions[0]
 
     # Find MCP spans
     mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
@@ -895,7 +998,13 @@ def test_fastmcp_sse_transport(sentry_init, capture_events, FastMCP):
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_http_transport(sentry_init, capture_events, FastMCP):
+def test_fastmcp_http_transport(
+    sentry_init,
+    capture_events,
+    FastMCP,
+    json_rpc,
+    select_mcp_transactions,
+):
     """Test that FastMCP correctly detects HTTP transport"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -905,35 +1014,48 @@ def test_fastmcp_http_transport(sentry_init, capture_events, FastMCP):
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context with HTTP transport
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(
-            request_id="req-http", session_id="session-http-456", transport="http"
-        )
-        request_ctx.set(mock_ctx)
+    session_manager = StreamableHTTPSessionManager(
+        app=mcp._mcp_server,
+        json_response=True,
+    )
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @mcp.tool()
     def http_tool(data: str) -> dict:
         """Tool for HTTP transport test"""
         return {"processed": data.upper()}
 
-    with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "http_tool", {"data": "test"})
+    _, result = json_rpc(
+        app,
+        method="tools/call",
+        params={
+            "name": "http_tool",
+            "arguments": {"data": "test"},
+        },
+        request_id="req-http",
+    )
 
-    assert result == {"processed": "TEST"}
+    assert json.loads(result.json()["result"]["content"][0]["text"]) == {
+        "processed": "TEST"
+    }
 
-    (tx,) = events
+    transactions = select_mcp_transactions(events)
+    assert len(transactions) == 1
+    tx = transactions[0]
 
-    # Find MCP spans
-    mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(mcp_spans) >= 1
-    span = mcp_spans[0]
     # Check that HTTP transport is detected
-    assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
+    assert tx["contexts"]["trace"]["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP, stdio):
     """Test that FastMCP correctly detects stdio transport"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -943,20 +1065,25 @@ def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP):
 
     mcp = FastMCP("Test Server")
 
-    # Set up mock request context with stdio transport
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-stdio", transport="stdio")
-        request_ctx.set(mock_ctx)
-
     @mcp.tool()
     def stdio_tool(n: int) -> dict:
         """Tool for stdio transport test"""
         return {"squared": n * n}
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "stdio_tool", {"n": 7})
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "stdio_tool",
+                "arguments": {"n": 7},
+            },
+            request_id="req-stdio",
+        )
 
-    assert result == {"squared": 49}
+    assert json.loads(result.message.root.result["content"][0]["text"]) == {
+        "squared": 49
+    }
 
     (tx,) = events
 
@@ -1000,10 +1127,11 @@ def test_mcp_fastmcp_specific_features(sentry_init, capture_events):
     assert tx["type"] == "transaction"
 
 
+@pytest.mark.asyncio
 @pytest.mark.skipif(
     not HAS_STANDALONE_FASTMCP, reason="standalone fastmcp not installed"
 )
-def test_standalone_fastmcp_specific_features(sentry_init, capture_events):
+async def test_standalone_fastmcp_specific_features(sentry_init, capture_events, stdio):
     """Test features specific to standalone fastmcp package"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1021,12 +1149,19 @@ def test_standalone_fastmcp_specific_features(sentry_init, capture_events):
         return {"echo": message, "length": len(message)}
 
     with start_transaction(name="standalone fastmcp tx"):
-        result = call_tool_through_mcp(
-            mcp, "standalone_specific_tool", {"message": "Hello FastMCP"}
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "standalone_specific_tool",
+                "arguments": {"message": "Hello FastMCP"},
+            },
         )
 
-    assert result["echo"] == "Hello FastMCP"
-    assert result["length"] == 13
+    assert json.loads(result.message.root.result["content"][0]["text"]) == {
+        "echo": "Hello FastMCP",
+        "length": 13,
+    }
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -1037,8 +1172,11 @@ def test_standalone_fastmcp_specific_features(sentry_init, capture_events):
 # =============================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_tool_with_no_arguments(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_tool_with_no_arguments(
+    sentry_init, capture_events, FastMCP, stdio
+):
     """Test FastMCP tool with no arguments"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1054,16 +1192,26 @@ def test_fastmcp_tool_with_no_arguments(sentry_init, capture_events, FastMCP):
         return "success"
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "no_args_tool", {})
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "no_args_tool",
+                "arguments": {},
+            },
+        )
 
-    assert result["result"] == "success"
+    assert result.message.root.result["content"][0]["text"] == "success"
 
     (tx,) = events
     assert tx["type"] == "transaction"
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_tool_with_none_return(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_tool_with_none_return(
+    sentry_init, capture_events, FastMCP, stdio
+):
     """Test FastMCP tool that returns None"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1079,18 +1227,33 @@ def test_fastmcp_tool_with_none_return(sentry_init, capture_events, FastMCP):
         pass
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "none_return_tool", {"action": "log"})
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "none_return_tool",
+                "arguments": {"action": "log"},
+            },
+        )
 
-    # Helper function normalizes to {"result": value} format
-    assert result["result"] is None
+    if (
+        isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION is not None
+    ) or isinstance(mcp, MCPFastMCP):
+        assert len(result.message.root.result["content"]) == 0
+    else:
+        assert result.message.root.result["content"] == [
+            {"type": "text", "text": "None"}
+        ]
 
     (tx,) = events
     assert tx["type"] == "transaction"
 
 
-@pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.asyncio
-async def test_fastmcp_mixed_sync_async_tools(sentry_init, capture_events, FastMCP):
+@pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
+async def test_fastmcp_mixed_sync_async_tools(
+    sentry_init, capture_events, FastMCP, stdio
+):
     """Test mixing sync and async tools in FastMCP"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1099,11 +1262,6 @@ async def test_fastmcp_mixed_sync_async_tools(sentry_init, capture_events, FastM
     events = capture_events()
 
     mcp = FastMCP("Test Server")
-
-    # Set up mock request context
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(request_id="req-mixed", transport="stdio")
-        request_ctx.set(mock_ctx)
 
     @mcp.tool()
     def sync_add(a: int, b: int) -> int:
@@ -1117,13 +1275,27 @@ async def test_fastmcp_mixed_sync_async_tools(sentry_init, capture_events, FastM
 
     with start_transaction(name="fastmcp tx"):
         # Use async version for both since we're in an async context
-        result1 = await call_tool_through_mcp_async(mcp, "sync_add", {"a": 3, "b": 4})
-        result2 = await call_tool_through_mcp_async(
-            mcp, "async_multiply", {"x": 5, "y": 6}
+        result1 = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "sync_add",
+                "arguments": {"a": 3, "b": 4},
+            },
+            request_id="req-mixed",
+        )
+        result2 = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "async_multiply",
+                "arguments": {"x": 5, "y": 6},
+            },
+            request_id="req-mixed",
         )
 
-    assert result1["result"] == 7
-    assert result2["result"] == 30
+    assert result1.message.root.result["content"][0]["text"] == "7"
+    assert result2.message.root.result["content"][0]["text"] == "30"
 
     (tx,) = events
     assert tx["type"] == "transaction"

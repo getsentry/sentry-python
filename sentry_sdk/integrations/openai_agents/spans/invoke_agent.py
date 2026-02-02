@@ -18,17 +18,6 @@ if TYPE_CHECKING:
     import agents
     from typing import Any, Optional
 
-    from sentry_sdk._types import TextPart
-
-
-def _transform_system_instruction(system_instructions: "str") -> "list[TextPart]":
-    return [
-        {
-            "type": "text",
-            "content": system_instructions,
-        }
-    ]
-
 
 def invoke_agent_span(
     context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"
@@ -46,16 +35,16 @@ def invoke_agent_span(
     if should_send_default_pii():
         messages = []
         if agent.instructions:
-            system_instruction = (
+            message = (
                 agent.instructions
                 if isinstance(agent.instructions, str)
                 else safe_serialize(agent.instructions)
             )
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                _transform_system_instruction(system_instruction),
-                unpack=False,
+            messages.append(
+                {
+                    "content": [{"text": message, "type": "text"}],
+                    "role": "system",
+                }
             )
 
         original_input = kwargs.get("original_input")

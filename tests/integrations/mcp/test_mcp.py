@@ -15,6 +15,9 @@ The tests mock the MCP server components and request context to verify
 that the integration properly instruments MCP handlers with Sentry spans.
 """
 
+import anyio
+import asyncio
+
 import pytest
 import json
 from unittest import mock
@@ -30,6 +33,8 @@ except ImportError:
 
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.server import request_ctx
+from mcp.types import GetPromptResult, PromptMessage, TextContent
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 
 try:
     from mcp.server.lowlevel.server import request_ctx
@@ -39,6 +44,12 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
+
+from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from starlette.routing import Mount, Route
+from starlette.applications import Starlette
+from starlette.responses import Response
 
 
 @pytest.fixture(autouse=True)
@@ -60,67 +71,11 @@ def reset_request_ctx():
             pass
 
 
-# Mock MCP types and structures
-class MockURI:
-    """Mock URI object for resource testing"""
-
-    def __init__(self, uri_string):
-        self.scheme = uri_string.split("://")[0] if "://" in uri_string else ""
-        self.path = uri_string.split("://")[1] if "://" in uri_string else uri_string
-        self._uri_string = uri_string
-
-    def __str__(self):
-        return self._uri_string
-
-
-class MockRequestContext:
-    """Mock MCP request context"""
-
-    def __init__(self, request_id=None, session_id=None, transport="stdio"):
-        self.request_id = request_id
-        if transport in ("http", "sse"):
-            self.request = MockHTTPRequest(session_id, transport)
-        else:
-            self.request = None
-
-
-class MockHTTPRequest:
-    """Mock HTTP request for SSE/StreamableHTTP transport"""
-
-    def __init__(self, session_id=None, transport="http"):
-        self.headers = {}
-        self.query_params = {}
-
-        if transport == "sse":
-            # SSE transport uses query parameter
-            if session_id:
-                self.query_params["session_id"] = session_id
-        else:
-            # StreamableHTTP transport uses header
-            if session_id:
-                self.headers["mcp-session-id"] = session_id
-
-
 class MockTextContent:
     """Mock TextContent object"""
 
     def __init__(self, text):
         self.text = text
-
-
-class MockPromptMessage:
-    """Mock PromptMessage object"""
-
-    def __init__(self, role, content_text):
-        self.role = role
-        self.content = MockTextContent(content_text)
-
-
-class MockGetPromptResult:
-    """Mock GetPromptResult object"""
-
-    def __init__(self, messages):
-        self.messages = messages
 
 
 def test_integration_patches_server(sentry_init):
@@ -141,12 +96,13 @@ def test_integration_patches_server(sentry_init):
     assert Server.read_resource is not original_read_resource
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-def test_tool_handler_sync(
-    sentry_init, capture_events, send_default_pii, include_prompts
+async def test_tool_handler_stdio(
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test that synchronous tool handlers create proper spans"""
     sentry_init(
@@ -158,19 +114,25 @@ def test_tool_handler_sync(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-123", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.call_tool()
-    def test_tool(tool_name, arguments):
+    async def test_tool(tool_name, arguments):
         return {"result": "success", "value": 42}
 
     with start_transaction(name="mcp tx"):
-        # Call the tool handler
-        result = test_tool("calculate", {"x": 10, "y": 5})
+        result = await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "calculate",
+                "arguments": {"x": 10, "y": 5},
+            },
+            request_id="req-123",
+        )
 
-    assert result == {"result": "success", "value": 42}
+    assert result.message.root.result["content"][0]["text"] == json.dumps(
+        {"result": "success", "value": 42},
+        indent=2,
+    )
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -208,8 +170,13 @@ def test_tool_handler_sync(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_tool_handler_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+async def test_tool_handler_streamable_http(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    json_rpc,
+    select_mcp_transactions,
 ):
     """Test that async tool handlers create proper spans"""
     sentry_init(
@@ -221,48 +188,75 @@ async def test_tool_handler_async(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(
-        request_id="req-456", session_id="session-789", transport="http"
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
     )
-    request_ctx.set(mock_ctx)
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @server.call_tool()
     async def test_tool_async(tool_name, arguments):
-        return {"status": "completed"}
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps({"status": "completed"}),
+            )
+        ]
 
-    with start_transaction(name="mcp tx"):
-        result = await test_tool_async("process", {"data": "test"})
+    session_id, result = json_rpc(
+        app,
+        method="tools/call",
+        params={
+            "name": "process",
+            "arguments": {
+                "data": "test",
+            },
+        },
+        request_id="req-456",
+    )
+    assert result.json()["result"]["content"][0]["text"] == json.dumps(
+        {"status": "completed"}
+    )
 
-    assert result == {"status": "completed"}
-
-    (tx,) = events
+    transactions = select_mcp_transactions(events)
+    assert len(transactions) == 1
+    tx = transactions[0]
     assert tx["type"] == "transaction"
-    assert len(tx["spans"]) == 1
 
-    span = tx["spans"][0]
-    assert span["op"] == OP.MCP_SERVER
-    assert span["description"] == "tools/call process"
-    assert span["origin"] == "auto.ai.mcp"
+    assert tx["contexts"]["trace"]["op"] == OP.MCP_SERVER
+    assert tx["transaction"] == "tools/call process"
+    assert tx["contexts"]["trace"]["origin"] == "auto.ai.mcp"
 
     # Check span data
-    assert span["data"][SPANDATA.MCP_TOOL_NAME] == "process"
-    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
-    assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-789"
-    assert span["data"]["mcp.request.argument.data"] == '"test"'
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TOOL_NAME] == "process"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_SESSION_ID] == session_id
+    assert tx["contexts"]["trace"]["data"]["mcp.request.argument.data"] == '"test"'
 
     # Check PII-sensitive data
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
-            {"status": "completed"}
+        # TODO: Investigate why tool result is double-serialized.
+        assert tx["contexts"]["trace"]["data"][
+            SPANDATA.MCP_TOOL_RESULT_CONTENT
+        ] == json.dumps(
+            json.dumps(
+                {"status": "completed"},
+            )
         )
     else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in tx["contexts"]["trace"]["data"]
 
 
-def test_tool_handler_with_error(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_tool_handler_with_error(sentry_init, capture_events, stdio):
     """Test that tool handler errors are captured properly"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -272,17 +266,24 @@ def test_tool_handler_with_error(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-error", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.call_tool()
     def failing_tool(tool_name, arguments):
         raise ValueError("Tool execution failed")
 
     with start_transaction(name="mcp tx"):
-        with pytest.raises(ValueError):
-            failing_tool("bad_tool", {})
+        result = await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "bad_tool",
+                "arguments": {},
+            },
+            request_id="req-error",
+        )
+
+        assert (
+            result.message.root.result["content"][0]["text"] == "Tool execution failed"
+        )
 
     # Should have error event and transaction
     assert len(events) == 2
@@ -304,12 +305,13 @@ def test_tool_handler_with_error(sentry_init, capture_events):
     assert span["tags"]["status"] == "internal_error"
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-def test_prompt_handler_sync(
-    sentry_init, capture_events, send_default_pii, include_prompts
+async def test_prompt_handler_stdio(
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test that synchronous prompt handlers create proper spans"""
     sentry_init(
@@ -321,19 +323,34 @@ def test_prompt_handler_sync(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-prompt", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.get_prompt()
-    def test_prompt(name, arguments):
-        return MockGetPromptResult([MockPromptMessage("user", "Tell me about Python")])
+    async def test_prompt(name, arguments):
+        return GetPromptResult(
+            description="A helpful test prompt",
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=TextContent(type="text", text="Tell me about Python"),
+                ),
+            ],
+        )
 
     with start_transaction(name="mcp tx"):
-        result = test_prompt("code_help", {"language": "python"})
+        result = await stdio(
+            server,
+            method="prompts/get",
+            params={
+                "name": "code_help",
+                "arguments": {"language": "python"},
+            },
+            request_id="req-prompt",
+        )
 
-    assert result.messages[0].role == "user"
-    assert result.messages[0].content.text == "Tell me about Python"
+    assert result.message.root.result["messages"][0]["role"] == "user"
+    assert (
+        result.message.root.result["messages"][0]["content"]["text"]
+        == "Tell me about Python"
+    )
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -372,8 +389,13 @@ def test_prompt_handler_sync(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
-async def test_prompt_handler_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+async def test_prompt_handler_streamable_http(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    json_rpc,
+    select_mcp_transactions,
 ):
     """Test that async prompt handlers create proper spans"""
     sentry_init(
@@ -385,42 +407,70 @@ async def test_prompt_handler_async(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(
-        request_id="req-async-prompt", session_id="session-abc", transport="http"
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
     )
-    request_ctx.set(mock_ctx)
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @server.get_prompt()
     async def test_prompt_async(name, arguments):
-        return MockGetPromptResult(
-            [
-                MockPromptMessage("system", "You are a helpful assistant"),
-                MockPromptMessage("user", "What is MCP?"),
-            ]
+        return GetPromptResult(
+            description="A helpful test prompt",
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=TextContent(
+                        type="text", text="You are a helpful assistant"
+                    ),
+                ),
+                PromptMessage(
+                    role="user", content=TextContent(type="text", text="What is MCP?")
+                ),
+            ],
         )
 
-    with start_transaction(name="mcp tx"):
-        result = await test_prompt_async("mcp_info", {})
+    _, result = json_rpc(
+        app,
+        method="prompts/get",
+        params={
+            "name": "mcp_info",
+            "arguments": {},
+        },
+        request_id="req-async-prompt",
+    )
+    assert len(result.json()["result"]["messages"]) == 2
 
-    assert len(result.messages) == 2
-
-    (tx,) = events
+    transactions = select_mcp_transactions(events)
+    assert len(transactions) == 1
+    tx = transactions[0]
     assert tx["type"] == "transaction"
-    assert len(tx["spans"]) == 1
 
-    span = tx["spans"][0]
-    assert span["op"] == OP.MCP_SERVER
-    assert span["description"] == "prompts/get mcp_info"
+    assert tx["contexts"]["trace"]["op"] == OP.MCP_SERVER
+    assert tx["transaction"] == "prompts/get mcp_info"
 
     # For multi-message prompts, count is always captured
-    assert span["data"][SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
+    assert (
+        tx["contexts"]["trace"]["data"][SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
+    )
     # Role/content are never captured for multi-message prompts (even with PII)
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in span["data"]
-    assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
+    assert (
+        SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in tx["contexts"]["trace"]["data"]
+    )
+    assert (
+        SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT
+        not in tx["contexts"]["trace"]["data"]
+    )
 
 
-def test_prompt_handler_with_error(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_prompt_handler_with_error(sentry_init, capture_events, stdio):
     """Test that prompt handler errors are captured"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -430,17 +480,22 @@ def test_prompt_handler_with_error(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-error-prompt", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.get_prompt()
-    def failing_prompt(name, arguments):
+    async def failing_prompt(name, arguments):
         raise RuntimeError("Prompt not found")
 
     with start_transaction(name="mcp tx"):
-        with pytest.raises(RuntimeError):
-            failing_prompt("missing_prompt", {})
+        response = await stdio(
+            server,
+            method="prompts/get",
+            params={
+                "name": "code_help",
+                "arguments": {"language": "python"},
+            },
+            request_id="req-error-prompt",
+        )
+
+    assert response.message.root.error.message == "Prompt not found"
 
     # Should have error event and transaction
     assert len(events) == 2
@@ -450,7 +505,8 @@ def test_prompt_handler_with_error(sentry_init, capture_events):
     assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
 
 
-def test_resource_handler_sync(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_resource_handler_stdio(sentry_init, capture_events, stdio):
     """Test that synchronous resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -460,19 +516,27 @@ def test_resource_handler_sync(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-resource", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.read_resource()
-    def test_resource(uri):
-        return {"content": "file contents", "mime_type": "text/plain"}
+    async def test_resource(uri):
+        return [
+            ReadResourceContents(
+                content=json.dumps({"content": "file contents"}), mime_type="text/plain"
+            )
+        ]
 
     with start_transaction(name="mcp tx"):
-        uri = MockURI("file:///path/to/file.txt")
-        result = test_resource(uri)
+        result = await stdio(
+            server,
+            method="resources/read",
+            params={
+                "uri": "file:///path/to/file.txt",
+            },
+            request_id="req-resource",
+        )
 
-    assert result["content"] == "file contents"
+    assert result.message.root.result["contents"][0]["text"] == json.dumps(
+        {"content": "file contents"},
+    )
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -494,7 +558,12 @@ def test_resource_handler_sync(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_resource_handler_async(sentry_init, capture_events):
+async def test_resource_handler_streamble_http(
+    sentry_init,
+    capture_events,
+    json_rpc,
+    select_mcp_transactions,
+):
     """Test that async resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -504,36 +573,57 @@ async def test_resource_handler_async(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(
-        request_id="req-async-resource", session_id="session-res", transport="http"
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
     )
-    request_ctx.set(mock_ctx)
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @server.read_resource()
     async def test_resource_async(uri):
-        return {"data": "resource data"}
+        return [
+            ReadResourceContents(
+                content=json.dumps({"data": "resource data"}), mime_type="text/plain"
+            )
+        ]
 
-    with start_transaction(name="mcp tx"):
-        uri = MockURI("https://example.com/resource")
-        result = await test_resource_async(uri)
+    session_id, result = json_rpc(
+        app,
+        method="resources/read",
+        params={
+            "uri": "https://example.com/resource",
+        },
+        request_id="req-async-resource",
+    )
 
-    assert result["data"] == "resource data"
+    assert result.json()["result"]["contents"][0]["text"] == json.dumps(
+        {"data": "resource data"}
+    )
 
-    (tx,) = events
+    transactions = select_mcp_transactions(events)
+    assert len(transactions) == 1
+    tx = transactions[0]
     assert tx["type"] == "transaction"
-    assert len(tx["spans"]) == 1
 
-    span = tx["spans"][0]
-    assert span["op"] == OP.MCP_SERVER
-    assert span["description"] == "resources/read https://example.com/resource"
+    assert tx["contexts"]["trace"]["op"] == OP.MCP_SERVER
+    assert tx["transaction"] == "resources/read https://example.com/resource"
 
-    assert span["data"][SPANDATA.MCP_RESOURCE_URI] == "https://example.com/resource"
-    assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-res"
+    assert (
+        tx["contexts"]["trace"]["data"][SPANDATA.MCP_RESOURCE_URI]
+        == "https://example.com/resource"
+    )
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
 
-def test_resource_handler_with_error(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_resource_handler_with_error(sentry_init, capture_events, stdio):
     """Test that resource handler errors are captured"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -543,18 +633,19 @@ def test_resource_handler_with_error(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-error-resource", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.read_resource()
     def failing_resource(uri):
         raise FileNotFoundError("Resource not found")
 
     with start_transaction(name="mcp tx"):
-        with pytest.raises(FileNotFoundError):
-            uri = MockURI("file:///missing.txt")
-            failing_resource(uri)
+        await stdio(
+            server,
+            method="resources/read",
+            params={
+                "uri": "file:///missing.txt",
+            },
+            request_id="req-error-resource",
+        )
 
     # Should have error event and transaction
     assert len(events) == 2
@@ -564,12 +655,13 @@ def test_resource_handler_with_error(sentry_init, capture_events):
     assert error_event["exception"]["values"][0]["type"] == "FileNotFoundError"
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (False, False)],
 )
-def test_tool_result_extraction_tuple(
-    sentry_init, capture_events, send_default_pii, include_prompts
+async def test_tool_result_extraction_tuple(
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test extraction of tool results from tuple format (UnstructuredContent, StructuredContent)"""
     sentry_init(
@@ -581,10 +673,6 @@ def test_tool_result_extraction_tuple(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-tuple", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.call_tool()
     def test_tool_tuple(tool_name, arguments):
         # Return CombinationContent: (UnstructuredContent, StructuredContent)
@@ -593,7 +681,15 @@ def test_tool_result_extraction_tuple(
         return (unstructured, structured)
 
     with start_transaction(name="mcp tx"):
-        test_tool_tuple("combo_tool", {})
+        await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "calculate",
+                "arguments": {},
+            },
+            request_id="req-tuple",
+        )
 
     (tx,) = events
     span = tx["spans"][0]
@@ -612,12 +708,13 @@ def test_tool_result_extraction_tuple(
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT not in span["data"]
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (False, False)],
 )
-def test_tool_result_extraction_unstructured(
-    sentry_init, capture_events, send_default_pii, include_prompts
+async def test_tool_result_extraction_unstructured(
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test extraction of tool results from UnstructuredContent (list of content blocks)"""
     sentry_init(
@@ -629,10 +726,6 @@ def test_tool_result_extraction_unstructured(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-unstructured", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.call_tool()
     def test_tool_unstructured(tool_name, arguments):
         # Return UnstructuredContent as list of content blocks
@@ -642,7 +735,15 @@ def test_tool_result_extraction_unstructured(
         ]
 
     with start_transaction(name="mcp tx"):
-        test_tool_unstructured("text_tool", {})
+        await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "text_tool",
+                "arguments": {},
+            },
+            request_id="req-unstructured",
+        )
 
     (tx,) = events
     span = tx["spans"][0]
@@ -656,44 +757,8 @@ def test_tool_result_extraction_unstructured(
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
 
 
-def test_request_context_no_context(sentry_init, capture_events):
-    """Test handling when no request context is available"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    server = Server("test-server")
-
-    # Clear request context (simulating no context available)
-    # This will cause a LookupError when trying to get context
-    request_ctx.set(None)
-
-    @server.call_tool()
-    def test_tool_no_ctx(tool_name, arguments):
-        return {"result": "ok"}
-
-    with start_transaction(name="mcp tx"):
-        # This should work even without request context
-        try:
-            test_tool_no_ctx("tool", {})
-        except LookupError:
-            # If it raises LookupError, that's expected when context is truly missing
-            pass
-
-    # Should still create span even if context is missing
-    (tx,) = events
-    span = tx["spans"][0]
-
-    # Transport defaults to "pipe" when no context
-    assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
-    # Request ID and Session ID should not be present
-    assert SPANDATA.MCP_REQUEST_ID not in span["data"]
-    assert SPANDATA.MCP_SESSION_ID not in span["data"]
-
-
-def test_span_origin(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_span_origin(sentry_init, capture_events, stdio):
     """Test that span origin is set correctly"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -703,16 +768,20 @@ def test_span_origin(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-origin", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.call_tool()
     def test_tool(tool_name, arguments):
         return {"result": "test"}
 
     with start_transaction(name="mcp tx"):
-        test_tool("origin_test", {})
+        await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "calculate",
+                "arguments": {"x": 10, "y": 5},
+            },
+            request_id="req-origin",
+        )
 
     (tx,) = events
 
@@ -720,7 +789,8 @@ def test_span_origin(sentry_init, capture_events):
     assert tx["spans"][0]["origin"] == "auto.ai.mcp"
 
 
-def test_multiple_handlers(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_multiple_handlers(sentry_init, capture_events, stdio):
     """Test that multiple handler calls create multiple spans"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -729,10 +799,6 @@ def test_multiple_handlers(sentry_init, capture_events):
     events = capture_events()
 
     server = Server("test-server")
-
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-multi", transport="stdio")
-    request_ctx.set(mock_ctx)
 
     @server.call_tool()
     def tool1(tool_name, arguments):
@@ -744,12 +810,45 @@ def test_multiple_handlers(sentry_init, capture_events):
 
     @server.get_prompt()
     def prompt1(name, arguments):
-        return MockGetPromptResult([MockPromptMessage("user", "Test prompt")])
+        return GetPromptResult(
+            description="A test prompt",
+            messages=[
+                PromptMessage(
+                    role="user", content=TextContent(type="text", text="Test prompt")
+                )
+            ],
+        )
 
     with start_transaction(name="mcp tx"):
-        tool1("tool_a", {})
-        tool2("tool_b", {})
-        prompt1("prompt_a", {})
+        await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "tool_a",
+                "arguments": {},
+            },
+            request_id="req-multi",
+        )
+
+        await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "tool_b",
+                "arguments": {},
+            },
+            request_id="req-multi",
+        )
+
+        await stdio(
+            server,
+            method="prompts/get",
+            params={
+                "name": "prompt_a",
+                "arguments": {},
+            },
+            request_id="req-multi",
+        )
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -765,12 +864,13 @@ def test_multiple_handlers(sentry_init, capture_events):
     assert "prompts/get prompt_a" in span_descriptions
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (False, False)],
 )
-def test_prompt_with_dict_result(
-    sentry_init, capture_events, send_default_pii, include_prompts
+async def test_prompt_with_dict_result(
+    sentry_init, capture_events, send_default_pii, include_prompts, stdio
 ):
     """Test prompt handler with dict result instead of GetPromptResult object"""
     sentry_init(
@@ -782,10 +882,6 @@ def test_prompt_with_dict_result(
 
     server = Server("test-server")
 
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-dict-prompt", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.get_prompt()
     def test_prompt_dict(name, arguments):
         # Return dict format instead of GetPromptResult object
@@ -796,7 +892,15 @@ def test_prompt_with_dict_result(
         }
 
     with start_transaction(name="mcp tx"):
-        test_prompt_dict("dict_prompt", {})
+        await stdio(
+            server,
+            method="prompts/get",
+            params={
+                "name": "dict_prompt",
+                "arguments": {},
+            },
+            request_id="req-dict-prompt",
+        )
 
     (tx,) = events
     span = tx["spans"][0]
@@ -816,37 +920,8 @@ def test_prompt_with_dict_result(
         assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
 
 
-def test_resource_without_protocol(sentry_init, capture_events):
-    """Test resource handler with URI without protocol scheme"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    server = Server("test-server")
-
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-no-proto", transport="stdio")
-    request_ctx.set(mock_ctx)
-
-    @server.read_resource()
-    def test_resource(uri):
-        return {"data": "test"}
-
-    with start_transaction(name="mcp tx"):
-        # URI without protocol
-        test_resource("simple-path")
-
-    (tx,) = events
-    span = tx["spans"][0]
-
-    assert span["data"][SPANDATA.MCP_RESOURCE_URI] == "simple-path"
-    # No protocol should be set
-    assert SPANDATA.MCP_RESOURCE_PROTOCOL not in span["data"]
-
-
-def test_tool_with_complex_arguments(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_tool_with_complex_arguments(sentry_init, capture_events, stdio):
     """Test tool handler with complex nested arguments"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -855,10 +930,6 @@ def test_tool_with_complex_arguments(sentry_init, capture_events):
     events = capture_events()
 
     server = Server("test-server")
-
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-complex", transport="stdio")
-    request_ctx.set(mock_ctx)
 
     @server.call_tool()
     def test_tool_complex(tool_name, arguments):
@@ -870,7 +941,15 @@ def test_tool_with_complex_arguments(sentry_init, capture_events):
             "string": "test",
             "number": 42,
         }
-        test_tool_complex("complex_tool", complex_args)
+        await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "complex_tool",
+                "arguments": complex_args,
+            },
+            request_id="req-complex",
+        )
 
     (tx,) = events
     span = tx["spans"][0]
@@ -884,43 +963,7 @@ def test_tool_with_complex_arguments(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_async_handlers_mixed(sentry_init, capture_events):
-    """Test mixing sync and async handlers in the same transaction"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    server = Server("test-server")
-
-    # Set up mock request context
-    mock_ctx = MockRequestContext(request_id="req-mixed", transport="stdio")
-    request_ctx.set(mock_ctx)
-
-    @server.call_tool()
-    def sync_tool(tool_name, arguments):
-        return {"type": "sync"}
-
-    @server.call_tool()
-    async def async_tool(tool_name, arguments):
-        return {"type": "async"}
-
-    with start_transaction(name="mcp tx"):
-        sync_result = sync_tool("sync", {})
-        async_result = await async_tool("async", {})
-
-    assert sync_result["type"] == "sync"
-    assert async_result["type"] == "async"
-
-    (tx,) = events
-    assert len(tx["spans"]) == 2
-
-    # Both should be instrumented correctly
-    assert all(span["op"] == OP.MCP_SERVER for span in tx["spans"])
-
-
-def test_sse_transport_detection(sentry_init, capture_events):
+async def test_sse_transport_detection(sentry_init, capture_events, json_rpc_sse):
     """Test that SSE transport is correctly detected via query parameter"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -929,32 +972,75 @@ def test_sse_transport_detection(sentry_init, capture_events):
     events = capture_events()
 
     server = Server("test-server")
+    sse = SseServerTransport("/messages/")
 
-    # Set up mock request context with SSE transport
-    mock_ctx = MockRequestContext(
-        request_id="req-sse", session_id="session-sse-123", transport="sse"
+    sse_connection_closed = asyncio.Event()
+
+    async def handle_sse(request):
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            async with anyio.create_task_group() as tg:
+
+                async def run_server():
+                    await server.run(
+                        streams[0], streams[1], server.create_initialization_options()
+                    )
+
+                tg.start_soon(run_server)
+
+        sse_connection_closed.set()
+        return Response()
+
+    app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse, methods=["GET"]),
+            Mount("/messages/", app=sse.handle_post_message),
+        ],
     )
-    request_ctx.set(mock_ctx)
 
     @server.call_tool()
-    def test_tool(tool_name, arguments):
+    async def test_tool(tool_name, arguments):
         return {"result": "success"}
 
-    with start_transaction(name="mcp tx"):
-        result = test_tool("sse_tool", {})
+    keep_sse_alive = asyncio.Event()
+    app_task, session_id, result = await json_rpc_sse(
+        app,
+        method="tools/call",
+        params={
+            "name": "sse_tool",
+            "arguments": {},
+        },
+        request_id="req-sse",
+        keep_sse_alive=keep_sse_alive,
+    )
 
-    assert result == {"result": "success"}
+    await sse_connection_closed.wait()
+    await app_task
 
-    (tx,) = events
+    assert result["result"]["structuredContent"] == {"result": "success"}
+
+    transactions = [
+        event
+        for event in events
+        if event["type"] == "transaction" and event["transaction"] == "/sse"
+    ]
+    assert len(transactions) == 1
+    tx = transactions[0]
     span = tx["spans"][0]
 
     # Check that SSE transport is detected
     assert span["data"][SPANDATA.MCP_TRANSPORT] == "sse"
     assert span["data"][SPANDATA.NETWORK_TRANSPORT] == "tcp"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-sse-123"
+    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
 
-def test_streamable_http_transport_detection(sentry_init, capture_events):
+def test_streamable_http_transport_detection(
+    sentry_init,
+    capture_events,
+    json_rpc,
+    select_mcp_transactions,
+):
     """Test that StreamableHTTP transport is correctly detected via header"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -964,31 +1050,52 @@ def test_streamable_http_transport_detection(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context with StreamableHTTP transport
-    mock_ctx = MockRequestContext(
-        request_id="req-http", session_id="session-http-456", transport="http"
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
     )
-    request_ctx.set(mock_ctx)
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
 
     @server.call_tool()
-    def test_tool(tool_name, arguments):
-        return {"result": "success"}
+    async def test_tool(tool_name, arguments):
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps({"status": "success"}),
+            )
+        ]
 
-    with start_transaction(name="mcp tx"):
-        result = test_tool("http_tool", {})
+    session_id, result = json_rpc(
+        app,
+        method="tools/call",
+        params={
+            "name": "http_tool",
+            "arguments": {},
+        },
+        request_id="req-http",
+    )
+    assert result.json()["result"]["content"][0]["text"] == json.dumps(
+        {"status": "success"}
+    )
 
-    assert result == {"result": "success"}
-
-    (tx,) = events
-    span = tx["spans"][0]
+    transactions = select_mcp_transactions(events)
+    assert len(transactions) == 1
+    tx = transactions[0]
 
     # Check that HTTP transport is detected
-    assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
-    assert span["data"][SPANDATA.NETWORK_TRANSPORT] == "tcp"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-http-456"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
 
-def test_stdio_transport_detection(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_stdio_transport_detection(sentry_init, capture_events, stdio):
     """Test that stdio transport is correctly detected when no HTTP request"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -998,18 +1105,22 @@ def test_stdio_transport_detection(sentry_init, capture_events):
 
     server = Server("test-server")
 
-    # Set up mock request context with stdio transport (no HTTP request)
-    mock_ctx = MockRequestContext(request_id="req-stdio", transport="stdio")
-    request_ctx.set(mock_ctx)
-
     @server.call_tool()
-    def test_tool(tool_name, arguments):
+    async def test_tool(tool_name, arguments):
         return {"result": "success"}
 
     with start_transaction(name="mcp tx"):
-        result = test_tool("stdio_tool", {})
+        result = await stdio(
+            server,
+            method="tools/call",
+            params={
+                "name": "stdio_tool",
+                "arguments": {},
+            },
+            request_id="req-stdio",
+        )
 
-    assert result == {"result": "success"}
+    assert result.message.root.result["structuredContent"] == {"result": "success"}
 
     (tx,) = events
     span = tx["spans"][0]

@@ -1,5 +1,42 @@
 # Changelog
 
+## 2.51.0
+
+### New Features ✨
+
+#### Openai
+
+- feat(openai): Set system instruction attribute for Responses API by @alexander-alderman-webb in [#5376](https://github.com/getsentry/sentry-python/pull/5376)
+- feat(openai): Set system instruction attribute for Completions API by @alexander-alderman-webb in [#5358](https://github.com/getsentry/sentry-python/pull/5358)
+- feat(integrations): OpenAI/OpenAI Agents detect and report the time to first token metric (TTFT) as `gen_ai.response.time_to_first_token` by @constantinius in [#5348](https://github.com/getsentry/sentry-python/pull/5348)
+
+#### Openai Agents
+
+- feat(openai-agents): Set system instruction attribute on `gen_ai.chat` spans by @alexander-alderman-webb in [#5370](https://github.com/getsentry/sentry-python/pull/5370)
+- feat(openai-agents): Set system instruction attribute by @alexander-alderman-webb in [#5355](https://github.com/getsentry/sentry-python/pull/5355)
+- feat(integrations): openai-agents streaming support by @constantinius in [#5291](https://github.com/getsentry/sentry-python/pull/5291)
+
+#### Other
+
+- feat(ai): Add original input length meta attribute by @alexander-alderman-webb in [#5375](https://github.com/getsentry/sentry-python/pull/5375)
+- feat(anthropic): Set system instruction attribute by @alexander-alderman-webb in [#5353](https://github.com/getsentry/sentry-python/pull/5353)
+- feat(asyncio): Allow to turn task spans off by @sentrivana in [#5367](https://github.com/getsentry/sentry-python/pull/5367)
+- feat(gen_ai): add function `set_conversation_id` and managing functions on the Scope and apply it on the Span on `.finish()` by @constantinius in [#5362](https://github.com/getsentry/sentry-python/pull/5362)
+- feat(google-genai): Set system instruction attribute by @alexander-alderman-webb in [#5354](https://github.com/getsentry/sentry-python/pull/5354)
+- feat(langchain): Set system instruction attribute by @alexander-alderman-webb in [#5357](https://github.com/getsentry/sentry-python/pull/5357)
+- feat(pydantic-ai): Set system instruction attribute by @alexander-alderman-webb in [#5356](https://github.com/getsentry/sentry-python/pull/5356)
+- feat(transport): Report 413 responses for oversized envelopes by @alexander-alderman-webb in [#5380](https://github.com/getsentry/sentry-python/pull/5380)
+
+### Bug Fixes 🐛
+
+- fix(ai): Keep single content input message by @alexander-alderman-webb in [#5345](https://github.com/getsentry/sentry-python/pull/5345)
+
+### Internal Changes 🔧
+
+- ci(release): Fix changelog-preview permissions by @BYK in [#5368](https://github.com/getsentry/sentry-python/pull/5368)
+- ref: Replace `set_data_normalized()` with `Span.set_data()` for system instructions by @alexander-alderman-webb in [#5374](https://github.com/getsentry/sentry-python/pull/5374)
+- ci: Fix path in AI integration tests by @alexander-alderman-webb in [#5347](https://github.com/getsentry/sentry-python/pull/5347)
+
 ## 2.50.0
 
 ### New Features ✨
