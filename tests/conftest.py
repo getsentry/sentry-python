@@ -16,6 +16,12 @@ from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 import jsonschema
 
+try:
+    from starlette.testclient import TestClient
+    # Catch RuntimeError to prevent the following exception in aws_lambda tests.
+    # RuntimeError: The starlette.testclient module requires the httpx package to be installed.
+except (ImportError, RuntimeError):
+    TestClient = None
 
 try:
     import gevent
@@ -704,6 +710,79 @@ def stdio(
             tg.start_soon(simulate_client, tg, result)
 
         return result["response"]
+
+    return inner
+
+
+@pytest.fixture()
+def json_rpc():
+    def inner(app, method: str, params, request_id: str):
+        with TestClient(app) as client:  # type: ignore
+            init_response = client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "initialize",
+                    "params": {
+                        "clientInfo": {"name": "test-client", "version": "1.0"},
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                    },
+                    "id": request_id,
+                },
+            )
+
+            session_id = init_response.headers["mcp-session-id"]
+
+            # Notification response is mandatory.
+            # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+            client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                    "mcp-session-id": session_id,
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "notifications/initialized",
+                    "params": {},
+                },
+            )
+
+            response = client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                    "mcp-session-id": session_id,
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": method,
+                    "params": params,
+                    "id": request_id,
+                },
+            )
+
+            return session_id, response
+
+    return inner
+
+
+@pytest.fixture()
+def select_mcp_transactions():
+    def inner(events):
+        return [
+            event
+            for event in events
+            if event["type"] == "transaction"
+            and event["contexts"]["trace"]["op"] == "mcp.server"
+        ]
 
     return inner
 
