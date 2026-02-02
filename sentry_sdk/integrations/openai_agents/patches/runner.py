@@ -123,7 +123,7 @@ def _create_run_streamed_wrapper(
             # If run_streamed itself fails (not the background task), clean up immediately
             workflow_span.__exit__(*sys.exc_info())
             _capture_exception(exc)
-            raise exc
+            raise
 
         def _close_workflow_span() -> None:
             if hasattr(agent, "_sentry_workflow_span"):
