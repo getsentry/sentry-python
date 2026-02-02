@@ -1228,7 +1228,7 @@ class Scope:
         name: str,
         attributes: "Optional[Attributes]" = None,
         parent_span: "Optional[StreamedSpan]" = None,
-        **kwargs: "Any",   # TODO: remove, just for expediting seer testing
+        **kwargs: "Any",  # TODO: remove, just for expediting seer testing
     ) -> "StreamedSpan":
         # TODO: rename to start_span once we drop the old API
         if parent_span is None:
