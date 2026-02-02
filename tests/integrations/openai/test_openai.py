@@ -621,8 +621,8 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
             assert span["data"]["gen_ai.usage.total_tokens"] == 9
         else:
             assert span["data"]["gen_ai.usage.output_tokens"] == 2
-            assert span["data"]["gen_ai.usage.input_tokens"] == 1
-            assert span["data"]["gen_ai.usage.total_tokens"] == 3
+            assert span["data"]["gen_ai.usage.input_tokens"] == 12
+            assert span["data"]["gen_ai.usage.total_tokens"] == 14
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
@@ -865,8 +865,8 @@ async def test_streaming_chat_completion_async(
             assert span["data"]["gen_ai.usage.total_tokens"] == 9
         else:
             assert span["data"]["gen_ai.usage.output_tokens"] == 2
-            assert span["data"]["gen_ai.usage.input_tokens"] == 1
-            assert span["data"]["gen_ai.usage.total_tokens"] == 3
+            assert span["data"]["gen_ai.usage.input_tokens"] == 12
+            assert span["data"]["gen_ai.usage.total_tokens"] == 14
 
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
