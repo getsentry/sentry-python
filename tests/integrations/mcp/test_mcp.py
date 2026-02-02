@@ -37,8 +37,6 @@ except ImportError:
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.server import request_ctx
 
-from starlette.routing import Mount, Route
-from starlette.responses import Response
 from starlette.applications import Starlette
 from mcp.types import GetPromptResult, PromptMessage, TextContent
 from mcp.server.lowlevel.helper_types import ReadResourceContents
@@ -54,6 +52,8 @@ from sentry_sdk.integrations.mcp import MCPIntegration
 
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from starlette.routing import Mount, Route
+from starlette.responses import Response
 
 
 @pytest.fixture(autouse=True)
