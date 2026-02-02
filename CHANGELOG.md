@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.52.0a1
+
+### New Features ✨
+
+#### Openai
+
+- feat(openai): Set system instruction attribute for Responses API by @alexander-alderman-webb in [#5376](https://github.com/getsentry/sentry-python/pull/5376)
+- feat(openai): Set system instruction attribute for Completions API by @alexander-alderman-webb in [#5358](https://github.com/getsentry/sentry-python/pull/5358)
+
+#### Other
+
+- feat(ai): Add original input length meta attribute by @alexander-alderman-webb in [#5375](https://github.com/getsentry/sentry-python/pull/5375)
+- feat(openai-agents): Set system instruction attribute on `gen_ai.chat` spans by @alexander-alderman-webb in [#5370](https://github.com/getsentry/sentry-python/pull/5370)
+- feat(span-streaming): Add experimental `trace_lifecycle` switch (1) by @sentrivana in [#5397](https://github.com/getsentry/sentry-python/pull/5397)
+- feat(transport): Report 413 responses for oversized envelopes by @alexander-alderman-webb in [#5380](https://github.com/getsentry/sentry-python/pull/5380)
+
+### Bug Fixes 🐛
+
+- fix(ai): Keep single content input message by @alexander-alderman-webb in [#5345](https://github.com/getsentry/sentry-python/pull/5345)
+- fix(arq): handle settings_cls passed as keyword argument by @nc9 in [#5393](https://github.com/getsentry/sentry-python/pull/5393)
+- fix(dramatiq): cleanup isolated scope and transaction when message is skipped by @frankie567 in [#5346](https://github.com/getsentry/sentry-python/pull/5346)
+- fix(google-genai): deactivate google genai when langchain is used by @shellmayr in [#5389](https://github.com/getsentry/sentry-python/pull/5389)
+
+### Internal Changes 🔧
+
+- ci: migration to the new codecov action by @MathurAditya724 in [#5392](https://github.com/getsentry/sentry-python/pull/5392)
+- ref: Replace `set_data_normalized()` with `Span.set_data()` for system instructions by @alexander-alderman-webb in [#5374](https://github.com/getsentry/sentry-python/pull/5374)
+
+### Other
+
+- [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
+- Update CHANGELOG.md by @alexander-alderman-webb in [8517eb0a](https://github.com/getsentry/sentry-python/commit/8517eb0a0750796ae73d0e4c020b0a71c7724d0a)
+- release: 2.51.0 by @alexander-alderman-webb in [93e89e4c](https://github.com/getsentry/sentry-python/commit/93e89e4c1b7e837c03dd62a81951e56634d4a9c0)
+
 ## 2.51.0a1
 
 This is an alpha release for internal testing of span streaming.
