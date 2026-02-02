@@ -59,7 +59,7 @@ def _transform_system_instructions(
             continue
 
         text_parts: "list[TextPart]" = [
-            {"type": "text", "content": content} for content in _get_text_items(content)
+            {"type": "text", "content": text} for text in _get_text_items(content)
         ]
         instruction_text_parts += text_parts
 
