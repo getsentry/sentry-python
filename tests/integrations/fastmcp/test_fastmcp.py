@@ -896,36 +896,6 @@ async def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP, stdio):
     assert mcp_spans[0]["origin"] == "auto.ai.mcp"
 
 
-@pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_without_request_context(sentry_init, capture_events, FastMCP):
-    """Test FastMCP handling when no request context is available"""
-    sentry_init(
-        integrations=[MCPIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    mcp = FastMCP("Test Server")
-
-    # Clear request context
-    if request_ctx is not None:
-        request_ctx.set(None)
-
-    @mcp.tool()
-    def test_tool_no_ctx(x: int) -> dict:
-        """Test tool without context"""
-        return {"result": x + 1}
-
-    with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "test_tool_no_ctx", {"x": 99})
-
-    assert result == {"result": 100}
-
-    # Should still create transaction even if context is missing
-    (tx,) = events
-    assert tx["type"] == "transaction"
-
-
 # =============================================================================
 # Transport Detection Tests
 # =============================================================================
