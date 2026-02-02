@@ -43,6 +43,12 @@ from sentry_sdk.integrations.mcp import MCPIntegration
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
+try:
+    from fastmcp.prompts import Message
+except ImportError:
+    Message = None
+
+
 from starlette.responses import Response
 from starlette.routing import Mount, Route
 from starlette.applications import Starlette
@@ -611,15 +617,18 @@ async def test_fastmcp_prompt_sync(
         @mcp.prompt()
         def code_help_prompt(language: str):
             """Get help for a programming language"""
-            return [
-                {
-                    "role": "user",
-                    "content": {
-                        "type": "text",
-                        "text": f"Tell me about {language}",
-                    },
-                }
-            ]
+            message = {
+                "role": "user",
+                "content": {
+                    "type": "text",
+                    "text": f"Tell me about {language}",
+                },
+            }
+
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+                message = Message(message)
+
+            return [message]
 
         with start_transaction(name="fastmcp tx"):
             result = await stdio(
@@ -692,19 +701,24 @@ async def test_fastmcp_prompt_async(
         @mcp.prompt()
         async def async_prompt(topic: str):
             """Get async prompt for a topic"""
-            return [
-                {
-                    "role": "user",
-                    "content": {"type": "text", "text": f"What is {topic}?"},
+            message1 = {
+                "role": "user",
+                "content": {"type": "text", "text": f"What is {topic}?"},
+            }
+
+            message2 = {
+                "role": "assistant",
+                "content": {
+                    "type": "text",
+                    "text": "Let me explain that",
                 },
-                {
-                    "role": "assistant",
-                    "content": {
-                        "type": "text",
-                        "text": "Let me explain that",
-                    },
-                },
-            ]
+            }
+
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+                message1 = Message(message1)
+                message2 = Message(message2)
+
+            return [message1, message2]
 
         _, result = json_rpc(
             app,
