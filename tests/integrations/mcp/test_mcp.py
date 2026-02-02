@@ -93,40 +93,6 @@ def get_mcp_command_payload(method: str, params, request_id: str):
     )
 
 
-async def stdio(server, method: str, params, request_id: str):
-    read_stream_writer, read_stream = anyio.create_memory_object_stream(0)
-    write_stream, write_stream_reader = anyio.create_memory_object_stream(0)
-
-    result = {}
-
-    async def run_server():
-        await server.run(
-            read_stream, write_stream, server.create_initialization_options()
-        )
-
-    async def simulate_client(tg, result):
-        init_request = get_initialization_payload("1")
-        await read_stream_writer.send(init_request)
-
-        await write_stream_reader.receive()
-
-        initialized_notification = get_initialized_notification_payload()
-        await read_stream_writer.send(initialized_notification)
-
-        request = get_mcp_command_payload(method, params=params, request_id=request_id)
-        await read_stream_writer.send(request)
-
-        result["response"] = await write_stream_reader.receive()
-
-        tg.cancel_scope.cancel()
-
-    async with anyio.create_task_group() as tg:
-        tg.start_soon(run_server)
-        tg.start_soon(simulate_client, tg, result)
-
-    return result["response"]
-
-
 @pytest.fixture(autouse=True)
 def reset_request_ctx():
     """Reset request context before and after each test"""
