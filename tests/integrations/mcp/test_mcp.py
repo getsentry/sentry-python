@@ -32,15 +32,11 @@ except ImportError:
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.server import request_ctx
 from mcp.types import (
-    JSONRPCMessage,
-    JSONRPCNotification,
-    JSONRPCRequest,
     GetPromptResult,
     PromptMessage,
     TextContent,
 )
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from mcp.shared.message import SessionMessage
 
 try:
     from mcp.server.lowlevel.server import request_ctx
@@ -50,47 +46,6 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
-
-
-def get_initialization_payload(request_id: str):
-    return SessionMessage(
-        message=JSONRPCMessage(
-            root=JSONRPCRequest(
-                jsonrpc="2.0",
-                id=request_id,
-                method="initialize",
-                params={
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {},
-                    "clientInfo": {"name": "test-client", "version": "1.0.0"},
-                },
-            )
-        )
-    )
-
-
-def get_initialized_notification_payload():
-    return SessionMessage(
-        message=JSONRPCMessage(
-            root=JSONRPCNotification(
-                jsonrpc="2.0",
-                method="notifications/initialized",
-            )
-        )
-    )
-
-
-def get_mcp_command_payload(method: str, params, request_id: str):
-    return SessionMessage(
-        message=JSONRPCMessage(
-            root=JSONRPCRequest(
-                jsonrpc="2.0",
-                id=request_id,
-                method=method,
-                params=params,
-            )
-        )
-    )
 
 
 @pytest.fixture(autouse=True)
