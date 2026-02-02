@@ -39,7 +39,10 @@ class StreamedSpan:
         trace_id: "Optional[str]" = None,
     ):
         self.name: str = name
-        self._attributes: "Attributes" = attributes or {}
+        self._attributes: "Attributes" = {}
+        if attributes:
+            for attribute, value in attributes.items():
+                self.set_attribute(attribute, value)
 
         self._trace_id = trace_id
 
