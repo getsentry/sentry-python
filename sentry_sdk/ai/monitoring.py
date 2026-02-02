@@ -1,11 +1,12 @@
 import inspect
+import sys
 from functools import wraps
 
 from sentry_sdk.consts import SPANDATA
 import sentry_sdk.utils
 from sentry_sdk import start_span
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import ContextVar
+from sentry_sdk.utils import ContextVar, reraise, capture_internal_exceptions
 
 from typing import TYPE_CHECKING
 
@@ -44,13 +45,15 @@ def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
                     try:
                         res = f(*args, **kwargs)
                     except Exception as e:
-                        event, hint = sentry_sdk.utils.event_from_exception(
-                            e,
-                            client_options=sentry_sdk.get_client().options,
-                            mechanism={"type": "ai_monitoring", "handled": False},
-                        )
-                        sentry_sdk.capture_event(event, hint=hint)
-                        raise e from None
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            event, hint = sentry_sdk.utils.event_from_exception(
+                                e,
+                                client_options=sentry_sdk.get_client().options,
+                                mechanism={"type": "ai_monitoring", "handled": False},
+                            )
+                            sentry_sdk.capture_event(event, hint=hint)
+                        reraise(*exc_info)
                     finally:
                         _ai_pipeline_name.set(None)
                     return res
@@ -72,13 +75,15 @@ def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
                     try:
                         res = await f(*args, **kwargs)
                     except Exception as e:
-                        event, hint = sentry_sdk.utils.event_from_exception(
-                            e,
-                            client_options=sentry_sdk.get_client().options,
-                            mechanism={"type": "ai_monitoring", "handled": False},
-                        )
-                        sentry_sdk.capture_event(event, hint=hint)
-                        raise e from None
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            event, hint = sentry_sdk.utils.event_from_exception(
+                                e,
+                                client_options=sentry_sdk.get_client().options,
+                                mechanism={"type": "ai_monitoring", "handled": False},
+                            )
+                            sentry_sdk.capture_event(event, hint=hint)
+                        reraise(*exc_info)
                     finally:
                         _ai_pipeline_name.set(None)
                     return res
@@ -95,6 +100,7 @@ def record_token_usage(
     span: "Span",
     input_tokens: "Optional[int]" = None,
     input_tokens_cached: "Optional[int]" = None,
+    input_tokens_cache_write: "Optional[int]" = None,
     output_tokens: "Optional[int]" = None,
     output_tokens_reasoning: "Optional[int]" = None,
     total_tokens: "Optional[int]" = None,
@@ -111,6 +117,12 @@ def record_token_usage(
         span.set_data(
             SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
             input_tokens_cached,
+        )
+
+    if input_tokens_cache_write is not None:
+        span.set_data(
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+            input_tokens_cache_write,
         )
 
     if output_tokens is not None:

@@ -1,12 +1,21 @@
 import asyncio
+import json
 import pytest
+from unittest.mock import MagicMock
 
 from typing import Annotated
 from pydantic import Field
 
+import sentry_sdk
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
+from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 
 from pydantic_ai import Agent
+from pydantic_ai.messages import BinaryContent, UserPromptPart
+from pydantic_ai.usage import RequestUsage
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
 
@@ -505,7 +514,18 @@ async def test_model_settings(sentry_init, capture_events, test_agent_with_setti
 
 
 @pytest.mark.asyncio
-async def test_system_prompt_in_messages(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_system_prompt_attribute(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
     """
     Test that system prompts are included as the first message.
     """
@@ -516,9 +536,9 @@ async def test_system_prompt_in_messages(sentry_init, capture_events):
     )
 
     sentry_init(
-        integrations=[PydanticAIIntegration()],
+        integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        send_default_pii=send_default_pii,
     )
 
     events = capture_events()
@@ -533,12 +553,17 @@ async def test_system_prompt_in_messages(sentry_init, capture_events):
     assert len(chat_spans) >= 1
 
     chat_span = chat_spans[0]
-    messages_str = chat_span["data"]["gen_ai.request.messages"]
 
-    # Messages is serialized as a string
-    # Should contain system role and helpful assistant text
-    assert "system" in messages_str
-    assert "helpful assistant" in messages_str
+    if send_default_pii and include_prompts:
+        system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        assert json.loads(system_instructions) == [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant specialized in testing.",
+            }
+        ]
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
 
 
 @pytest.mark.asyncio
@@ -1175,7 +1200,18 @@ async def test_invoke_agent_with_list_user_prompt(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_invoke_agent_with_instructions(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_invoke_agent_with_instructions(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
     """
     Test that invoke_agent span handles instructions correctly.
     """
@@ -1192,9 +1228,9 @@ async def test_invoke_agent_with_instructions(sentry_init, capture_events):
     agent._system_prompts = ["System prompt"]
 
     sentry_init(
-        integrations=[PydanticAIIntegration()],
+        integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        send_default_pii=send_default_pii,
     )
 
     events = capture_events()
@@ -1202,14 +1238,22 @@ async def test_invoke_agent_with_instructions(sentry_init, capture_events):
     await agent.run("Test input")
 
     (transaction,) = events
+    spans = transaction["spans"]
 
-    # Check that the invoke_agent transaction has messages data
-    if "gen_ai.request.messages" in transaction["contexts"]["trace"]["data"]:
-        messages_str = transaction["contexts"]["trace"]["data"][
-            "gen_ai.request.messages"
+    # The transaction IS the invoke_agent span, check for messages in chat spans instead
+    chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+    assert len(chat_spans) >= 1
+
+    chat_span = chat_spans[0]
+
+    if send_default_pii and include_prompts:
+        system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        assert json.loads(system_instructions) == [
+            {"type": "text", "content": "System prompt"},
+            {"type": "text", "content": "Instruction 1\nInstruction 2"},
         ]
-        # Should contain both instructions and system prompts
-        assert "Instruction" in messages_str or "System prompt" in messages_str
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
 
 
 @pytest.mark.asyncio
@@ -2604,3 +2648,147 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_events)
 
     # Should not crash
     assert transaction is not None
+
+
+def _get_messages_from_span(span_data):
+    """Helper to extract and parse messages from span data."""
+    messages_data = span_data["gen_ai.request.messages"]
+    return (
+        json.loads(messages_data) if isinstance(messages_data, str) else messages_data
+    )
+
+
+def _find_binary_content(messages_data, expected_modality, expected_mime_type):
+    """Helper to find and verify binary content in messages."""
+    for msg in messages_data:
+        if "content" not in msg:
+            continue
+        for content_item in msg["content"]:
+            if content_item.get("type") == "blob":
+                assert content_item["modality"] == expected_modality
+                assert content_item["mime_type"] == expected_mime_type
+                assert content_item["content"] == BLOB_DATA_SUBSTITUTE
+                return True
+    return False
+
+
+@pytest.mark.asyncio
+async def test_binary_content_encoding_image(sentry_init, capture_events):
+    """Test that BinaryContent with image data is properly encoded in messages."""
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        binary_content = BinaryContent(
+            data=b"fake_image_data_12345", media_type="image/png"
+        )
+        user_part = UserPromptPart(content=["Look at this image:", binary_content])
+        mock_msg = MagicMock()
+        mock_msg.parts = [user_part]
+        mock_msg.instructions = None
+
+        _set_input_messages(span, [mock_msg])
+        span.finish()
+
+    (event,) = events
+    span_data = event["spans"][0]["data"]
+    messages_data = _get_messages_from_span(span_data)
+    assert _find_binary_content(messages_data, "image", "image/png")
+
+
+@pytest.mark.asyncio
+async def test_binary_content_encoding_mixed_content(sentry_init, capture_events):
+    """Test that BinaryContent mixed with text content is properly handled."""
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        binary_content = BinaryContent(
+            data=b"fake_image_bytes", media_type="image/jpeg"
+        )
+        user_part = UserPromptPart(
+            content=["Here is an image:", binary_content, "What do you see?"]
+        )
+        mock_msg = MagicMock()
+        mock_msg.parts = [user_part]
+        mock_msg.instructions = None
+
+        _set_input_messages(span, [mock_msg])
+        span.finish()
+
+    (event,) = events
+    span_data = event["spans"][0]["data"]
+    messages_data = _get_messages_from_span(span_data)
+
+    # Verify both text and binary content are present
+    found_text = any(
+        content_item.get("type") == "text"
+        for msg in messages_data
+        if "content" in msg
+        for content_item in msg["content"]
+    )
+    assert found_text, "Text content should be found"
+    assert _find_binary_content(messages_data, "image", "image/jpeg")
+
+
+@pytest.mark.asyncio
+async def test_binary_content_in_agent_run(sentry_init, capture_events):
+    """Test that BinaryContent in actual agent run is properly captured in spans."""
+    agent = Agent("test", name="test_binary_agent")
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+    binary_content = BinaryContent(
+        data=b"fake_image_data_for_testing", media_type="image/png"
+    )
+    await agent.run(["Analyze this image:", binary_content])
+
+    (transaction,) = events
+    chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
+    assert len(chat_spans) >= 1
+
+    chat_span = chat_spans[0]
+    if "gen_ai.request.messages" in chat_span["data"]:
+        messages_str = str(chat_span["data"]["gen_ai.request.messages"])
+        assert any(keyword in messages_str for keyword in ["blob", "image", "base64"])
+
+
+@pytest.mark.asyncio
+async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
+    """Test that cache_read_tokens and cache_write_tokens are tracked."""
+    sentry_init(integrations=[PydanticAIIntegration()], traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        usage = RequestUsage(
+            input_tokens=100,
+            output_tokens=50,
+            cache_read_tokens=80,
+            cache_write_tokens=20,
+        )
+        _set_usage_data(span, usage)
+        span.finish()
+
+    (event,) = events
+    (span_data,) = event["spans"]
+    assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20

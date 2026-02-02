@@ -1,5 +1,7 @@
 import json
 import os
+import asyncio
+from urllib.parse import urlparse, parse_qs
 import socket
 import warnings
 import brotli
@@ -16,6 +18,12 @@ from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 import jsonschema
 
+try:
+    from starlette.testclient import TestClient
+    # Catch RuntimeError to prevent the following exception in aws_lambda tests.
+    # RuntimeError: The starlette.testclient module requires the httpx package to be installed.
+except (ImportError, RuntimeError):
+    TestClient = None
 
 try:
     import gevent
@@ -45,8 +53,39 @@ from tests import _warning_recorder, _warning_recorder_mgr
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Any, Callable, MutableMapping, Optional
     from collections.abc import Iterator
+
+try:
+    from anyio import create_memory_object_stream, create_task_group, EndOfStream
+    from mcp.types import (
+        JSONRPCMessage,
+        JSONRPCNotification,
+        JSONRPCRequest,
+    )
+    from mcp.shared.message import SessionMessage
+    from httpx import (
+        ASGITransport,
+        Request as HttpxRequest,
+        Response as HttpxResponse,
+        AsyncByteStream,
+        AsyncClient,
+    )
+except ImportError:
+    create_memory_object_stream = None
+    create_task_group = None
+    EndOfStream = None
+
+    JSONRPCMessage = None
+    JSONRPCNotification = None
+    JSONRPCRequest = None
+    SessionMessage = None
+
+    ASGITransport = None
+    HttpxRequest = None
+    HttpxResponse = None
+    AsyncByteStream = None
+    AsyncClient = None
 
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
@@ -590,6 +629,363 @@ def suppress_deprecation_warnings():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         yield
+
+
+@pytest.fixture
+def get_initialization_payload():
+    def inner(request_id: str):
+        return SessionMessage(  # type: ignore
+            message=JSONRPCMessage(  # type: ignore
+                root=JSONRPCRequest(  # type: ignore
+                    jsonrpc="2.0",
+                    id=request_id,
+                    method="initialize",
+                    params={
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test-client", "version": "1.0.0"},
+                    },
+                )
+            )
+        )
+
+    return inner
+
+
+@pytest.fixture
+def get_initialized_notification_payload():
+    def inner():
+        return SessionMessage(  # type: ignore
+            message=JSONRPCMessage(  # type: ignore
+                root=JSONRPCNotification(  # type: ignore
+                    jsonrpc="2.0",
+                    method="notifications/initialized",
+                )
+            )
+        )
+
+    return inner
+
+
+@pytest.fixture
+def get_mcp_command_payload():
+    def inner(method: str, params, request_id: str):
+        return SessionMessage(  # type: ignore
+            message=JSONRPCMessage(  # type: ignore
+                root=JSONRPCRequest(  # type: ignore
+                    jsonrpc="2.0",
+                    id=request_id,
+                    method=method,
+                    params=params,
+                )
+            )
+        )
+
+    return inner
+
+
+@pytest.fixture
+def stdio(
+    get_initialization_payload,
+    get_initialized_notification_payload,
+    get_mcp_command_payload,
+):
+    async def inner(server, method: str, params, request_id: str | None = None):
+        if request_id is None:
+            request_id = "1"
+
+        read_stream_writer, read_stream = create_memory_object_stream(0)  # type: ignore
+        write_stream, write_stream_reader = create_memory_object_stream(0)  # type: ignore
+
+        result = {}
+
+        async def run_server():
+            await server.run(
+                read_stream, write_stream, server.create_initialization_options()
+            )
+
+        async def simulate_client(tg, result):
+            init_request = get_initialization_payload("1")
+            await read_stream_writer.send(init_request)
+
+            await write_stream_reader.receive()
+
+            initialized_notification = get_initialized_notification_payload()
+            await read_stream_writer.send(initialized_notification)
+
+            request = get_mcp_command_payload(
+                method, params=params, request_id=request_id
+            )
+            await read_stream_writer.send(request)
+
+            result["response"] = await write_stream_reader.receive()
+
+            tg.cancel_scope.cancel()
+
+        async with create_task_group() as tg:  # type: ignore
+            tg.start_soon(run_server)
+            tg.start_soon(simulate_client, tg, result)
+
+        return result["response"]
+
+    return inner
+
+
+@pytest.fixture()
+def json_rpc():
+    def inner(app, method: str, params, request_id: str):
+        with TestClient(app) as client:  # type: ignore
+            init_response = client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "initialize",
+                    "params": {
+                        "clientInfo": {"name": "test-client", "version": "1.0"},
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                    },
+                    "id": request_id,
+                },
+            )
+
+            session_id = init_response.headers["mcp-session-id"]
+
+            # Notification response is mandatory.
+            # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+            client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                    "mcp-session-id": session_id,
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "notifications/initialized",
+                    "params": {},
+                },
+            )
+
+            response = client.post(
+                "/mcp/",
+                headers={
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                    "mcp-session-id": session_id,
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": method,
+                    "params": params,
+                    "id": request_id,
+                },
+            )
+
+            return session_id, response
+
+    return inner
+
+
+@pytest.fixture()
+def select_mcp_transactions():
+    def inner(events):
+        return [
+            event
+            for event in events
+            if event["type"] == "transaction"
+            and event["contexts"]["trace"]["op"] == "mcp.server"
+        ]
+
+    return inner
+
+
+@pytest.fixture()
+def json_rpc_sse():
+    class StreamingASGITransport(ASGITransport):
+        """
+        Simple transport whose only purpose is to keep GET request alive in SSE connections, allowing
+        tests involving SSE interactions to run in-process.
+        """
+
+        def __init__(
+            self,
+            app: "Callable",
+            keep_sse_alive: "asyncio.Event",
+        ) -> None:
+            self.keep_sse_alive = keep_sse_alive
+            super().__init__(app)
+
+        async def handle_async_request(
+            self, request: "HttpxRequest"
+        ) -> "HttpxResponse":
+            scope = {
+                "type": "http",
+                "method": request.method,
+                "headers": [(k.lower(), v) for (k, v) in request.headers.raw],
+                "path": request.url.path,
+                "query_string": request.url.query,
+            }
+
+            is_streaming_sse = scope["method"] == "GET" and scope["path"] == "/sse"
+            if not is_streaming_sse:
+                return await super().handle_async_request(request)
+
+            request_body = b""
+            if request.content:
+                request_body = await request.aread()
+
+            body_sender, body_receiver = create_memory_object_stream[bytes](0)  # type: ignore
+
+            async def receive() -> "dict[str, Any]":
+                if self.keep_sse_alive.is_set():
+                    return {"type": "http.disconnect"}
+
+                await self.keep_sse_alive.wait()  # Keep alive :)
+                return {
+                    "type": "http.request",
+                    "body": request_body,
+                    "more_body": False,
+                }
+
+            async def send(message: "MutableMapping[str, Any]") -> None:
+                if message["type"] == "http.response.body":
+                    body = message.get("body", b"")
+                    more_body = message.get("more_body", False)
+
+                    if body == b"" and not more_body:
+                        return
+
+                    if body:
+                        await body_sender.send(body)
+
+                    if not more_body:
+                        await body_sender.aclose()
+
+            async def run_app():
+                await self.app(scope, receive, send)
+
+            class StreamingBodyStream(AsyncByteStream):  # type: ignore
+                def __init__(self, receiver):
+                    self.receiver = receiver
+
+                async def __aiter__(self):
+                    try:
+                        async for chunk in self.receiver:
+                            yield chunk
+                    except EndOfStream:  # type: ignore
+                        pass
+
+            stream = StreamingBodyStream(body_receiver)
+            response = HttpxResponse(status_code=200, headers=[], stream=stream)  # type: ignore
+
+            asyncio.create_task(run_app())
+            return response
+
+    def parse_sse_data_package(sse_chunk):
+        sse_text = sse_chunk.decode("utf-8")
+        json_str = sse_text.split("data: ")[1]
+        return json.loads(json_str)
+
+    async def inner(
+        app, method: str, params, request_id: str, keep_sse_alive: "asyncio.Event"
+    ):
+        context = {}
+
+        stream_complete = asyncio.Event()
+        endpoint_parsed = asyncio.Event()
+
+        # https://github.com/Kludex/starlette/issues/104#issuecomment-729087925
+        async with AsyncClient(  # type: ignore
+            transport=StreamingASGITransport(app=app, keep_sse_alive=keep_sse_alive),
+            base_url="http://test",
+        ) as client:
+
+            async def parse_stream():
+                async with client.stream("GET", "/sse") as stream:
+                    # Read directly from stream.stream instead of aiter_bytes()
+                    async for chunk in stream.stream:
+                        if b"event: endpoint" in chunk:
+                            sse_text = chunk.decode("utf-8")
+                            url = sse_text.split("data: ")[1]
+
+                            parsed = urlparse(url)
+                            query_params = parse_qs(parsed.query)
+                            context["session_id"] = query_params["session_id"][0]
+                            endpoint_parsed.set()
+                            continue
+
+                        if b"event: message" in chunk and b"structuredContent" in chunk:
+                            context["response"] = parse_sse_data_package(chunk)
+                            break
+                        elif (
+                            "result" in parse_sse_data_package(chunk)
+                            and "content" in parse_sse_data_package(chunk)["result"]
+                        ):
+                            context["response"] = parse_sse_data_package(chunk)
+                            break
+
+                stream_complete.set()
+
+            task = asyncio.create_task(parse_stream())
+            await endpoint_parsed.wait()
+
+            await client.post(
+                f"/messages/?session_id={context['session_id']}",
+                headers={
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "initialize",
+                    "params": {
+                        "clientInfo": {"name": "test-client", "version": "1.0"},
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                    },
+                    "id": request_id,
+                },
+            )
+
+            # Notification response is mandatory.
+            # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+            await client.post(
+                f"/messages/?session_id={context['session_id']}",
+                headers={
+                    "Content-Type": "application/json",
+                    "mcp-session-id": context["session_id"],
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "notifications/initialized",
+                    "params": {},
+                },
+            )
+
+            await client.post(
+                f"/messages/?session_id={context['session_id']}",
+                headers={
+                    "Content-Type": "application/json",
+                    "mcp-session-id": context["session_id"],
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "method": method,
+                    "params": params,
+                    "id": request_id,
+                },
+            )
+
+            await stream_complete.wait()
+            keep_sse_alive.set()
+
+            return task, context["session_id"], context["response"]
+
+    return inner
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):

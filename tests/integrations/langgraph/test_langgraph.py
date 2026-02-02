@@ -270,9 +270,8 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
             import json
 
             request_messages = json.loads(request_messages)
-        assert len(request_messages) == 2
-        assert request_messages[0]["content"] == "Hello, can you help me?"
-        assert request_messages[1]["content"] == "Of course! How can I assist you?"
+        assert len(request_messages) == 1
+        assert request_messages[0]["content"] == "Of course! How can I assist you?"
 
         response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert response_text == expected_assistant_response
@@ -1383,7 +1382,8 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 2
-    assert "small message 4" in str(parsed_messages[0])
-    assert "small message 5" in str(parsed_messages[1])
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
+
+    assert invoke_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 5
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
