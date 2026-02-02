@@ -15,6 +15,7 @@ The tests mock the MCP server components and request context to verify
 that the integration properly instruments MCP handlers with Sentry spans.
 """
 
+import anyio
 import pytest
 import json
 from unittest import mock
@@ -45,6 +46,73 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
+
+from starlette.testclient import TestClient
+
+
+def json_rpc(app, method: str, params, request_id: str):
+    with TestClient(app) as client:
+        init_response = client.post(
+            "/mcp/",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "params": {
+                    "clientInfo": {"name": "test-client", "version": "1.0"},
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                },
+                "id": request_id,
+            },
+        )
+
+        session_id = init_response.headers["mcp-session-id"]
+
+        # Notification response is mandatory.
+        # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+        client.post(
+            "/mcp/",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+                "mcp-session-id": session_id,
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {},
+            },
+        )
+
+        response = client.post(
+            "/mcp/",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+                "mcp-session-id": session_id,
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": method,
+                "params": params,
+                "id": request_id,
+            },
+        )
+
+        return session_id, response
+
+
+def select_mcp_transactions(events):
+    return [
+        event
+        for event in events
+        if event["type"] == "transaction"
+        and event["contexts"]["trace"]["op"] == "mcp.server"
+    ]
 
 
 @pytest.fixture(autouse=True)
