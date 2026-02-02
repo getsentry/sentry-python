@@ -6,6 +6,7 @@ sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
 import uuid
+import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -361,7 +362,7 @@ class StreamedSpan:
         """
         return self.__enter__()
 
-    def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+    def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         """
         Finish this span and queue it for sending.
 
@@ -377,6 +378,15 @@ class StreamedSpan:
             pass
 
         self.__exit__(None, None, None)
+
+    def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        warnings.warn(
+            "span.finish() is deprecated. Use span.end() instead."
+            stacklevel=2,
+            category=DeprecationWarning,
+        )
+
+        self.end(end_timestamp)
 
     def _end(
         self,
