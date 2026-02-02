@@ -143,12 +143,15 @@ def _collect_ai_data(
                 model = event.message.model or model
 
                 incoming_usage = event.message.usage
-                usage.input_tokens = incoming_usage.input_tokens
                 usage.output_tokens = incoming_usage.output_tokens
-                usage.cache_write_input_tokens = (
-                    incoming_usage.cache_creation_input_tokens
+                usage.input_tokens = incoming_usage.input_tokens
+
+                usage.cache_write_input_tokens = getattr(
+                    incoming_usage, "cache_creation_input_tokens", None
                 )
-                usage.cache_read_input_tokens = incoming_usage.cache_read_input_tokens
+                usage.cache_read_input_tokens = getattr(
+                    incoming_usage, "cache_read_input_tokens", None
+                )
 
                 return (
                     model,
@@ -161,14 +164,21 @@ def _collect_ai_data(
                 usage.output_tokens = event.usage.output_tokens
 
                 # Update other usage fields if they exist in the event
-                if event.usage.input_tokens is not None:
-                    usage.input_tokens = event.usage.input_tokens
-                if event.usage.cache_creation_input_tokens is not None:
-                    usage.cache_write_input_tokens = (
-                        event.usage.cache_creation_input_tokens
-                    )
-                if event.usage.cache_read_input_tokens is not None:
-                    usage.cache_read_input_tokens = event.usage.cache_read_input_tokens
+                input_tokens = getattr(event.usage, "input_tokens", None)
+                if input_tokens is not None:
+                    usage.input_tokens = input_tokens
+
+                cache_creation_input_tokens = getattr(
+                    event.usage, "cache_creation_input_tokens", None
+                )
+                if cache_creation_input_tokens is not None:
+                    usage.cache_write_input_tokens = cache_creation_input_tokens
+
+                cache_read_input_tokens = getattr(
+                    event.usage, "cache_read_input_tokens", None
+                )
+                if cache_read_input_tokens is not None:
+                    usage.cache_read_input_tokens = cache_read_input_tokens
                 # TODO: Record event.usage.server_tool_use
 
                 return (
