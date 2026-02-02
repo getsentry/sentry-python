@@ -15,7 +15,12 @@ The tests mock the MCP server components and request context to verify
 that the integration properly instruments MCP handlers with Sentry spans.
 """
 
+from urllib.parse import urlparse, parse_qs
 import anyio
+import asyncio
+import httpx
+from .streaming_asgi_transport import StreamingASGITransport
+
 import pytest
 import json
 from unittest import mock
@@ -43,9 +48,11 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
 
+from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from starlette.routing import Mount
+from starlette.routing import Mount, Route
 from starlette.applications import Starlette
+from starlette.responses import Response
 
 
 @pytest.fixture(autouse=True)
@@ -67,39 +74,103 @@ def reset_request_ctx():
             pass
 
 
-class MockRequestContext:
-    """Mock MCP request context"""
-
-    def __init__(self, request_id=None, session_id=None, transport="stdio"):
-        self.request_id = request_id
-        if transport in ("http", "sse"):
-            self.request = MockHTTPRequest(session_id, transport)
-        else:
-            self.request = None
-
-
-class MockHTTPRequest:
-    """Mock HTTP request for SSE/StreamableHTTP transport"""
-
-    def __init__(self, session_id=None, transport="http"):
-        self.headers = {}
-        self.query_params = {}
-
-        if transport == "sse":
-            # SSE transport uses query parameter
-            if session_id:
-                self.query_params["session_id"] = session_id
-        else:
-            # StreamableHTTP transport uses header
-            if session_id:
-                self.headers["mcp-session-id"] = session_id
-
-
 class MockTextContent:
     """Mock TextContent object"""
 
     def __init__(self, text):
         self.text = text
+
+
+async def json_rpc_sse(
+    app, method: str, params, request_id: str, keep_sse_alive: "asyncio.Event"
+):
+    context = {}
+
+    stream_complete = asyncio.Event()
+    endpoint_parsed = asyncio.Event()
+
+    # https://github.com/Kludex/starlette/issues/104#issuecomment-729087925
+    async with httpx.AsyncClient(
+        transport=StreamingASGITransport(app=app, keep_sse_alive=keep_sse_alive),
+        base_url="http://test",
+    ) as client:
+
+        async def parse_stream():
+            async with client.stream("GET", "/sse") as stream:
+                # Read directly from stream.stream instead of aiter_bytes()
+                async for chunk in stream.stream:
+                    if b"event: endpoint" in chunk:
+                        sse_text = chunk.decode("utf-8")
+                        url = sse_text.split("data: ")[1]
+
+                        parsed = urlparse(url)
+                        query_params = parse_qs(parsed.query)
+                        context["session_id"] = query_params["session_id"][0]
+                        endpoint_parsed.set()
+                        continue
+
+                    if b"event: message" in chunk and b"structuredContent" in chunk:
+                        sse_text = chunk.decode("utf-8")
+
+                        json_str = sse_text.split("data: ")[1]
+                        context["response"] = json.loads(json_str)
+                        break
+
+            stream_complete.set()
+
+        task = asyncio.create_task(parse_stream())
+        await endpoint_parsed.wait()
+
+        await client.post(
+            f"/messages/?session_id={context['session_id']}",
+            headers={
+                "Content-Type": "application/json",
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "params": {
+                    "clientInfo": {"name": "test-client", "version": "1.0"},
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                },
+                "id": request_id,
+            },
+        )
+
+        # Notification response is mandatory.
+        # https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+        await client.post(
+            f"/messages/?session_id={context['session_id']}",
+            headers={
+                "Content-Type": "application/json",
+                "mcp-session-id": context["session_id"],
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {},
+            },
+        )
+
+        await client.post(
+            f"/messages/?session_id={context['session_id']}",
+            headers={
+                "Content-Type": "application/json",
+                "mcp-session-id": context["session_id"],
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": method,
+                "params": params,
+                "id": request_id,
+            },
+        )
+
+        await stream_complete.wait()
+        keep_sse_alive.set()
+
+        return task, context["session_id"], context["response"]
 
 
 def test_integration_patches_server(sentry_init):
@@ -986,7 +1057,8 @@ async def test_tool_with_complex_arguments(sentry_init, capture_events, stdio):
     assert span["data"]["mcp.request.argument.number"] == "42"
 
 
-def test_sse_transport_detection(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_sse_transport_detection(sentry_init, capture_events):
     """Test that SSE transport is correctly detected via query parameter"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -995,29 +1067,67 @@ def test_sse_transport_detection(sentry_init, capture_events):
     events = capture_events()
 
     server = Server("test-server")
+    sse = SseServerTransport("/messages/")
 
-    # Set up mock request context with SSE transport
-    mock_ctx = MockRequestContext(
-        request_id="req-sse", session_id="session-sse-123", transport="sse"
+    sse_connection_closed = asyncio.Event()
+
+    async def handle_sse(request):
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            async with anyio.create_task_group() as tg:
+
+                async def run_server():
+                    await server.run(
+                        streams[0], streams[1], server.create_initialization_options()
+                    )
+
+                tg.start_soon(run_server)
+
+        sse_connection_closed.set()
+        return Response()
+
+    app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse, methods=["GET"]),
+            Mount("/messages/", app=sse.handle_post_message),
+        ],
     )
-    request_ctx.set(mock_ctx)
 
     @server.call_tool()
-    def test_tool(tool_name, arguments):
+    async def test_tool(tool_name, arguments):
         return {"result": "success"}
 
-    with start_transaction(name="mcp tx"):
-        result = test_tool("sse_tool", {})
+    keep_sse_alive = asyncio.Event()
+    app_task, session_id, result = await json_rpc_sse(
+        app,
+        method="tools/call",
+        params={
+            "name": "sse_tool",
+            "arguments": {},
+        },
+        request_id="req-sse",
+        keep_sse_alive=keep_sse_alive,
+    )
 
-    assert result == {"result": "success"}
+    await sse_connection_closed.wait()
+    await app_task
 
-    (tx,) = events
+    assert result["result"]["structuredContent"] == {"result": "success"}
+
+    transactions = [
+        event
+        for event in events
+        if event["type"] == "transaction" and event["transaction"] == "/sse"
+    ]
+    assert len(transactions) == 1
+    tx = transactions[0]
     span = tx["spans"][0]
 
     # Check that SSE transport is detected
     assert span["data"][SPANDATA.MCP_TRANSPORT] == "sse"
     assert span["data"][SPANDATA.NETWORK_TRANSPORT] == "tcp"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-sse-123"
+    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
 
 def test_streamable_http_transport_detection(
