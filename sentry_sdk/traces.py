@@ -381,7 +381,7 @@ class StreamedSpan:
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         warnings.warn(
-            "span.finish() is deprecated. Use span.end() instead."
+            "span.finish() is deprecated. Use span.end() instead.",
             stacklevel=2,
             category=DeprecationWarning,
         )
