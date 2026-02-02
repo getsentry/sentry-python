@@ -33,7 +33,6 @@ from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.server import request_ctx
 from mcp.types import GetPromptResult, PromptMessage, TextContent
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 try:
     from mcp.server.lowlevel.server import request_ctx
@@ -44,6 +43,7 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
 
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.routing import Mount
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
