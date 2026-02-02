@@ -667,7 +667,10 @@ def stdio(
     get_initialized_notification_payload,
     get_mcp_command_payload,
 ):
-    async def inner(server, method: str, params, request_id: str):
+    async def inner(server, method: str, params, request_id: str | None = None):
+        if request_id is None:
+            request_id = "1"
+
         read_stream_writer, read_stream = create_memory_object_stream(0)  # type: ignore
         write_stream, write_stream_reader = create_memory_object_stream(0)  # type: ignore
 
