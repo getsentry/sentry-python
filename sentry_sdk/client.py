@@ -11,6 +11,7 @@ import warnings
 import sentry_sdk
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk._metrics_batcher import MetricsBatcher
+from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.utils import (
     AnnotatedValue,
     ContextVar,
@@ -31,6 +32,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
     SPANDATA,
@@ -188,6 +190,7 @@ class BaseClient:
         self.monitor: "Optional[Monitor]" = None
         self.log_batcher: "Optional[LogBatcher]" = None
         self.metrics_batcher: "Optional[MetricsBatcher]" = None
+        self.span_batcher: "Optional[SpanBatcher]" = None
         self.integrations: "dict[str, Integration]" = {}
 
     def __getstate__(self, *args: "Any", **kwargs: "Any") -> "Any":
@@ -395,6 +398,13 @@ class _Client(BaseClient):
             self.metrics_batcher = None
             if has_metrics_enabled(self.options):
                 self.metrics_batcher = MetricsBatcher(
+                    capture_func=_capture_envelope,
+                    record_lost_func=_record_lost_event,
+                )
+
+            self.span_batcher = None
+            if has_span_streaming_enabled(self.options):
+                self.span_batcher = SpanBatcher(
                     capture_func=_capture_envelope,
                     record_lost_func=_record_lost_event,
                 )
@@ -909,7 +919,10 @@ class _Client(BaseClient):
         return return_value
 
     def _capture_telemetry(
-        self, telemetry: "Optional[Union[Log, Metric]]", ty: str, scope: "Scope"
+        self,
+        telemetry: "Optional[Union[Log, Metric]]",
+        ty: str,
+        scope: "Scope",
     ) -> None:
         # Capture attributes-based telemetry (logs, metrics, spansV2)
         if telemetry is None:
@@ -993,6 +1006,8 @@ class _Client(BaseClient):
                 self.log_batcher.kill()
             if self.metrics_batcher is not None:
                 self.metrics_batcher.kill()
+            if self.span_batcher is not None:
+                self.span_batcher.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -1018,6 +1033,8 @@ class _Client(BaseClient):
                 self.log_batcher.flush()
             if self.metrics_batcher is not None:
                 self.metrics_batcher.flush()
+            if self.span_batcher is not None:
+                self.span_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self) -> "_Client":

@@ -15,6 +15,7 @@ The tests mock the MCP server components and request context to verify
 that the integration properly instruments MCP handlers with Sentry spans.
 """
 
+import anyio
 import pytest
 import json
 from unittest import mock
@@ -49,6 +50,81 @@ except ImportError:
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
+
+
+def get_initialization_payload(request_id: str):
+    return SessionMessage(
+        message=JSONRPCMessage(
+            root=JSONRPCRequest(
+                jsonrpc="2.0",
+                id=request_id,
+                method="initialize",
+                params={
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "1.0.0"},
+                },
+            )
+        )
+    )
+
+
+def get_initialized_notification_payload():
+    return SessionMessage(
+        message=JSONRPCMessage(
+            root=JSONRPCNotification(
+                jsonrpc="2.0",
+                method="notifications/initialized",
+            )
+        )
+    )
+
+
+def get_mcp_command_payload(method: str, params, request_id: str):
+    return SessionMessage(
+        message=JSONRPCMessage(
+            root=JSONRPCRequest(
+                jsonrpc="2.0",
+                id=request_id,
+                method=method,
+                params=params,
+            )
+        )
+    )
+
+
+async def stdio(server, method: str, params, request_id: str):
+    read_stream_writer, read_stream = anyio.create_memory_object_stream(0)
+    write_stream, write_stream_reader = anyio.create_memory_object_stream(0)
+
+    result = {}
+
+    async def run_server():
+        await server.run(
+            read_stream, write_stream, server.create_initialization_options()
+        )
+
+    async def simulate_client(tg, result):
+        init_request = get_initialization_payload("1")
+        await read_stream_writer.send(init_request)
+
+        await write_stream_reader.receive()
+
+        initialized_notification = get_initialized_notification_payload()
+        await read_stream_writer.send(initialized_notification)
+
+        request = get_mcp_command_payload(method, params=params, request_id=request_id)
+        await read_stream_writer.send(request)
+
+        result["response"] = await write_stream_reader.receive()
+
+        tg.cancel_scope.cancel()
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(run_server)
+        tg.start_soon(simulate_client, tg, result)
+
+    return result["response"]
 
 
 @pytest.fixture(autouse=True)
