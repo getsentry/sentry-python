@@ -625,7 +625,7 @@ async def test_fastmcp_prompt_sync(
                 },
             }
 
-            if Message is not None:
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
                 message = Message(message)
 
             return [message]
@@ -714,7 +714,7 @@ async def test_fastmcp_prompt_async(
                 },
             }
 
-            if Message is not None:
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
                 message1 = Message(message1)
                 message2 = Message(message2)
 
