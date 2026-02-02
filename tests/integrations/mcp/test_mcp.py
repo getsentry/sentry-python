@@ -34,15 +34,16 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
-from mcp.types import GetPromptResult, PromptMessage, TextContent
-from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.server import request_ctx
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
-from starlette.routing import Mount, Route, Response
+from starlette.routing import Mount, Route
+from starlette.responses import Response
 from starlette.applications import Starlette
+from mcp.types import GetPromptResult, PromptMessage, TextContent
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 
 try:
     from mcp.server.lowlevel.server import request_ctx
@@ -71,6 +72,34 @@ def reset_request_ctx():
             request_ctx.set(None)
         except LookupError:
             pass
+
+
+class MockRequestContext:
+    """Mock MCP request context"""
+
+    def __init__(self, request_id=None, session_id=None, transport="stdio"):
+        self.request_id = request_id
+        if transport in ("http", "sse"):
+            self.request = MockHTTPRequest(session_id, transport)
+        else:
+            self.request = None
+
+
+class MockHTTPRequest:
+    """Mock HTTP request for SSE/StreamableHTTP transport"""
+
+    def __init__(self, session_id=None, transport="http"):
+        self.headers = {}
+        self.query_params = {}
+
+        if transport == "sse":
+            # SSE transport uses query parameter
+            if session_id:
+                self.query_params["session_id"] = session_id
+        else:
+            # StreamableHTTP transport uses header
+            if session_id:
+                self.headers["mcp-session-id"] = session_id
 
 
 class MockTextContent:
