@@ -31,7 +31,6 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     has_span_streaming_enabled,
     is_ignored_span,
-    normalize_incoming_data,
     PropagationContext,
 )
 from sentry_sdk.traces import StreamedSpan
@@ -1683,7 +1682,7 @@ class Scope:
         if isinstance(telemetry, dict):
             attributes = telemetry["attributes"]
         else:
-            attributes = telemetry.attributes
+            attributes = telemetry._attributes
 
         for attribute, value in self._attributes.items():
             if attribute not in attributes:
@@ -1695,7 +1694,7 @@ class Scope:
         if isinstance(telemetry, dict):
             attributes = telemetry["attributes"]
         else:
-            attributes = telemetry.attributes
+            attributes = telemetry._attributes
 
         if not should_send_default_pii() or self._user is None:
             return

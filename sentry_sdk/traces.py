@@ -204,7 +204,7 @@ class StreamedSpan:
 
     __slots__ = (
         "name",
-        "attributes",
+        "_attributes",
         "_span_id",
         "_trace_id",
         "parent_span_id",
@@ -250,7 +250,7 @@ class StreamedSpan:
         self._scope = scope
 
         self.name: str = name
-        self.attributes: "Attributes" = attributes or {}
+        self._attributes: "Attributes" = attributes or {}
 
         self._trace_id = trace_id
         self.parent_span_id = parent_span_id
@@ -318,7 +318,7 @@ class StreamedSpan:
                 "span_id": self.span_id,
                 "parent_span_id": self.parent_span_id,
                 "parent_sampled": self.parent_sampled,
-                "attributes": self.attributes,
+                "attributes": self._attributes,
             }
             custom_sampling_context = (
                 scope.get_active_propagation_context()._custom_sampling_context
@@ -432,20 +432,20 @@ class StreamedSpan:
         self._finished = True
 
     def get_attributes(self) -> "Attributes":
-        return self.attributes
+        return self._attributes
 
     def set_attribute(self, key: str, value: "AttributeValue") -> None:
-        self.attributes[key] = format_attribute(value)
-
-    def remove_attribute(self, key: str) -> None:
-        try:
-            del self.attributes[key]
-        except KeyError:
-            pass
+        self._attributes[key] = format_attribute(value)
 
     def set_attributes(self, attributes: "Attributes") -> None:
         for key, value in attributes.items():
             self.set_attribute(key, value)
+
+    def remove_attribute(self, key: str) -> None:
+        try:
+            del self._attributes[key]
+        except KeyError:
+            pass
 
     def set_status(self, status: "Union[SpanStatus, str]") -> None:
         if isinstance(status, Enum):
