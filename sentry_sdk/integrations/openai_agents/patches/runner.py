@@ -36,17 +36,11 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
             # Clone agent because agent invocation spans are attached per run.
             agent = args[0].clone()
 
-            # Capture conversation_id from kwargs if provided
-            conversation_id = kwargs.get("conversation_id")
-            if conversation_id:
-                agent._sentry_conversation_id = conversation_id
-
-            with agent_workflow_span(agent) as workflow_span:
+            with agent_workflow_span(agent):
                 # Set conversation ID on workflow span early so it's captured even on errors
+                conversation_id = kwargs.get("conversation_id")
                 if conversation_id:
-                    workflow_span.set_data(
-                        SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
-                    )
+                    agent._sentry_conversation_id = conversation_id
 
                 args = (agent, *args[1:])
                 try:
@@ -129,11 +123,7 @@ def _create_run_streamed_wrapper(
             # If run_streamed itself fails (not the background task), clean up immediately
             workflow_span.__exit__(*sys.exc_info())
             _capture_exception(exc)
-            raise exc from None
-
-        # Store references for cleanup
-        run_result._sentry_workflow_span = workflow_span
-        run_result._sentry_agent = agent
+            raise exc
 
         def _close_workflow_span() -> None:
             if hasattr(agent, "_sentry_workflow_span"):

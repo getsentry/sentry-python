@@ -1,5 +1,4 @@
 import copy
-import sys
 import time
 from functools import wraps
 
@@ -126,7 +125,7 @@ def _create_get_model_wrapper(
                     delattr(agent, "_sentry_response_model")
 
                 _set_response_model_on_agent_span(agent, response_model)
-                update_ai_client_span(span, result, response_model, agent)
+                update_ai_client_span(span, result, response_model)
 
             return result
 
