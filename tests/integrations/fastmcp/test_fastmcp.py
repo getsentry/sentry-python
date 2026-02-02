@@ -72,12 +72,6 @@ except ImportError:
     ReadResourceRequest = None
 
 
-try:
-    from fastmcp import __version__ as FASTMCP_VERSION
-except ImportError:
-    FASTMCP_VERSION = None
-
-
 # Collect available FastMCP implementations for parametrization
 fastmcp_implementations = []
 fastmcp_ids = []
@@ -320,24 +314,10 @@ async def test_fastmcp_tool_sync(
             request_id="req-123",
         )
 
-    if (
-        isinstance(mcp, StandaloneFastMCP)
-        and FASTMCP_VERSION is not None
-        and FASTMCP_VERSION.startswith("2")
-    ):
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {"result": 15, "operation": "addition"}, separators=(",", ":")
-        )
-    elif (
-        isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION is not None
-    ):  # Checking for None is not precise.
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {"result": 15, "operation": "addition"}
-        )
-    else:
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {"result": 15, "operation": "addition"}, indent=2
-        )
+    assert json.loads(result.message.root.result["content"][0]["text"]) == {
+        "result": 15,
+        "operation": "addition",
+    }
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -581,41 +561,12 @@ async def test_fastmcp_tool_with_complex_return(
             request_id="req-complex",
         )
 
-    if (
-        isinstance(mcp, StandaloneFastMCP)
-        and FASTMCP_VERSION is not None
-        and FASTMCP_VERSION.startswith("2")
-    ):
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {
-                "id": 123,
-                "name": "Alice",
-                "nested": {"preferences": {"theme": "dark", "notifications": True}},
-                "tags": ["admin", "verified"],
-            },
-            separators=(",", ":"),
-        )
-    elif (
-        isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION is not None
-    ):  # Checking for None is not precise.
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {
-                "id": 123,
-                "name": "Alice",
-                "nested": {"preferences": {"theme": "dark", "notifications": True}},
-                "tags": ["admin", "verified"],
-            }
-        )
-    else:
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {
-                "id": 123,
-                "name": "Alice",
-                "nested": {"preferences": {"theme": "dark", "notifications": True}},
-                "tags": ["admin", "verified"],
-            },
-            indent=2,
-        )
+    assert json.loads(result.message.root.result["content"][0]["text"]) == {
+        "id": 123,
+        "name": "Alice",
+        "nested": {"preferences": {"theme": "dark", "notifications": True}},
+        "tags": ["admin", "verified"],
+    }
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -1057,24 +1008,9 @@ async def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP, std
             request_id="req-stdio",
         )
 
-    if (
-        isinstance(mcp, StandaloneFastMCP)
-        and FASTMCP_VERSION is not None
-        and FASTMCP_VERSION.startswith("2")
-    ):
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {"squared": 49}, separators=(",", ":")
-        )
-    elif (
-        isinstance(mcp, StandaloneFastMCP) and FASTMCP_VERSION is not None
-    ):  # Checking for None is not precise.
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {"squared": 49}
-        )
-    else:
-        assert result.message.root.result["content"][0]["text"] == json.dumps(
-            {"squared": 49}, indent=2
-        )
+    assert json.loads(result.message.root.result["content"][0]["text"]) == {
+        "squared": 49
+    }
 
     (tx,) = events
 
@@ -1118,10 +1054,11 @@ def test_mcp_fastmcp_specific_features(sentry_init, capture_events):
     assert tx["type"] == "transaction"
 
 
+@pytest.mark.asyncio
 @pytest.mark.skipif(
     not HAS_STANDALONE_FASTMCP, reason="standalone fastmcp not installed"
 )
-def test_standalone_fastmcp_specific_features(sentry_init, capture_events):
+async def test_standalone_fastmcp_specific_features(sentry_init, capture_events, stdio):
     """Test features specific to standalone fastmcp package"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1139,12 +1076,19 @@ def test_standalone_fastmcp_specific_features(sentry_init, capture_events):
         return {"echo": message, "length": len(message)}
 
     with start_transaction(name="standalone fastmcp tx"):
-        result = call_tool_through_mcp(
-            mcp, "standalone_specific_tool", {"message": "Hello FastMCP"}
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "standalone_specific_tool",
+                "arguments": {"message": "Hello FastMCP"},
+            },
         )
 
-    assert result["echo"] == "Hello FastMCP"
-    assert result["length"] == 13
+    assert json.loads(result.message.root.result["content"][0]["text"]) == {
+        "echo": "Hello FastMCP",
+        "length": 13,
+    }
 
     (tx,) = events
     assert tx["type"] == "transaction"
@@ -1155,8 +1099,11 @@ def test_standalone_fastmcp_specific_features(sentry_init, capture_events):
 # =============================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_tool_with_no_arguments(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_tool_with_no_arguments(
+    sentry_init, capture_events, FastMCP, stdio
+):
     """Test FastMCP tool with no arguments"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1172,16 +1119,26 @@ def test_fastmcp_tool_with_no_arguments(sentry_init, capture_events, FastMCP):
         return "success"
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "no_args_tool", {})
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "no_args_tool",
+                "arguments": {},
+            },
+        )
 
-    assert result["result"] == "success"
+    assert result.message.root.result["content"][0]["text"] == "success"
 
     (tx,) = events
     assert tx["type"] == "transaction"
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_tool_with_none_return(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_tool_with_none_return(
+    sentry_init, capture_events, FastMCP, stdio
+):
     """Test FastMCP tool that returns None"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -1197,10 +1154,16 @@ def test_fastmcp_tool_with_none_return(sentry_init, capture_events, FastMCP):
         pass
 
     with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "none_return_tool", {"action": "log"})
+        result = await stdio(
+            mcp._mcp_server,
+            method="tools/call",
+            params={
+                "name": "none_return_tool",
+                "arguments": {"action": "log"},
+            },
+        )
 
-    # Helper function normalizes to {"result": value} format
-    assert result["result"] is None
+    assert len(result.message.root.result["content"]) == 0
 
     (tx,) = events
     assert tx["type"] == "transaction"
