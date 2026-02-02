@@ -21,6 +21,7 @@ to properly trigger Sentry instrumentation and span creation. This ensures
 accurate testing of the integration's behavior in real MCP Server scenarios.
 """
 
+import anyio
 import asyncio
 import json
 import pytest
@@ -39,9 +40,11 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.mcp import MCPIntegration
 
+from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
-from starlette.routing import Mount
+from starlette.responses import Response
+from starlette.routing import Mount, Route
 from starlette.applications import Starlette
 
 # Try to import both FastMCP implementations
@@ -252,34 +255,6 @@ def reset_request_ctx():
             request_ctx.set(None)
         except LookupError:
             pass
-
-
-class MockRequestContext:
-    """Mock MCP request context"""
-
-    def __init__(self, request_id=None, session_id=None, transport="stdio"):
-        self.request_id = request_id
-        if transport in ("http", "sse"):
-            self.request = MockHTTPRequest(session_id, transport)
-        else:
-            self.request = None
-
-
-class MockHTTPRequest:
-    """Mock HTTP request for SSE/StreamableHTTP transport"""
-
-    def __init__(self, session_id=None, transport="http"):
-        self.headers = {}
-        self.query_params = {}
-
-        if transport == "sse":
-            # SSE transport uses query parameter
-            if session_id:
-                self.query_params["session_id"] = session_id
-        else:
-            # StreamableHTTP transport uses header
-            if session_id:
-                self.headers["mcp-session-id"] = session_id
 
 
 # =============================================================================
@@ -956,8 +931,11 @@ def test_fastmcp_without_request_context(sentry_init, capture_events, FastMCP):
 # =============================================================================
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-def test_fastmcp_sse_transport(sentry_init, capture_events, FastMCP):
+async def test_fastmcp_sse_transport(
+    sentry_init, capture_events, FastMCP, json_rpc_sse
+):
     """Test that FastMCP correctly detects SSE transport"""
     sentry_init(
         integrations=[MCPIntegration()],
@@ -966,25 +944,66 @@ def test_fastmcp_sse_transport(sentry_init, capture_events, FastMCP):
     events = capture_events()
 
     mcp = FastMCP("Test Server")
+    sse = SseServerTransport("/messages/")
 
-    # Set up mock request context with SSE transport
-    if request_ctx is not None:
-        mock_ctx = MockRequestContext(
-            request_id="req-sse", session_id="session-sse-123", transport="sse"
-        )
-        request_ctx.set(mock_ctx)
+    sse_connection_closed = asyncio.Event()
+
+    async def handle_sse(request):
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            async with anyio.create_task_group() as tg:
+
+                async def run_server():
+                    await mcp._mcp_server.run(
+                        streams[0],
+                        streams[1],
+                        mcp._mcp_server.create_initialization_options(),
+                    )
+
+                tg.start_soon(run_server)
+
+        sse_connection_closed.set()
+        return Response()
+
+    app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse, methods=["GET"]),
+            Mount("/messages/", app=sse.handle_post_message),
+        ],
+    )
 
     @mcp.tool()
     def sse_tool(value: str) -> dict:
         """Tool for SSE transport test"""
         return {"message": f"Received: {value}"}
 
-    with start_transaction(name="fastmcp tx"):
-        result = call_tool_through_mcp(mcp, "sse_tool", {"value": "hello"})
+    keep_sse_alive = asyncio.Event()
+    app_task, _, result = await json_rpc_sse(
+        app,
+        method="tools/call",
+        params={
+            "name": "sse_tool",
+            "arguments": {"value": "hello"},
+        },
+        request_id="req-sse",
+        keep_sse_alive=keep_sse_alive,
+    )
 
-    assert result == {"message": "Received: hello"}
+    await sse_connection_closed.wait()
+    await app_task
 
-    (tx,) = events
+    assert json.loads(result["result"]["content"][0]["text"]) == {
+        "message": "Received: hello"
+    }
+
+    transactions = [
+        event
+        for event in events
+        if event["type"] == "transaction" and event["transaction"] == "/sse"
+    ]
+    assert len(transactions) == 1
+    tx = transactions[0]
 
     # Find MCP spans
     mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
