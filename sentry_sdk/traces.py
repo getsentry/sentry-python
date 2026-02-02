@@ -248,7 +248,10 @@ class StreamedSpan:
         self._scope = scope
 
         self.name: str = name
-        self._attributes: "Attributes" = attributes or {}
+        self._attributes: "Attributes" = {}
+        if attributes:
+            for attribute, value in attributes.items():
+                self.set_attribute(attribute, value)
 
         self._trace_id = trace_id
         self.parent_span_id = parent_span_id
