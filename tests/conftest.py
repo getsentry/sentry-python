@@ -805,7 +805,7 @@ def select_mcp_transactions():
 
 
 @pytest.fixture()
-def json_rpc_sse(is_structured_content: bool = True):
+def json_rpc_sse():
     class StreamingASGITransport(ASGITransport):
         """
         Simple transport whose only purpose is to keep GET request alive in SSE connections, allowing
@@ -919,11 +919,7 @@ def json_rpc_sse(is_structured_content: bool = True):
                             endpoint_parsed.set()
                             continue
 
-                        if (
-                            is_structured_content
-                            and b"event: message" in chunk
-                            and b"structuredContent" in chunk
-                        ):
+                        if b"event: message" in chunk and b"structuredContent" in chunk:
                             context["response"] = parse_sse_data_package(chunk)
                             break
                         elif (
