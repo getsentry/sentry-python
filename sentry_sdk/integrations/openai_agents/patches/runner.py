@@ -2,6 +2,7 @@ import sys
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
@@ -34,7 +35,16 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
         with sentry_sdk.isolation_scope():
             # Clone agent because agent invocation spans are attached per run.
             agent = args[0].clone()
-            with agent_workflow_span(agent):
+
+            with agent_workflow_span(agent) as workflow_span:
+                # Set conversation ID on workflow span early so it's captured even on errors
+                conversation_id = kwargs.get("conversation_id")
+                if conversation_id:
+                    agent._sentry_conversation_id = conversation_id
+                    workflow_span.set_data(
+                        SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+                    )
+
                 args = (agent, *args[1:])
                 try:
                     run_result = await original_func(*args, **kwargs)
@@ -91,9 +101,18 @@ def _create_run_streamed_wrapper(
         # Clone agent because agent invocation spans are attached per run.
         agent = args[0].clone()
 
+        # Capture conversation_id from kwargs if provided
+        conversation_id = kwargs.get("conversation_id")
+        if conversation_id:
+            agent._sentry_conversation_id = conversation_id
+
         # Start workflow span immediately (before run_streamed returns)
         workflow_span = agent_workflow_span(agent)
         workflow_span.__enter__()
+
+        # Set conversation ID on workflow span early so it's captured even on errors
+        if conversation_id:
+            workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
 
         # Store span on agent for cleanup
         agent._sentry_workflow_span = workflow_span

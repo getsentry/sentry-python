@@ -46,6 +46,7 @@ def update_ai_client_span(
     span: "sentry_sdk.tracing.Span",
     response: "Any",
     response_model: "Optional[str]" = None,
+    agent: "Optional[Agent]" = None,
 ) -> None:
     """Update AI client span with response data (works for streaming and non-streaming)."""
     if hasattr(response, "usage") and response.usage:
@@ -59,3 +60,9 @@ def update_ai_client_span(
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
     elif hasattr(response, "model") and response.model:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, str(response.model))
+
+    # Set conversation ID from agent if available
+    if agent:
+        conv_id = getattr(agent, "_sentry_conversation_id", None)
+        if conv_id:
+            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)

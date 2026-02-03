@@ -465,6 +465,12 @@ class SPANDATA:
     Example: "ResearchAssistant"
     """
 
+    GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
+    """
+    The unique identifier for the conversation/thread with the AI model.
+    Example: "conv_abc123"
+    """
+
     GEN_AI_CHOICE = "gen_ai.choice"
     """
     The model's response message.
