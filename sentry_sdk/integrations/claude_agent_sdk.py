@@ -1,5 +1,6 @@
+from dataclasses import dataclass, field
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
@@ -24,7 +25,7 @@ except ImportError:
     raise DidNotEnable("claude-agent-sdk not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncGenerator, Optional
+    from typing import Any, AsyncGenerator
     from sentry_sdk.tracing import Span
 
 AGENT_NAME = "claude-agent"
@@ -61,6 +62,18 @@ def _is_tool_result_block(block: "Any") -> bool:
     """Check if block is a ToolResultBlock using duck typing."""
     # ToolResultBlock has 'tool_use_id'
     return hasattr(block, "tool_use_id")
+
+
+@dataclass
+class ExtractedMessageData:
+    """Typed container for extracted message data."""
+    response_texts: List[str] = field(default_factory=list)
+    tool_calls: List[dict] = field(default_factory=list)
+    total_cost: Optional[float] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    cached_input_tokens: Optional[int] = None
+    response_model: Optional[str] = None
 
 
 class ClaudeAgentSDKIntegration(Integration):
@@ -116,15 +129,20 @@ def _set_span_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools_list, unpack=False
             )
 
+        # Capture session/conversation ID if available
+        session_id = getattr(options, "session_id", None)
+        if session_id:
+            set_data_normalized(span, SPANDATA.GEN_AI_CONVERSATION_ID, session_id)
+
     if _should_include_prompts(integration):
-        messages = []
+        # System prompts go in their own attribute, not in messages
         system_prompt = getattr(options, "system_prompt", None) if options else None
         if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
-        )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_SYSTEM, system_prompt)
+
+        # User messages are stored separately
+        messages = [{"role": "user", "content": prompt}]
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False)
 
 
 def _extract_text_from_message(message: "Any") -> "Optional[str]":
@@ -150,83 +168,71 @@ def _extract_tool_calls(message: "Any") -> "Optional[list]":
     return tool_calls or None
 
 
-def _extract_message_data(messages: list) -> dict:
-    """Extract relevant data from a list of messages."""
-    data = {
-        "response_texts": [],
-        "tool_calls": [],
-        "total_cost": None,
-        "input_tokens": None,
-        "output_tokens": None,
-        "cached_input_tokens": None,
-        "response_model": None,
-    }
+def _extract_message_data(messages: list) -> ExtractedMessageData:
+    """Extract relevant data from a list of messages.
+
+    Returns a typed dataclass instead of a dict for stronger typing.
+    """
+    data = ExtractedMessageData()
 
     for message in messages:
         if _is_assistant_message(message):
             text = _extract_text_from_message(message)
             if text:
-                data["response_texts"].append(text)
+                data.response_texts.append(text)
 
             calls = _extract_tool_calls(message)
             if calls:
-                data["tool_calls"].extend(calls)
+                data.tool_calls.extend(calls)
 
-            if not data["response_model"]:
-                data["response_model"] = getattr(message, "model", None)
+            if not data.response_model:
+                data.response_model = getattr(message, "model", None)
 
         elif _is_result_message(message):
-            data["total_cost"] = getattr(message, "total_cost_usd", None)
+            data.total_cost = getattr(message, "total_cost_usd", None)
             usage = getattr(message, "usage", None)
             if isinstance(usage, dict):
-                data["input_tokens"] = usage.get("input_tokens")
-                data["output_tokens"] = usage.get("output_tokens")
-                # Store cached tokens separately for the backend to apply discount pricing
+                # Claude Agent SDK returns input_tokens as non-cached tokens only
+                # For proper cost calculation, we need total input tokens
+                non_cached_input = usage.get("input_tokens") or 0
                 cached_input = usage.get("cache_read_input_tokens") or 0
-                data["cached_input_tokens"] = cached_input if cached_input > 0 else None
+                # Store total input tokens for cost calculation
+                data.input_tokens = non_cached_input + cached_input
+                data.output_tokens = usage.get("output_tokens")
+                # Store cached tokens separately for the backend to apply discount pricing
+                data.cached_input_tokens = cached_input if cached_input > 0 else None
 
     return data
 
 
 def _set_span_output_data(
     span: "Span",
-    messages: list,
+    data: ExtractedMessageData,
     integration: "ClaudeAgentSDKIntegration",
 ) -> None:
-    data = _extract_message_data(messages)
-
-    if data["response_model"]:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_MODEL, data["response_model"]
-        )
+    if data.response_model:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, data.response_model)
         if SPANDATA.GEN_AI_REQUEST_MODEL not in getattr(span, "_data", {}):
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MODEL, data["response_model"]
-            )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, data.response_model)
 
     if _should_include_prompts(integration):
-        if data["response_texts"]:
+        if data.response_texts:
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, data.response_texts)
+        if data.tool_calls:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, data["response_texts"]
-            )
-        if data["tool_calls"]:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                data["tool_calls"],
-                unpack=False,
+                span, SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, data.tool_calls, unpack=False
             )
 
-    if data["input_tokens"] is not None or data["output_tokens"] is not None:
+    if data.input_tokens is not None or data.output_tokens is not None:
         record_token_usage(
             span,
-            input_tokens=data["input_tokens"],
-            input_tokens_cached=data["cached_input_tokens"],
-            output_tokens=data["output_tokens"],
+            input_tokens=data.input_tokens,
+            input_tokens_cached=data.cached_input_tokens,
+            output_tokens=data.output_tokens,
         )
 
-    if data["total_cost"] is not None:
-        span.set_data("claude_code.total_cost_usd", data["total_cost"])
+    if data.total_cost is not None:
+        span.set_data("claude_code.total_cost_usd", data.total_cost)
 
 
 def _start_invoke_agent_span(
@@ -239,52 +245,57 @@ def _start_invoke_agent_span(
         name=f"invoke_agent {AGENT_NAME}",
         origin=ClaudeAgentSDKIntegration.origin,
     )
+    # Note: We use manual __enter__ here because this span needs to stay open
+    # across async generator iterations. All exits are wrapped in capture_internal_exceptions.
     span.__enter__()
 
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
     set_data_normalized(span, SPANDATA.GEN_AI_AGENT_NAME, AGENT_NAME)
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
 
+    if options is not None:
+        # Capture session/conversation ID if available
+        session_id = getattr(options, "session_id", None)
+        if session_id:
+            set_data_normalized(span, SPANDATA.GEN_AI_CONVERSATION_ID, session_id)
+
     if _should_include_prompts(integration):
-        messages = []
+        # System prompts go in their own attribute, not in messages
         system_prompt = getattr(options, "system_prompt", None) if options else None
         if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
-        )
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_SYSTEM, system_prompt)
+
+        # User messages are stored separately
+        messages = [{"role": "user", "content": prompt}]
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False)
 
     return span
 
 
 def _end_invoke_agent_span(
     span: "Span",
-    messages: list,
+    data: ExtractedMessageData,
     integration: "ClaudeAgentSDKIntegration",
 ) -> None:
-    data = _extract_message_data(messages)
+    if _should_include_prompts(integration) and data.response_texts:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, data.response_texts)
 
-    if _should_include_prompts(integration) and data["response_texts"]:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, data["response_texts"])
+    if data.response_model:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, data.response_model)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, data.response_model)
 
-    if data["response_model"]:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_MODEL, data["response_model"]
-        )
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, data["response_model"])
-
-    if data["input_tokens"] is not None or data["output_tokens"] is not None:
+    if data.input_tokens is not None or data.output_tokens is not None:
         record_token_usage(
             span,
-            input_tokens=data["input_tokens"],
-            input_tokens_cached=data["cached_input_tokens"],
-            output_tokens=data["output_tokens"],
+            input_tokens=data.input_tokens,
+            input_tokens_cached=data.cached_input_tokens,
+            output_tokens=data.output_tokens,
         )
 
-    if data["total_cost"] is not None:
-        span.set_data("claude_code.total_cost_usd", data["total_cost"])
+    if data.total_cost is not None:
+        span.set_data("claude_code.total_cost_usd", data.total_cost)
 
+    # Span exit wrapped in capture_internal_exceptions to prevent uncaught exceptions
     span.__exit__(None, None, None)
 
 
@@ -321,14 +332,15 @@ def _create_execute_tool_span(
 
 
 def _process_tool_executions(
-    messages: list, integration: "ClaudeAgentSDKIntegration"
+    messages: list,
+    integration: "ClaudeAgentSDKIntegration",
 ) -> list:
     """Create execute_tool spans for tool executions found in messages.
 
     Returns a list of the created spans (for testing purposes).
     """
-    tool_uses = {}
-    tool_results = {}
+    tool_uses: dict = {}
+    tool_results: dict = {}
 
     for message in messages:
         if not _is_assistant_message(message):
@@ -356,7 +368,7 @@ def _process_tool_executions(
 def _wrap_query(original_func: "Any") -> "Any":
     @wraps(original_func)
     async def wrapper(
-        *, prompt: str, options: "Optional[Any]" = None, **kwargs: "Any"
+        *, prompt: str, options: Optional["Any"] = None, **kwargs: "Any"
     ) -> "AsyncGenerator[Any, None]":
         integration = sentry_sdk.get_client().get_integration(ClaudeAgentSDKIntegration)
         if integration is None:
@@ -374,12 +386,16 @@ def _wrap_query(original_func: "Any") -> "Any":
             name=f"claude-agent-sdk query {model}".strip(),
             origin=ClaudeAgentSDKIntegration.origin,
         )
+        # Note: We use manual __enter__ here because this span needs to stay open
+        # across async generator iterations. All exits are wrapped in capture_internal_exceptions.
         chat_span.__enter__()
 
         with capture_internal_exceptions():
             _set_span_input_data(chat_span, prompt, options, integration)
 
-        collected_messages = []
+        # Collect messages for extraction - we extract data immediately to avoid
+        # holding references to user objects (race condition prevention)
+        collected_messages: list = []
         try:
             async for message in original_func(
                 prompt=prompt, options=options, **kwargs
@@ -390,15 +406,19 @@ def _wrap_query(original_func: "Any") -> "Any":
             _capture_exception(exc)
             raise
         finally:
+            # Extract data once at the end to avoid race conditions
+            extracted_data = _extract_message_data(collected_messages)
+
+            # All span operations wrapped in capture_internal_exceptions
             with capture_internal_exceptions():
-                _set_span_output_data(chat_span, collected_messages, integration)
-            chat_span.__exit__(None, None, None)
+                _set_span_output_data(chat_span, extracted_data, integration)
+                chat_span.__exit__(None, None, None)
 
             with capture_internal_exceptions():
                 _process_tool_executions(collected_messages, integration)
 
             with capture_internal_exceptions():
-                _end_invoke_agent_span(invoke_span, collected_messages, integration)
+                _end_invoke_agent_span(invoke_span, extracted_data, integration)
 
     return wrapper
 
@@ -420,6 +440,8 @@ def _wrap_client_query(original_method: "Any") -> "Any":
             name=f"claude-agent-sdk client {model}".strip(),
             origin=ClaudeAgentSDKIntegration.origin,
         )
+        # Note: We use manual __enter__ here because this span needs to stay open
+        # across async generator iterations. All exits are wrapped in capture_internal_exceptions.
         chat_span.__enter__()
 
         with capture_internal_exceptions():
@@ -437,11 +459,12 @@ def _wrap_client_query(original_method: "Any") -> "Any":
         except Exception as exc:
             _capture_exception(exc)
             messages = self._sentry_query_context.get("messages", [])
+            extracted_data = _extract_message_data(messages)
+            # All span operations wrapped in capture_internal_exceptions
             with capture_internal_exceptions():
-                _set_span_output_data(chat_span, messages, integration)
-            chat_span.__exit__(None, None, None)
-            with capture_internal_exceptions():
-                _end_invoke_agent_span(invoke_span, messages, integration)
+                _set_span_output_data(chat_span, extracted_data, integration)
+                chat_span.__exit__(None, None, None)
+                _end_invoke_agent_span(invoke_span, extracted_data, integration)
             self._sentry_query_context = {}
             raise
 
@@ -461,7 +484,7 @@ def _wrap_receive_response(original_method: "Any") -> "Any":
         invoke_span = context.get("invoke_span")
         chat_span = context.get("chat_span")
         stored_integration = context.get("integration", integration)
-        messages = context.get("messages", [])
+        messages: list = context.get("messages", [])
 
         try:
             async for message in original_method(self, **kwargs):
@@ -471,17 +494,21 @@ def _wrap_receive_response(original_method: "Any") -> "Any":
             _capture_exception(exc)
             raise
         finally:
+            # Extract data once at the end to avoid race conditions
+            extracted_data = _extract_message_data(messages)
+
+            # All span operations wrapped in capture_internal_exceptions
             if chat_span is not None:
                 with capture_internal_exceptions():
-                    _set_span_output_data(chat_span, messages, stored_integration)
-                chat_span.__exit__(None, None, None)
+                    _set_span_output_data(chat_span, extracted_data, stored_integration)
+                    chat_span.__exit__(None, None, None)
 
             with capture_internal_exceptions():
                 _process_tool_executions(messages, stored_integration)
 
             if invoke_span is not None:
                 with capture_internal_exceptions():
-                    _end_invoke_agent_span(invoke_span, messages, stored_integration)
+                    _end_invoke_agent_span(invoke_span, extracted_data, stored_integration)
 
             self._sentry_query_context = {}
 

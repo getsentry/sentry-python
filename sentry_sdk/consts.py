@@ -464,6 +464,12 @@ class SPANDATA:
     Example: "ResearchAssistant"
     """
 
+    GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
+    """
+    The session or conversation ID for tracking conversations across requests.
+    Example: "session_abc123"
+    """
+
     GEN_AI_CHOICE = "gen_ai.choice"
     """
     The model's response message.
@@ -546,6 +552,12 @@ class SPANDATA:
     """
     The messages passed to the model. The "content" can be a string or an array of objects.
     Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
+    """
+
+    GEN_AI_REQUEST_SYSTEM = "gen_ai.request.system"
+    """
+    The system prompt passed to the model, separate from user messages.
+    Example: "You are a helpful assistant that specializes in math calculations."
     """
 
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
