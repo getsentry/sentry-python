@@ -1263,7 +1263,9 @@ class Scope:
 
         # This is a child span; take propagation context from the parent span
         with new_scope():
-            if is_ignored_span(name, attributes) or isinstance(parent_span, NoOpStreamedSpan):
+            if is_ignored_span(name, attributes) or isinstance(
+                parent_span, NoOpStreamedSpan
+            ):
                 # TODO[span-first]: emit "ignored" client report
                 # also add tests for it
                 return NoOpStreamedSpan()

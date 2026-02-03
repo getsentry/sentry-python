@@ -656,15 +656,14 @@ class NoOpStreamedSpan(StreamedSpan):
         "_context_manager_state",
     )
 
-    def __init__(self, scope: "Optional[sentry_sdk.Scope]" = None, **kwargs: "Any") -> None:
+    def __init__(
+        self, scope: "Optional[sentry_sdk.Scope]" = None, **kwargs: "Any"
+    ) -> None:
         self.segment = None  # type: ignore[assignment]
         self._scope = scope  # type: ignore[assignment]
 
     def __repr__(self) -> str:
-        return (
-            f"<{self.__class__.__name__}("
-            f"sampled={self.sampled})>"
-        )
+        return f"<{self.__class__.__name__}(sampled={self.sampled})>"
 
     def __enter__(self) -> "NoOpStreamedSpan":
         if self._scope is None:

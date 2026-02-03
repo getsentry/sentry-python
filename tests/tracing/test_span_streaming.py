@@ -962,7 +962,9 @@ def test_ignore_spans(
         assert span["name"] == name
 
 
-def test_ignore_spans_basic(sentry_init, capture_envelopes, capture_record_lost_event_calls):
+def test_ignore_spans_basic(
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
+):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={
@@ -993,7 +995,9 @@ def test_ignore_spans_basic(sentry_init, capture_envelopes, capture_record_lost_
     assert lost_event_calls[0] == ("ignored", "span", None, 1)
 
 
-def test_ignore_spans_ignored_segment_drops_whole_tree(sentry_init, capture_envelopes, capture_record_lost_event_calls):
+def test_ignore_spans_ignored_segment_drops_whole_tree(
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
+):
     # Ignored segments should drop the whole span tree.
     sentry_init(
         traces_sample_rate=1.0,
@@ -1048,16 +1052,12 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
     assert isinstance(ignored_span, NoOpStreamedSpan)
     assert ignored_span.sampled is False
 
-    span1 = sentry_sdk.traces.start_span(
-        name="not ignored 1", parent_span=ignored_span
-    )
+    span1 = sentry_sdk.traces.start_span(name="not ignored 1", parent_span=ignored_span)
     span1.start()
     assert isinstance(span1, NoOpStreamedSpan)
     assert span1.sampled is False
 
-    span2 = sentry_sdk.traces.start_span(
-        name="not ignored 2", parent_span=ignored_span
-    )
+    span2 = sentry_sdk.traces.start_span(name="not ignored 2", parent_span=ignored_span)
     span2.start()
     assert isinstance(span2, NoOpStreamedSpan)
     assert span2.sampled is False
@@ -1077,7 +1077,9 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
         assert lost_event_call == ("ignored", "span", None, 1)
 
 
-def test_ignore_spans_set_ignored_child_span_as_parent(sentry_init, capture_envelopes, capture_record_lost_event_calls):
+def test_ignore_spans_set_ignored_child_span_as_parent(
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
+):
     # Ignored non-segment spans should NOT drop the whole subtree under them.
     sentry_init(
         traces_sample_rate=1.0,
@@ -1173,6 +1175,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     assert len(lost_event_calls) == 2
     for lost_event_call in lost_event_calls:
         assert lost_event_call == ("ignored", "span", None, 1)
+
 
 def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
     sentry_init(
