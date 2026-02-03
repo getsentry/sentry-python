@@ -649,17 +649,20 @@ class StreamedSpan:
 
 
 class NoOpStreamedSpan(StreamedSpan):
-    def __init__(self, name: "Optional[str]" = None, scope: "Optional[sentry_sdk.Scope]" = None, **kwargs: "Any") -> None:
-        self.name = name
-        self.parent_span_id = None
-        self.segment = None
-        self._scope = scope
-        self._context_manager_state = None
+    __slots__ = (
+        "name",
+        "segment",
+        "_scope",
+        "_context_manager_state",
+    )
+
+    def __init__(self, scope: "Optional[sentry_sdk.Scope]" = None, **kwargs: "Any") -> None:
+        self.segment = None  # type: ignore[assignment]
+        self._scope = scope  # type: ignore[assignment]
 
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__}("
-            f"name={self.name}, "
             f"sampled={self.sampled})>"
         )
 
@@ -689,7 +692,7 @@ class NoOpStreamedSpan(StreamedSpan):
             quantity=1,
         )
 
-        if self._context_manager_state is None:
+        if self._scope is None:
             return
 
         with capture_internal_exceptions():
@@ -697,13 +700,13 @@ class NoOpStreamedSpan(StreamedSpan):
             del self._context_manager_state
             scope.span = old_span
 
-    def start(self) -> None:
+    def start(self) -> "NoOpStreamedSpan":
         return self.__enter__()
 
-    def end(self) -> None:
+    def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         self.__exit__(None, None, None)
 
-    def finish(self) -> None:
+    def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         pass
 
     def get_attributes(self) -> "Attributes":
@@ -712,7 +715,7 @@ class NoOpStreamedSpan(StreamedSpan):
     def set_attribute(self, key: str, value: "AttributeValue") -> None:
         pass
 
-    def set_attributes(self) -> None:
+    def set_attributes(self, attributes: "Attributes") -> None:
         pass
 
     def remove_attribute(self, key: str) -> None:
@@ -724,7 +727,7 @@ class NoOpStreamedSpan(StreamedSpan):
     def get_name(self) -> str:
         return ""
 
-    def set_flag(self) -> None:
+    def set_flag(self, flag: str, result: bool) -> None:
         pass
 
     def set_op(self, op: str) -> None:
@@ -750,21 +753,6 @@ class NoOpStreamedSpan(StreamedSpan):
     @property
     def sampled(self) -> "Optional[bool]":
         return False
-
-    def dynamic_sampling_context(self) -> dict[str, str]:
-        return {}
-
-    def get_baggage(self) -> "Baggage":
-        return Baggage()
-
-    def to_baggage(self) -> "Optional[Baggage]":
-        return None
-
-    def to_traceparent(self) -> str:
-        return "0000-0000-0"
-
-    def iter_headers(self) -> "Iterator[tuple[str, str]]":
-        return
 
     def _set_segment_attributes(self) -> None:
         pass

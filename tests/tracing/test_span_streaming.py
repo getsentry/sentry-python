@@ -90,8 +90,8 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
     child = sentry_sdk.traces.start_span(name="child")
     child.start()
     assert child.segment == segment
-    child.finish()
-    segment.finish()
+    child.end()
+    segment.end()
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -137,7 +137,7 @@ def test_span_sampled_at_start(sentry_init, capture_envelopes):
     segment = sentry_sdk.traces.start_span(name="segment")
     segment.set_attribute("delayed_attribute", 12)
     segment.start()
-    segment.finish()
+    segment.end()
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -1092,15 +1092,12 @@ def test_ignore_spans_set_ignored_child_span_as_parent(sentry_init, capture_enve
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
         assert segment.sampled is True
-        assert segment.parent_span_id is None
 
         with sentry_sdk.traces.start_span(name="ignored") as ignored_span1:
             assert ignored_span1.sampled is False
-            assert ignored_span1.parent_span_id is None
 
             with sentry_sdk.traces.start_span(name="ignored") as ignored_span2:
                 assert ignored_span2.sampled is False
-                assert ignored_span2.parent_span_id is None
 
                 with sentry_sdk.traces.start_span(name="child") as span:
                     assert span.sampled is True
@@ -1145,7 +1142,6 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     ignored_span1.start()
     assert isinstance(ignored_span1, NoOpStreamedSpan)
     assert ignored_span1.sampled is False
-    assert ignored_span1.parent_span_id is None
 
     ignored_span2 = sentry_sdk.traces.start_span(
         name="ignored", parent_span=ignored_span1
@@ -1153,7 +1149,6 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     ignored_span2.start()
     assert isinstance(ignored_span2, NoOpStreamedSpan)
     assert ignored_span2.sampled is False
-    assert ignored_span2.parent_span_id is None
 
     span = sentry_sdk.traces.start_span(name="child", parent_span=ignored_span2)
     span.start()
