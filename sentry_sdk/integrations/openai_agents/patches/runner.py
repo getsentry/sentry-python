@@ -36,11 +36,14 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
             # Clone agent because agent invocation spans are attached per run.
             agent = args[0].clone()
 
-            with agent_workflow_span(agent):
+            with agent_workflow_span(agent) as workflow_span:
                 # Set conversation ID on workflow span early so it's captured even on errors
                 conversation_id = kwargs.get("conversation_id")
                 if conversation_id:
                     agent._sentry_conversation_id = conversation_id
+                    workflow_span.set_data(
+                        SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+                    )
 
                 args = (agent, *args[1:])
                 try:
