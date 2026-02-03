@@ -17,6 +17,7 @@ from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
     _get_system_instructions as _get_system_instructions_completions,
     _transform_system_instructions,
+    _get_text_items,
 )
 from sentry_sdk.ai._openai_responses_api import (
     _is_system_instruction as _is_system_instruction_responses,
@@ -181,10 +182,17 @@ def _calculate_token_usage(
     # Manually count tokens
     if input_tokens == 0:
         for message in messages or []:
-            if isinstance(message, dict) and "content" in message:
-                input_tokens += count_tokens(message["content"])
-            elif isinstance(message, str):
+            if isinstance(message, str):
                 input_tokens += count_tokens(message)
+                continue
+            elif isinstance(message, dict):
+                message_content = message.get("content")
+                if message_content is None:
+                    continue
+                # Deliberate use of Completions function for both Completions and Responses input format.
+                text_items = _get_text_items(message_content)
+                input_tokens += sum(count_tokens(text) for text in text_items)
+                continue
 
     if output_tokens == 0:
         if streaming_message_responses is not None:
