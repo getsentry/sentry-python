@@ -2712,6 +2712,10 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
         assert chat_span._data.get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
 
 
+@pytest.mark.skipif(
+    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
+    reason="conversation_id support requires openai-agents >= 0.4.0",
+)
 @pytest.mark.asyncio
 async def test_conversation_id_on_all_spans(
     sentry_init, capture_events, test_agent, mock_model_response
@@ -2759,6 +2763,10 @@ async def test_conversation_id_on_all_spans(
     assert ai_client_span["data"]["gen_ai.conversation.id"] == "conv_test_123"
 
 
+@pytest.mark.skipif(
+    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
+    reason="conversation_id support requires openai-agents >= 0.4.0",
+)
 @pytest.mark.asyncio
 async def test_conversation_id_on_tool_span(sentry_init, capture_events, test_agent):
     """
@@ -2851,6 +2859,10 @@ async def test_conversation_id_on_tool_span(sentry_init, capture_events, test_ag
     )
 
 
+@pytest.mark.skipif(
+    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
+    reason="conversation_id support requires openai-agents >= 0.4.0",
+)
 @pytest.mark.asyncio
 async def test_no_conversation_id_when_not_provided(
     sentry_init, capture_events, test_agent, mock_model_response
