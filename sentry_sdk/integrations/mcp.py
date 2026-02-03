@@ -469,7 +469,7 @@ def _create_instrumented_decorator(
     def instrumented_decorator(func: "Callable[..., Any]") -> "Callable[..., Any]":
         @wraps(func)
         async def wrapper(*args: "Any") -> "Any":
-            return await _handler_wrapper(handler_type, func, args)
+            return await _handler_wrapper(handler_type, func, args, force_await=False)
 
         # Then register it with the original MCP decorator
         return original_decorator(*decorator_args, **decorator_kwargs)(wrapper)
@@ -543,7 +543,6 @@ def _patch_fastmcp() -> None:
                 args,
                 kwargs,
                 self,
-                force_await=True,
             )
 
         FastMCP._get_prompt_mcp = patched_get_prompt_mcp
@@ -561,7 +560,6 @@ def _patch_fastmcp() -> None:
                 args,
                 kwargs,
                 self,
-                force_await=True,
             )
 
         FastMCP._read_resource_mcp = patched_read_resource_mcp
