@@ -358,6 +358,7 @@ async def _handler_wrapper(
     original_args: "tuple[Any, ...]",
     original_kwargs: "Optional[dict[str, Any]]" = None,
     self: "Optional[Any]" = None,
+    force_await: bool = True,
 ) -> "Any":
     """
     Wrapper for MCP handlers.
@@ -423,7 +424,7 @@ async def _handler_wrapper(
                 original_args = (self, *original_args)
 
             result = func(*original_args, **original_kwargs)
-            if inspect.isawaitable(result):
+            if force_await or inspect.isawaitable(result):
                 result = await result
 
         except Exception as e:
@@ -542,6 +543,7 @@ def _patch_fastmcp() -> None:
                 args,
                 kwargs,
                 self,
+                force_await=True,
             )
 
         FastMCP._get_prompt_mcp = patched_get_prompt_mcp
@@ -559,6 +561,7 @@ def _patch_fastmcp() -> None:
                 args,
                 kwargs,
                 self,
+                force_await=True,
             )
 
         FastMCP._read_resource_mcp = patched_read_resource_mcp
