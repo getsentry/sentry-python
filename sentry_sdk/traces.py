@@ -222,7 +222,6 @@ class StreamedSpan:
         "sample_rate",
         "_sample_rand",
         "_finished",
-        "_unsampled_reason",
         "_last_valid_parent_id",
     )
 
@@ -243,7 +242,6 @@ class StreamedSpan:
         baggage: "Optional[Baggage]" = None,
         segment: "Optional[StreamedSpan]" = None,
         sampled: "Optional[bool]" = None,
-        unsampled_reason: "Optional[str]" = None,
         last_valid_parent_id: "Optional[str]" = None,
     ) -> None:
         self._scope = scope
@@ -277,7 +275,6 @@ class StreamedSpan:
         # XXX[span-first] ^ populate this correctly
 
         self._sampled: "Optional[bool]" = sampled
-        self._unsampled_reason: "Optional[str]" = unsampled_reason
         self.sample_rate: "Optional[float]" = None
         self._last_valid_parent_id: "Optional[str]" = last_valid_parent_id
 
@@ -412,8 +409,6 @@ class StreamedSpan:
             if client.transport and has_tracing_enabled(client.options):
                 if client.monitor and client.monitor.downsample_factor > 0:
                     reason = "backpressure"
-                elif self._unsampled_reason:
-                    reason = self._unsampled_reason
                 else:
                     reason = "sample_rate"
 
@@ -651,6 +646,128 @@ class StreamedSpan:
             self.set_attribute("sentry.segment.id", self.segment.span_id)
 
         self.set_attribute("sentry.segment.name", self.segment.name)
+
+
+class NoOpStreamedSpan(StreamedSpan):
+    def __init__(self, name: "Optional[str]" = None, scope: "Optional[sentry_sdk.Scope]" = None, **kwargs: "Any") -> None:
+        self.name = name
+        self.parent_span_id = None
+        self.segment = None
+        self._scope = scope
+        self._context_manager_state = None
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"name={self.name}, "
+            f"sampled={self.sampled})>"
+        )
+
+    def __enter__(self) -> "NoOpStreamedSpan":
+        if self._scope is None:
+            return self
+
+        scope = self._scope or sentry_sdk.get_current_scope()
+        old_span = scope.span
+        scope.span = self
+        self._context_manager_state = (scope, old_span)
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        client = sentry_sdk.get_client()
+        if not client.is_active():
+            return
+        transport = client.transport
+        if not transport:
+            return
+
+        transport.record_lost_event(
+            reason="ignored",
+            data_category="span",
+            quantity=1,
+        )
+
+        if self._context_manager_state is None:
+            return
+
+        with capture_internal_exceptions():
+            scope, old_span = self._context_manager_state
+            del self._context_manager_state
+            scope.span = old_span
+
+    def start(self) -> None:
+        return self.__enter__()
+
+    def end(self) -> None:
+        self.__exit__(None, None, None)
+
+    def finish(self) -> None:
+        pass
+
+    def get_attributes(self) -> "Attributes":
+        return {}
+
+    def set_attribute(self, key: str, value: "AttributeValue") -> None:
+        pass
+
+    def set_attributes(self) -> None:
+        pass
+
+    def remove_attribute(self, key: str) -> None:
+        pass
+
+    def set_name(self, name: str) -> None:
+        pass
+
+    def get_name(self) -> str:
+        return ""
+
+    def set_flag(self) -> None:
+        pass
+
+    def set_op(self, op: str) -> None:
+        pass
+
+    def set_origin(self, origin: str) -> None:
+        pass
+
+    def set_source(self, source: "Union[str, SegmentSource]") -> None:
+        pass
+
+    def is_segment(self) -> bool:
+        return False
+
+    @property
+    def span_id(self) -> str:
+        return "000000"
+
+    @property
+    def trace_id(self) -> str:
+        return "000000"
+
+    @property
+    def sampled(self) -> "Optional[bool]":
+        return False
+
+    def dynamic_sampling_context(self) -> dict[str, str]:
+        return {}
+
+    def get_baggage(self) -> "Baggage":
+        return Baggage()
+
+    def to_baggage(self) -> "Optional[Baggage]":
+        return None
+
+    def to_traceparent(self) -> str:
+        return "0000-0000-0"
+
+    def iter_headers(self) -> "Iterator[tuple[str, str]]":
+        return
+
+    def _set_segment_attributes(self) -> None:
+        pass
 
 
 def trace(

@@ -1,13 +1,13 @@
 import asyncio
 import re
-import time
 import sys
+from typing import Any
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk.traces import SegmentSource, SpanStatus
+from sentry_sdk.traces import SegmentSource, SpanStatus, StreamedSpan, NoOpStreamedSpan
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
@@ -15,7 +15,7 @@ minimum_python_38 = pytest.mark.skipif(
 
 
 def envelopes_to_spans(envelopes):
-    res = []  # type: List[Metric]
+    res: "list[dict[str, Any]]" = []
     for envelope in envelopes:
         for item in envelope.items:
             if item.type == "span":
@@ -944,7 +944,12 @@ def test_ignore_spans(
     events = capture_envelopes()
 
     with sentry_sdk.traces.start_span(name=name, attributes=attributes) as span:
-        assert span.sampled is not ignored
+        if ignored:
+            assert span.sampled is False
+            assert isinstance(span, NoOpStreamedSpan)
+        else:
+            assert span.sampled is True
+            assert isinstance(span, StreamedSpan)
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -957,7 +962,7 @@ def test_ignore_spans(
         assert span["name"] == name
 
 
-def test_ignore_spans_basic(sentry_init, capture_envelopes):
+def test_ignore_spans_basic(sentry_init, capture_envelopes, capture_record_lost_event_calls):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={
@@ -967,6 +972,7 @@ def test_ignore_spans_basic(sentry_init, capture_envelopes):
     )
 
     events = capture_envelopes()
+    lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
         assert ignored_span.sampled is False
@@ -975,6 +981,7 @@ def test_ignore_spans_basic(sentry_init, capture_envelopes):
         assert span.sampled is True
 
     sentry_sdk.get_client().flush()
+
     spans = envelopes_to_spans(events)
 
     assert len(spans) == 1
@@ -982,8 +989,11 @@ def test_ignore_spans_basic(sentry_init, capture_envelopes):
     assert span["name"] == "not ignored"
     assert span["parent_span_id"] is None
 
+    assert len(lost_event_calls) == 1
+    assert lost_event_calls[0] == ("ignored", "span", None, 1)
 
-def test_ignore_spans_ignored_segment_drops_whole_tree(sentry_init, capture_envelopes):
+
+def test_ignore_spans_ignored_segment_drops_whole_tree(sentry_init, capture_envelopes, capture_record_lost_event_calls):
     # Ignored segments should drop the whole span tree.
     sentry_init(
         traces_sample_rate=1.0,
@@ -994,24 +1004,32 @@ def test_ignore_spans_ignored_segment_drops_whole_tree(sentry_init, capture_enve
     )
 
     events = capture_envelopes()
+    lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
         assert ignored_span.sampled is False
+        assert isinstance(ignored_span, NoOpStreamedSpan)
 
         with sentry_sdk.traces.start_span(name="not ignored") as span1:
             assert span1.sampled is False
+            assert isinstance(span1, NoOpStreamedSpan)
 
             with sentry_sdk.traces.start_span(name="not ignored") as span2:
                 assert span2.sampled is False
+                assert isinstance(span2, NoOpStreamedSpan)
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
 
     assert len(spans) == 0
 
+    assert len(lost_event_calls) == 3
+    for lost_event_call in lost_event_calls:
+        assert lost_event_call == ("ignored", "span", None, 1)
+
 
 def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
-    sentry_init, capture_envelopes
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
 ):
     # Ignored segments should drop the whole span tree.
     sentry_init(
@@ -1023,27 +1041,43 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
     )
 
     events = capture_envelopes()
+    lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
-        assert ignored_span.sampled is False
+    ignored_span = sentry_sdk.traces.start_span(name="ignored")
+    ignored_span.start()
+    assert isinstance(ignored_span, NoOpStreamedSpan)
+    assert ignored_span.sampled is False
 
-    with sentry_sdk.traces.start_span(
-        name="not ignored", parent_span=ignored_span
-    ) as span1:
-        assert span1.sampled is False
+    span1 = sentry_sdk.traces.start_span(
+        name="not ignored 1", parent_span=ignored_span
+    )
+    span1.start()
+    assert isinstance(span1, NoOpStreamedSpan)
+    assert span1.sampled is False
 
-    with sentry_sdk.traces.start_span(
-        name="not ignored", parent_span=ignored_span
-    ) as span2:
-        assert span2.sampled is False
+    span2 = sentry_sdk.traces.start_span(
+        name="not ignored 2", parent_span=ignored_span
+    )
+    span2.start()
+    assert isinstance(span2, NoOpStreamedSpan)
+    assert span2.sampled is False
+
+    span1.end()
+    span2.end()
+    ignored_span.end()
 
     sentry_sdk.get_client().flush()
+
     spans = envelopes_to_spans(events)
 
     assert len(spans) == 0
 
+    assert len(lost_event_calls) == 3
+    for lost_event_call in lost_event_calls:
+        assert lost_event_call == ("ignored", "span", None, 1)
 
-def test_ignore_spans_set_ignored_child_span_as_parent(sentry_init, capture_envelopes):
+
+def test_ignore_spans_set_ignored_child_span_as_parent(sentry_init, capture_envelopes, capture_record_lost_event_calls):
     # Ignored non-segment spans should NOT drop the whole subtree under them.
     sentry_init(
         traces_sample_rate=1.0,
@@ -1054,6 +1088,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent(sentry_init, capture_enve
     )
 
     events = capture_envelopes()
+    lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
         assert segment.sampled is True
@@ -1061,15 +1096,15 @@ def test_ignore_spans_set_ignored_child_span_as_parent(sentry_init, capture_enve
 
         with sentry_sdk.traces.start_span(name="ignored") as ignored_span1:
             assert ignored_span1.sampled is False
-            assert ignored_span1.parent_span_id == segment.span_id
+            assert ignored_span1.parent_span_id is None
 
             with sentry_sdk.traces.start_span(name="ignored") as ignored_span2:
                 assert ignored_span2.sampled is False
-                assert ignored_span2.parent_span_id == ignored_span1.span_id
+                assert ignored_span2.parent_span_id is None
 
                 with sentry_sdk.traces.start_span(name="child") as span:
                     assert span.sampled is True
-                    assert span.parent_span_id == ignored_span2.span_id
+                    assert span.parent_span_id == segment.span_id
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -1080,9 +1115,13 @@ def test_ignore_spans_set_ignored_child_span_as_parent(sentry_init, capture_enve
     assert child["name"] == "child"
     assert child["parent_span_id"] == segment["span_id"]  # reparented to segment
 
+    assert len(lost_event_calls) == 2
+    for lost_event_call in lost_event_calls:
+        assert lost_event_call == ("ignored", "span", None, 1)
+
 
 def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
-    sentry_init, capture_envelopes
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
 ):
     # Ignored non-segment spans should NOT drop the whole subtree under them.
     sentry_init(
@@ -1094,36 +1133,51 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     )
 
     events = capture_envelopes()
+    lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="segment") as segment:
-        assert segment.sampled is True
-        assert segment.parent_span_id is None
+    segment = sentry_sdk.traces.start_span(name="segment")
+    segment.start()
+    assert not isinstance(segment, NoOpStreamedSpan)
+    assert segment.sampled is True
+    assert segment.parent_span_id is None
 
-    with sentry_sdk.traces.start_span(
-        name="ignored", parent_span=segment
-    ) as ignored_span1:
-        assert ignored_span1.sampled is False
-        assert ignored_span1.parent_span_id == segment.span_id
+    ignored_span1 = sentry_sdk.traces.start_span(name="ignored", parent_span=segment)
+    ignored_span1.start()
+    assert isinstance(ignored_span1, NoOpStreamedSpan)
+    assert ignored_span1.sampled is False
+    assert ignored_span1.parent_span_id is None
 
-    with sentry_sdk.traces.start_span(
+    ignored_span2 = sentry_sdk.traces.start_span(
         name="ignored", parent_span=ignored_span1
-    ) as ignored_span2:
-        assert ignored_span2.sampled is False
-        assert ignored_span2.parent_span_id == ignored_span1.span_id
+    )
+    ignored_span2.start()
+    assert isinstance(ignored_span2, NoOpStreamedSpan)
+    assert ignored_span2.sampled is False
+    assert ignored_span2.parent_span_id is None
 
-    with sentry_sdk.traces.start_span(name="child", parent_span=ignored_span2) as span:
-        assert span.sampled is True
-        assert span.parent_span_id == ignored_span2.span_id
+    span = sentry_sdk.traces.start_span(name="child", parent_span=ignored_span2)
+    span.start()
+    assert not isinstance(span, NoOpStreamedSpan)
+    assert span.sampled is True
+    assert span.parent_span_id == segment.span_id
+    span.end()
+
+    ignored_span2.end()
+    ignored_span1.end()
+    segment.end()
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
 
     assert len(spans) == 2
-    (segment, child) = spans
+    (child, segment) = spans
     assert segment["name"] == "segment"
     assert child["name"] == "child"
     assert child["parent_span_id"] == segment["span_id"]  # reparented to segment
 
+    assert len(lost_event_calls) == 2
+    for lost_event_call in lost_event_calls:
+        assert lost_event_call == ("ignored", "span", None, 1)
 
 def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
     sentry_init(
@@ -1142,19 +1196,17 @@ def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
 
         with sentry_sdk.traces.start_span(name="ignored") as span2:
             assert span2.sampled is False
-            assert span2.parent_span_id == span1.span_id
 
             with sentry_sdk.traces.start_span(name="child 1") as span3:
                 assert span3.sampled is True
-                assert span3.parent_span_id == span2.span_id
+                assert span3.parent_span_id == span1.span_id
 
                 with sentry_sdk.traces.start_span(name="ignored") as span4:
                     assert span4.sampled is False
-                    assert span4.parent_span_id == span3.span_id
 
                     with sentry_sdk.traces.start_span(name="child 2") as span5:
                         assert span5.sampled is True
-                        assert span5.parent_span_id == span4.span_id
+                        assert span5.parent_span_id == span3.span_id
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)

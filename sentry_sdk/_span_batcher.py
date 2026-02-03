@@ -79,11 +79,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         if item.timestamp:
             res["end_timestamp"] = item.timestamp.timestamp()
 
-        if item._last_valid_parent_id:
-            # This span needs to be reparented because its parent is ignored
-            res["parent_span_id"] = item._last_valid_parent_id
-
-        elif item.parent_span_id:
+        if item.parent_span_id:
             res["parent_span_id"] = item.parent_span_id
 
         if item._attributes:

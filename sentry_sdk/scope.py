@@ -33,7 +33,7 @@ from sentry_sdk.tracing_utils import (
     is_ignored_span,
     PropagationContext,
 )
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, NoOpStreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -1228,22 +1228,29 @@ class Scope:
         name: str,
         attributes: "Optional[Attributes]" = None,
         parent_span: "Optional[StreamedSpan]" = None,
-        **kwargs: "Any",  # TODO: remove, just for expediting seer testing
+        **kwargs: "Any",  # TODO[span-first]: remove, just for expediting seer testing
     ) -> "StreamedSpan":
         # TODO: rename to start_span once we drop the old API
-        if parent_span is None:
+        if isinstance(parent_span, NoOpStreamedSpan):
+            # parent_span is only set if the user explicitly set it
+            logger.debug(
+                "Ignored parent span provided. Span will be parented to the "
+                "currently active span instead."
+            )
+
+        if parent_span is None or isinstance(parent_span, NoOpStreamedSpan):
             parent_span = self.span or self.get_current_scope().span  # type: ignore
 
-        # If no specific parent_span provided and there is no currently
+        # If no specific parent_span was provided and there is no currently
         # active span, this is a segment
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
-            unsampled_reason = None
             if is_ignored_span(name, attributes):
-                unsampled_reason = "ignored"
+                return NoOpStreamedSpan(scope=self)
+                # TODO[span-first]: emit "ignored" client report
 
-            span = StreamedSpan(
+            return StreamedSpan(
                 name=name,
                 attributes=attributes,
                 scope=self,
@@ -1252,30 +1259,16 @@ class Scope:
                 parent_span_id=propagation_context.parent_span_id,
                 parent_sampled=propagation_context.parent_sampled,
                 baggage=propagation_context.baggage,
-                sampled=None if unsampled_reason is None else False,
-                unsampled_reason=unsampled_reason,
             )
-
-            return span
 
         # This is a child span; take propagation context from the parent span
         with new_scope():
-            unsampled_reason = None
-            if is_ignored_span(name, attributes):
-                unsampled_reason = "ignored"
+            if is_ignored_span(name, attributes) or isinstance(parent_span, NoOpStreamedSpan):
+                # TODO[span-first]: emit "ignored" client report
+                # also add tests for it
+                return NoOpStreamedSpan()
 
-            # If this span's parent is ignored, we'll eventually attempt to
-            # reparent it to its last non-ignored ancestor, so keep track of it
-            last_valid_parent_id = None
-            if parent_span.sampled is False:
-                # If the parent's parent is also ignored, it'll have a last valid
-                # parent ID stored already. Otherwise, take the parent's parent
-                # if it's not ignored.
-                last_valid_parent_id = (
-                    parent_span._last_valid_parent_id or parent_span.parent_span_id
-                )
-
-            span = StreamedSpan(
+            return StreamedSpan(
                 name=name,
                 attributes=attributes,
                 scope=self,
@@ -1283,12 +1276,7 @@ class Scope:
                 parent_span_id=parent_span.span_id,
                 parent_sampled=parent_span.sampled,
                 segment=parent_span.segment,
-                sampled=None if unsampled_reason is None else False,
-                unsampled_reason=unsampled_reason,
-                last_valid_parent_id=last_valid_parent_id,
             )
-
-            return span
 
     def _start_profile_on_segment(self, span: "StreamedSpan") -> None:
         try_autostart_continuous_profiler()
