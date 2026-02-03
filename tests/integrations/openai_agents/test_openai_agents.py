@@ -35,7 +35,13 @@ from agents.tool import HostedMCPTool
 from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
 
-from openai.types.responses import Response, ResponseUsage
+from openai.types.responses import (
+    ResponseCreatedEvent,
+    ResponseTextDeltaEvent,
+    ResponseCompletedEvent,
+    Response,
+    ResponseUsage,
+)
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
@@ -78,6 +84,63 @@ EXAMPLE_RESPONSE = Response(
         total_tokens=30,
     ),
 )
+
+
+async def EXAMPLE_STREAMED_RESPONSE(*args, **kwargs):
+    yield ResponseCreatedEvent(
+        response=Response(
+            id="chat-id",
+            output=[],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="response-model-id",
+            object="response",
+        ),
+        type="response.created",
+        sequence_number=0,
+    )
+
+    yield ResponseCompletedEvent(
+        response=Response(
+            id="chat-id",
+            output=[
+                ResponseOutputMessage(
+                    id="message-id",
+                    content=[
+                        ResponseOutputText(
+                            annotations=[],
+                            text="the model response",
+                            type="output_text",
+                        ),
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                ),
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="response-model-id",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=20,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=5,
+                ),
+                output_tokens=10,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=8,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        type="response.completed",
+        sequence_number=1,
+    )
 
 
 @pytest.fixture
@@ -1170,6 +1233,90 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span2["data"]["gen_ai.usage.output_tokens"] == 10
     assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
+
+
+@pytest.mark.asyncio
+async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_agent):
+    """
+    Test responses API is given trace propagation headers with HostedMCPTool.
+    """
+
+    hosted_tool = HostedMCPTool(
+        tool_config={
+            "type": "mcp",
+            "server_label": "test_server",
+            "server_url": "http://example.com/",
+            "headers": {
+                "baggage": "custom=data",
+            },
+        },
+    )
+
+    client = AsyncOpenAI(api_key="z")
+    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
+
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+
+    agent_with_tool = test_agent.clone(
+        tools=[hosted_tool],
+        model=model,
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+    )
+
+    with patch.object(
+        model._client.responses,
+        "create",
+        side_effect=EXAMPLE_STREAMED_RESPONSE,
+    ) as create, mock.patch(
+        "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
+    ):
+        with sentry_sdk.start_transaction(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            trace_id="01234567890123456789012345678901",
+        ) as transaction:
+            result = agents.Runner.run_streamed(
+                agent_with_tool,
+                "Please use the simple test tool",
+                run_config=test_run_config,
+            )
+
+            async for event in result.stream_events():
+                pass
+
+            ai_client_span = transaction._span_recorder.spans[-1]
+
+        args, kwargs = create.call_args
+
+        assert "tools" in kwargs
+        assert len(kwargs["tools"]) == 1
+        hosted_mcp_tool = kwargs["tools"][0]
+
+        assert hosted_mcp_tool["headers"][
+            "sentry-trace"
+        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=ai_client_span.span_id,
+            sampled=1,
+        )
+
+        expected_outgoing_baggage = (
+            "custom=data,"
+            "sentry-trace_id=01234567890123456789012345678901,"
+            "sentry-sample_rand=0.500000,"
+            "sentry-environment=production,"
+            "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,"
+            "sentry-transaction=/interactions/other-dogs/new-dog,"
+            "sentry-sample_rate=1.0,"
+            "sentry-sampled=true"
+        )
+
+        assert hosted_mcp_tool["headers"]["baggage"] == expected_outgoing_baggage
 
 
 @pytest.mark.asyncio

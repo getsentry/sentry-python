@@ -145,7 +145,21 @@ def _create_get_model_wrapper(
                 if len(args) > 1:
                     span_kwargs["input"] = args[1]
 
+                hosted_tools = []
+                if len(args) > 3:
+                    mcp_tools = args[3]
+
+                    if mcp_tools is not None:
+                        hosted_tools = [
+                            tool
+                            for tool in mcp_tools
+                            if isinstance(tool, HostedMCPTool)
+                        ]
+
                 with ai_client_span(agent, span_kwargs) as span:
+                    for hosted_tool in hosted_tools:
+                        _inject_trace_propagation_headers(hosted_tool, span=span)
+
                     span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
                     streaming_response = None
