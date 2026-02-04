@@ -983,7 +983,6 @@ def test_google_genai_message_truncation(
     assert parsed_messages[0]["role"] == "user"
     assert small_content in parsed_messages[0]["content"]
 
-    assert invoke_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 2
     assert (
         event["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 2
     )

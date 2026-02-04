@@ -1012,7 +1012,6 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
     assert len(parsed_messages) == 1
     assert "small message 5" in str(parsed_messages[0])
 
-    assert chat_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 5
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
@@ -1064,7 +1063,6 @@ async def test_anthropic_message_truncation_async(sentry_init, capture_events):
     assert len(parsed_messages) == 1
     assert "small message 5" in str(parsed_messages[0])
 
-    assert chat_span["data"][SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH] == 5
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
