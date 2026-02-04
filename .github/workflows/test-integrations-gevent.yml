@@ -17,6 +17,9 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+  actions: read
+  pull-requests: write
+  statuses: write
 env:
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
@@ -38,7 +41,7 @@ jobs:
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
-      - uses: actions/checkout@v6.0.1
+      - uses: actions/checkout@v6.0.2
       - uses: actions/setup-python@v6
         if: ${{ matrix.python-version != '3.6' }}
         with:
@@ -65,21 +68,13 @@ jobs:
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
-      - name: Upload coverage to Codecov
+      - name: Parse and Upload Coverage
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.5.2
+        uses: getsentry/codecov-action@main
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugins: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
+          junit-xml-pattern: .junitxml
           verbose: true
   check_required_tests:
     name: All Gevent tests passed

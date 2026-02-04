@@ -77,6 +77,14 @@ IGNORE = {
 MIN_FREE_THREADING_SUPPORT = Version("3.14")
 
 
+class PackageVersion(Version):
+    # Convenience wrapper around Version. It's convenient to be able to set
+    # attributes on a Version in toxgen, but we can't because the class now
+    # defines __slots__. By rewrapping Version in this custom class, we get
+    # around that.
+    pass
+
+
 @dataclass(order=True)
 class ThreadedVersion:
     version: Version
@@ -218,7 +226,7 @@ def _save_to_package_dependencies_cache(
 def _prefilter_releases(
     integration: str,
     releases: dict[str, dict],
-) -> tuple[list[Version], Optional[Version]]:
+) -> tuple[list[PackageVersion], Optional[PackageVersion]]:
     """
     Filter `releases`, removing releases that are for sure unsupported.
 
@@ -238,7 +246,7 @@ def _prefilter_releases(
 
     min_supported = _MIN_VERSIONS.get(integration_name)
     if min_supported is not None:
-        min_supported = Version(".".join(map(str, min_supported)))
+        min_supported = PackageVersion(".".join(map(str, min_supported)))
     else:
         print(
             f"  {integration} doesn't have a minimum version defined in "
@@ -291,10 +299,10 @@ def _prefilter_releases(
             ):
                 # Don't save all patch versions of a release, just the newest one
                 if version.micro > saved_version.micro:
-                    filtered_releases[i] = version
+                    filtered_releases[i] = PackageVersion(str(version))
                 break
         else:
-            filtered_releases.append(version)
+            filtered_releases.append(PackageVersion(str(version)))
 
     filtered_releases.sort()
 
@@ -302,14 +310,14 @@ def _prefilter_releases(
     # than the last released version); if not, don't consider it
     if last_prerelease is not None:
         if not filtered_releases or last_prerelease > filtered_releases[-1]:
-            return filtered_releases, last_prerelease
+            return filtered_releases, PackageVersion(str(last_prerelease))
 
     return filtered_releases, None
 
 
 def get_supported_releases(
     integration: str, pypi_data: dict
-) -> tuple[list[Version], Optional[Version]]:
+) -> tuple[list[PackageVersion], Optional[PackageVersion]]:
     """
     Get a list of releases that are currently supported by the SDK.
 
@@ -331,7 +339,7 @@ def get_supported_releases(
         pypi_data["releases"],
     )
 
-    def _supports_lowest(release: Version) -> bool:
+    def _supports_lowest(release: PackageVersion) -> bool:
         time.sleep(PYPI_COOLDOWN)  # don't DoS PYPI
 
         pypi_data = fetch_release(package, release)
@@ -504,6 +512,9 @@ def pick_python_versions_to_test(
     - a free-threaded wheel is distributed; and
     - the SDK supports free-threading.
     """
+    if not python_versions:
+        return []
+
     filtered_python_versions = {
         python_versions[0],
     }
@@ -545,7 +556,8 @@ def _parse_python_versions_from_classifiers(classifiers: list[str]) -> list[Vers
 
     if python_versions:
         python_versions.sort()
-        return python_versions
+
+    return python_versions
 
 
 def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Version]]:
@@ -578,6 +590,14 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
 
     if requires_python:
         return SpecifierSet(requires_python)
+
+    # If we haven't found neither specific 3.x classifiers nor a requires_python,
+    # check if there is a generic "Python 3" classifier and if so, assume the
+    # package supports all Python versions the SDK does. If this is not the case
+    # in reality, add the actual constraints manually to config.py.
+    for classifier in classifiers:
+        if CLASSIFIER_PREFIX + "3" in classifiers:
+            return SpecifierSet(f">={MIN_PYTHON_VERSION}")
 
     return []
 
@@ -770,7 +790,7 @@ def _compare_min_version_with_defined(
 
 
 def _add_python_versions_to_release(
-    integration: str, package: str, release: Version
+    integration: str, package: str, release: PackageVersion
 ) -> None:
     release_pypi_data = fetch_release(package, release)
     if release_pypi_data is None:

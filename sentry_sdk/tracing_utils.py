@@ -4,7 +4,7 @@ import inspect
 import os
 import re
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from datetime import timedelta
 from random import Random
 from urllib.parse import quote, unquote
@@ -104,6 +104,13 @@ def has_tracing_enabled(options: "Optional[Dict[str, Any]]") -> bool:
             or options.get("traces_sampler") is not None
         )
     )
+
+
+def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
+    if options is None:
+        return False
+
+    return (options.get("_experiments") or {}).get("trace_lifecycle") == "stream"
 
 
 @contextlib.contextmanager
@@ -1283,6 +1290,25 @@ def _should_continue_trace(baggage: "Optional[Baggage]") -> bool:
             return False
 
     return True
+
+
+def add_sentry_baggage_to_headers(
+    headers: "MutableMapping[str, str]", sentry_baggage: str
+) -> None:
+    """Add the Sentry baggage to the headers.
+
+    This function directly mutates the provided headers. The provided sentry_baggage
+    is appended to the existing baggage. If the baggage already contains Sentry items,
+    they are stripped out first.
+    """
+    existing_baggage = headers.get(BAGGAGE_HEADER_NAME, "")
+    stripped_existing_baggage = Baggage.strip_sentry_baggage(existing_baggage)
+
+    separator = "," if len(stripped_existing_baggage) > 0 else ""
+
+    headers[BAGGAGE_HEADER_NAME] = (
+        stripped_existing_baggage + separator + sentry_baggage
+    )
 
 
 # Circular imports

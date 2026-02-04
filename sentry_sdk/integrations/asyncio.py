@@ -4,6 +4,7 @@ import functools
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations._wsgi_common import nullcontext
 from sentry_sdk.utils import event_from_exception, logger, reraise
 
 try:
@@ -47,6 +48,10 @@ def patch_asyncio() -> None:
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
 
+        # Check if already patched
+        if getattr(orig_task_factory, "_is_sentry_task_factory", False):
+            return
+
         def _sentry_task_factory(
             loop: "asyncio.AbstractEventLoop",
             coro: "Coroutine[Any, Any, Any]",
@@ -56,11 +61,20 @@ def patch_asyncio() -> None:
             async def _task_with_sentry_span_creation() -> "Any":
                 result = None
 
+                integration = sentry_sdk.get_client().get_integration(
+                    AsyncioIntegration
+                )
+                task_spans = integration.task_spans if integration else False
+
                 with sentry_sdk.isolation_scope():
-                    with sentry_sdk.start_span(
-                        op=OP.FUNCTION,
-                        name=get_name(coro),
-                        origin=AsyncioIntegration.origin,
+                    with (
+                        sentry_sdk.start_span(
+                            op=OP.FUNCTION,
+                            name=get_name(coro),
+                            origin=AsyncioIntegration.origin,
+                        )
+                        if task_spans
+                        else nullcontext()
                     ):
                         try:
                             result = await coro
@@ -102,6 +116,7 @@ def patch_asyncio() -> None:
 
             return task
 
+        _sentry_task_factory._is_sentry_task_factory = True  # type: ignore
         loop.set_task_factory(_sentry_task_factory)  # type: ignore
 
     except RuntimeError:
@@ -135,6 +150,54 @@ class AsyncioIntegration(Integration):
     identifier = "asyncio"
     origin = f"auto.function.{identifier}"
 
+    def __init__(self, task_spans: bool = True) -> None:
+        self.task_spans = task_spans
+
     @staticmethod
     def setup_once() -> None:
         patch_asyncio()
+
+
+def enable_asyncio_integration(*args: "Any", **kwargs: "Any") -> None:
+    """
+    Enable AsyncioIntegration with the provided options.
+
+    This is useful in scenarios where Sentry needs to be initialized before
+    an event loop is set up, but you still want to instrument asyncio once there
+    is an event loop. In that case, you can sentry_sdk.init() early on without
+    the AsyncioIntegration and then, once the event loop has been set up,
+    execute:
+
+    ```python
+    from sentry_sdk.integrations.asyncio import enable_asyncio_integration
+
+    async def async_entrypoint():
+        enable_asyncio_integration()
+    ```
+
+    Any arguments provided will be passed to AsyncioIntegration() as is.
+
+    If AsyncioIntegration has already patched the current event loop, this
+    function won't have any effect.
+
+    If AsyncioIntegration was provided in
+    sentry_sdk.init(disabled_integrations=[...]), this function will ignore that
+    and the integration will be enabled.
+    """
+    client = sentry_sdk.get_client()
+    if not client.is_active():
+        return
+
+    # This function purposefully bypasses the integration machinery in
+    # integrations/__init__.py. _installed_integrations/_processed_integrations
+    # is used to prevent double patching the same module, but in the case of
+    # the AsyncioIntegration, we don't monkeypatch the standard library directly,
+    # we patch the currently running event loop, and we keep the record of doing
+    # that on the loop itself.
+    logger.debug("Setting up integration asyncio")
+
+    integration = AsyncioIntegration(*args, **kwargs)
+    integration.setup_once()
+
+    if "asyncio" not in client.integrations:
+        client.integrations["asyncio"] = integration

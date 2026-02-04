@@ -385,6 +385,33 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
+def test_envelope_too_large_response(capturing_server, make_client):
+    client = make_client()
+
+    capturing_server.respond_with(code=413)
+    client.capture_event({"type": "error"})
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    # Error, transaction, and client report payloads
+    assert len(capturing_server.captured) == 3
+    report = parse_json(capturing_server.captured[2].envelope.items[0].get_bytes())
+
+    # Client reports for error, transaction and included span
+    assert len(report["discarded_events"]) == 3
+    assert {"reason": "send_error", "category": "error", "quantity": 1} in report[
+        "discarded_events"
+    ]
+    assert {"reason": "send_error", "category": "span", "quantity": 1} in report[
+        "discarded_events"
+    ]
+    assert {"reason": "send_error", "category": "transaction", "quantity": 1} in report[
+        "discarded_events"
+    ]
+
+    capturing_server.clear_captured()
+
+
 def test_simple_rate_limits(capturing_server, make_client):
     client = make_client()
     capturing_server.respond_with(code=429, headers={"Retry-After": "4"})

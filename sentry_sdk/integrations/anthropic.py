@@ -1,3 +1,5 @@
+import sys
+import json
 from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING
@@ -10,6 +12,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     truncate_and_annotate_messages,
     get_start_span_function,
+    transform_anthropic_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
@@ -20,6 +23,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
     safe_serialize,
+    reraise,
 )
 
 try:
@@ -36,13 +40,21 @@ try:
     from anthropic.resources import AsyncMessages, Messages
 
     if TYPE_CHECKING:
-        from anthropic.types import MessageStreamEvent
+        from anthropic.types import MessageStreamEvent, TextBlockParam
 except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Iterator, List, Optional, Union
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
+
+
+class _RecordedUsage:
+    output_tokens: int = 0
+    input_tokens: int = 0
+    cache_write_input_tokens: "Optional[int]" = 0
+    cache_read_input_tokens: "Optional[int]" = 0
 
 
 class AnthropicIntegration(Integration):
@@ -72,40 +84,50 @@ def _capture_exception(exc: "Any") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _get_token_usage(result: "Messages") -> "tuple[int, int]":
+def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
     """
     Get token usage from the Anthropic response.
+    Returns: (input_tokens, output_tokens, cache_read_input_tokens, cache_write_input_tokens)
     """
     input_tokens = 0
     output_tokens = 0
+    cache_read_input_tokens = 0
+    cache_write_input_tokens = 0
     if hasattr(result, "usage"):
         usage = result.usage
         if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
             input_tokens = usage.input_tokens
         if hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
             output_tokens = usage.output_tokens
+        if hasattr(usage, "cache_read_input_tokens") and isinstance(
+            usage.cache_read_input_tokens, int
+        ):
+            cache_read_input_tokens = usage.cache_read_input_tokens
+        if hasattr(usage, "cache_creation_input_tokens") and isinstance(
+            usage.cache_creation_input_tokens, int
+        ):
+            cache_write_input_tokens = usage.cache_creation_input_tokens
 
-    return input_tokens, output_tokens
+    return (
+        input_tokens,
+        output_tokens,
+        cache_read_input_tokens,
+        cache_write_input_tokens,
+    )
 
 
 def _collect_ai_data(
     event: "MessageStreamEvent",
     model: "str | None",
-    input_tokens: int,
-    output_tokens: int,
+    usage: "_RecordedUsage",
     content_blocks: "list[str]",
-) -> "tuple[str | None, int, int, list[str]]":
+) -> "tuple[str | None, _RecordedUsage, list[str]]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
     with capture_internal_exceptions():
         if hasattr(event, "type"):
-            if event.type == "message_start":
-                usage = event.message.usage
-                input_tokens += usage.input_tokens
-                output_tokens += usage.output_tokens
-                model = event.message.model or model
-            elif event.type == "content_block_start":
+            if event.type == "content_block_start":
                 pass
             elif event.type == "content_block_delta":
                 if hasattr(event.delta, "text"):
@@ -114,10 +136,104 @@ def _collect_ai_data(
                     content_blocks.append(event.delta.partial_json)
             elif event.type == "content_block_stop":
                 pass
-            elif event.type == "message_delta":
-                output_tokens += event.usage.output_tokens
 
-    return model, input_tokens, output_tokens, content_blocks
+            # Token counting logic mirrors anthropic SDK, which also extracts already accumulated tokens.
+            # https://github.com/anthropics/anthropic-sdk-python/blob/9c485f6966e10ae0ea9eabb3a921d2ea8145a25b/src/anthropic/lib/streaming/_messages.py#L433-L518
+            if event.type == "message_start":
+                model = event.message.model or model
+
+                incoming_usage = event.message.usage
+                usage.output_tokens = incoming_usage.output_tokens
+                usage.input_tokens = incoming_usage.input_tokens
+
+                usage.cache_write_input_tokens = getattr(
+                    incoming_usage, "cache_creation_input_tokens", None
+                )
+                usage.cache_read_input_tokens = getattr(
+                    incoming_usage, "cache_read_input_tokens", None
+                )
+
+                return (
+                    model,
+                    usage,
+                    content_blocks,
+                )
+
+            # Counterintuitive, but message_delta contains cumulative token counts :)
+            if event.type == "message_delta":
+                usage.output_tokens = event.usage.output_tokens
+
+                # Update other usage fields if they exist in the event
+                input_tokens = getattr(event.usage, "input_tokens", None)
+                if input_tokens is not None:
+                    usage.input_tokens = input_tokens
+
+                cache_creation_input_tokens = getattr(
+                    event.usage, "cache_creation_input_tokens", None
+                )
+                if cache_creation_input_tokens is not None:
+                    usage.cache_write_input_tokens = cache_creation_input_tokens
+
+                cache_read_input_tokens = getattr(
+                    event.usage, "cache_read_input_tokens", None
+                )
+                if cache_read_input_tokens is not None:
+                    usage.cache_read_input_tokens = cache_read_input_tokens
+                # TODO: Record event.usage.server_tool_use
+
+                return (
+                    model,
+                    usage,
+                    content_blocks,
+                )
+
+    return (
+        model,
+        usage,
+        content_blocks,
+    )
+
+
+def _transform_anthropic_content_block(
+    content_block: "dict[str, Any]",
+) -> "dict[str, Any]":
+    """
+    Transform an Anthropic content block using the Anthropic-specific transformer,
+    with special handling for Anthropic's text-type documents.
+    """
+    # Handle Anthropic's text-type documents specially (not covered by shared function)
+    if content_block.get("type") == "document":
+        source = content_block.get("source")
+        if isinstance(source, dict) and source.get("type") == "text":
+            return {
+                "type": "text",
+                "text": source.get("data", ""),
+            }
+
+    # Use Anthropic-specific transformation
+    result = transform_anthropic_content_part(content_block)
+    return result if result is not None else content_block
+
+
+def _transform_system_instructions(
+    system_instructions: "Union[str, Iterable[TextBlockParam]]",
+) -> "list[TextPart]":
+    if isinstance(system_instructions, str):
+        return [
+            {
+                "type": "text",
+                "content": system_instructions,
+            }
+        ]
+
+    return [
+        {
+            "type": "text",
+            "content": instruction["text"],
+        }
+        for instruction in system_instructions
+        if isinstance(instruction, dict) and "text" in instruction
+    ]
 
 
 def _set_input_data(
@@ -127,7 +243,7 @@ def _set_input_data(
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-    system_prompt = kwargs.get("system")
+    system_instructions: "Union[str, Iterable[TextBlockParam]]" = kwargs.get("system")  # type: ignore
     messages = kwargs.get("messages")
     if (
         messages is not None
@@ -135,48 +251,56 @@ def _set_input_data(
         and should_send_default_pii()
         and integration.include_prompts
     ):
+        if isinstance(system_instructions, str) or isinstance(
+            system_instructions, Iterable
+        ):
+            span.set_data(
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                json.dumps(_transform_system_instructions(system_instructions)),
+            )
+
         normalized_messages = []
-        if system_prompt:
-            system_prompt_content: "Optional[Union[str, List[dict[str, Any]]]]" = None
-            if isinstance(system_prompt, str):
-                system_prompt_content = system_prompt
-            elif isinstance(system_prompt, Iterable):
-                system_prompt_content = []
-                for item in system_prompt:
-                    if (
-                        isinstance(item, dict)
-                        and item.get("type") == "text"
-                        and item.get("text")
-                    ):
-                        system_prompt_content.append(item.copy())
-
-            if system_prompt_content:
-                normalized_messages.append(
-                    {
-                        "role": GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM,
-                        "content": system_prompt_content,
-                    }
-                )
-
         for message in messages:
             if (
                 message.get("role") == GEN_AI_ALLOWED_MESSAGE_ROLES.USER
                 and "content" in message
                 and isinstance(message["content"], (list, tuple))
             ):
+                transformed_content = []
                 for item in message["content"]:
-                    if item.get("type") == "tool_result":
-                        normalized_messages.append(
-                            {
-                                "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
-                                "content": {  # type: ignore[dict-item]
-                                    "tool_use_id": item.get("tool_use_id"),
-                                    "output": item.get("content"),
-                                },
-                            }
-                        )
+                    # Skip tool_result items - they can contain images/documents
+                    # with nested structures that are difficult to redact properly
+                    if isinstance(item, dict) and item.get("type") == "tool_result":
+                        continue
+
+                    # Transform content blocks (images, documents, etc.)
+                    transformed_content.append(
+                        _transform_anthropic_content_block(item)
+                        if isinstance(item, dict)
+                        else item
+                    )
+
+                # If there are non-tool-result items, add them as a message
+                if transformed_content:
+                    normalized_messages.append(
+                        {
+                            "role": message.get("role"),
+                            "content": transformed_content,
+                        }
+                    )
             else:
-                normalized_messages.append(message)
+                # Transform content for non-list messages or assistant messages
+                transformed_message = message.copy()
+                if "content" in transformed_message:
+                    content = transformed_message["content"]
+                    if isinstance(content, (list, tuple)):
+                        transformed_message["content"] = [
+                            _transform_anthropic_content_block(item)
+                            if isinstance(item, dict)
+                            else item
+                            for item in content
+                        ]
+                normalized_messages.append(transformed_message)
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
         scope = sentry_sdk.get_current_scope()
@@ -219,6 +343,8 @@ def _set_output_data(
     model: "str | None",
     input_tokens: "int | None",
     output_tokens: "int | None",
+    cache_read_input_tokens: "int | None",
+    cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
     finish_span: bool = False,
 ) -> None:
@@ -254,6 +380,8 @@ def _set_output_data(
         span,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+        input_tokens_cached=cache_read_input_tokens,
+        input_tokens_cache_write=cache_write_input_tokens,
     )
 
     if finish_span:
@@ -288,7 +416,12 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
     with capture_internal_exceptions():
         if hasattr(result, "content"):
-            input_tokens, output_tokens = _get_token_usage(result)
+            (
+                input_tokens,
+                output_tokens,
+                cache_read_input_tokens,
+                cache_write_input_tokens,
+            ) = _get_token_usage(result)
 
             content_blocks = []
             for content_block in result.content:
@@ -305,6 +438,8 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 model=getattr(result, "model", None),
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
+                cache_read_input_tokens=cache_read_input_tokens,
+                cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
                 finish_span=True,
             )
@@ -315,15 +450,19 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
             def new_iterator() -> "Iterator[MessageStreamEvent]":
                 model = None
-                input_tokens = 0
-                output_tokens = 0
+                usage = _RecordedUsage()
                 content_blocks: "list[str]" = []
 
                 for event in old_iterator:
-                    model, input_tokens, output_tokens, content_blocks = (
-                        _collect_ai_data(
-                            event, model, input_tokens, output_tokens, content_blocks
-                        )
+                    (
+                        model,
+                        usage,
+                        content_blocks,
+                    ) = _collect_ai_data(
+                        event,
+                        model,
+                        usage,
+                        content_blocks,
                     )
                     yield event
 
@@ -331,23 +470,29 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     span=span,
                     integration=integration,
                     model=model,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    cache_read_input_tokens=usage.cache_read_input_tokens,
+                    cache_write_input_tokens=usage.cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                 )
 
             async def new_iterator_async() -> "AsyncIterator[MessageStreamEvent]":
                 model = None
-                input_tokens = 0
-                output_tokens = 0
+                usage = _RecordedUsage()
                 content_blocks: "list[str]" = []
 
                 async for event in old_iterator:
-                    model, input_tokens, output_tokens, content_blocks = (
-                        _collect_ai_data(
-                            event, model, input_tokens, output_tokens, content_blocks
-                        )
+                    (
+                        model,
+                        usage,
+                        content_blocks,
+                    ) = _collect_ai_data(
+                        event,
+                        model,
+                        usage,
+                        content_blocks,
                     )
                     yield event
 
@@ -355,8 +500,10 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     span=span,
                     integration=integration,
                     model=model,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    cache_read_input_tokens=usage.cache_read_input_tokens,
+                    cache_write_input_tokens=usage.cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                 )
@@ -386,8 +533,10 @@ def _wrap_message_create(f: "Any") -> "Any":
             try:
                 result = f(*args, **kwargs)
             except Exception as exc:
-                _capture_exception(exc)
-                raise exc from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:
@@ -422,8 +571,10 @@ def _wrap_message_create_async(f: "Any") -> "Any":
             try:
                 result = await f(*args, **kwargs)
             except Exception as exc:
-                _capture_exception(exc)
-                raise exc from None
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc)
+                reraise(*exc_info)
 
             return gen.send(result)
         except StopIteration as e:

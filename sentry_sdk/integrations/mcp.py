@@ -379,19 +379,20 @@ def _prepare_handler_data(
     )
 
 
-async def _async_handler_wrapper(
+async def _handler_wrapper(
     handler_type: str,
     func: "Callable[..., Any]",
     original_args: "tuple[Any, ...]",
     original_kwargs: "Optional[dict[str, Any]]" = None,
     self: "Optional[Any]" = None,
+    force_await: bool = True,
 ) -> "Any":
     """
-    Async wrapper for MCP handlers.
+    Wrapper for MCP handlers.
 
     Args:
         handler_type: "tool", "prompt", or "resource"
-        func: The async handler function to wrap
+        func: The handler function to wrap
         original_args: Original arguments passed to the handler
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
@@ -469,7 +470,11 @@ async def _async_handler_wrapper(
                     # Execute the async handler
                     if self is not None:
                         original_args = (self, *original_args)
-                    result = await func(*original_args, **original_kwargs)
+
+                    result = func(*original_args, **original_kwargs)
+                    if force_await or inspect.isawaitable(result):
+                        result = await result
+
                 except Exception as e:
                     # Set error flag for tools
                     if handler_type == "tool":
@@ -480,128 +485,6 @@ async def _async_handler_wrapper(
                 _set_span_output_data(span, result, result_data_key, handler_type)
 
     return result
-
-
-def _sync_handler_wrapper(
-    handler_type: str, func: "Callable[..., Any]", original_args: "tuple[Any, ...]"
-) -> "Any":
-    """
-    Sync wrapper for MCP handlers.
-
-    Args:
-        handler_type: "tool", "prompt", or "resource"
-        func: The sync handler function to wrap
-        original_args: Original arguments passed to the handler
-    """
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data(handler_type, original_args)
-
-    scopes = _get_active_http_scopes()
-
-    if scopes is None:
-        isolation_scope_context = nullcontext()
-        current_scope_context = nullcontext()
-    else:
-        isolation_scope, current_scope = scopes
-
-        isolation_scope_context = (
-            nullcontext()
-            if isolation_scope is None
-            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
-        )
-        current_scope_context = (
-            nullcontext()
-            if current_scope is None
-            else sentry_sdk.scope.use_scope(current_scope)
-        )
-
-    # Start span and execute
-    with isolation_scope_context:
-        with current_scope_context:
-            with get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=span_name,
-                origin=MCPIntegration.origin,
-            ) as span:
-                # Get request ID, session ID, and transport from context
-                request_id, session_id, mcp_transport = _get_request_context_data()
-
-                # Set input span data
-                _set_span_input_data(
-                    span,
-                    handler_name,
-                    span_data_key,
-                    mcp_method_name,
-                    arguments,
-                    request_id,
-                    session_id,
-                    mcp_transport,
-                )
-
-                # For resources, extract and set protocol
-                if handler_type == "resource":
-                    uri = original_args[0]
-                    protocol = None
-                    if hasattr(uri, "scheme"):
-                        protocol = uri.scheme
-                    elif handler_name and "://" in handler_name:
-                        protocol = handler_name.split("://")[0]
-                    if protocol:
-                        span.set_data(SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
-
-                try:
-                    # Execute the sync handler
-                    result = func(*original_args)
-                except Exception as e:
-                    # Set error flag for tools
-                    if handler_type == "tool":
-                        span.set_data(SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
-                    sentry_sdk.capture_exception(e)
-                    raise
-
-                _set_span_output_data(span, result, result_data_key, handler_type)
-                return result
-
-
-def _create_instrumented_handler(
-    handler_type: str, func: "Callable[..., Any]"
-) -> "Callable[..., Any]":
-    """
-    Create an instrumented version of a handler function (async or sync).
-
-    This function wraps the user's handler with a runtime wrapper that will create
-    Sentry spans and capture metrics when the handler is actually called.
-
-    The wrapper preserves the async/sync nature of the original function, which is
-    critical for Python's async/await to work correctly.
-
-    Args:
-        handler_type: "tool", "prompt", or "resource" - determines span configuration
-        func: The handler function to instrument (async or sync)
-
-    Returns:
-        A wrapped version of func that creates Sentry spans on execution
-    """
-    if inspect.iscoroutinefunction(func):
-
-        @wraps(func)
-        async def async_wrapper(*args: "Any") -> "Any":
-            return await _async_handler_wrapper(handler_type, func, args)
-
-        return async_wrapper
-    else:
-
-        @wraps(func)
-        def sync_wrapper(*args: "Any") -> "Any":
-            return _sync_handler_wrapper(handler_type, func, args)
-
-        return sync_wrapper
 
 
 def _create_instrumented_decorator(
@@ -617,8 +500,7 @@ def _create_instrumented_decorator(
     Sentry instrumentation into the handler registration flow. The returned decorator
     will:
     1. Receive the user's handler function
-    2. Wrap it with instrumentation via _create_instrumented_handler
-    3. Pass the instrumented version to the original MCP decorator
+    2. Pass the instrumented version to the original MCP decorator
 
     This ensures that when the handler is called at runtime, it's already wrapped
     with Sentry spans and metrics collection.
@@ -634,12 +516,12 @@ def _create_instrumented_decorator(
     """
 
     def instrumented_decorator(func: "Callable[..., Any]") -> "Callable[..., Any]":
-        # First wrap the handler with instrumentation
-        instrumented_func = _create_instrumented_handler(handler_type, func)
+        @wraps(func)
+        async def wrapper(*args: "Any") -> "Any":
+            return await _handler_wrapper(handler_type, func, args, force_await=False)
+
         # Then register it with the original MCP decorator
-        return original_decorator(*decorator_args, **decorator_kwargs)(
-            instrumented_func
-        )
+        return original_decorator(*decorator_args, **decorator_kwargs)(wrapper)
 
     return instrumented_decorator
 
@@ -723,7 +605,7 @@ def _patch_fastmcp() -> None:
         async def patched_get_prompt_mcp(
             self: "Any", *args: "Any", **kwargs: "Any"
         ) -> "Any":
-            return await _async_handler_wrapper(
+            return await _handler_wrapper(
                 "prompt",
                 original_get_prompt_mcp,
                 args,
@@ -740,7 +622,7 @@ def _patch_fastmcp() -> None:
         async def patched_read_resource_mcp(
             self: "Any", *args: "Any", **kwargs: "Any"
         ) -> "Any":
-            return await _async_handler_wrapper(
+            return await _handler_wrapper(
                 "resource",
                 original_read_resource_mcp,
                 args,

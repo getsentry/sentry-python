@@ -12,6 +12,12 @@ from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.utils import parse_version
 
+from openai import AsyncOpenAI
+from agents.models.openai_responses import OpenAIResponsesModel
+
+from unittest import mock
+from unittest.mock import AsyncMock
+
 import agents
 from agents import (
     Agent,
@@ -25,15 +31,116 @@ from agents.items import (
     ResponseOutputText,
     ResponseFunctionToolCall,
 )
+from agents.tool import HostedMCPTool
 from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
 
+from openai.types.responses import (
+    ResponseCreatedEvent,
+    ResponseTextDeltaEvent,
+    ResponseCompletedEvent,
+    Response,
+    ResponseUsage,
+)
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
 )
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
+
+EXAMPLE_RESPONSE = Response(
+    id="chat-id",
+    output=[
+        ResponseOutputMessage(
+            id="message-id",
+            content=[
+                ResponseOutputText(
+                    annotations=[],
+                    text="the model response",
+                    type="output_text",
+                ),
+            ],
+            role="assistant",
+            status="completed",
+            type="message",
+        ),
+    ],
+    parallel_tool_calls=False,
+    tool_choice="none",
+    tools=[],
+    created_at=10000000,
+    model="response-model-id",
+    object="response",
+    usage=ResponseUsage(
+        input_tokens=20,
+        input_tokens_details=InputTokensDetails(
+            cached_tokens=5,
+        ),
+        output_tokens=10,
+        output_tokens_details=OutputTokensDetails(
+            reasoning_tokens=8,
+        ),
+        total_tokens=30,
+    ),
+)
+
+
+async def EXAMPLE_STREAMED_RESPONSE(*args, **kwargs):
+    yield ResponseCreatedEvent(
+        response=Response(
+            id="chat-id",
+            output=[],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="response-model-id",
+            object="response",
+        ),
+        type="response.created",
+        sequence_number=0,
+    )
+
+    yield ResponseCompletedEvent(
+        response=Response(
+            id="chat-id",
+            output=[
+                ResponseOutputMessage(
+                    id="message-id",
+                    content=[
+                        ResponseOutputText(
+                            annotations=[],
+                            text="the model response",
+                            type="output_text",
+                        ),
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                ),
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="response-model-id",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=20,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=5,
+                ),
+                output_tokens=10,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=8,
+                ),
+                total_tokens=30,
+            ),
+        ),
+        type="response.completed",
+        sequence_number=1,
+    )
 
 
 @pytest.fixture
@@ -89,6 +196,26 @@ def test_agent():
 
 
 @pytest.fixture
+def test_agent_with_instructions():
+    def inner(instructions):
+        """Create a real Agent instance for testing."""
+        return Agent(
+            name="test_agent",
+            instructions=instructions,
+            model="gpt-4",
+            model_settings=ModelSettings(
+                max_tokens=100,
+                temperature=0.7,
+                top_p=1.0,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+            ),
+        )
+
+    return inner
+
+
+@pytest.fixture
 def test_agent_custom_model():
     """Create a real Agent instance for testing."""
     return Agent(
@@ -107,8 +234,145 @@ def test_agent_custom_model():
 
 
 @pytest.mark.asyncio
-async def test_agent_invocation_span(
+async def test_agent_invocation_span_no_pii(
     sentry_init, capture_events, test_agent, mock_model_response
+):
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["data"]
+    assert "gen_ai.request.messages" not in invoke_agent_span["data"]
+    assert "gen_ai.response.text" not in invoke_agent_span["data"]
+
+    assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+    assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+    assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "instructions",
+    (
+        None,
+        "You are a coding assistant that talks like a pirate.",
+    ),
+)
+@pytest.mark.parametrize(
+    "input",
+    [
+        pytest.param("Test input", id="string"),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="blocks_no_type",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="parts_no_type",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="parts",
+        ),
+    ],
+)
+async def test_agent_invocation_span(
+    sentry_init,
+    capture_events,
+    test_agent_with_instructions,
+    mock_model_response,
+    instructions,
+    input,
+    request,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -129,7 +393,9 @@ async def test_agent_invocation_span(
             events = capture_events()
 
             result = await agents.Runner.run(
-                test_agent, "Test input", run_config=test_run_config
+                test_agent_with_instructions(instructions),
+                input,
+                run_config=test_run_config,
             )
 
             assert result is not None
@@ -143,21 +409,101 @@ async def test_agent_invocation_span(
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
-    assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
-        [
-            {
-                "content": [
-                    {"text": "You are a helpful test assistant.", "type": "text"}
-                ],
-                "role": "system",
-            },
-            {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
-        ]
-    )
+
+    # Only first case checks "gen_ai.request.messages" until further input handling work.
+    param_id = request.node.callspec.id
+    if "string" in param_id and instructions is None:  # type: ignore
+        assert "gen_ai.system_instructions" not in ai_client_span["data"]
+
+        assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
+            [
+                {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
+            ]
+        )
+
+    elif "string" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+            ]
+        )
+    elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks_no_type" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks" in param_id and instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "parts_no_type" in param_id and instructions is None:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    elif "parts_no_type" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    elif instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    else:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+
     assert (
         invoke_agent_span["data"]["gen_ai.response.text"]
         == "Hello, how can I help you?"
     )
+
     assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
     assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
     assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
@@ -212,8 +558,11 @@ async def test_client_span_custom_model(
     assert ai_client_span["data"]["gen_ai.request.model"] == "my-custom-model"
 
 
-def test_agent_invocation_span_sync(
-    sentry_init, capture_events, test_agent, mock_model_response
+def test_agent_invocation_span_sync_no_pii(
+    sentry_init,
+    capture_events,
+    test_agent,
+    mock_model_response,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -228,6 +577,7 @@ def test_agent_invocation_span_sync(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
+                send_default_pii=False,
             )
 
             events = capture_events()
@@ -263,6 +613,226 @@ def test_agent_invocation_span_sync(
     assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["data"]
+
+
+@pytest.mark.parametrize(
+    "instructions",
+    (
+        None,
+        "You are a coding assistant that talks like a pirate.",
+    ),
+)
+@pytest.mark.parametrize(
+    "input",
+    [
+        pytest.param("Test input", id="string"),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="blocks_no_type",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="blocks",
+        ),
+        pytest.param(
+            [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="parts_no_type",
+        ),
+        pytest.param(
+            [
+                {
+                    "type": "message",
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Test input",
+                },
+            ],
+            id="parts",
+        ),
+    ],
+)
+def test_agent_invocation_span_sync(
+    sentry_init,
+    capture_events,
+    test_agent_with_instructions,
+    mock_model_response,
+    instructions,
+    input,
+    request,
+):
+    """
+    Test that the integration creates spans for agent invocations.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
+            result = agents.Runner.run_sync(
+                test_agent_with_instructions(instructions),
+                input,
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+    assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+    assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    param_id = request.node.callspec.id
+    if "string" in param_id and instructions is None:  # type: ignore
+        assert "gen_ai.system_instructions" not in ai_client_span["data"]
+    elif "string" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+            ]
+        )
+    elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks_no_type" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks" in param_id and instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "blocks" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ]
+        )
+    elif "parts_no_type" in param_id and instructions is None:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    elif "parts_no_type" in param_id:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    elif instructions is None:  # type: ignore
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
+    else:
+        assert ai_client_span["data"]["gen_ai.system_instructions"] == safe_serialize(
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ]
+        )
 
 
 @pytest.mark.asyncio
@@ -574,12 +1144,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
         [
             {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
-            {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": "Please use the simple test tool"}
@@ -645,30 +1209,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
         [
             {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Please use the simple test tool"}
-                ],
-            },
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "arguments": '{"message": "hello"}',
-                        "call_id": "call_123",
-                        "name": "simple_test_tool",
-                        "type": "function_call",
-                        "id": "call_123",
-                    }
-                ],
-            },
-            {
                 "role": "tool",
                 "content": [
                     {
@@ -693,6 +1233,171 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span2["data"]["gen_ai.usage.output_tokens"] == 10
     assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
+
+
+@pytest.mark.asyncio
+async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_agent):
+    """
+    Test responses API is given trace propagation headers with HostedMCPTool.
+    """
+
+    hosted_tool = HostedMCPTool(
+        tool_config={
+            "type": "mcp",
+            "server_label": "test_server",
+            "server_url": "http://example.com/",
+            "headers": {
+                "baggage": "custom=data",
+            },
+        },
+    )
+
+    client = AsyncOpenAI(api_key="z")
+    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
+
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+
+    agent_with_tool = test_agent.clone(
+        tools=[hosted_tool],
+        model=model,
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+    )
+
+    with patch.object(
+        model._client.responses,
+        "create",
+        side_effect=EXAMPLE_STREAMED_RESPONSE,
+    ) as create, mock.patch(
+        "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
+    ):
+        with sentry_sdk.start_transaction(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            trace_id="01234567890123456789012345678901",
+        ) as transaction:
+            result = agents.Runner.run_streamed(
+                agent_with_tool,
+                "Please use the simple test tool",
+                run_config=test_run_config,
+            )
+
+            async for event in result.stream_events():
+                pass
+
+            ai_client_span = transaction._span_recorder.spans[-1]
+
+        args, kwargs = create.call_args
+
+        assert "tools" in kwargs
+        assert len(kwargs["tools"]) == 1
+        hosted_mcp_tool = kwargs["tools"][0]
+
+        assert hosted_mcp_tool["headers"][
+            "sentry-trace"
+        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=ai_client_span.span_id,
+            sampled=1,
+        )
+
+        expected_outgoing_baggage = (
+            "custom=data,"
+            "sentry-trace_id=01234567890123456789012345678901,"
+            "sentry-sample_rand=0.500000,"
+            "sentry-environment=production,"
+            "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,"
+            "sentry-transaction=/interactions/other-dogs/new-dog,"
+            "sentry-sample_rate=1.0,"
+            "sentry-sampled=true"
+        )
+
+        assert hosted_mcp_tool["headers"]["baggage"] == expected_outgoing_baggage
+
+
+@pytest.mark.asyncio
+async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
+    """
+    Test responses API is given trace propagation headers with HostedMCPTool.
+    """
+
+    hosted_tool = HostedMCPTool(
+        tool_config={
+            "type": "mcp",
+            "server_label": "test_server",
+            "server_url": "http://example.com/",
+            "headers": {
+                "baggage": "custom=data",
+            },
+        },
+    )
+
+    client = AsyncOpenAI(api_key="z")
+    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
+
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+
+    agent_with_tool = test_agent.clone(
+        tools=[hosted_tool],
+        model=model,
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+    )
+
+    with patch.object(
+        model._client.responses,
+        "create",
+        wraps=model._client.responses.create,
+    ) as create, mock.patch(
+        "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
+    ):
+        with sentry_sdk.start_transaction(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            trace_id="01234567890123456789012345678901",
+        ) as transaction:
+            await agents.Runner.run(
+                agent_with_tool,
+                "Please use the simple test tool",
+                run_config=test_run_config,
+            )
+
+            ai_client_span = transaction._span_recorder.spans[-1]
+
+        args, kwargs = create.call_args
+
+        assert "tools" in kwargs
+        assert len(kwargs["tools"]) == 1
+        hosted_mcp_tool = kwargs["tools"][0]
+
+        assert hosted_mcp_tool["headers"][
+            "sentry-trace"
+        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=ai_client_span.span_id,
+            sampled=1,
+        )
+
+        expected_outgoing_baggage = (
+            "custom=data,"
+            "sentry-trace_id=01234567890123456789012345678901,"
+            "sentry-sample_rand=0.500000,"
+            "sentry-environment=production,"
+            "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,"
+            "sentry-transaction=/interactions/other-dogs/new-dog,"
+            "sentry-sample_rate=1.0,"
+            "sentry-sampled=true"
+        )
+
+        assert hosted_mcp_tool["headers"]["baggage"] == expected_outgoing_baggage
 
 
 @pytest.mark.asyncio
@@ -857,12 +1562,6 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
     assert "gen_ai.request.messages" in ai_client_span["data"]
     request_messages = safe_serialize(
         [
-            {
-                "role": "system",
-                "content": [
-                    {"type": "text", "text": "You are a helpful test assistant."}
-                ],
-            },
             {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
         ]
     )
@@ -1241,7 +1940,24 @@ async def test_multiple_agents_asyncio(
     assert txn3["transaction"] == "test_agent workflow"
 
 
-def test_openai_agents_message_role_mapping(sentry_init, capture_events):
+# Test input messages with mixed roles including "ai"
+@pytest.mark.parametrize(
+    "test_message,expected_role",
+    [
+        ({"role": "user", "content": "Hello"}, "user"),
+        (
+            {"role": "ai", "content": "Hi there!"},
+            "assistant",
+        ),  # Should be mapped to "assistant"
+        (
+            {"role": "assistant", "content": "How can I help?"},
+            "assistant",
+        ),  # Should stay "assistant"
+    ],
+)
+def test_openai_agents_message_role_mapping(
+    sentry_init, capture_events, test_message, expected_role
+):
     """Test that OpenAI Agents integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
@@ -1249,15 +1965,7 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
         send_default_pii=True,
     )
 
-    # Test input messages with mixed roles including "ai"
-    test_input = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hello"},
-        {"role": "ai", "content": "Hi there!"},  # Should be mapped to "assistant"
-        {"role": "assistant", "content": "How can I help?"},  # Should stay "assistant"
-    ]
-
-    get_response_kwargs = {"input": test_input}
+    get_response_kwargs = {"input": [test_message]}
 
     from sentry_sdk.integrations.openai_agents.utils import _set_input_data
     from sentry_sdk import start_span
@@ -1268,23 +1976,10 @@ def test_openai_agents_message_role_mapping(sentry_init, capture_events):
     # Verify that messages were processed and roles were mapped
     from sentry_sdk.consts import SPANDATA
 
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data:
-        import json
+    stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
-        stored_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
-        # Verify roles were properly mapped
-        found_assistant_roles = 0
-        for message in stored_messages:
-            if message["role"] == "assistant":
-                found_assistant_roles += 1
-
-        # Should have 2 assistant roles (1 from original "assistant", 1 from mapped "ai")
-        assert found_assistant_roles == 2
-
-        # Verify no "ai" roles remain in any message
-        for message in stored_messages:
-            assert message["role"] != "ai"
+    # Verify roles were properly mapped
+    assert stored_messages[0]["role"] == expected_role
 
 
 @pytest.mark.asyncio
@@ -1465,7 +2160,7 @@ async def test_ai_client_span_includes_response_model(
 ):
     """
     Test that ai_client spans (gen_ai.chat) include the response model from the actual API response.
-    This verifies the new functionality to capture the model used in the response.
+    This verifies we capture the actual model used (which may differ from the requested model).
     """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
@@ -1473,7 +2168,7 @@ async def test_ai_client_span_includes_response_model(
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
         ) as mock_fetch_response:
-            # Create a mock OpenAI Response object with a model field
+            # Create a mock OpenAI Response object with a specific model version
             mock_response = MagicMock()
             mock_response.model = "gpt-4.1-2025-04-14"  # The actual response model
             mock_response.id = "resp_123"
@@ -1523,7 +2218,7 @@ async def test_ai_client_span_includes_response_model(
     spans = transaction["spans"]
     _, ai_client_span = spans
 
-    # Verify ai_client span has response model
+    # Verify ai_client span has response model from API response
     assert ai_client_span["description"] == "chat gpt-4"
     assert "gen_ai.response.model" in ai_client_span["data"]
     assert ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
@@ -1545,13 +2240,13 @@ async def test_ai_client_span_response_model_with_chat_completions(
     )
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        # Mock the get_response method directly since ChatCompletions may use Responses API anyway
+        # Mock the _fetch_response method
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
         ) as mock_fetch_response:
-            # Create a mock Response object with a model field
+            # Create a mock Response object
             mock_response = MagicMock()
-            mock_response.model = "gpt-4o-mini-2024-07-18"  # Actual response model
+            mock_response.model = "gpt-4o-mini-2024-07-18"
             mock_response.id = "resp_123"
             mock_response.output = [
                 ResponseOutputMessage(
@@ -1598,7 +2293,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
     spans = transaction["spans"]
     _, ai_client_span = spans
 
-    # Verify response model from Response is captured
+    # Verify response model from API response is captured
     assert "gen_ai.response.model" in ai_client_span["data"]
     assert ai_client_span["data"]["gen_ai.response.model"] == "gpt-4o-mini-2024-07-18"
 
@@ -1711,41 +2406,45 @@ async def test_response_model_not_set_when_unavailable(
     sentry_init, capture_events, test_agent
 ):
     """
-    Test that response model is not set if the raw response doesn't have a model field.
-    This can happen with custom model implementations.
+    Test that response model is not set if the API response doesn't have a model field.
+    The request model should still be set correctly.
     """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        # Mock without _fetch_response (simulating custom model without this method)
         with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            response = ModelResponse(
-                output=[
-                    ResponseOutputMessage(
-                        id="msg_123",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                text="Response without model field",
-                                type="output_text",
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                ],
-                usage=Usage(
-                    requests=1,
-                    input_tokens=10,
-                    output_tokens=20,
-                    total_tokens=30,
-                ),
-                response_id="resp_123",
+            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
+        ) as mock_fetch_response:
+            # Create a mock response without a model field
+            mock_response = MagicMock()
+            mock_response.model = None  # No model in response
+            mock_response.id = "resp_123"
+            mock_response.output = [
+                ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="Response without model field",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ]
+            mock_response.usage = MagicMock()
+            mock_response.usage.input_tokens = 10
+            mock_response.usage.output_tokens = 20
+            mock_response.usage.total_tokens = 30
+            mock_response.usage.input_tokens_details = InputTokensDetails(
+                cached_tokens=0
             )
-            # Don't set _sentry_response_model attribute
-            mock_get_response.return_value = response
+            mock_response.usage.output_tokens_details = OutputTokensDetails(
+                reasoning_tokens=0
+            )
+
+            mock_fetch_response.return_value = mock_response
 
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
@@ -1754,25 +2453,21 @@ async def test_response_model_not_set_when_unavailable(
 
             events = capture_events()
 
-            # Remove the _fetch_response method to simulate custom model
-            with patch.object(
-                agents.models.openai_responses.OpenAIResponsesModel,
-                "_fetch_response",
-                None,
-            ):
-                result = await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
-                )
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
 
-                assert result is not None
+            assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
     _, ai_client_span = spans
 
-    # When response model can't be captured, it shouldn't be in the span data
-    # (we only set it when we can accurately capture it)
+    # Response model should NOT be set when API doesn't return it
     assert "gen_ai.response.model" not in ai_client_span["data"]
+    # But request model should still be set
+    assert "gen_ai.request.model" in ai_client_span["data"]
+    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
 
 
 @pytest.mark.asyncio
@@ -1780,15 +2475,14 @@ async def test_invoke_agent_span_includes_response_model(
     sentry_init, capture_events, test_agent
 ):
     """
-    Test that invoke_agent spans include the response model.
-    When an agent makes multiple LLM calls, it should report the last model used.
+    Test that invoke_agent spans include the response model from the API response.
     """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
         ) as mock_fetch_response:
-            # Create a mock OpenAI Response object with a model field
+            # Create a mock OpenAI Response object with a specific model version
             mock_response = MagicMock()
             mock_response.model = "gpt-4.1-2025-04-14"  # The actual response model
             mock_response.id = "resp_123"
@@ -1838,7 +2532,7 @@ async def test_invoke_agent_span_includes_response_model(
     spans = transaction["spans"]
     invoke_agent_span, ai_client_span = spans
 
-    # Verify invoke_agent span has response model
+    # Verify invoke_agent span has response model from API
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
     assert "gen_ai.response.model" in invoke_agent_span["data"]
     assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
@@ -1868,7 +2562,7 @@ async def test_invoke_agent_span_uses_last_response_model(
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
         ) as mock_fetch_response:
-            # First call: gpt-4 model
+            # First call: gpt-4 model returns tool call
             first_response = MagicMock()
             first_response.model = "gpt-4-0613"
             first_response.id = "resp_1"
@@ -1892,9 +2586,9 @@ async def test_invoke_agent_span_uses_last_response_model(
                 reasoning_tokens=0
             )
 
-            # Second call: different model (e.g., after tool execution)
+            # Second call: different model version returns final message
             second_response = MagicMock()
-            second_response.model = "gpt-4.1-2025-04-14"  # Different model
+            second_response.model = "gpt-4.1-2025-04-14"
             second_response.id = "resp_2"
             second_response.output = [
                 ResponseOutputMessage(
@@ -1946,11 +2640,11 @@ async def test_invoke_agent_span_uses_last_response_model(
     first_ai_client_span = spans[1]
     second_ai_client_span = spans[3]  # After tool span
 
-    # Verify invoke_agent span uses the LAST response model
+    # Invoke_agent span uses the LAST response model
     assert "gen_ai.response.model" in invoke_agent_span["data"]
     assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
 
-    # Verify each ai_client span has its own response model
+    # Each ai_client span has its own response model from the API
     assert first_ai_client_span["data"]["gen_ai.response.model"] == "gpt-4-0613"
     assert (
         second_ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
@@ -1971,7 +2665,6 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
     )
 
     test_messages = [
-        {"role": "system", "content": "small message 1"},
         {"role": "user", "content": large_content},
         {"role": "assistant", "content": large_content},
         {"role": "user", "content": "small message 4"},
@@ -1985,8 +2678,8 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
         _set_input_data(span, get_response_kwargs)
         if hasattr(scope, "_gen_ai_original_message_count"):
             truncated_count = scope._gen_ai_original_message_count.get(span.span_id)
-            assert truncated_count == 5, (
-                f"Expected 5 original messages, got {truncated_count}"
+            assert truncated_count == 4, (
+                f"Expected 4 original messages, got {truncated_count}"
             )
 
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span._data
@@ -1995,6 +2688,363 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
 
         parsed_messages = json.loads(messages_data)
         assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 2
-        assert "small message 4" in str(parsed_messages[0])
-        assert "small message 5" in str(parsed_messages[1])
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
+
+
+def test_streaming_patches_applied(sentry_init):
+    """
+    Test that the streaming patches are applied correctly.
+    """
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Verify that run_streamed is patched (will have __wrapped__ attribute if patched)
+    import agents
+
+    # Check that the method exists and has been modified
+    assert hasattr(agents.run.DEFAULT_AGENT_RUNNER, "run_streamed")
+    assert hasattr(agents.run.AgentRunner, "_run_single_turn_streamed")
+
+    # Verify the patches were applied by checking for our wrapper
+    run_streamed_func = agents.run.DEFAULT_AGENT_RUNNER.run_streamed
+    assert run_streamed_func is not None
+
+
+@pytest.mark.asyncio
+async def test_streaming_span_update_captures_response_data(
+    sentry_init, test_agent, mock_usage
+):
+    """
+    Test that update_ai_client_span correctly captures response text,
+    usage data, and response model from a streaming response.
+    """
+    from sentry_sdk.integrations.openai_agents.spans.ai_client import (
+        update_ai_client_span,
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    # Create a mock streaming response object (similar to what we'd get from ResponseCompletedEvent)
+    mock_streaming_response = MagicMock()
+    mock_streaming_response.model = "gpt-4-streaming"
+    mock_streaming_response.usage = mock_usage
+    mock_streaming_response.output = [
+        ResponseOutputMessage(
+            id="msg_streaming_123",
+            type="message",
+            status="completed",
+            content=[
+                ResponseOutputText(
+                    text="Hello from streaming!",
+                    type="output_text",
+                    annotations=[],
+                )
+            ],
+            role="assistant",
+        )
+    ]
+
+    # Test the unified update function (works for both streaming and non-streaming)
+    with start_span(op="gen_ai.chat", description="test chat") as span:
+        update_ai_client_span(span, mock_streaming_response)
+
+        # Verify the span data was set correctly
+        assert span._data["gen_ai.response.text"] == "Hello from streaming!"
+        assert span._data["gen_ai.usage.input_tokens"] == 10
+        assert span._data["gen_ai.usage.output_tokens"] == 20
+        assert span._data["gen_ai.response.model"] == "gpt-4-streaming"
+
+
+@pytest.mark.asyncio
+async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
+    """
+    Test that time-to-first-token (TTFT) is recorded on chat spans during streaming.
+
+    TTFT is triggered by events with a `delta` attribute, which includes:
+    - ResponseTextDeltaEvent (text output)
+    - ResponseAudioDeltaEvent (audio output)
+    - ResponseReasoningTextDeltaEvent (reasoning/thinking)
+    - ResponseFunctionCallArgumentsDeltaEvent (function call args)
+    - and other delta events...
+
+    Events WITHOUT delta (like ResponseCompletedEvent, ResponseCreatedEvent, etc.)
+    should NOT trigger TTFT.
+    """
+    from sentry_sdk.integrations.openai_agents.patches.models import (
+        _create_get_model_wrapper,
+    )
+
+    sentry_init(
+        integrations=[OpenAIAgentsIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    # Create a mock model with stream_response and get_response
+    class MockModel:
+        model = "gpt-4"
+
+        async def get_response(self, *args, **kwargs):
+            # Not used in this test, but required by the wrapper
+            pass
+
+        async def stream_response(self, *args, **kwargs):
+            # First event: ResponseCreatedEvent (no delta - should NOT trigger TTFT)
+            created_event = MagicMock(spec=["type", "sequence_number"])
+            created_event.type = "response.created"
+            yield created_event
+
+            # Simulate server-side processing delay before first token
+            await asyncio.sleep(0.05)  # 50ms delay
+
+            # Second event: ResponseTextDeltaEvent (HAS delta - triggers TTFT)
+            text_delta_event = MagicMock(spec=["delta", "type", "content_index"])
+            text_delta_event.delta = "Hello"
+            text_delta_event.type = "response.output_text.delta"
+            yield text_delta_event
+
+            # Third event: more text content (also has delta, but TTFT already recorded)
+            text_delta_event2 = MagicMock(spec=["delta", "type", "content_index"])
+            text_delta_event2.delta = " world!"
+            text_delta_event2.type = "response.output_text.delta"
+            yield text_delta_event2
+
+            # Final event: ResponseCompletedEvent (has response, no delta)
+            completed_event = MagicMock(spec=["response", "type", "sequence_number"])
+            completed_event.response = MagicMock()
+            completed_event.response.model = "gpt-4"
+            completed_event.response.usage = Usage(
+                requests=1,
+                input_tokens=10,
+                output_tokens=5,
+                total_tokens=15,
+            )
+            completed_event.response.output = []
+            yield completed_event
+
+    # Create a mock original _get_model that returns our mock model
+    def mock_get_model(agent, run_config):
+        return MockModel()
+
+    # Wrap it with our integration wrapper
+    wrapped_get_model = _create_get_model_wrapper(mock_get_model)
+
+    with sentry_sdk.start_transaction(name="test_ttft", sampled=True) as transaction:
+        # Get the wrapped model (this applies the stream_response wrapper)
+        wrapped_model = wrapped_get_model(None, test_agent, MagicMock())
+
+        # Call the wrapped stream_response and consume all events
+        async for _event in wrapped_model.stream_response():
+            pass
+
+        # Verify TTFT is recorded on the chat span (must be inside transaction context)
+        chat_spans = [
+            s for s in transaction._span_recorder.spans if s.op == "gen_ai.chat"
+        ]
+        assert len(chat_spans) >= 1
+        chat_span = chat_spans[0]
+
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in chat_span._data
+        ttft_value = chat_span._data[SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+        # TTFT should be at least 40ms (our simulated delay minus some variance) but reasonable
+        assert 0.04 < ttft_value < 1.0, f"TTFT {ttft_value} should be around 50ms"
+
+        # Verify streaming flag is set
+        assert chat_span._data.get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
+
+
+@pytest.mark.skipif(
+    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
+    reason="conversation_id support requires openai-agents >= 0.4.0",
+)
+@pytest.mark.asyncio
+async def test_conversation_id_on_all_spans(
+    sentry_init, capture_events, test_agent, mock_model_response
+):
+    """
+    Test that gen_ai.conversation.id is set on all AI-related spans when passed to Runner.run().
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                test_agent,
+                "Test input",
+                run_config=test_run_config,
+                conversation_id="conv_test_123",
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    # Verify workflow span (transaction) has conversation_id
+    assert (
+        transaction["contexts"]["trace"]["data"]["gen_ai.conversation.id"]
+        == "conv_test_123"
+    )
+
+    # Verify invoke_agent span has conversation_id
+    assert invoke_agent_span["data"]["gen_ai.conversation.id"] == "conv_test_123"
+
+    # Verify ai_client span has conversation_id
+    assert ai_client_span["data"]["gen_ai.conversation.id"] == "conv_test_123"
+
+
+@pytest.mark.skipif(
+    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
+    reason="conversation_id support requires openai-agents >= 0.4.0",
+)
+@pytest.mark.asyncio
+async def test_conversation_id_on_tool_span(sentry_init, capture_events, test_agent):
+    """
+    Test that gen_ai.conversation.id is set on tool execution spans when passed to Runner.run().
+    """
+
+    @agents.function_tool
+    def simple_tool(message: str) -> str:
+        """A simple tool"""
+        return f"Result: {message}"
+
+    agent_with_tool = test_agent.clone(tools=[simple_tool])
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            tool_call = ResponseFunctionToolCall(
+                id="call_123",
+                call_id="call_123",
+                name="simple_tool",
+                type="function_call",
+                arguments='{"message": "hello"}',
+            )
+
+            tool_response = ModelResponse(
+                output=[tool_call],
+                usage=Usage(
+                    requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+                ),
+                response_id="resp_tool_456",
+            )
+
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="Done",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1, input_tokens=15, output_tokens=10, total_tokens=25
+                ),
+                response_id="resp_final_789",
+            )
+
+            mock_get_response.side_effect = [tool_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            await agents.Runner.run(
+                agent_with_tool,
+                "Use the tool",
+                run_config=test_run_config,
+                conversation_id="conv_tool_test_456",
+            )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # Find the tool span
+    tool_span = None
+    for span in spans:
+        if span.get("description", "").startswith("execute_tool"):
+            tool_span = span
+            break
+
+    assert tool_span is not None
+    # Tool span should have the conversation_id passed to Runner.run()
+    assert tool_span["data"]["gen_ai.conversation.id"] == "conv_tool_test_456"
+
+    # Workflow span (transaction) should have the same conversation_id
+    assert (
+        transaction["contexts"]["trace"]["data"]["gen_ai.conversation.id"]
+        == "conv_tool_test_456"
+    )
+
+
+@pytest.mark.skipif(
+    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
+    reason="conversation_id support requires openai-agents >= 0.4.0",
+)
+@pytest.mark.asyncio
+async def test_no_conversation_id_when_not_provided(
+    sentry_init, capture_events, test_agent, mock_model_response
+):
+    """
+    Test that gen_ai.conversation.id is not set when not passed to Runner.run().
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            # Don't pass conversation_id
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    # Verify conversation_id is NOT set on any spans
+    assert "gen_ai.conversation.id" not in transaction["contexts"]["trace"].get(
+        "data", {}
+    )
+    assert "gen_ai.conversation.id" not in invoke_agent_span.get("data", {})
+    assert "gen_ai.conversation.id" not in ai_client_span.get("data", {})

@@ -1,6 +1,7 @@
 import contextvars
 import itertools
 import sys
+import json
 import warnings
 from collections import OrderedDict
 from functools import wraps
@@ -14,6 +15,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_messages,
+    transform_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -35,6 +37,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from sentry_sdk.tracing import Span
+    from sentry_sdk._types import TextPart
 
 
 try:
@@ -117,6 +120,39 @@ DATA_FIELDS = {
 }
 
 
+def _transform_langchain_content_block(
+    content_block: "Dict[str, Any]",
+) -> "Dict[str, Any]":
+    """
+    Transform a LangChain content block using the shared transform_content_part function.
+
+    Returns the original content block if transformation is not applicable
+    (e.g., for text blocks or unrecognized formats).
+    """
+    result = transform_content_part(content_block)
+    return result if result is not None else content_block
+
+
+def _transform_langchain_message_content(content: "Any") -> "Any":
+    """
+    Transform LangChain message content, handling both string content and
+    list of content blocks.
+    """
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, (list, tuple)):
+        transformed = []
+        for block in content:
+            if isinstance(block, dict):
+                transformed.append(_transform_langchain_content_block(block))
+            else:
+                transformed.append(block)
+        return transformed
+
+    return content
+
+
 # Contextvar to track agent names in a stack for re-entrant agent support
 _agent_stack: "contextvars.ContextVar[Optional[List[Optional[str]]]]" = (
     contextvars.ContextVar("langchain_agent_stack", default=None)
@@ -153,6 +189,40 @@ def _get_current_agent() -> "Optional[str]":
     if stack:
         return stack[-1]
     return None
+
+
+def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[str]":
+    system_instructions = []
+
+    for list_ in messages:
+        for message in list_:
+            # type of content: str | list[str | dict] | None
+            if message.type == "system" and isinstance(message.content, str):
+                system_instructions.append(message.content)
+
+            elif message.type == "system" and isinstance(message.content, list):
+                for item in message.content:
+                    if isinstance(item, str):
+                        system_instructions.append(item)
+
+                    elif isinstance(item, dict) and item.get("type") == "text":
+                        instruction = item.get("text")
+                        if isinstance(instruction, str):
+                            system_instructions.append(instruction)
+
+    return system_instructions
+
+
+def _transform_system_instructions(
+    system_instructions: "List[str]",
+) -> "List[TextPart]":
+    return [
+        {
+            "type": "text",
+            "content": instruction,
+        }
+        for instruction in system_instructions
+    ]
 
 
 class LangchainIntegration(Integration):
@@ -234,7 +304,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message: "BaseMessage") -> "Any":
-        parsed = {"role": message.type, "content": message.content}
+        # Transform content to handle multimodal data (images, audio, video, files)
+        transformed_content = _transform_langchain_message_content(message.content)
+        parsed = {"role": message.type, "content": transformed_content}
         parsed.update(message.additional_kwargs)
         return parsed
 
@@ -394,9 +466,19 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
+                system_instructions = _get_system_instructions(messages)
+                if len(system_instructions) > 0:
+                    span.set_data(
+                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                        json.dumps(_transform_system_instructions(system_instructions)),
+                    )
+
                 normalized_messages = []
                 for list_ in messages:
                     for message in list_:
+                        if message.type == "system":
+                            continue
+
                         normalized_messages.append(
                             self._normalize_langchain_message(message)
                         )
