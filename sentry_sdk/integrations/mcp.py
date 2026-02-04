@@ -10,6 +10,7 @@ Supports the low-level `mcp.server.lowlevel.Server` API.
 import inspect
 from functools import wraps
 from typing import TYPE_CHECKING
+from contextlib import nullcontext
 
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function
@@ -17,7 +18,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.utils import safe_serialize
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import nullcontext
 
 try:
     from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
