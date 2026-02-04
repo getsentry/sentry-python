@@ -459,6 +459,14 @@ class StreamedSpan:
 
         self.status = status
 
+    def set_http_status(self, http_status: int) -> None:
+        self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
+
+        if http_status >= 400:
+            self.set_status(SpanStatus.ERROR)
+        else:
+            self.set_status(SpanStatus.OK)
+
     def get_name(self) -> str:
         return self.name
 
@@ -556,14 +564,6 @@ class StreamedSpan:
     def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
         if profiler_id is not None:
             self.set_attribute("sentry.profiler_id", profiler_id)
-
-    def set_http_status(self, http_status: int) -> None:
-        self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
-
-        if http_status >= 400:
-            self.set_status(SpanStatus.ERROR)
-        else:
-            self.set_status(SpanStatus.OK)
 
     def get_baggage(self) -> "Baggage":
         """
