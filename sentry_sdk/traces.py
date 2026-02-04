@@ -202,7 +202,7 @@ class StreamedSpan:
     """
 
     __slots__ = (
-        "name",
+        "_name",
         "_attributes",
         "_span_id",
         "_trace_id",
@@ -212,7 +212,7 @@ class StreamedSpan:
         "parent_sampled",
         "start_timestamp",
         "timestamp",
-        "status",
+        "_status",
         "_start_timestamp_monotonic_ns",
         "_scope",
         "_flags",
@@ -246,17 +246,18 @@ class StreamedSpan:
     ) -> None:
         self._scope = scope
 
-        self.name: str = name
+        self._name: str = name
         self._attributes: "Attributes" = {}
         if attributes:
             for attribute, value in attributes.items():
                 self.set_attribute(attribute, value)
 
-        self._trace_id = trace_id
+        self._trace_id: "Optional[str]" = trace_id
         self.parent_span_id = parent_span_id
         self.parent_sampled = parent_sampled
         self.segment = segment or self
 
+        self._flags: dict[str, bool] = {}
         self.start_timestamp = datetime.now(timezone.utc)
 
         try:
@@ -270,9 +271,8 @@ class StreamedSpan:
         self._finished: bool = False
         self._span_id: "Optional[str]" = None
 
-        self.status: str = SpanStatus.OK.value
+        self.set_status(SpanStatus.OK)
         self.set_source(SegmentSource.CUSTOM)
-        # XXX[span-first] ^ populate this correctly
 
         self._sampled: "Optional[bool]" = sampled
         self.sample_rate: "Optional[float]" = None
@@ -297,7 +297,7 @@ class StreamedSpan:
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__}("
-            f"name={self.name}, "
+            f"name={self._name}, "
             f"trace_id={self.trace_id}, "
             f"span_id={self.span_id}, "
             f"parent_span_id={self.parent_span_id}, "
@@ -312,7 +312,7 @@ class StreamedSpan:
 
         if self.is_segment():
             sampling_context = {
-                "name": self.name,
+                "name": self._name,
                 "trace_id": self.trace_id,
                 "span_id": self.span_id,
                 "parent_span_id": self.parent_span_id,
@@ -453,11 +453,17 @@ class StreamedSpan:
         except KeyError:
             pass
 
+    def get_status(self) -> "Union[SpanStatus, str]":
+        if self._status in {s.value for s in SpanStatus}:
+            return SpanStatus(self._status)
+
+        return self._status
+
     def set_status(self, status: "Union[SpanStatus, str]") -> None:
         if isinstance(status, Enum):
             status = status.value
 
-        self.status = status
+        self._status = status
 
     def set_http_status(self, http_status: int) -> None:
         self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
@@ -468,10 +474,10 @@ class StreamedSpan:
             self.set_status(SpanStatus.OK)
 
     def get_name(self) -> str:
-        return self.name
+        return self._name
 
     def set_name(self, name: str) -> None:
-        self.name = name
+        self._name = name
 
     def set_flag(self, flag: str, result: bool) -> None:
         if len(self._flags) < FLAGS_CAPACITY:
@@ -609,7 +615,7 @@ class StreamedSpan:
         # booleans or numbers between 0 and 1.)
         if not is_valid_sample_rate(sample_rate, source="Tracing"):
             logger.warning(
-                f"[Tracing] Discarding {self.name} because of invalid sample rate."
+                f"[Tracing] Discarding {self._name} because of invalid sample rate."
             )
             self._sampled = False
             return
@@ -627,7 +633,7 @@ class StreamedSpan:
             else:
                 reason = "traces_sample_rate is set to 0"
 
-            logger.debug(f"[Tracing] Discarding {self.name} because {reason}")
+            logger.debug(f"[Tracing] Discarding {self._name} because {reason}")
             self._sampled = False
             return
 
@@ -635,22 +641,22 @@ class StreamedSpan:
         self._sampled = self._sample_rand < self.sample_rate
 
         if self.sampled:
-            logger.debug(f"[Tracing] Starting {self.name}")
+            logger.debug(f"[Tracing] Starting {self._name}")
         else:
             logger.debug(
-                f"[Tracing] Discarding {self.name} because it's not included in the random sample (sampling rate = {self.sample_rate})"
+                f"[Tracing] Discarding {self._name} because it's not included in the random sample (sampling rate = {self.sample_rate})"
             )
 
     def _set_segment_attributes(self) -> None:
         if not self.is_segment():
             self.set_attribute("sentry.segment.id", self.segment.span_id)
 
-        self.set_attribute("sentry.segment.name", self.segment.name)
+        self.set_attribute("sentry.segment.name", self.segment._name)
 
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
-        "name",
+        "_name",
         "segment",
         "_scope",
         "_context_manager_state",

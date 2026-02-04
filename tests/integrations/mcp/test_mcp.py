@@ -176,7 +176,7 @@ async def test_tool_handler_streamable_http(
     send_default_pii,
     include_prompts,
     json_rpc,
-    select_mcp_transactions,
+    select_transactions_with_mcp_spans,
 ):
     """Test that async tool handlers create proper spans"""
     sentry_init(
@@ -224,35 +224,35 @@ async def test_tool_handler_streamable_http(
         {"status": "completed"}
     )
 
-    transactions = select_mcp_transactions(events)
+    transactions = select_transactions_with_mcp_spans(events, method_name="tools/call")
     assert len(transactions) == 1
     tx = transactions[0]
     assert tx["type"] == "transaction"
+    assert len(tx["spans"]) == 1
+    span = tx["spans"][0]
 
-    assert tx["contexts"]["trace"]["op"] == OP.MCP_SERVER
-    assert tx["transaction"] == "tools/call process"
-    assert tx["contexts"]["trace"]["origin"] == "auto.ai.mcp"
+    assert span["op"] == OP.MCP_SERVER
+    assert span["description"] == "tools/call process"
+    assert span["origin"] == "auto.ai.mcp"
 
     # Check span data
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TOOL_NAME] == "process"
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TRANSPORT] == "http"
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_SESSION_ID] == session_id
-    assert tx["contexts"]["trace"]["data"]["mcp.request.argument.data"] == '"test"'
+    assert span["data"][SPANDATA.MCP_TOOL_NAME] == "process"
+    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
+    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
+    assert span["data"]["mcp.request.argument.data"] == '"test"'
 
     # Check PII-sensitive data
     if send_default_pii and include_prompts:
         # TODO: Investigate why tool result is double-serialized.
-        assert tx["contexts"]["trace"]["data"][
-            SPANDATA.MCP_TOOL_RESULT_CONTENT
-        ] == json.dumps(
+        assert span["data"][SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
             json.dumps(
                 {"status": "completed"},
             )
         )
     else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in tx["contexts"]["trace"]["data"]
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
 
 
 @pytest.mark.asyncio
@@ -395,7 +395,7 @@ async def test_prompt_handler_streamable_http(
     send_default_pii,
     include_prompts,
     json_rpc,
-    select_mcp_transactions,
+    select_transactions_with_mcp_spans,
 ):
     """Test that async prompt handlers create proper spans"""
     sentry_init(
@@ -447,18 +447,18 @@ async def test_prompt_handler_streamable_http(
     )
     assert len(result.json()["result"]["messages"]) == 2
 
-    transactions = select_mcp_transactions(events)
+    transactions = select_transactions_with_mcp_spans(events, method_name="prompts/get")
     assert len(transactions) == 1
     tx = transactions[0]
     assert tx["type"] == "transaction"
+    assert len(tx["spans"]) == 1
+    span = tx["spans"][0]
 
-    assert tx["contexts"]["trace"]["op"] == OP.MCP_SERVER
-    assert tx["transaction"] == "prompts/get mcp_info"
+    assert span["op"] == OP.MCP_SERVER
+    assert span["description"] == "prompts/get mcp_info"
 
     # For multi-message prompts, count is always captured
-    assert (
-        tx["contexts"]["trace"]["data"][SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
-    )
+    assert span["data"][SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 2
     # Role/content are never captured for multi-message prompts (even with PII)
     assert (
         SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE not in tx["contexts"]["trace"]["data"]
@@ -562,7 +562,7 @@ async def test_resource_handler_streamble_http(
     sentry_init,
     capture_events,
     json_rpc,
-    select_mcp_transactions,
+    select_transactions_with_mcp_spans,
 ):
     """Test that async resource handlers create proper spans"""
     sentry_init(
@@ -606,20 +606,21 @@ async def test_resource_handler_streamble_http(
         {"data": "resource data"}
     )
 
-    transactions = select_mcp_transactions(events)
+    transactions = select_transactions_with_mcp_spans(
+        events, method_name="resources/read"
+    )
     assert len(transactions) == 1
     tx = transactions[0]
     assert tx["type"] == "transaction"
+    assert len(tx["spans"]) == 1
+    span = tx["spans"][0]
 
-    assert tx["contexts"]["trace"]["op"] == OP.MCP_SERVER
-    assert tx["transaction"] == "resources/read https://example.com/resource"
+    assert span["op"] == OP.MCP_SERVER
+    assert span["description"] == "resources/read https://example.com/resource"
 
-    assert (
-        tx["contexts"]["trace"]["data"][SPANDATA.MCP_RESOURCE_URI]
-        == "https://example.com/resource"
-    )
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_SESSION_ID] == session_id
+    assert span["data"][SPANDATA.MCP_RESOURCE_URI] == "https://example.com/resource"
+    assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
 
 @pytest.mark.asyncio
@@ -1039,7 +1040,7 @@ def test_streamable_http_transport_detection(
     sentry_init,
     capture_events,
     json_rpc,
-    select_mcp_transactions,
+    select_transactions_with_mcp_spans,
 ):
     """Test that StreamableHTTP transport is correctly detected via header"""
     sentry_init(
@@ -1084,14 +1085,17 @@ def test_streamable_http_transport_detection(
         {"status": "success"}
     )
 
-    transactions = select_mcp_transactions(events)
+    transactions = select_transactions_with_mcp_spans(events, method_name="tools/call")
     assert len(transactions) == 1
     tx = transactions[0]
+    assert tx["type"] == "transaction"
+    assert len(tx["spans"]) == 1
+    span = tx["spans"][0]
 
     # Check that HTTP transport is detected
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_TRANSPORT] == "http"
-    assert tx["contexts"]["trace"]["data"][SPANDATA.NETWORK_TRANSPORT] == "tcp"
-    assert tx["contexts"]["trace"]["data"][SPANDATA.MCP_SESSION_ID] == session_id
+    assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
+    assert span["data"][SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
 
 
 @pytest.mark.asyncio

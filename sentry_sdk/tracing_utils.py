@@ -817,7 +817,7 @@ class Baggage:
             segment.get_attributes().get("sentry.span.source")
             not in LOW_QUALITY_SEGMENT_SOURCES
         ):
-            sentry_items["transaction"] = segment.name
+            sentry_items["transaction"] = segment._name
 
         if segment.sample_rate is not None:
             sentry_items["sample_rate"] = str(segment.sample_rate)
