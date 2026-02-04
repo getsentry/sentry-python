@@ -4,12 +4,6 @@
 
 ### New Features ✨
 
-#### Span Streaming
-
-- feat(span-streaming): Add spans to telemetry pipeline, add span name and attributes (3) by @sentrivana in [#5399](https://github.com/getsentry/sentry-python/pull/5399)
-- feat(span-streaming): Add span batcher (2) by @sentrivana in [#5398](https://github.com/getsentry/sentry-python/pull/5398)
-- feat(span-streaming): Add experimental `trace_lifecycle` switch (1) by @sentrivana in [#5397](https://github.com/getsentry/sentry-python/pull/5397)
-
 #### Other
 
 - feat(integration): add `gen_ai.conversation.id` if available by @constantinius in [#5307](https://github.com/getsentry/sentry-python/pull/5307)
@@ -25,11 +19,6 @@
 
 - fix(mcp): Nest MCP spans under HTTP transactions by @alexander-alderman-webb in [#5292](https://github.com/getsentry/sentry-python/pull/5292)
 - fix(mcp): Handle all awaitable return types by @alexander-alderman-webb in [#5415](https://github.com/getsentry/sentry-python/pull/5415)
-
-#### Span Streaming
-
-- fix(span-streaming): Always preserialize attributes by @sentrivana in [#5407](https://github.com/getsentry/sentry-python/pull/5407)
-- fix(span-streaming): Warn about thread usage if any batcher is active by @sentrivana in [#5408](https://github.com/getsentry/sentry-python/pull/5408)
 
 #### Other
 
