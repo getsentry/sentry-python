@@ -1295,7 +1295,9 @@ class IssuesSamplerTestConfig:
         ),
         # If sampler returns invalid value, we should still send the event
         IssuesSamplerTestConfig(
-            sampler_function=lambda *_: "This is an invalid return value for the sampler",
+            sampler_function=lambda *_: (
+                "This is an invalid return value for the sampler"
+            ),
             expected_events=1,
         ),
     ),
