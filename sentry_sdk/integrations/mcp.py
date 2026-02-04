@@ -411,18 +411,21 @@ async def _handler_wrapper(
 
     scopes = _get_active_http_scopes()
 
+    isolation_scope_context: "ContextManager[Any]"
+    current_scope_context: "ContextManager[Any]"
+
     if scopes is None:
         isolation_scope_context = nullcontext()
         current_scope_context = nullcontext()
     else:
         isolation_scope, current_scope = scopes
 
-        isolation_scope_context: "ContextManager[Any]" = (
+        isolation_scope_context = (
             nullcontext()
             if isolation_scope is None
             else sentry_sdk.scope.use_isolation_scope(isolation_scope)
         )
-        current_scope_context: "ContextManager[Any]" = (
+        current_scope_context = (
             nullcontext()
             if current_scope is None
             else sentry_sdk.scope.use_scope(current_scope)
