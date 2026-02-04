@@ -2101,7 +2101,7 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
 
         # Only lists of elements of a single type are supported
         ty = type(val[0])
-        if ty in (int, str, bool, float) and all(isinstance(v, ty) for v in val):
+        if ty in (int, str, bool, float) and all(type(v) is ty for v in val):
             return {"value": val, "type": "array"}
 
     # Coerce to string if we don't know what to do with the value. This should
