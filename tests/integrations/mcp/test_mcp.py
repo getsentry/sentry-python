@@ -252,7 +252,7 @@ async def test_tool_handler_streamable_http(
             )
         )
     else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in tx["contexts"]["trace"]["data"]
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
 
 
 @pytest.mark.asyncio
