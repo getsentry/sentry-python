@@ -33,7 +33,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Tuple
+    from typing import Any, Callable, Optional, Tuple, ContextManager
 
     from starlette.types import Receive, Scope, Send  # type: ignore[import-not-found]
 
@@ -417,12 +417,12 @@ async def _handler_wrapper(
     else:
         isolation_scope, current_scope = scopes
 
-        isolation_scope_context = (
+        isolation_scope_context: "ContextManager[Any]" = (
             nullcontext()
             if isolation_scope is None
             else sentry_sdk.scope.use_isolation_scope(isolation_scope)
         )
-        current_scope_context = (
+        current_scope_context: "ContextManager[Any]" = (
             nullcontext()
             if current_scope is None
             else sentry_sdk.scope.use_scope(current_scope)
