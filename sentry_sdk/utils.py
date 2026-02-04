@@ -17,7 +17,6 @@ from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
-from contextlib import contextmanager
 
 try:
     # Python 3.11
