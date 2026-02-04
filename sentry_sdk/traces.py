@@ -74,6 +74,7 @@ class StreamedSpan:
     __slots__ = (
         "_name",
         "_attributes",
+        "_span_id",
         "_trace_id",
         "_status",
         "_flags",
@@ -92,7 +93,8 @@ class StreamedSpan:
             for attribute, value in attributes.items():
                 self.set_attribute(attribute, value)
 
-        self._trace_id = trace_id
+        self._span_id: "Optional[str]" = None
+        self._trace_id: "Optional[str]" = trace_id
 
         self.set_status(SpanStatus.OK)
         self.set_source(SegmentSource.CUSTOM)
