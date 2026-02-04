@@ -1241,14 +1241,13 @@ class Scope:
         if parent_span is None or isinstance(parent_span, NoOpStreamedSpan):
             parent_span = self.span or self.get_current_scope().span  # type: ignore
 
-        # If no specific parent_span was provided and there is no currently
+        # If no eligible parent_span was provided and there is no currently
         # active span, this is a segment
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(scope=self)
-                # TODO[span-first]: emit "ignored" client report
 
             return StreamedSpan(
                 name=name,
@@ -1266,8 +1265,6 @@ class Scope:
             if is_ignored_span(name, attributes) or isinstance(
                 parent_span, NoOpStreamedSpan
             ):
-                # TODO[span-first]: emit "ignored" client report
-                # also add tests for it
                 return NoOpStreamedSpan()
 
             return StreamedSpan(
