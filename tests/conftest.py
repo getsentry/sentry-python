@@ -805,6 +805,22 @@ def select_mcp_transactions():
 
 
 @pytest.fixture()
+def select_transactions_with_mcp_spans():
+    def inner(events, method_name):
+        return [
+            transaction
+            for transaction in events
+            if transaction["type"] == "transaction"
+            and any(
+                span["data"].get("mcp.method.name") == method_name
+                for span in transaction.get("spans", [])
+            )
+        ]
+
+    return inner
+
+
+@pytest.fixture()
 def json_rpc_sse():
     class StreamingASGITransport(ASGITransport):
         """
