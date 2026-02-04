@@ -1,5 +1,63 @@
 # Changelog
 
+## 2.52.0
+
+### New Features ✨
+
+#### Other
+
+- feat(integration): add `gen_ai.conversation.id` if available by @constantinius in [#5307](https://github.com/getsentry/sentry-python/pull/5307)
+
+### Bug Fixes 🐛
+
+#### Google Genai
+
+- fix(google-genai): Token reporting by @alexander-alderman-webb in [#5404](https://github.com/getsentry/sentry-python/pull/5404)
+- fix(google-genai): deactivate google genai when langchain is used by @shellmayr in [#5389](https://github.com/getsentry/sentry-python/pull/5389)
+
+#### Mcp
+
+- fix(mcp): Nest MCP spans under HTTP transactions by @alexander-alderman-webb in [#5292](https://github.com/getsentry/sentry-python/pull/5292)
+- fix(mcp): Handle all awaitable return types by @alexander-alderman-webb in [#5415](https://github.com/getsentry/sentry-python/pull/5415)
+
+#### Other
+
+- fix(anthropic): Token reporting by @alexander-alderman-webb in [#5403](https://github.com/getsentry/sentry-python/pull/5403)
+- fix(arq): handle settings_cls passed as keyword argument by @nc9 in [#5393](https://github.com/getsentry/sentry-python/pull/5393)
+- fix(dramatiq): cleanup isolated scope and transaction when message is skipped by @frankie567 in [#5346](https://github.com/getsentry/sentry-python/pull/5346)
+- fix(openai): Token reporting by @alexander-alderman-webb in [#5406](https://github.com/getsentry/sentry-python/pull/5406)
+- fix(openai-agents): Inject propagation headers for `HostedMCPTool` when streaming by @alexander-alderman-webb in [#5405](https://github.com/getsentry/sentry-python/pull/5405)
+- fix: Fix list attribute type by @sentrivana in [#5417](https://github.com/getsentry/sentry-python/pull/5417)
+- fix: Adapt to new packaging in toxgen by @sentrivana in [#5382](https://github.com/getsentry/sentry-python/pull/5382)
+
+### Internal Changes 🔧
+
+#### Fastmcp
+
+- test(fastmcp): Wrap prompt in `Message` by @alexander-alderman-webb in [#5411](https://github.com/getsentry/sentry-python/pull/5411)
+- test(fastmcp): Remove `test_fastmcp_without_request_context()` by @alexander-alderman-webb in [#5412](https://github.com/getsentry/sentry-python/pull/5412)
+- test(fastmcp): Use `AsyncClient` for SSE by @alexander-alderman-webb in [#5400](https://github.com/getsentry/sentry-python/pull/5400)
+- test(fastmcp): Use `TestClient` for Streamable HTTP by @alexander-alderman-webb in [#5384](https://github.com/getsentry/sentry-python/pull/5384)
+- test(fastmcp): Simulate stdio transport with memory streams by @alexander-alderman-webb in [#5333](https://github.com/getsentry/sentry-python/pull/5333)
+
+#### Mcp
+
+- test(mcp): Use `AsyncClient` for SSE by @alexander-alderman-webb in [#5396](https://github.com/getsentry/sentry-python/pull/5396)
+- test(mcp): Use `TestClient` for Streamable HTTP by @alexander-alderman-webb in [#5383](https://github.com/getsentry/sentry-python/pull/5383)
+- test(mcp): Remove unused stdio helpers by @alexander-alderman-webb in [#5409](https://github.com/getsentry/sentry-python/pull/5409)
+- test(mcp): Simulate stdio transport with memory streams by @alexander-alderman-webb in [#5329](https://github.com/getsentry/sentry-python/pull/5329)
+
+#### Other
+
+- ci: Fix lint step by @sentrivana in [#5418](https://github.com/getsentry/sentry-python/pull/5418)
+- ci: 🤖 Update test matrix with new releases (02/02) by @github-actions in [#5413](https://github.com/getsentry/sentry-python/pull/5413)
+- ci: Update tox and pin packaging version for tox by @alexander-alderman-webb in [#5381](https://github.com/getsentry/sentry-python/pull/5381)
+- ci: migration to the new codecov action by @MathurAditya724 in [#5392](https://github.com/getsentry/sentry-python/pull/5392)
+
+### Other
+
+- Revert "feat(ai): Add original input length meta attribute (#5375)" by @alexander-alderman-webb in [#5419](https://github.com/getsentry/sentry-python/pull/5419)
+
 ## 2.51.0
 
 ### New Features ✨
