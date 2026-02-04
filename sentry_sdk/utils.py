@@ -2097,19 +2097,12 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
 
     if isinstance(val, list):
         if not val:
-            return {"value": [], "type": "string[]"}
+            return {"value": [], "type": "array"}
 
         # Only lists of elements of a single type are supported
-        list_types: 'dict[type, Literal["string[]", "integer[]", "double[]", "boolean[]"]]' = {
-            str: "string[]",
-            int: "integer[]",
-            float: "double[]",
-            bool: "boolean[]",
-        }
-
         ty = type(val[0])
-        if ty in list_types and all(type(v) is ty for v in val):
-            return {"value": val, "type": list_types[ty]}
+        if ty in (int, str, bool, float) and all(type(v) is ty for v in val):
+            return {"value": val, "type": "array"}
 
     # Coerce to string if we don't know what to do with the value. This should
     # never happen as we pre-format early in format_attribute, but let's be safe.
