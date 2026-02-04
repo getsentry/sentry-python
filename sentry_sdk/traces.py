@@ -118,7 +118,7 @@ class StreamedSpan:
             pass
 
     def get_status(self) -> "Union[SpanStatus, str]":
-        if self._status in SpanStatus:
+        if self._status in {s.value for s in SpanStatus}:
             return SpanStatus(self._status)
 
         return self._status
