@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.52.0a2
+
+This is an alpha release for internal testing of span streaming.
+
+## 2.51.0a1
+
+This is an alpha release for internal testing of span streaming.
+
 ## 2.52.0
 
 ### New Features ✨

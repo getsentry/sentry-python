@@ -4,14 +4,12 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.utils import format_timestamp, serialize_attribute, safe_repr
+from sentry_sdk.utils import format_timestamp, serialize_attribute
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
     from sentry_sdk.traces import StreamedSpan
-    from sentry_sdk._types import SerializedAttributeValue
 
 
 class SpanBatcher(Batcher["StreamedSpan"]):
@@ -69,12 +67,20 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
-        # TODO[span-first]
         res: "dict[str, Any]" = {
+            "trace_id": item.trace_id,
             "span_id": item.span_id,
             "name": item._name,
             "status": item._status,
+            "is_segment": item.is_segment(),
+            "start_timestamp": item.start_timestamp.timestamp(),
         }
+
+        if item.timestamp:
+            res["end_timestamp"] = item.timestamp.timestamp()
+
+        if item.parent_span_id:
+            res["parent_span_id"] = item.parent_span_id
 
         if item._attributes:
             res["attributes"] = {
@@ -89,11 +95,9 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return None
 
             envelopes = []
-            for trace_id, spans in self._span_buffer.items():
+            for spans in self._span_buffer.values():
                 if spans:
-                    # TODO[span-first]
-                    # dsc = spans[0].dynamic_sampling_context()
-                    dsc = None
+                    dsc = spans[0].dynamic_sampling_context()
 
                     envelope = Envelope(
                         headers={
