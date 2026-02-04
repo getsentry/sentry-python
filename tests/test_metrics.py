@@ -425,11 +425,11 @@ def test_log_array_attributes(sentry_init, capture_envelopes):
 
     assert serialized_attributes["string_list.attribute"] == {
         "value": ["value1", "value2"],
-        "type": "string[]",
+        "type": "array",
     }
     assert serialized_attributes["int_tuple.attribute"] == {
         "value": [3, 2, 1, 4],
-        "type": "integer[]",
+        "type": "array",
     }
     assert serialized_attributes["inhomogeneous_tuple.attribute"] == {
         "value": "(3, 2.0, 1, 4)",
@@ -438,11 +438,11 @@ def test_log_array_attributes(sentry_init, capture_envelopes):
 
     assert serialized_attributes["float_list.attribute"] == {
         "value": [3.0, 3.5, 4.2],
-        "type": "double[]",
+        "type": "array",
     }
     assert serialized_attributes["bool_tuple.attribute"] == {
         "value": [False, False, True],
-        "type": "boolean[]",
+        "type": "array",
     }
     assert serialized_attributes["inhomogeneous_list.attribute"] == {
         "value": "[3.2, True, None]",
