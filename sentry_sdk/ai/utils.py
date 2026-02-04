@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 import sentry_sdk
 from sentry_sdk.utils import logger
-from sentry_sdk.consts import SPANDATA
 
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 # Maximum characters when only a single message is left after bytes truncation
@@ -698,8 +697,6 @@ def truncate_and_annotate_messages(
     )
     if len(messages) > 1:
         scope._gen_ai_original_message_count[span.span_id] = len(messages)
-
-    span.set_data(SPANDATA.META_GEN_AI_ORIGINAL_INPUT_MESSAGES_LENGTH, len(messages))
 
     return [truncated_message]
 
