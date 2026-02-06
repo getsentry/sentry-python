@@ -392,10 +392,11 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
                     )
 
                 with capture_internal_exceptions():
-                    span.set_data(
-                        SPANDATA.MESSAGING_SYSTEM,
-                        task.app.connection().transport.driver_type,
-                    )
+                    with task.app.connection() as conn:
+                        span.set_data(
+                            SPANDATA.MESSAGING_SYSTEM,
+                            conn.transport.driver_type,
+                        )
 
                 return f(*args, **kwargs)
         except Exception:
