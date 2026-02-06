@@ -72,6 +72,11 @@ class AnthropicIntegration(Integration):
         Messages.create = _wrap_message_create(Messages.create)
         AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
 
+        if hasattr(Messages, "stream"):
+            Messages.stream = _wrap_message_stream(Messages.stream)
+        if hasattr(AsyncMessages, "stream"):
+            AsyncMessages.stream = _wrap_message_stream_async(AsyncMessages.stream)
+
 
 def _capture_exception(exc: "Any") -> None:
     set_span_errored()
@@ -594,6 +599,228 @@ def _wrap_message_create_async(f: "Any") -> "Any":
                     span.__exit__(None, None, None)
 
     return _sentry_patched_create_async
+
+
+class _SentryStreamProxy:
+    """Wraps a MessageStream to collect AI data during sync iteration."""
+
+    def __init__(
+        self,
+        original_stream: "Any",
+        span: "Span",
+        integration: "AnthropicIntegration",
+    ) -> None:
+        self._original = original_stream
+        self._span = span
+        self._integration = integration
+
+    def __iter__(self) -> "Iterator[MessageStreamEvent]":
+        model = None
+        usage = _RecordedUsage()
+        content_blocks: "list[str]" = []
+
+        try:
+            for event in self._original:
+                model, usage, content_blocks = _collect_ai_data(
+                    event, model, usage, content_blocks
+                )
+                yield event
+        except Exception as exc:
+            _capture_exception(exc)
+            raise
+        finally:
+            with capture_internal_exceptions():
+                _set_output_data(
+                    span=self._span,
+                    integration=self._integration,
+                    model=model,
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    cache_read_input_tokens=usage.cache_read_input_tokens,
+                    cache_write_input_tokens=usage.cache_write_input_tokens,
+                    content_blocks=[
+                        {"text": "".join(content_blocks), "type": "text"}
+                    ],
+                    finish_span=True,
+                )
+
+    def __getattr__(self, name: str) -> "Any":
+        return getattr(self._original, name)
+
+
+class _SentryAsyncStreamProxy:
+    """Wraps an AsyncMessageStream to collect AI data during async iteration."""
+
+    def __init__(
+        self,
+        original_stream: "Any",
+        span: "Span",
+        integration: "AnthropicIntegration",
+    ) -> None:
+        self._original = original_stream
+        self._span = span
+        self._integration = integration
+
+    async def __aiter__(self) -> "AsyncIterator[MessageStreamEvent]":
+        model = None
+        usage = _RecordedUsage()
+        content_blocks: "list[str]" = []
+
+        try:
+            async for event in self._original:
+                model, usage, content_blocks = _collect_ai_data(
+                    event, model, usage, content_blocks
+                )
+                yield event
+        except Exception as exc:
+            _capture_exception(exc)
+            raise
+        finally:
+            with capture_internal_exceptions():
+                _set_output_data(
+                    span=self._span,
+                    integration=self._integration,
+                    model=model,
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    cache_read_input_tokens=usage.cache_read_input_tokens,
+                    cache_write_input_tokens=usage.cache_write_input_tokens,
+                    content_blocks=[
+                        {"text": "".join(content_blocks), "type": "text"}
+                    ],
+                    finish_span=True,
+                )
+
+    def __getattr__(self, name: str) -> "Any":
+        return getattr(self._original, name)
+
+
+class _SentryStreamManagerProxy:
+    """Wraps a MessageStreamManager to intercept iteration and collect AI data."""
+
+    def __init__(
+        self,
+        original_manager: "Any",
+        span: "Span",
+        integration: "AnthropicIntegration",
+    ) -> None:
+        self._original = original_manager
+        self._span = span
+        self._integration = integration
+
+    def __enter__(self) -> "_SentryStreamProxy":
+        try:
+            stream = self._original.__enter__()
+        except Exception as exc:
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+            self._span.__exit__(*sys.exc_info())
+            raise
+        return _SentryStreamProxy(stream, self._span, self._integration)
+
+    def __exit__(self, *args: "Any") -> "Any":
+        return self._original.__exit__(*args)
+
+    def __getattr__(self, name: str) -> "Any":
+        return getattr(self._original, name)
+
+
+class _SentryAsyncStreamManagerProxy:
+    """Wraps an AsyncMessageStreamManager to intercept async iteration."""
+
+    def __init__(
+        self,
+        original_manager: "Any",
+        span: "Span",
+        integration: "AnthropicIntegration",
+    ) -> None:
+        self._original = original_manager
+        self._span = span
+        self._integration = integration
+
+    async def __aenter__(self) -> "_SentryAsyncStreamProxy":
+        try:
+            stream = await self._original.__aenter__()
+        except Exception as exc:
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+            self._span.__exit__(*sys.exc_info())
+            raise
+        return _SentryAsyncStreamProxy(stream, self._span, self._integration)
+
+    async def __aexit__(self, *args: "Any") -> "Any":
+        return await self._original.__aexit__(*args)
+
+    def __getattr__(self, name: str) -> "Any":
+        return getattr(self._original, name)
+
+
+def _wrap_message_stream(f: "Any") -> "Any":
+    @wraps(f)
+    def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
+        if "messages" not in kwargs:
+            return f(*args, **kwargs)
+
+        model = kwargs.get("model", "")
+
+        span = get_start_span_function()(
+            op=OP.GEN_AI_CHAT,
+            name=f"chat {model}".strip(),
+            origin=AnthropicIntegration.origin,
+        )
+        span.__enter__()
+
+        _set_input_data(span, kwargs, integration)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
+        try:
+            stream_manager = f(*args, **kwargs)
+        except Exception as exc:
+            _capture_exception(exc)
+            span.__exit__(*sys.exc_info())
+            raise
+
+        return _SentryStreamManagerProxy(stream_manager, span, integration)
+
+    return wrapper
+
+
+def _wrap_message_stream_async(f: "Any") -> "Any":
+    @wraps(f)
+    def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
+        if "messages" not in kwargs:
+            return f(*args, **kwargs)
+
+        model = kwargs.get("model", "")
+
+        span = get_start_span_function()(
+            op=OP.GEN_AI_CHAT,
+            name=f"chat {model}".strip(),
+            origin=AnthropicIntegration.origin,
+        )
+        span.__enter__()
+
+        _set_input_data(span, kwargs, integration)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
+        try:
+            stream_manager = f(*args, **kwargs)
+        except Exception as exc:
+            _capture_exception(exc)
+            span.__exit__(*sys.exc_info())
+            raise
+
+        return _SentryAsyncStreamManagerProxy(stream_manager, span, integration)
+
+    return wrapper
 
 
 def _is_given(obj: "Any") -> bool:
