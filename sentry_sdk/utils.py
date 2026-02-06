@@ -2062,23 +2062,15 @@ def format_attribute(val: "Any") -> "AttributeValue":
     if isinstance(val, (bool, int, float, str)):
         return val
 
-    # Only lists of elements of a single type are supported
-    list_types: 'dict[type, Literal["string[]", "integer[]", "double[]", "boolean[]"]]' = {
-        str: "string[]",
-        int: "integer[]",
-        float: "double[]",
-        bool: "boolean[]",
-    }
-
     if isinstance(val, (list, tuple)) and not val:
         return []
     elif isinstance(val, list):
         ty = type(val[0])
-        if ty in list_types and all(type(v) is ty for v in val):
+        if ty in (str, int, float, bool) and all(type(v) is ty for v in val):
             return copy.deepcopy(val)
     elif isinstance(val, tuple):
         ty = type(val[0])
-        if ty in list_types and all(type(v) is ty for v in val):
+        if ty in (str, int, float, bool) and all(type(v) is ty for v in val):
             return list(val)
 
     return safe_repr(val)
