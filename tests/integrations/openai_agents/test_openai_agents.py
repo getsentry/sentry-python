@@ -164,7 +164,17 @@ async def EXAMPLE_STREAMED_RESPONSE_WITH_DELTA(*args, **kwargs):
         item_id="message-id",
         output_index=0,
         content_index=0,
-        delta="the model response",
+        delta="Hello",
+        logprobs=[],
+        sequence_number=1,
+    )
+
+    yield ResponseTextDeltaEvent(
+        type="response.output_text.delta",
+        item_id="message-id",
+        output_index=0,
+        content_index=0,
+        delta=" world!",
         logprobs=[],
         sequence_number=1,
     )
@@ -178,7 +188,7 @@ async def EXAMPLE_STREAMED_RESPONSE_WITH_DELTA(*args, **kwargs):
                     content=[
                         ResponseOutputText(
                             annotations=[],
-                            text="the model response",
+                            text="Hello world!",
                             type="output_text",
                         ),
                     ],
