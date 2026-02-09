@@ -826,7 +826,7 @@ class Scope:
         self._transaction = name
         if self._span:
             if isinstance(self._span, StreamedSpan):
-                self._span.segment.name = name
+                self._span.segment.set_name(name)
                 if source:
                     self._span.segment.set_source(source)
 

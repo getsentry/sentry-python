@@ -449,7 +449,7 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
 
                 with capture_internal_exceptions():
                     with task.app.connection() as conn:
-                        span.set_data(
+                        set_on_span(
                             SPANDATA.MESSAGING_SYSTEM,
                             conn.transport.driver_type,
                         )

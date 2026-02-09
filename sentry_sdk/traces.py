@@ -288,7 +288,6 @@ class StreamedSpan:
         else:
             self._sample_rand = _generate_sample_rand(self.trace_id)
 
-        self._flags: dict[str, bool] = {}
         self._continuous_profile: "Optional[ContinuousProfile]" = None
 
         self._update_active_thread()
