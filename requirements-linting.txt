@@ -5,7 +5,7 @@ types-protobuf
 types-gevent
 types-greenlet
 types-redis
-types-setuptools
+types-setuptools==80.10.0.20260124
 types-webob
 opentelemetry-distro[otlp]
 pymongo # There is no separate types module.
