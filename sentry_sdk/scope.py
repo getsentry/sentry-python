@@ -606,14 +606,6 @@ class Scope:
         Returns the Sentry "trace" context from the Propagation Context.
         """
         if has_tracing_enabled(self.get_client().options) and self._span is not None:
-            if isinstance(self._span, StreamedSpan):
-                warnings.warn(
-                    "Scope.get_trace_context is not available in streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                return {}
-
             return self._span.get_trace_context()
 
         # if we are tracing externally (otel), those values take precedence

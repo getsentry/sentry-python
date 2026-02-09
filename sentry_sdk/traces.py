@@ -647,6 +647,20 @@ class StreamedSpan:
                 f"[Tracing] Discarding {self._name} because it's not included in the random sample (sampling rate = {self.sample_rate})"
             )
 
+    # TODO: Populate other fields as necessary
+    def get_trace_context(self) -> "dict[str, Any]":
+        warnings.warn(
+            "StreamedSpan.get_trace_context is probably incorrect in streaming mode.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        return {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "parent_span_id": self.parent_span_id,
+        }
+
     def _set_segment_attributes(self) -> None:
         if not self.is_segment():
             self.set_attribute("sentry.segment.id", self.segment.span_id)
