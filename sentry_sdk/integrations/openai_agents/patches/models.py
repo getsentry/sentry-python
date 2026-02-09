@@ -203,7 +203,7 @@ def _create_runner_get_model_wrapper(
     return wrapped_get_model
 
 
-def _create_run_internal_get_model_wrapper(
+def _create_turn_preparation_get_model_wrapper(
     original_get_model: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     @wraps(original_get_model)
