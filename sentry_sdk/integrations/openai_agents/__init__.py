@@ -48,7 +48,7 @@ def _patch_agent_runner_get_model() -> None:
     )
 
 
-def _patch_run_internal_get_model():
+def _patch_run_internal_get_model() -> None:
     agents.run_internal.run_loop.get_model = _create_run_internal_get_model_wrapper(
         turn_preparation.get_model
     )
@@ -83,7 +83,8 @@ class OpenAIAgentsIntegration(Integration):
             agents.run.DEFAULT_AGENT_RUNNER.run_streamed
         )
 
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
+        library_version = parse_version(OPENAI_AGENTS_VERSION)
+        if library_version is not None and library_version >= (
             0,
             8,
         ):
