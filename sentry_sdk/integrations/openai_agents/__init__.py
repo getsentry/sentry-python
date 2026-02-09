@@ -3,9 +3,9 @@ from sentry_sdk.utils import parse_version
 
 from .patches import (
     _create_runner_get_model_wrapper,
-    _create_run_internal_get_model_wrapper,
+    _create_turn_preparation_get_model_wrapper,
     _create_runner_get_all_tools_wrapper,
-    _create_run_internal_get_all_tools_wrapper,
+    _create_run_loop_get_all_tools_wrapper,
     _create_run_wrapper,
     _create_run_streamed_wrapper,
     _patch_agent_runner_run_single_turn,
@@ -49,7 +49,7 @@ def _patch_agent_runner_get_model() -> None:
 
 
 def _patch_run_internal_get_model() -> None:
-    agents.run_internal.run_loop.get_model = _create_run_internal_get_model_wrapper(
+    agents.run_internal.run_loop.get_model = _create_turn_preparation_get_model_wrapper(
         turn_preparation.get_model
     )
 
@@ -61,7 +61,7 @@ def _patch_agent_runner_get_all_tools() -> None:
 
 
 def _patch_run_get_all_tools() -> None:
-    agents.run.get_all_tools = _create_run_internal_get_all_tools_wrapper(
+    agents.run.get_all_tools = _create_run_loop_get_all_tools_wrapper(
         run_loop.get_all_tools
     )
 
