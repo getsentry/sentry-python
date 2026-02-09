@@ -90,7 +90,7 @@ def _create_runner_get_all_tools_wrapper(
     return wrapped_get_all_tools
 
 
-def _create_run_internal_get_all_tools_wrapper(
+def _create_run_loop_get_all_tools_wrapper(
     original_get_all_tools: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
