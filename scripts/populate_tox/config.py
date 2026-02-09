@@ -74,7 +74,7 @@ TEST_SUITE_CONFIG = {
     "chalice": {
         "package": "chalice",
         "deps": {
-            "*": ["pytest-chalice"],
+            "*": ["pytest-chalice", "setuptools"],
         },
         "num_versions": 2,
     },
