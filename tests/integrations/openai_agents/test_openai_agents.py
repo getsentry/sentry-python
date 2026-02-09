@@ -176,7 +176,7 @@ async def EXAMPLE_STREAMED_RESPONSE_WITH_DELTA(*args, **kwargs):
         content_index=0,
         delta=" world!",
         logprobs=[],
-        sequence_number=1,
+        sequence_number=2,
     )
 
     yield ResponseCompletedEvent(
@@ -216,7 +216,7 @@ async def EXAMPLE_STREAMED_RESPONSE_WITH_DELTA(*args, **kwargs):
             ),
         ),
         type="response.completed",
-        sequence_number=2,
+        sequence_number=3,
     )
 
 
