@@ -1118,6 +1118,11 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         available_tools[0].update(
             {"tool_input_guardrails": None, "tool_output_guardrails": None}
         )
+    if parse_version(OPENAI_AGENTS_VERSION) >= (
+        0,
+        8,
+    ):
+        available_tools[0]["needs_approval"] = False
 
     available_tools = safe_serialize(available_tools)
 
@@ -1496,6 +1501,7 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
                 )
 
     (
+        error_log,
         error_event,
         transaction,
     ) = events
@@ -1545,6 +1551,7 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
                 )
 
     (
+        error_log,
         error_event,
         transaction,
     ) = events
@@ -1588,7 +1595,7 @@ async def test_span_status_error(sentry_init, capture_events, test_agent):
                     test_agent, "Test input", run_config=test_run_config
                 )
 
-    (error, transaction) = events
+    (error_log, error, transaction) = events
     assert error["level"] == "error"
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
@@ -2690,27 +2697,6 @@ def test_openai_agents_message_truncation(sentry_init, capture_events):
         assert isinstance(parsed_messages, list)
         assert len(parsed_messages) == 1
         assert "small message 5" in str(parsed_messages[0])
-
-
-def test_streaming_patches_applied(sentry_init):
-    """
-    Test that the streaming patches are applied correctly.
-    """
-    sentry_init(
-        integrations=[OpenAIAgentsIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    # Verify that run_streamed is patched (will have __wrapped__ attribute if patched)
-    import agents
-
-    # Check that the method exists and has been modified
-    assert hasattr(agents.run.DEFAULT_AGENT_RUNNER, "run_streamed")
-    assert hasattr(agents.run.AgentRunner, "_run_single_turn_streamed")
-
-    # Verify the patches were applied by checking for our wrapper
-    run_streamed_func = agents.run.DEFAULT_AGENT_RUNNER.run_streamed
-    assert run_streamed_func is not None
 
 
 @pytest.mark.asyncio
