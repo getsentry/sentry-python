@@ -24,67 +24,93 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-def _patch_agent_run() -> None:
-    """
-    Patches AgentRunner methods to create agent invocation spans.
-    This directly patches the execution flow to track when agents start and stop.
-    """
+try:
+    # AgentRunner methods moved in v0.8
+    # https://github.com/openai/openai-agents-python/commit/3ce7c24d349b77bb750062b7e0e856d9ff48a5d5#diff-7470b3a5c5cbe2fcbb2703dc24f326f45a5819d853be2b1f395d122d278cd911
+    from agents.run_internal import run_loop, turn_resolution
 
-    # Store original methods
+except ImportError:
+    run_loop = None
+    turn_resolution = None
+
+
+def _has_active_agent_span(context_wrapper: "agents.RunContextWrapper") -> bool:
+    """Check if there's an active agent span for this context"""
+    return getattr(context_wrapper, "_sentry_current_agent", None) is not None
+
+
+def _get_current_agent(
+    context_wrapper: "agents.RunContextWrapper",
+) -> "Optional[agents.Agent]":
+    """Get the current agent from context wrapper"""
+    return getattr(context_wrapper, "_sentry_current_agent", None)
+
+
+def _close_streaming_workflow_span(agent: "Optional[agents.Agent]") -> None:
+    """Close the workflow span for streaming executions if it exists."""
+    if agent and hasattr(agent, "_sentry_workflow_span"):
+        workflow_span = agent._sentry_workflow_span
+        workflow_span.__exit__(*sys.exc_info())
+        delattr(agent, "_sentry_workflow_span")
+
+
+def _maybe_start_agent_span(
+    context_wrapper: "agents.RunContextWrapper",
+    agent: "agents.Agent",
+    should_run_agent_start_hooks: bool,
+    span_kwargs: "dict[str, Any]",
+    is_streaming: bool = False,
+) -> "Optional[Span]":
+    """
+    Start an agent invocation span if conditions are met.
+    Handles ending any existing span for a different agent.
+
+    Returns the new span if started, or the existing span if conditions aren't met.
+    """
+    if not (should_run_agent_start_hooks and agent and context_wrapper):
+        return getattr(context_wrapper, "_sentry_agent_span", None)
+
+    # End any existing span for a different agent
+    if _has_active_agent_span(context_wrapper):
+        current_agent = _get_current_agent(context_wrapper)
+        if current_agent and current_agent != agent:
+            end_invoke_agent_span(context_wrapper, current_agent)
+
+    # Store the agent on the context wrapper so we can access it later
+    context_wrapper._sentry_current_agent = agent
+    span = invoke_agent_span(context_wrapper, agent, span_kwargs)
+    context_wrapper._sentry_agent_span = span
+    agent._sentry_agent_span = span
+
+    if is_streaming:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
+    return span
+
+
+async def _single_turn(original_run_single_turn, *args, **kwargs):
+    """Patched _run_single_turn that creates agent invocation spans"""
+    agent = kwargs.get("agent")
+    context_wrapper = kwargs.get("context_wrapper")
+    should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
+
+    span = _maybe_start_agent_span(
+        context_wrapper, agent, should_run_agent_start_hooks, kwargs
+    )
+
+    try:
+        result = await original_run_single_turn(*args, **kwargs)
+    except Exception as exc:
+        if span is not None and span.timestamp is None:
+            _record_exception_on_span(span, exc)
+            end_invoke_agent_span(context_wrapper, agent)
+        reraise(*sys.exc_info())
+
+    return result
+
+
+def _patch_agent_runner_run_single_turn():
     original_run_single_turn = agents.run.AgentRunner._run_single_turn
-    original_run_single_turn_streamed = agents.run.AgentRunner._run_single_turn_streamed
-    original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
-    original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
-
-    def _has_active_agent_span(context_wrapper: "agents.RunContextWrapper") -> bool:
-        """Check if there's an active agent span for this context"""
-        return getattr(context_wrapper, "_sentry_current_agent", None) is not None
-
-    def _get_current_agent(
-        context_wrapper: "agents.RunContextWrapper",
-    ) -> "Optional[agents.Agent]":
-        """Get the current agent from context wrapper"""
-        return getattr(context_wrapper, "_sentry_current_agent", None)
-
-    def _close_streaming_workflow_span(agent: "Optional[agents.Agent]") -> None:
-        """Close the workflow span for streaming executions if it exists."""
-        if agent and hasattr(agent, "_sentry_workflow_span"):
-            workflow_span = agent._sentry_workflow_span
-            workflow_span.__exit__(*sys.exc_info())
-            delattr(agent, "_sentry_workflow_span")
-
-    def _maybe_start_agent_span(
-        context_wrapper: "agents.RunContextWrapper",
-        agent: "agents.Agent",
-        should_run_agent_start_hooks: bool,
-        span_kwargs: "dict[str, Any]",
-        is_streaming: bool = False,
-    ) -> "Optional[Span]":
-        """
-        Start an agent invocation span if conditions are met.
-        Handles ending any existing span for a different agent.
-
-        Returns the new span if started, or the existing span if conditions aren't met.
-        """
-        if not (should_run_agent_start_hooks and agent and context_wrapper):
-            return getattr(context_wrapper, "_sentry_agent_span", None)
-
-        # End any existing span for a different agent
-        if _has_active_agent_span(context_wrapper):
-            current_agent = _get_current_agent(context_wrapper)
-            if current_agent and current_agent != agent:
-                end_invoke_agent_span(context_wrapper, current_agent)
-
-        # Store the agent on the context wrapper so we can access it later
-        context_wrapper._sentry_current_agent = agent
-        span = invoke_agent_span(context_wrapper, agent, span_kwargs)
-        context_wrapper._sentry_agent_span = span
-        agent._sentry_agent_span = span
-
-        if is_streaming:
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
-
-        return span
 
     @wraps(
         original_run_single_turn.__func__
@@ -95,87 +121,74 @@ def _patch_agent_run() -> None:
         cls: "agents.Runner", *args: "Any", **kwargs: "Any"
     ) -> "Any":
         """Patched _run_single_turn that creates agent invocation spans"""
-        agent = kwargs.get("agent")
-        context_wrapper = kwargs.get("context_wrapper")
-        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
+        return await _single_turn(original_run_single_turn, *args, **kwargs)
 
-        span = _maybe_start_agent_span(
-            context_wrapper, agent, should_run_agent_start_hooks, kwargs
-        )
+    agents.run.AgentRunner._run_single_turn = patched_run_single_turn
 
-        try:
-            result = await original_run_single_turn(*args, **kwargs)
-        except Exception as exc:
+
+def _patch_run_loop_run_single_turn():
+    original_run_single_turn = run_loop.run_single_turn
+
+    @wraps(original_run_single_turn)
+    async def patched_run_single_turn(*args: "Any", **kwargs: "Any") -> "Any":
+        """Patched _run_single_turn that creates agent invocation spans"""
+        return await _single_turn(original_run_single_turn, *args, **kwargs)
+
+    agents.run.run_single_turn = patched_run_single_turn
+
+
+async def _single_turn_streamed(original_run_single_turn_streamed, *args, **kwargs):
+    """Patched _run_single_turn_streamed that creates agent invocation spans for streaming.
+
+    Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
+    _run_single_turn_streamed uses positional arguments. The call signature is:
+    _run_single_turn_streamed(
+        streamed_result,              # args[0]
+        agent,                        # args[1]
+        hooks,                        # args[2]
+        context_wrapper,              # args[3]
+        run_config,                   # args[4]
+        should_run_agent_start_hooks, # args[5]
+        tool_use_tracker,             # args[6]
+        all_tools,                    # args[7]
+        server_conversation_tracker,  # args[8] (optional)
+    )
+    """
+    streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
+    agent = args[1] if len(args) > 1 else kwargs.get("agent")
+    context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
+    should_run_agent_start_hooks = bool(
+        args[5] if len(args) > 5 else kwargs.get("should_run_agent_start_hooks", False)
+    )
+
+    span_kwargs: "dict[str, Any]" = {}
+    if streamed_result and hasattr(streamed_result, "input"):
+        span_kwargs["original_input"] = streamed_result.input
+
+    span = _maybe_start_agent_span(
+        context_wrapper,
+        agent,
+        should_run_agent_start_hooks,
+        span_kwargs,
+        is_streaming=True,
+    )
+
+    try:
+        result = await original_run_single_turn_streamed(*args, **kwargs)
+    except Exception as exc:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
             if span is not None and span.timestamp is None:
                 _record_exception_on_span(span, exc)
                 end_invoke_agent_span(context_wrapper, agent)
-            reraise(*sys.exc_info())
+            _close_streaming_workflow_span(agent)
+        reraise(*exc_info)
 
-        return result
+    return result
 
-    @wraps(
-        original_execute_handoffs.__func__
-        if hasattr(original_execute_handoffs, "__func__")
-        else original_execute_handoffs
-    )
-    async def patched_execute_handoffs(
-        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        """Patched execute_handoffs that creates handoff spans and ends agent span for handoffs"""
 
-        context_wrapper = kwargs.get("context_wrapper")
-        run_handoffs = kwargs.get("run_handoffs")
-        agent = kwargs.get("agent")
-
-        # Create Sentry handoff span for the first handoff (agents library only processes the first one)
-        if run_handoffs:
-            first_handoff = run_handoffs[0]
-            handoff_agent_name = first_handoff.handoff.agent_name
-            handoff_span(context_wrapper, agent, handoff_agent_name)
-
-        # Call original method with all parameters
-        try:
-            result = await original_execute_handoffs(*args, **kwargs)
-        except Exception:
-            exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                _close_streaming_workflow_span(agent)
-            reraise(*exc_info)
-        finally:
-            # End span for current agent after handoff processing is complete
-            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-                end_invoke_agent_span(context_wrapper, agent)
-
-        return result
-
-    @wraps(
-        original_execute_final_output.__func__
-        if hasattr(original_execute_final_output, "__func__")
-        else original_execute_final_output
-    )
-    async def patched_execute_final_output(
-        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        """Patched execute_final_output that ends agent span for final outputs"""
-
-        agent = kwargs.get("agent")
-        context_wrapper = kwargs.get("context_wrapper")
-        final_output = kwargs.get("final_output")
-
-        try:
-            result = await original_execute_final_output(*args, **kwargs)
-        finally:
-            with capture_internal_exceptions():
-                if (
-                    agent
-                    and context_wrapper
-                    and _has_active_agent_span(context_wrapper)
-                ):
-                    end_invoke_agent_span(context_wrapper, agent, final_output)
-                # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
-                _close_streaming_workflow_span(agent)
-
-        return result
+def _patch_agent_runner_run_single_turn_streamed():
+    original_run_single_turn_streamed = agents.run.AgentRunner._run_single_turn_streamed
 
     @wraps(
         original_run_single_turn_streamed.__func__
@@ -185,62 +198,127 @@ def _patch_agent_run() -> None:
     async def patched_run_single_turn_streamed(
         cls: "agents.Runner", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        """Patched _run_single_turn_streamed that creates agent invocation spans for streaming.
-
-        Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
-        _run_single_turn_streamed uses positional arguments. The call signature is:
-        _run_single_turn_streamed(
-            streamed_result,              # args[0]
-            agent,                        # args[1]
-            hooks,                        # args[2]
-            context_wrapper,              # args[3]
-            run_config,                   # args[4]
-            should_run_agent_start_hooks, # args[5]
-            tool_use_tracker,             # args[6]
-            all_tools,                    # args[7]
-            server_conversation_tracker,  # args[8] (optional)
-        )
-        """
-        streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
-        agent = args[1] if len(args) > 1 else kwargs.get("agent")
-        context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
-        should_run_agent_start_hooks = bool(
-            args[5]
-            if len(args) > 5
-            else kwargs.get("should_run_agent_start_hooks", False)
+        return await _single_turn_streamed(
+            original_run_single_turn_streamed, *args, **kwargs
         )
 
-        span_kwargs: "dict[str, Any]" = {}
-        if streamed_result and hasattr(streamed_result, "input"):
-            span_kwargs["original_input"] = streamed_result.input
+    agents.run.AgentRunner._run_single_turn_streamed = patched_run_single_turn_streamed
 
-        span = _maybe_start_agent_span(
-            context_wrapper,
-            agent,
-            should_run_agent_start_hooks,
-            span_kwargs,
-            is_streaming=True,
+
+def _patch_run_loop_run_single_turn_streamed():
+    original_run_single_turn_streamed = run_loop.run_single_turn_streamed
+
+    @wraps(original_run_single_turn_streamed)
+    async def patched_run_single_turn_streamed(*args: "Any", **kwargs: "Any") -> "Any":
+        return await _single_turn_streamed(
+            original_run_single_turn_streamed, *args, **kwargs
         )
 
-        try:
-            result = await original_run_single_turn_streamed(*args, **kwargs)
-        except Exception as exc:
-            exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                if span is not None and span.timestamp is None:
-                    _record_exception_on_span(span, exc)
-                    end_invoke_agent_span(context_wrapper, agent)
-                _close_streaming_workflow_span(agent)
-            reraise(*exc_info)
-
-        return result
-
-    # Apply patches
-    agents.run.AgentRunner._run_single_turn = classmethod(patched_run_single_turn)
-    agents.run.AgentRunner._run_single_turn_streamed = classmethod(
+    agents.run_internal.run_loop.run_single_turn_streamed = (
         patched_run_single_turn_streamed
     )
-    agents._run_impl.RunImpl.execute_handoffs = classmethod(patched_execute_handoffs)
-    agents._run_impl.RunImpl.execute_final_output = classmethod(
+
+
+async def execute_handoffs(original_execute_handoffs, *args, **kwargs):
+    """Patched execute_handoffs that creates handoff spans and ends agent span for handoffs"""
+    context_wrapper = kwargs.get("context_wrapper")
+    run_handoffs = kwargs.get("run_handoffs")
+    agent = kwargs.get("agent")
+
+    # Create Sentry handoff span for the first handoff (agents library only processes the first one)
+    if run_handoffs:
+        first_handoff = run_handoffs[0]
+        handoff_agent_name = first_handoff.handoff.agent_name
+        handoff_span(context_wrapper, agent, handoff_agent_name)
+
+    # Call original method with all parameters
+    try:
+        result = await original_execute_handoffs(*args, **kwargs)
+    except Exception:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            _close_streaming_workflow_span(agent)
+        reraise(*exc_info)
+    finally:
+        # End span for current agent after handoff processing is complete
+        if agent and context_wrapper and _has_active_agent_span(context_wrapper):
+            end_invoke_agent_span(context_wrapper, agent)
+
+    return result
+
+
+def _patch_run_impl_execute_handoffs():
+    original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
+
+    @wraps(
+        original_execute_handoffs.__func__
+        if hasattr(original_execute_handoffs, "__func__")
+        else original_execute_handoffs
+    )
+    async def patched_execute_handoffs(
+        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        return await execute_handoffs(original_execute_handoffs, *args, **kwargs)
+
+    agents._run_impl.RunImpl.execute_handoffs = patched_execute_handoffs
+
+
+def _patch_turn_resolution_execute_handoffs():
+    original_execute_handoffs = turn_resolution.execute_handoffs
+
+    @wraps(original_execute_handoffs)
+    async def patched_execute_handoffs(*args: "Any", **kwargs: "Any") -> "Any":
+        return await execute_handoffs(original_execute_handoffs, *args, **kwargs)
+
+    agents.run_internal.turn_resolution.execute_handoffs = patched_execute_handoffs
+
+
+async def execute_final_output(original_execute_final_output, *args, **kwargs):
+    """Patched execute_final_output that ends agent span for final outputs"""
+
+    agent = kwargs.get("agent")
+    context_wrapper = kwargs.get("context_wrapper")
+    final_output = kwargs.get("final_output")
+
+    try:
+        result = await original_execute_final_output(*args, **kwargs)
+    finally:
+        with capture_internal_exceptions():
+            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
+                end_invoke_agent_span(context_wrapper, agent, final_output)
+            # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
+            _close_streaming_workflow_span(agent)
+
+    return result
+
+
+def _patch_run_impl_execute_final_output():
+    original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
+
+    @wraps(
+        original_execute_final_output.__func__
+        if hasattr(original_execute_final_output, "__func__")
+        else original_execute_final_output
+    )
+    async def patched_execute_final_output(
+        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        return await execute_final_output(
+            original_execute_final_output, *args, **kwargs
+        )
+
+    agents._run_impl.RunImpl = patched_execute_final_output
+
+
+def _patch_turn_resolution_execute_final_output():
+    original_execute_final_output = turn_resolution.execute_final_output
+
+    @wraps(original_execute_final_output)
+    async def patched_execute_final_output(*args: "Any", **kwargs: "Any") -> "Any":
+        return await execute_final_output(
+            original_execute_final_output, *args, **kwargs
+        )
+
+    agents.run_internal.turn_resolution.execute_final_output = (
         patched_execute_final_output
     )
