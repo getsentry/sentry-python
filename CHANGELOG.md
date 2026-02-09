@@ -1,5 +1,63 @@
 # Changelog
 
+## 2.52.0a3
+
+### New Features ✨
+
+- feat(integration): add `gen_ai.conversation.id` if available by @constantinius in [#5307](https://github.com/getsentry/sentry-python/pull/5307)
+
+### Bug Fixes 🐛
+
+#### Mcp
+
+- fix(mcp): Nest MCP spans under HTTP transactions by @alexander-alderman-webb in [#5292](https://github.com/getsentry/sentry-python/pull/5292)
+- fix(mcp): Handle all awaitable return types by @alexander-alderman-webb in [#5415](https://github.com/getsentry/sentry-python/pull/5415)
+
+#### Span Streaming
+
+- fix(span-streaming): Always preserialize attributes by @sentrivana in [#5407](https://github.com/getsentry/sentry-python/pull/5407)
+- fix(span-streaming): Warn about thread usage if any batcher is active by @sentrivana in [#5408](https://github.com/getsentry/sentry-python/pull/5408)
+
+#### Other
+
+- fix(anthropic): Token reporting by @alexander-alderman-webb in [#5403](https://github.com/getsentry/sentry-python/pull/5403)
+- fix(celery): Close the connection we're reading driver_type from by @sentrivana in [#5427](https://github.com/getsentry/sentry-python/pull/5427)
+- fix(google-genai): Token reporting by @alexander-alderman-webb in [#5404](https://github.com/getsentry/sentry-python/pull/5404)
+- fix(openai): Token reporting by @alexander-alderman-webb in [#5406](https://github.com/getsentry/sentry-python/pull/5406)
+- fix(openai-agents): Inject propagation headers for `HostedMCPTool` when streaming by @alexander-alderman-webb in [#5405](https://github.com/getsentry/sentry-python/pull/5405)
+- fix: Fix list attribute type by @sentrivana in [#5417](https://github.com/getsentry/sentry-python/pull/5417)
+- fix: Adapt to new packaging in toxgen by @sentrivana in [#5382](https://github.com/getsentry/sentry-python/pull/5382)
+
+### Internal Changes 🔧
+
+#### Fastmcp
+
+- test(fastmcp): Wrap prompt in `Message` by @alexander-alderman-webb in [#5411](https://github.com/getsentry/sentry-python/pull/5411)
+- test(fastmcp): Remove `test_fastmcp_without_request_context()` by @alexander-alderman-webb in [#5412](https://github.com/getsentry/sentry-python/pull/5412)
+- test(fastmcp): Use `AsyncClient` for SSE by @alexander-alderman-webb in [#5400](https://github.com/getsentry/sentry-python/pull/5400)
+- test(fastmcp): Use `TestClient` for Streamable HTTP by @alexander-alderman-webb in [#5384](https://github.com/getsentry/sentry-python/pull/5384)
+- test(fastmcp): Simulate stdio transport with memory streams by @alexander-alderman-webb in [#5333](https://github.com/getsentry/sentry-python/pull/5333)
+
+#### Mcp
+
+- test(mcp): Use `AsyncClient` for SSE by @alexander-alderman-webb in [#5396](https://github.com/getsentry/sentry-python/pull/5396)
+- test(mcp): Use `TestClient` for Streamable HTTP by @alexander-alderman-webb in [#5383](https://github.com/getsentry/sentry-python/pull/5383)
+- test(mcp): Remove unused stdio helpers by @alexander-alderman-webb in [#5409](https://github.com/getsentry/sentry-python/pull/5409)
+
+#### Other
+
+- ci: Pin setuptools for linting and chalice tests by @alexander-alderman-webb in [#5438](https://github.com/getsentry/sentry-python/pull/5438)
+- ci: Fix lint step by @sentrivana in [#5418](https://github.com/getsentry/sentry-python/pull/5418)
+- ci: 🤖 Update test matrix with new releases (02/02) by @github-actions in [#5413](https://github.com/getsentry/sentry-python/pull/5413)
+- ci: Update tox and pin packaging version for tox by @alexander-alderman-webb in [#5381](https://github.com/getsentry/sentry-python/pull/5381)
+
+### Other
+
+- [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
+- Update CHANGELOG.md by @alexander-alderman-webb in [bcec5780](https://github.com/getsentry/sentry-python/commit/bcec57806fcb8ef0aa228052aeddf10272df43ba)
+- release: 2.52.0 by @alexander-alderman-webb in [3d2154ce](https://github.com/getsentry/sentry-python/commit/3d2154ce57447e6717f7e38b2ea0d1d27b4ff940)
+- Revert "feat(ai): Add original input length meta attribute (#5375)" by @alexander-alderman-webb in [#5419](https://github.com/getsentry/sentry-python/pull/5419)
+
 ## 2.52.0a2
 
 This is an alpha release for internal testing of span streaming.
