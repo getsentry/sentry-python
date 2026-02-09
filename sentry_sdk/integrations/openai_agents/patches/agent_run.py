@@ -14,9 +14,11 @@ from ..utils import _record_exception_on_span
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Callable, Awaitable
 
     from sentry_sdk.tracing import Span
+
+    from agents.run_internal.run_steps import SingleStepResult
 
 try:
     import agents
@@ -88,7 +90,11 @@ def _maybe_start_agent_span(
     return span
 
 
-async def _single_turn(original_run_single_turn, *args, **kwargs):
+async def _single_turn(
+    original_run_single_turn: "Callable[..., Awaitable[SingleStepResult]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "SingleStepResult":
     """Patched _run_single_turn that creates agent invocation spans"""
     agent = kwargs.get("agent")
     context_wrapper = kwargs.get("context_wrapper")
@@ -109,7 +115,7 @@ async def _single_turn(original_run_single_turn, *args, **kwargs):
     return result
 
 
-def _patch_agent_runner_run_single_turn():
+def _patch_agent_runner_run_single_turn() -> None:
     original_run_single_turn = agents.run.AgentRunner._run_single_turn
 
     @wraps(
@@ -123,10 +129,10 @@ def _patch_agent_runner_run_single_turn():
         """Patched _run_single_turn that creates agent invocation spans"""
         return await _single_turn(original_run_single_turn, *args, **kwargs)
 
-    agents.run.AgentRunner._run_single_turn = patched_run_single_turn
+    agents.run.AgentRunner._run_single_turn = classmethod(patched_run_single_turn)
 
 
-def _patch_run_loop_run_single_turn():
+def _patch_run_loop_run_single_turn() -> None:
     original_run_single_turn = run_loop.run_single_turn
 
     @wraps(original_run_single_turn)
@@ -137,7 +143,11 @@ def _patch_run_loop_run_single_turn():
     agents.run.run_single_turn = patched_run_single_turn
 
 
-async def _single_turn_streamed(original_run_single_turn_streamed, *args, **kwargs):
+async def _single_turn_streamed(
+    original_run_single_turn_streamed: "Callable[..., Awaitable[SingleStepResult]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "SingleStepResult":
     """Patched _run_single_turn_streamed that creates agent invocation spans for streaming.
 
     Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
@@ -187,7 +197,7 @@ async def _single_turn_streamed(original_run_single_turn_streamed, *args, **kwar
     return result
 
 
-def _patch_agent_runner_run_single_turn_streamed():
+def _patch_agent_runner_run_single_turn_streamed() -> None:
     original_run_single_turn_streamed = agents.run.AgentRunner._run_single_turn_streamed
 
     @wraps(
@@ -202,10 +212,12 @@ def _patch_agent_runner_run_single_turn_streamed():
             original_run_single_turn_streamed, *args, **kwargs
         )
 
-    agents.run.AgentRunner._run_single_turn_streamed = patched_run_single_turn_streamed
+    agents.run.AgentRunner._run_single_turn_streamed = classmethod(
+        patched_run_single_turn_streamed
+    )
 
 
-def _patch_run_loop_run_single_turn_streamed():
+def _patch_run_loop_run_single_turn_streamed() -> None:
     original_run_single_turn_streamed = run_loop.run_single_turn_streamed
 
     @wraps(original_run_single_turn_streamed)
@@ -219,7 +231,11 @@ def _patch_run_loop_run_single_turn_streamed():
     )
 
 
-async def execute_handoffs(original_execute_handoffs, *args, **kwargs):
+async def execute_handoffs(
+    original_execute_handoffs: "Callable[..., Awaitable[SingleStepResult]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "SingleStepResult":
     """Patched execute_handoffs that creates handoff spans and ends agent span for handoffs"""
     context_wrapper = kwargs.get("context_wrapper")
     run_handoffs = kwargs.get("run_handoffs")
@@ -247,7 +263,7 @@ async def execute_handoffs(original_execute_handoffs, *args, **kwargs):
     return result
 
 
-def _patch_run_impl_execute_handoffs():
+def _patch_run_impl_execute_handoffs() -> None:
     original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
 
     @wraps(
@@ -260,10 +276,10 @@ def _patch_run_impl_execute_handoffs():
     ) -> "Any":
         return await execute_handoffs(original_execute_handoffs, *args, **kwargs)
 
-    agents._run_impl.RunImpl.execute_handoffs = patched_execute_handoffs
+    agents._run_impl.RunImpl.execute_handoffs = classmethod(patched_execute_handoffs)
 
 
-def _patch_turn_resolution_execute_handoffs():
+def _patch_turn_resolution_execute_handoffs() -> None:
     original_execute_handoffs = turn_resolution.execute_handoffs
 
     @wraps(original_execute_handoffs)
@@ -273,7 +289,11 @@ def _patch_turn_resolution_execute_handoffs():
     agents.run_internal.turn_resolution.execute_handoffs = patched_execute_handoffs
 
 
-async def execute_final_output(original_execute_final_output, *args, **kwargs):
+async def execute_final_output(
+    original_execute_final_output: "Callable[..., Awaitable[SingleStepResult]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "SingleStepResult":
     """Patched execute_final_output that ends agent span for final outputs"""
 
     agent = kwargs.get("agent")
@@ -292,7 +312,7 @@ async def execute_final_output(original_execute_final_output, *args, **kwargs):
     return result
 
 
-def _patch_run_impl_execute_final_output():
+def _patch_run_impl_execute_final_output() -> None:
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
 
     @wraps(
@@ -307,10 +327,12 @@ def _patch_run_impl_execute_final_output():
             original_execute_final_output, *args, **kwargs
         )
 
-    agents._run_impl.RunImpl = patched_execute_final_output
+    agents._run_impl.RunImpl.execute_final_output = classmethod(
+        patched_execute_final_output
+    )
 
 
-def _patch_turn_resolution_execute_final_output():
+def _patch_turn_resolution_execute_final_output() -> None:
     original_execute_final_output = turn_resolution.execute_final_output
 
     @wraps(original_execute_final_output)

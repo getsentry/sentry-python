@@ -1,6 +1,6 @@
 import copy
 import time
-from functools import wraps
+from functools import wraps, partial
 
 from sentry_sdk.integrations import DidNotEnable
 
@@ -67,8 +67,10 @@ def _inject_trace_propagation_headers(
 
 
 def _get_model(
-    original_get_model, agent: "agents.Agent", run_config: "agents.RunConfig"
-):
+    original_get_model: "Callable[..., agents.Model]",
+    agent: "agents.Agent",
+    run_config: "agents.RunConfig",
+) -> "agents.Model":
     # copy the model to double patching its methods. We use copy on purpose here (instead of deepcopy)
     # because we only patch its direct methods, all underlying data can remain unchanged.
     model = copy.copy(original_get_model(agent, run_config))

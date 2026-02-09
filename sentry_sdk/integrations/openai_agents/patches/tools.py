@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import wraps, partial
 
 from sentry_sdk.integrations import DidNotEnable
 
@@ -7,7 +7,7 @@ from ..spans import execute_tool_span, update_execute_tool_span
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Awaitable
 
 try:
     import agents
@@ -15,7 +15,11 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-async def _get_all_tools(original_get_all_tools, agent, context_wrapper):
+async def _get_all_tools(
+    original_get_all_tools: "Callable[..., Awaitable[list[agents.Tool]]]",
+    agent: "agents.Agent",
+    context_wrapper: "agents.RunContextWrapper",
+) -> "list[agents.Tool]":
     # Get the original tools
     tools = await original_get_all_tools(agent, context_wrapper)
 
