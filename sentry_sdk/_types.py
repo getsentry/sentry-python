@@ -285,16 +285,17 @@ if TYPE_CHECKING:
             "type": str,
             "asgi": _ASGIInfo,
             "http_version": str,
-            "server": tuple[str, int],
-            "client": tuple[str, int],
-            "scheme": str,
             "method": str,
-            "root_path": str,
             "path": str,
-            "raw_path": bytes,
             "query_string": bytes,
             "headers": list[tuple[bytes, bytes]],
-            "state": dict[str, Any],
+            # Optional fields per ASGI spec
+            "scheme": NotRequired[str],
+            "raw_path": NotRequired[bytes],
+            "root_path": NotRequired[str],
+            "client": NotRequired[tuple[str, int]],
+            "server": NotRequired[tuple[str, int]],
+            "state": NotRequired[dict[str, Any]],
         },
     )
     _TransactionContext = TypedDict(
