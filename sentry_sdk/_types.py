@@ -310,7 +310,7 @@ if TYPE_CHECKING:
             "timestamp": Optional[datetime],
             "origin": str,
             "tags": NotRequired[dict[str, str]],
-            "data": dict[str, Any],
+            "data": NotRequired[dict[str, Any]],
             "name": str,
             "source": TransactionSource,
             "sampled": Optional[bool],
@@ -333,6 +333,7 @@ if TYPE_CHECKING:
             "aws_event": NotRequired[Any],
             "aws_context": NotRequired[Any],
             "gcp_env": NotRequired[dict[str, Any]],
+            "gcp_event": NotRequired[Any],
         },
     )
     SamplingContext = Union[_SamplingContextTyped, dict[str, Any]]
