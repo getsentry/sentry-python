@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.52.0a4
+
+- [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
+
 ## 2.52.0a3
 
 ### New Features ✨
