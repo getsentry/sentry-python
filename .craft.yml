@@ -1,4 +1,5 @@
 minVersion: 2.21.1
+preReleaseCommand: bash scripts/bump-version.sh
 targets:
   - name: pypi
     includeNames: /^sentry[_\-]sdk.*$/
