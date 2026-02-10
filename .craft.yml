@@ -35,7 +35,7 @@ artifactProvider:
   name: github
   config:
     artifacts:
-      ci.yml:
+      CI:
         - 'artifact-*'
 changelog:
   filePath: CHANGELOG.md
