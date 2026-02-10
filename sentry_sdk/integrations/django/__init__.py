@@ -40,18 +40,18 @@ try:
     try:
         from django.urls import resolve
     except ImportError:
-        from django.core.urlresolvers import resolve
+        from django.core.urlresolvers import resolve  # type: ignore[no-redef]
 
     try:
         from django.urls import Resolver404
     except ImportError:
-        from django.core.urlresolvers import Resolver404
+        from django.core.urlresolvers import Resolver404  # type: ignore[no-redef]
 
     # Only available in Django 3.0+
     try:
         from django.core.handlers.asgi import ASGIRequest
     except Exception:
-        ASGIRequest = None
+        ASGIRequest = None  # type: ignore[assignment, misc]
 
 except ImportError:
     raise DidNotEnable("Django not installed")
@@ -86,6 +86,7 @@ if TYPE_CHECKING:
     from django.http.request import QueryDict
     from django.utils.datastructures import MultiValueDict
 
+    from django.dispatch import Signal
     from sentry_sdk.tracing import Span
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
@@ -124,7 +125,7 @@ class DjangoIntegration(Integration):
     middleware_spans = None
     signals_spans = None
     cache_spans = None
-    signals_denylist: "list[signals.Signal]" = []
+    signals_denylist: "list[Signal]" = []
 
     def __init__(
         self,
@@ -133,7 +134,7 @@ class DjangoIntegration(Integration):
         signals_spans: bool = True,
         cache_spans: bool = False,
         db_transaction_spans: bool = False,
-        signals_denylist: "Optional[list[signals.Signal]]" = None,
+        signals_denylist: "Optional[list[Signal]]" = None,
         http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
     ) -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
@@ -154,7 +155,7 @@ class DjangoIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        _check_minimum_version(DjangoIntegration, DJANGO_VERSION)
+        _check_minimum_version(DjangoIntegration, DJANGO_VERSION)  # type: ignore[arg-type]
 
         install_sql_hook()
         # Patch in our custom middleware.
@@ -167,7 +168,7 @@ class DjangoIntegration(Integration):
 
         old_app = WSGIHandler.__call__
 
-        @ensure_integration_enabled(DjangoIntegration, old_app)
+        @ensure_integration_enabled(DjangoIntegration, old_app)  # type: ignore[arg-type]
         def sentry_patched_wsgi_handler(
             self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
         ) -> "_ScopedResponse":
@@ -191,7 +192,7 @@ class DjangoIntegration(Integration):
             )
             return middleware(environ, start_response)
 
-        WSGIHandler.__call__ = sentry_patched_wsgi_handler
+        WSGIHandler.__call__ = sentry_patched_wsgi_handler  # type: ignore[method-assign]
 
         _patch_get_response()
 
@@ -438,7 +439,7 @@ def _before_get_response(request: "WSGIRequest") -> None:
     _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
     scope.add_event_processor(
-        _make_wsgi_request_event_processor(weakref.ref(request), integration)
+        _make_wsgi_request_event_processor(weakref.ref(request), integration)  # type: ignore[arg-type]
     )
 
 
@@ -479,9 +480,9 @@ def _patch_get_response() -> None:
         _before_get_response(request)
         rv = old_get_response(self, request)
         _after_get_response(request)
-        return rv
+        return rv  # type: ignore[return-value]
 
-    BaseHandler.get_response = sentry_patched_get_response
+    BaseHandler.get_response = sentry_patched_get_response  # type: ignore[method-assign, assignment]
 
     if hasattr(BaseHandler, "get_response_async"):
         from sentry_sdk.integrations.django.asgi import patch_get_response_async
@@ -501,7 +502,7 @@ def _make_wsgi_request_event_processor(
             return event
 
         django_3 = ASGIRequest is not None
-        if django_3 and type(request) == ASGIRequest:
+        if django_3 and type(request) == ASGIRequest:  # type: ignore[comparison-overlap]
             # We have a `asgi_request_event_processor` for this.
             return event
 
@@ -517,7 +518,9 @@ def _make_wsgi_request_event_processor(
     return wsgi_request_event_processor
 
 
-def _got_request_exception(request: "WSGIRequest" = None, **kwargs: "Any") -> None:
+def _got_request_exception(
+    request: "Optional[WSGIRequest]" = None, **kwargs: "Any"
+) -> None:
     client = sentry_sdk.get_client()
     integration = client.get_integration(DjangoIntegration)
     if integration is None:
@@ -538,7 +541,7 @@ def _got_request_exception(request: "WSGIRequest" = None, **kwargs: "Any") -> No
 class DjangoRequestExtractor(RequestExtractor):
     def __init__(self, request: "Union[WSGIRequest, ASGIRequest]") -> None:
         try:
-            drf_request = request._sentry_drf_request_backref()
+            drf_request = request._sentry_drf_request_backref()  # type: ignore[union-attr]
             if drf_request is not None:
                 request = drf_request
         except AttributeError:
@@ -569,7 +572,7 @@ class DjangoRequestExtractor(RequestExtractor):
     def form(self) -> "QueryDict":
         return self.request.POST
 
-    def files(self) -> "MultiValueDict":
+    def files(self) -> "MultiValueDict[str, Any]":
         return self.request.FILES
 
     def size_of_file(self, file: "Any") -> int:
@@ -611,11 +614,11 @@ def install_sql_hook() -> None:
     try:
         from django.db.backends.utils import CursorWrapper
     except ImportError:
-        from django.db.backends.util import CursorWrapper
+        from django.db.backends.util import CursorWrapper  # type: ignore[no-redef]
 
     try:
         # django 1.6 and 1.7 compatability
-        from django.db.backends import BaseDatabaseWrapper
+        from django.db.backends import BaseDatabaseWrapper  # type: ignore[attr-defined]
     except ImportError:
         # django 1.8 or later
         from django.db.backends.base.base import BaseDatabaseWrapper
@@ -650,7 +653,7 @@ def install_sql_hook() -> None:
 
         return result
 
-    @ensure_integration_enabled(DjangoIntegration, real_executemany)
+    @ensure_integration_enabled(DjangoIntegration, real_executemany)  # type: ignore[arg-type]
     def executemany(
         self: "CursorWrapper", sql: "Any", param_list: "List[Any]"
     ) -> "Any":
@@ -712,8 +715,8 @@ def install_sql_hook() -> None:
             _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
             return real_rollback(self)
 
-    CursorWrapper.execute = execute
-    CursorWrapper.executemany = executemany
+    CursorWrapper.execute = execute  # type: ignore[method-assign]
+    CursorWrapper.executemany = executemany  # type: ignore[method-assign]
     BaseDatabaseWrapper.connect = connect
     BaseDatabaseWrapper._commit = _commit
     BaseDatabaseWrapper._rollback = _rollback

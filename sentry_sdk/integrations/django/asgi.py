@@ -64,7 +64,7 @@ def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcesso
         if request is None:
             return event
 
-        if type(request) == WSGIRequest:
+        if type(request) == WSGIRequest:  # type: ignore[comparison-overlap]
             return event
 
         with capture_internal_exceptions():
@@ -72,7 +72,7 @@ def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcesso
 
         if should_send_default_pii():
             with capture_internal_exceptions():
-                _set_user_info(request, event)
+                _set_user_info(request, event)  # type: ignore[arg-type]
 
         return event
 
@@ -132,7 +132,7 @@ def patch_get_response_async(cls: "Any", _before_get_response: "Any") -> None:
 
 
 def patch_channels_asgi_handler_impl(cls: "Any") -> None:
-    import channels  # type: ignore
+    import channels
 
     from sentry_sdk.integrations.django import DjangoIntegration
 
