@@ -25,7 +25,7 @@ changelog:
       labels:
         - "Changelog: Deprecation"
       commit_patterns:
-        - "^(?<type>deprecat(?:\\((?<scope>[^)]+)\\))?!?:?\\s*)"
+        - "^(?<type>deprecat(?:ion|ed|e)(?:\\((?<scope>[^)]+)\\))?!?:?\\s*)"
       semver: patch
     - title: Documentation 📚
       labels:
