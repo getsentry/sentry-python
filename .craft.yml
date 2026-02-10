@@ -1,4 +1,4 @@
-minVersion: 2.17.0
+minVersion: 2.21.1
 targets:
   - name: pypi
     includeNames: /^sentry[_\-]sdk.*$/
@@ -30,5 +30,12 @@ targets:
     license: MIT
   - name: sentry-pypi
     internalPypiRepo: getsentry/pypi
-changelog: CHANGELOG.md
-changelogPolicy: auto
+artifactProvider:
+  name: github
+  config:
+    artifacts:
+      ci.yml:
+        - 'artifact-*'
+changelog:
+  filePath: CHANGELOG.md
+  policy: auto
