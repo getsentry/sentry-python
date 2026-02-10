@@ -1,0 +1,35 @@
+## Implementation Plan
+
+### Problem
+- .github/release.yml commit_patterns lacked named capture groups (?<type>...)
+  and (?<scope>...) needed for Craft's title stripping feature
+- CI had an unnecessary merge job to combine artifacts into a single SHA-named
+  artifact, which Craft 2.21.1+ no longer requires
+- .craft.yml used the old separate-key changelog format
+
+### Changes
+
+#### .github/release.yml
+- All commit_patterns now use (?<type>...) and (?<scope>...) named capture
+  groups so Craft strips conventional commit prefixes from changelog entries
+  (e.g. 'feat(api): add endpoint' becomes 'Add endpoint')
+- Added Breaking Changes category (semver: major) from Craft defaults, matching
+  any conventional commit with ! (e.g. feat!:, fix!:)
+- Expanded Internal Changes patterns to include refactor|meta|perf from Craft
+  defaults, merged with existing build|ref|chore|ci|tests?
+
+#### .craft.yml
+- Bumped minVersion from 2.17.0 to 2.21.1 (for workflow-scoped artifacts)
+- Added artifactProvider config: fetches artifact-* from ci.yml workflow
+- Modernized changelog from separate keys (changelog: CHANGELOG.md +
+  changelogPolicy: auto) to object format (changelog: {filePath, policy})
+
+#### .github/workflows/ci.yml
+- Removed the merge job (combined artifact-build_lambda_layer and artifact-docs
+  into a single SHA-named artifact) — Craft now pulls individual artifacts
+- Removed compression-level: '0' from upload steps (was only needed for merging)
+
+### References
+- Craft title stripping docs: https://craft.sentry.dev/configuration/#title-stripping-default-behavior
+- Craft artifact provider docs: https://craft.sentry.dev/configuration/#github-artifact-provider-configuration
+- Prior art: https://github.com/getsentry/cli/pull/215
