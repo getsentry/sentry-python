@@ -127,8 +127,8 @@ def _patch_agent_run() -> None:
     ) -> "Any":
         """
         Patched execute_handoffs that
-        - creates handoff spans.
-        - ends the agent span for handoffs.
+        - creates and manages handoff spans.
+        - ends the agent invocation span.
         - ends the workflow span if the response is streamed and an exception is raised in `execute_handoffs()`.
         """
 
