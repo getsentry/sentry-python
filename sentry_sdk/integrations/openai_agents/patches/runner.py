@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., Any]":
     """
+    Responsible for workflow spans.
+
     Wraps the agents.Runner.run methods to create a root span for the agent workflow runs.
 
     Note agents.Runner.run_sync() is a wrapper around agents.Runner.run(),
