@@ -167,7 +167,7 @@ def _patch_agent_run() -> None:
     ) -> "Any":
         """
         Patched execute_final_output that
-        - ends agent span for final outputs.
+        - ends the agent invocation span.
         - ends the workflow span if the response is streamed.
         """
 
