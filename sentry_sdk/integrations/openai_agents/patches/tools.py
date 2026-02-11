@@ -1,4 +1,4 @@
-from functools import wraps, partial
+from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 
