@@ -55,7 +55,7 @@ class OpenAIAgentsIntegration(Integration):
     """
     Typical interaction with the library:
     1. The user creates an Agent instance with configuration, including system instructions sent to every Responses API call.
-    2. The user passes the agent instance to a Runner, which returns the agent execution response synchronously or asynchronously (the latter is called streaming).
+    2. The user passes the agent instance to a Runner with `run()` and `run_streamed()` methods. The latter can be used to incrementally receive progress.
     3. In a loop, the agent repeatedly calls the Responses API, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
 
     Local tools are run based on the return value from the Responses API as a post-API call step in the above loop.
