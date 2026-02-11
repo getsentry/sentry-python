@@ -84,5 +84,6 @@ class OpenAIAgentsIntegration(Integration):
             8,
         ):
             _patch_run_get_all_tools()
+            return
 
         _patch_agent_runner_get_all_tools()
