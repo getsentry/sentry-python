@@ -40,18 +40,12 @@ def _patch_runner() -> None:
 
 
 def _patch_model() -> None:
-    """
-    Responsible for `gen_ai.chat` spans.
-    """
     agents.run.AgentRunner._get_model = classmethod(
         _create_get_model_wrapper(agents.run.AgentRunner._get_model),
     )
 
 
 def _patch_tools() -> None:
-    """
-    Responsible for `gen_ai.execute_tool` spans.
-    """
     agents.run.AgentRunner._get_all_tools = classmethod(
         _create_get_all_tools_wrapper(agents.run.AgentRunner._get_all_tools),
     )
