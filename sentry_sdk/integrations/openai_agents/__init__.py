@@ -1,10 +1,11 @@
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import parse_version
 
+from functools import wraps
+
 from .patches import (
     _create_get_model_wrapper,
-    _create_runner_get_all_tools_wrapper,
-    _create_run_loop_get_all_tools_wrapper,
+    _get_all_tools,
     _create_run_wrapper,
     _create_run_streamed_wrapper,
     _patch_agent_run,
@@ -19,6 +20,7 @@ try:
     # after it, even if we don't use it.
     import agents
     from agents.run import DEFAULT_AGENT_RUNNER
+    from agents.run import AgentRunner
     from agents.version import __version__ as OPENAI_AGENTS_VERSION
 
 except ImportError:
@@ -28,10 +30,9 @@ except ImportError:
 try:
     # AgentRunner methods moved in v0.8
     # https://github.com/openai/openai-agents-python/commit/3ce7c24d349b77bb750062b7e0e856d9ff48a5d5#diff-7470b3a5c5cbe2fcbb2703dc24f326f45a5819d853be2b1f395d122d278cd911
-    from agents.run_internal import run_loop, turn_preparation
+    from agents.run_internal import run_loop
 except ImportError:
     run_loop = None
-    turn_preparation = None
 
 
 def _patch_runner() -> None:
@@ -57,18 +58,6 @@ def _patch_model() -> None:
     )
 
 
-def _patch_agent_runner_get_all_tools() -> None:
-    agents.run.AgentRunner._get_all_tools = classmethod(
-        _create_runner_get_all_tools_wrapper(agents.run.AgentRunner._get_all_tools),
-    )
-
-
-def _patch_run_get_all_tools() -> None:
-    agents.run.get_all_tools = _create_run_loop_get_all_tools_wrapper(
-        run_loop.get_all_tools
-    )
-
-
 class OpenAIAgentsIntegration(Integration):
     identifier = "openai_agents"
 
@@ -83,7 +72,27 @@ class OpenAIAgentsIntegration(Integration):
             0,
             8,
         ):
-            _patch_run_get_all_tools()
+
+            @wraps(run_loop.get_all_tools)
+            async def new_wrapped_get_all_tools(
+                agent: "agents.Agent",
+                context_wrapper: "agents.RunContextWrapper",
+            ) -> "list[agents.Tool]":
+                return await _get_all_tools(
+                    run_loop.get_all_tools, agent, context_wrapper
+                )
+
+            agents.run.get_all_tools = new_wrapped_get_all_tools
             return
 
-        _patch_agent_runner_get_all_tools()
+        original_get_all_tools = AgentRunner._get_all_tools
+
+        @wraps(AgentRunner._get_all_tools.__func__)
+        async def old_wrapped_get_all_tools(
+            cls: "agents.Runner",
+            agent: "agents.Agent",
+            context_wrapper: "agents.RunContextWrapper",
+        ) -> "list[agents.Tool]":
+            return await _get_all_tools(original_get_all_tools, agent, context_wrapper)
+
+        agents.run.AgentRunner._get_all_tools = classmethod(old_wrapped_get_all_tools)

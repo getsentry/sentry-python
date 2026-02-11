@@ -66,34 +66,3 @@ async def _get_all_tools(
         wrapped_tools.append(wrapped_tool)
 
     return wrapped_tools
-
-
-def _create_runner_get_all_tools_wrapper(
-    original_get_all_tools: "Callable[..., Any]",
-) -> "Callable[..., Any]":
-    @wraps(
-        original_get_all_tools.__func__
-        if hasattr(original_get_all_tools, "__func__")
-        else original_get_all_tools
-    )
-    async def wrapped_get_all_tools(
-        cls: "agents.Runner",
-        agent: "agents.Agent",
-        context_wrapper: "agents.RunContextWrapper",
-    ) -> "list[agents.Tool]":
-        return await _get_all_tools(original_get_all_tools, agent, context_wrapper)
-
-    return wrapped_get_all_tools
-
-
-def _create_run_loop_get_all_tools_wrapper(
-    original_get_all_tools: "Callable[..., Any]",
-) -> "Callable[..., Any]":
-    @wraps(original_get_all_tools)
-    async def wrapped_get_all_tools(
-        agent: "agents.Agent",
-        context_wrapper: "agents.RunContextWrapper",
-    ) -> "list[agents.Tool]":
-        return await _get_all_tools(original_get_all_tools, agent, context_wrapper)
-
-    return wrapped_get_all_tools
