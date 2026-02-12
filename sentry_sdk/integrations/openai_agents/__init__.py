@@ -147,7 +147,7 @@ class OpenAIAgentsIntegration(Integration):
         @wraps(AgentRunner._get_model.__func__)
         def old_wrapped_get_model(
             cls: "agents.Runner", agent: "agents.Agent", run_config: "agents.RunConfig"
-        ) -> "list[agents.Model]":
+        ) -> "agents.Model":
             return _get_model(original_get_model, agent, run_config)
 
         agents.run.AgentRunner._get_model = classmethod(old_wrapped_get_model)
