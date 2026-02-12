@@ -79,7 +79,7 @@ class OpenAIAgentsIntegration(Integration):
         - A Model instance is created at the start of the loop by calling the `Runner._get_model()`. We patch the Model instance using `patches._get_model()`.
         - Available tools are also deteremined at the start of the loop, with `Runner._get_all_tools()`. We patch Tool instances by iterating through the returned tools in `patches._get_all_tools()`.
         - In each loop iteration, `run_single_turn()` or `run_single_turn_streamed()` is responsible for calling the Responses API, patched with `patches._run_single_turn()` and `patches._run_single_turn_streamed()`.
-    4. On loop termination, `RunImpl.execute_final_output()` is called. The function is patched with `patched_execute_final_output()`.
+    4. On loop termination, `RunImpl.execute_final_output()` is called. The function is patched with `patches._execute_final_output()`.
 
     Local tools are run based on the return value from the Responses API as a post-API call step in the above loop.
     Hosted MCP Tools are run as part of the Responses API call, and involve OpenAI reaching out to an external MCP server.
