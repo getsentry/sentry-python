@@ -20,6 +20,9 @@ async def _get_all_tools(
     agent: "agents.Agent",
     context_wrapper: "agents.RunContextWrapper",
 ) -> "list[agents.Tool]":
+    """
+    Responsible for creating and managing `gen_ai.execute_tool` spans.
+    """
     # Get the original tools
     tools = await original_get_all_tools(agent, context_wrapper)
 

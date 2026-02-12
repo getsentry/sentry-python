@@ -22,7 +22,9 @@ if TYPE_CHECKING:
 
 def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., Any]":
     """
-    Wraps the agents.Runner.run methods to create a root span for the agent workflow runs.
+    Wraps the agents.Runner.run methods to
+    - create and manage a root span for the agent workflow runs.
+    - end the agent invocation span if an `AgentsException` is raised in `run()`.
 
     Note agents.Runner.run_sync() is a wrapper around agents.Runner.run(),
     so it does not need to be wrapped separately.
@@ -85,7 +87,9 @@ def _create_run_streamed_wrapper(
     original_func: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
-    Wraps the agents.Runner.run_streamed method to create a root span for streaming agent workflow runs.
+    Wraps the agents.Runner.run_streamed method to
+    - create a root span for streaming agent workflow runs.
+    - end the workflow span if and only if the response stream is consumed or cancelled.
 
     Unlike run(), run_streamed() returns immediately with a RunResultStreaming object
     while execution continues in a background task. The workflow span must stay open
