@@ -132,7 +132,7 @@ class OpenAIAgentsIntegration(Integration):
             @wraps(run_loop.run_single_turn_streamed)
             async def new_wrapped_run_single_turn_streamed(
                 *args: "Any", **kwargs: "Any"
-            ) -> "Any":
+            ) -> "SingleStepResult":
                 return await _run_single_turn_streamed(
                     run_loop.run_single_turn_streamed, *args, **kwargs
                 )
@@ -177,10 +177,10 @@ class OpenAIAgentsIntegration(Integration):
 
         original_run_single_turn_streamed = AgentRunner._run_single_turn_streamed
 
-        @wraps(AgentRunner._run_single_turn_streamed)
+        @wraps(AgentRunner._run_single_turn_streamed.__func__)
         async def old_wrapped_run_single_turn_streamed(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "Any":
+        ) -> "SingleStepResult":
             return await _run_single_turn_streamed(
                 original_run_single_turn_streamed, *args, **kwargs
             )
