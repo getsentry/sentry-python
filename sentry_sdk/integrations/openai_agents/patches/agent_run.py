@@ -84,7 +84,7 @@ async def _run_single_turn(
     original_run_single_turn: "Callable[..., Awaitable[SingleStepResult]]",
     *args: "Any",
     **kwargs: "Any",
-) -> "Any":
+) -> "SingleStepResult":
     """
     Patched _run_single_turn that
     - creates agent invocation spans if there is no already active agent invocation span.

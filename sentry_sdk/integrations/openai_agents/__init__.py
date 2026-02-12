@@ -42,6 +42,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
 
+    from agents.run_internal.run_steps import SingleStepResult
+
 
 def _patch_runner() -> None:
     # Create the root span for one full agent run (including eventual handoffs)
@@ -120,7 +122,9 @@ class OpenAIAgentsIntegration(Integration):
             agents.run_internal.run_loop.get_model = new_wrapped_get_model
 
             @wraps(run_loop.run_single_turn)
-            async def patched_run_single_turn(*args: "Any", **kwargs: "Any") -> "Any":
+            async def patched_run_single_turn(
+                *args: "Any", **kwargs: "Any"
+            ) -> "SingleStepResult":
                 return await _run_single_turn(run_loop.run_single_turn, *args, **kwargs)
 
             agents.run.run_single_turn = patched_run_single_turn
@@ -154,17 +158,17 @@ class OpenAIAgentsIntegration(Integration):
         @wraps(AgentRunner._get_model.__func__)
         def old_wrapped_get_model(
             cls: "agents.Runner", agent: "agents.Agent", run_config: "agents.RunConfig"
-        ) -> "list[agents.Tool]":
+        ) -> "list[agents.Model]":
             return _get_model(original_get_model, agent, run_config)
 
         agents.run.AgentRunner._get_model = classmethod(old_wrapped_get_model)
 
         original_run_single_turn = AgentRunner._run_single_turn
 
-        @wraps(AgentRunner._run_single_turn)
+        @wraps(AgentRunner._run_single_turn.__func__)
         async def old_wrapped_run_single_turn(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "Any":
+        ) -> "SingleStepResult":
             return await _run_single_turn(original_run_single_turn, *args, **kwargs)
 
         agents.run.AgentRunner._run_single_turn = classmethod(
