@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.52.0a5
+
+### Documentation 📚
+
+- Document `openai-agents` control-flow by @alexander-alderman-webb in [#5447](https://github.com/getsentry/sentry-python/pull/5447)
+
+### Internal Changes 🔧
+
+- (ci) Improve Craft config with title stripping and artifact filtering by @BYK in [#5444](https://github.com/getsentry/sentry-python/pull/5444)
+- (openai-agents) Avoid calling SDK-internal functions by @alexander-alderman-webb in [#5437](https://github.com/getsentry/sentry-python/pull/5437)
+- Remove references to unsupported attribute types by @alexander-alderman-webb in [#5425](https://github.com/getsentry/sentry-python/pull/5425)
+
+### Other
+
+- [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
+
 ## 2.52.0a4
 
 - [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
