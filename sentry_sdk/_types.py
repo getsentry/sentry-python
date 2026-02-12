@@ -278,17 +278,20 @@ if TYPE_CHECKING:
     # TODO: Make a proper type definition for this (PRs welcome!)
     BreadcrumbHint = Dict[str, Any]
 
-    _ASGIInfo = TypedDict("_ASGIInfo", {"version": str, "spec_version": str})
+    _ASGIInfo = TypedDict(
+        "_ASGIInfo", {"version": str, "spec_version": NotRequired[str]}
+    )
     _ASGIScope = TypedDict(
         "_ASGIScope",
         {
             "type": str,
             "asgi": _ASGIInfo,
-            "http_version": str,
-            "method": str,
             "path": str,
             "query_string": bytes,
             "headers": list[tuple[bytes, bytes]],
+            # Not mandatory in Websocket
+            "http_version": NotRequired[str],
+            "method": NotRequired[str],
             # Optional fields per ASGI spec
             "scheme": NotRequired[str],
             "raw_path": NotRequired[bytes],
