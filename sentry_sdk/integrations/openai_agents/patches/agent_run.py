@@ -109,6 +109,63 @@ async def _run_single_turn(
     return result
 
 
+async def _run_single_turn_streamed(
+    original_run_single_turn_streamed: "Callable[..., Awaitable[SingleStepResult]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "SingleStepResult":
+    """
+    Patched _run_single_turn_streamed that
+    - creates agent invocation spans for streaming if there is no already active agent invocation span.
+    - ends the agent invocation span if and only if `_run_single_turn_streamed()` raises an exception.
+
+    Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
+    _run_single_turn_streamed uses positional arguments. The call signature is:
+    _run_single_turn_streamed(
+        streamed_result,              # args[0]
+        agent,                        # args[1]
+        hooks,                        # args[2]
+        context_wrapper,              # args[3]
+        run_config,                   # args[4]
+        should_run_agent_start_hooks, # args[5]
+        tool_use_tracker,             # args[6]
+        all_tools,                    # args[7]
+        server_conversation_tracker,  # args[8] (optional)
+    )
+    """
+    streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
+    agent = args[1] if len(args) > 1 else kwargs.get("agent")
+    context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
+    should_run_agent_start_hooks = bool(
+        args[5] if len(args) > 5 else kwargs.get("should_run_agent_start_hooks", False)
+    )
+
+    span_kwargs: "dict[str, Any]" = {}
+    if streamed_result and hasattr(streamed_result, "input"):
+        span_kwargs["original_input"] = streamed_result.input
+
+    span = _maybe_start_agent_span(
+        context_wrapper,
+        agent,
+        should_run_agent_start_hooks,
+        span_kwargs,
+        is_streaming=True,
+    )
+
+    try:
+        result = await original_run_single_turn_streamed(*args, **kwargs)
+    except Exception as exc:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            if span is not None and span.timestamp is None:
+                _record_exception_on_span(span, exc)
+                end_invoke_agent_span(context_wrapper, agent)
+            _close_streaming_workflow_span(agent)
+        reraise(*exc_info)
+
+    return result
+
+
 def _patch_agent_run() -> None:
     """
     Patches AgentRunner methods to create agent invocation spans.
@@ -116,7 +173,6 @@ def _patch_agent_run() -> None:
     """
 
     # Store original methods
-    original_run_single_turn_streamed = agents.run.AgentRunner._run_single_turn_streamed
     original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
 
@@ -193,71 +249,7 @@ def _patch_agent_run() -> None:
 
         return result
 
-    @wraps(
-        original_run_single_turn_streamed.__func__
-        if hasattr(original_run_single_turn_streamed, "__func__")
-        else original_run_single_turn_streamed
-    )
-    async def patched_run_single_turn_streamed(
-        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        """
-        Patched _run_single_turn_streamed that
-        - creates agent invocation spans for streaming if there is no already active agent invocation span.
-        - ends the agent invocation span if and only if `_run_single_turn_streamed()` raises an exception.
-
-        Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
-        _run_single_turn_streamed uses positional arguments. The call signature is:
-        _run_single_turn_streamed(
-            streamed_result,              # args[0]
-            agent,                        # args[1]
-            hooks,                        # args[2]
-            context_wrapper,              # args[3]
-            run_config,                   # args[4]
-            should_run_agent_start_hooks, # args[5]
-            tool_use_tracker,             # args[6]
-            all_tools,                    # args[7]
-            server_conversation_tracker,  # args[8] (optional)
-        )
-        """
-        streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
-        agent = args[1] if len(args) > 1 else kwargs.get("agent")
-        context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
-        should_run_agent_start_hooks = bool(
-            args[5]
-            if len(args) > 5
-            else kwargs.get("should_run_agent_start_hooks", False)
-        )
-
-        span_kwargs: "dict[str, Any]" = {}
-        if streamed_result and hasattr(streamed_result, "input"):
-            span_kwargs["original_input"] = streamed_result.input
-
-        span = _maybe_start_agent_span(
-            context_wrapper,
-            agent,
-            should_run_agent_start_hooks,
-            span_kwargs,
-            is_streaming=True,
-        )
-
-        try:
-            result = await original_run_single_turn_streamed(*args, **kwargs)
-        except Exception as exc:
-            exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                if span is not None and span.timestamp is None:
-                    _record_exception_on_span(span, exc)
-                    end_invoke_agent_span(context_wrapper, agent)
-                _close_streaming_workflow_span(agent)
-            reraise(*exc_info)
-
-        return result
-
     # Apply patches
-    agents.run.AgentRunner._run_single_turn_streamed = classmethod(
-        patched_run_single_turn_streamed
-    )
     agents._run_impl.RunImpl.execute_handoffs = classmethod(patched_execute_handoffs)
     agents._run_impl.RunImpl.execute_final_output = classmethod(
         patched_execute_final_output
