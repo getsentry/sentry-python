@@ -19,6 +19,8 @@ def _create_get_all_tools_wrapper(
     original_get_all_tools: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
+    Responsible for creating and managing `gen_ai.execute_tool` spans.
+
     Wraps the agents.Runner._get_all_tools method of the Runner class to wrap all function tools with Sentry instrumentation.
     """
 

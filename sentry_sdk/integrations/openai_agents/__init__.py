@@ -52,6 +52,32 @@ def _patch_tools() -> None:
 
 
 class OpenAIAgentsIntegration(Integration):
+    """
+    NOTE: With version 0.8.0, the class methods below have been refactored to functions.
+    - `AgentRunner._get_model()` -> `agents.run_internal.turn_preparation.get_model()`
+    - `AgentRunner._get_all_tools()` -> `agents.run_internal.turn_preparation.get_all_tools()`
+    - `AgentRunner._run_single_turn()` -> `agents.run_internal.run_loop.run_single_turn()`
+    - `RunImpl.execute_handoffs()` -> `agents.run_internal.turn_resolution.execute_handoffs()`
+    - `RunImpl.execute_final_output()` -> `agents.run_internal.turn_resolution.execute_final_output()`
+
+    Typical interaction with the library:
+    1. The user creates an Agent instance with configuration, including system instructions sent to every Responses API call.
+    2. The user passes the agent instance to a Runner with `run()` and `run_streamed()` methods. The latter can be used to incrementally receive progress.
+        - `Runner.run()` and `Runner.run_streamed()` are thin wrappers for `DEFAULT_AGENT_RUNNER.run()` and `DEFAULT_AGENT_RUNNER.run_streamed()`.
+        - `DEFAULT_AGENT_RUNNER.run()` and `DEFAULT_AGENT_RUNNER.run_streamed()` are patched in `_patch_runner()` with `_create_run_wrapper()` and `_create_run_streamed_wrapper()`, respectively.
+    3. In a loop, the agent repeatedly calls the Responses API, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
+        - A Model instance is created at the start of the loop by calling the `Runner._get_model()`. We patch the Model instance using `_create_get_model_wrapper()` in `_patch_model()`.
+        - Available tools are also deteremined at the start of the loop, with `Runner._get_all_tools()`. We patch Tool instances by iterating through the returned tools, in `_create_get_all_tools_wrapper()` called via `_patch_tools()`
+        - In each loop iteration, `run_single_turn()` or `run_single_turn_streamed()` is responsible for calling the Responses API, patched with `patched_run_single_turn()` and `patched_run_single_turn_streamed()`.
+    4. On loop termination, `RunImpl.execute_final_output()` is called. The function is patched with `patched_execute_final_output()`.
+
+    Local tools are run based on the return value from the Responses API as a post-API call step in the above loop.
+    Hosted MCP Tools are run as part of the Responses API call, and involve OpenAI reaching out to an external MCP server.
+    An agent can handoff to another agent, also directed by the return value of the Responses API and run post-API call in the loop.
+    Handoffs are a way to switch agent-wide configuration.
+    - Handoffs are executed by calling `RunImpl.execute_handoffs()`. The method is patched in `patched_execute_handoffs()`
+    """
+
     identifier = "openai_agents"
 
     @staticmethod
