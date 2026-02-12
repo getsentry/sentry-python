@@ -121,12 +121,12 @@ class OpenAIAgentsIntegration(Integration):
             agents.run_internal.run_loop.get_model = new_wrapped_get_model
 
             @wraps(run_loop.run_single_turn)
-            async def patched_run_single_turn(
+            async def new_wrapped_run_single_turn(
                 *args: "Any", **kwargs: "Any"
             ) -> "SingleStepResult":
                 return await _run_single_turn(run_loop.run_single_turn, *args, **kwargs)
 
-            agents.run.run_single_turn = patched_run_single_turn
+            agents.run.run_single_turn = new_wrapped_run_single_turn
 
             return
 
