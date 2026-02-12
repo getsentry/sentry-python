@@ -204,49 +204,28 @@ async def _execute_handoffs(
     return result
 
 
-def _patch_agent_run() -> None:
+async def _execute_final_output(
+    original_execute_final_output: "Callable[..., SingleStepResult]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "SingleStepResult":
     """
-    Patches AgentRunner methods to create agent invocation spans.
-    This directly patches the execution flow to track when agents start and stop.
+    Patched execute_final_output that
+    - ends the agent invocation span.
+    - ends the workflow span if the response is streamed.
     """
 
-    # Store original methods
-    original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
+    agent = kwargs.get("agent")
+    context_wrapper = kwargs.get("context_wrapper")
+    final_output = kwargs.get("final_output")
 
-    @wraps(
-        original_execute_final_output.__func__
-        if hasattr(original_execute_final_output, "__func__")
-        else original_execute_final_output
-    )
-    async def patched_execute_final_output(
-        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        """
-        Patched execute_final_output that
-        - ends the agent invocation span.
-        - ends the workflow span if the response is streamed.
-        """
+    try:
+        result = await original_execute_final_output(*args, **kwargs)
+    finally:
+        with capture_internal_exceptions():
+            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
+                end_invoke_agent_span(context_wrapper, agent, final_output)
+            # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
+            _close_streaming_workflow_span(agent)
 
-        agent = kwargs.get("agent")
-        context_wrapper = kwargs.get("context_wrapper")
-        final_output = kwargs.get("final_output")
-
-        try:
-            result = await original_execute_final_output(*args, **kwargs)
-        finally:
-            with capture_internal_exceptions():
-                if (
-                    agent
-                    and context_wrapper
-                    and _has_active_agent_span(context_wrapper)
-                ):
-                    end_invoke_agent_span(context_wrapper, agent, final_output)
-                # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
-                _close_streaming_workflow_span(agent)
-
-        return result
-
-    # Apply patches
-    agents._run_impl.RunImpl.execute_final_output = classmethod(
-        patched_execute_final_output
-    )
+    return result
