@@ -30,9 +30,10 @@ except ImportError:
 try:
     # AgentRunner methods moved in v0.8
     # https://github.com/openai/openai-agents-python/commit/3ce7c24d349b77bb750062b7e0e856d9ff48a5d5#diff-7470b3a5c5cbe2fcbb2703dc24f326f45a5819d853be2b1f395d122d278cd911
-    from agents.run_internal import run_loop
+    from agents.run_internal import run_loop, turn_preparation
 except ImportError:
     run_loop = None
+    turn_preparation = None
 
 
 def _patch_runner() -> None:
@@ -102,6 +103,14 @@ class OpenAIAgentsIntegration(Integration):
                 )
 
             agents.run.get_all_tools = new_wrapped_get_all_tools
+
+            @wraps(turn_preparation.get_model)
+            def new_wrapped_get_model(
+                agent: "agents.Agent", run_config: "agents.RunConfig"
+            ) -> "agents.Model":
+                return _get_model(turn_preparation.get_model, agent, run_config)
+
+            agents.run_internal.run_loop.get_model = new_wrapped_get_model
             return
 
         original_get_all_tools = AgentRunner._get_all_tools
