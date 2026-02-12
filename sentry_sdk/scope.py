@@ -1223,6 +1223,16 @@ class Scope:
         **kwargs: "Any",  # TODO[span-first]: remove, just for expediting seer testing
     ) -> "StreamedSpan":
         # TODO: rename to start_span once we drop the old API
+        if name is None:
+            # TODO[span-first]: remove, just here for debugging
+            logger.debug("Span missing a name, ignoring, call stack:")
+            import traceback
+
+            for line in traceback.format_stack():
+                logger.debug(line)
+
+            return NoOpStreamedSpan(scope=self)
+
         if isinstance(parent_span, NoOpStreamedSpan):
             # parent_span is only set if the user explicitly set it
             logger.debug(
