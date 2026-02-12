@@ -1,6 +1,7 @@
 import sys
 from collections.abc import Mapping
 from functools import wraps
+from urllib.parse import urlparse
 
 import sentry_sdk
 from sentry_sdk import isolation_scope
@@ -392,11 +393,9 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
                     )
 
                 with capture_internal_exceptions():
-                    with task.app.connection() as conn:
-                        span.set_data(
-                            SPANDATA.MESSAGING_SYSTEM,
-                            conn.transport.driver_type,
-                        )
+                    task_broker_url = task.app.conf.broker_url
+                    driver_type = urlparse(task_broker_url).scheme
+                    span.set_data(SPANDATA.MESSAGING_SYSTEM, driver_type)
 
                 return f(*args, **kwargs)
         except Exception:
