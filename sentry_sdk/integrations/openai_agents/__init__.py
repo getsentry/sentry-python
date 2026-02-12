@@ -146,7 +146,7 @@ class OpenAIAgentsIntegration(Integration):
             @wraps(original_execute_handoffs)
             async def new_wrapped_execute_handoffs(
                 *args: "Any", **kwargs: "Any"
-            ) -> "Any":
+            ) -> "SingleStepResult":
                 return await _execute_handoffs(
                     original_execute_handoffs, *args, **kwargs
                 )
@@ -210,7 +210,7 @@ class OpenAIAgentsIntegration(Integration):
         @wraps(agents._run_impl.RunImpl.execute_handoffs.__func__)
         async def old_wrapped_execute_handoffs(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "Any":
+        ) -> "SingleStepResult":
             return await _execute_handoffs(original_execute_handoffs, *args, **kwargs)
 
         agents._run_impl.RunImpl.execute_handoffs = classmethod(
