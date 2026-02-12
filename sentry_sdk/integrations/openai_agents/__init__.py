@@ -152,10 +152,14 @@ class OpenAIAgentsIntegration(Integration):
                 new_wrapped_execute_handoffs
             )
 
+            original_execute_final_output = turn_resolution.execute_final_output
+
             @wraps(turn_resolution.execute_final_output)
-            async def new_wrapped_final_output(*args: "Any", **kwargs: "Any") -> "Any":
+            async def new_wrapped_final_output(
+                *args: "Any", **kwargs: "Any"
+            ) -> "SingleStepResult":
                 return await _execute_final_output(
-                    turn_resolution.execute_final_output, *args, **kwargs
+                    original_execute_final_output, *args, **kwargs
                 )
 
             agents.run_internal.turn_resolution.execute_final_output = (
@@ -229,7 +233,7 @@ class OpenAIAgentsIntegration(Integration):
         @wraps(agents._run_impl.RunImpl.execute_final_output.__func__)
         async def old_wrapped_final_output(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "Any":
+        ) -> "SingleStepResult":
             return await _execute_final_output(
                 original_execute_final_output, *args, **kwargs
             )
