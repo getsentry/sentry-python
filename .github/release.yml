@@ -5,33 +5,37 @@ changelog:
     authors:
       - dependabot
   categories:
+    - title: Breaking Changes 🛠
+      commit_patterns:
+        - "^(?<type>\\w+(?:\\((?<scope>[^)]+)\\))?!:\\s*)"
+      semver: major
     - title: New Features ✨
       labels:
         - "Changelog: Feature"
       commit_patterns:
-        - "^feat\\b"
+        - "^(?<type>feat(?:\\((?<scope>[^)]+)\\))?!?:\\s*)"
       semver: minor
     - title: Bug Fixes 🐛
       labels:
         - "Changelog: Bugfix"
       commit_patterns:
-        - "^(fix|bugfix)\\b"
+        - "^(?<type>(?:fix|bugfix)(?:\\((?<scope>[^)]+)\\))?!?:\\s*)"
       semver: patch
     - title: Deprecations 🏗️
       labels:
         - "Changelog: Deprecation"
       commit_patterns:
-        - "deprecat"  # deprecation, deprecated
+        - "^(?<type>deprecat(?:ion|ed|e)(?:\\((?<scope>[^)]+)\\))?!?:?\\s*)"
       semver: patch
     - title: Documentation 📚
       labels:
         - "Changelog: Docs"
       commit_patterns:
-        - "^docs?\\b"
+        - "^(?<type>docs?(?:\\((?<scope>[^)]+)\\))?!?:\\s*)"
       semver: patch
     - title: Internal Changes 🔧
       labels:
         - "Changelog: Internal"
       commit_patterns:
-        - "^(build|ref|chore|ci|tests?)\\b"
+        - "^(?<type>(?:build|refactor|meta|chore|ci|ref|perf|tests?)(?:\\((?<scope>[^)]+)\\))?!?:\\s*)"
       semver: patch
