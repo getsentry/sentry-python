@@ -5,6 +5,6 @@ from .agent_run import (
     _run_single_turn,
     _run_single_turn_streamed,
     _execute_handoffs,
-    _patch_agent_run,
+    _execute_final_output,
 )  # noqa: F401
 from .error_tracing import _patch_error_tracing  # noqa: F401

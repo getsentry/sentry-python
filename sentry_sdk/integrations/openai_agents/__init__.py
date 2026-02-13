@@ -11,7 +11,7 @@ from .patches import (
     _execute_handoffs,
     _create_run_wrapper,
     _create_run_streamed_wrapper,
-    _patch_agent_run,
+    _execute_final_output,
     _patch_error_tracing,
 )
 
@@ -60,9 +60,6 @@ def _patch_runner() -> None:
         agents.run.DEFAULT_AGENT_RUNNER.run_streamed
     )
 
-    # Creating the actual spans for each agent run (works for both streaming and non-streaming).
-    _patch_agent_run()
-
 
 class OpenAIAgentsIntegration(Integration):
     """
@@ -82,7 +79,7 @@ class OpenAIAgentsIntegration(Integration):
         - A Model instance is created at the start of the loop by calling the `Runner._get_model()`. We patch the Model instance using `patches._get_model()`.
         - Available tools are also deteremined at the start of the loop, with `Runner._get_all_tools()`. We patch Tool instances by iterating through the returned tools in `patches._get_all_tools()`.
         - In each loop iteration, `run_single_turn()` or `run_single_turn_streamed()` is responsible for calling the Responses API, patched with `patches._run_single_turn()` and `patches._run_single_turn_streamed()`.
-    4. On loop termination, `RunImpl.execute_final_output()` is called. The function is patched with `patched_execute_final_output()`.
+    4. On loop termination, `RunImpl.execute_final_output()` is called. The function is patched with `patches._execute_final_output()`.
 
     Local tools are run based on the return value from the Responses API as a post-API call step in the above loop.
     Hosted MCP Tools are run as part of the Responses API call, and involve OpenAI reaching out to an external MCP server.
@@ -155,6 +152,20 @@ class OpenAIAgentsIntegration(Integration):
                 new_wrapped_execute_handoffs
             )
 
+            original_execute_final_output = turn_resolution.execute_final_output
+
+            @wraps(turn_resolution.execute_final_output)
+            async def new_wrapped_final_output(
+                *args: "Any", **kwargs: "Any"
+            ) -> "SingleStepResult":
+                return await _execute_final_output(
+                    original_execute_final_output, *args, **kwargs
+                )
+
+            agents.run_internal.turn_resolution.execute_final_output = (
+                new_wrapped_final_output
+            )
+
             return
 
         original_get_all_tools = AgentRunner._get_all_tools
@@ -215,4 +226,18 @@ class OpenAIAgentsIntegration(Integration):
 
         agents._run_impl.RunImpl.execute_handoffs = classmethod(
             old_wrapped_execute_handoffs
+        )
+
+        original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
+
+        @wraps(agents._run_impl.RunImpl.execute_final_output.__func__)
+        async def old_wrapped_final_output(
+            cls: "agents.Runner", *args: "Any", **kwargs: "Any"
+        ) -> "SingleStepResult":
+            return await _execute_final_output(
+                original_execute_final_output, *args, **kwargs
+            )
+
+        agents._run_impl.RunImpl.execute_final_output = classmethod(
+            old_wrapped_final_output
         )
