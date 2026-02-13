@@ -42,7 +42,7 @@ jobs:
         os: [ubuntu-22.04]
     services:
       docker:
-        image: docker:dind  # Required for Docker network management
+        image: docker:24.0.9-dind  # Required for Docker network management
         options: --privileged  # Required for Docker-in-Docker operations
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
