@@ -60,6 +60,11 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Install SAM binary
+        run: |
+          curl -sL "https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip" -o aws-sam-cli.zip
+          unzip -q -o aws-sam-cli.zip -d sam-installation
+          sudo ./sam-installation/install
       - name: Test aws_lambda
         run: |
           set -x # print commands that are executed
