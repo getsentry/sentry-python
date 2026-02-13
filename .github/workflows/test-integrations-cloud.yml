@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     env:
-      DOCKER_HOST: tcp://127.0.0.1:2375
+      DOCKER_API_VERSION: "1.44"
     strategy:
       fail-fast: false
       matrix:
@@ -42,12 +42,8 @@ jobs:
         os: [ubuntu-22.04]
     services:
       docker:
-        image: docker:24.0.9-dind  # Required for Docker network management
+        image: docker:dind  # Required for Docker network management
         options: --privileged  # Required for Docker-in-Docker operations
-        env:
-          DOCKER_TLS_CERTDIR: ""
-        ports:
-          - 2375:2375
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
