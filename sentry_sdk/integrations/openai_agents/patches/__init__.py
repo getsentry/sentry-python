@@ -1,4 +1,4 @@
-from .models import _create_get_model_wrapper  # noqa: F401
+from .models import _get_model  # noqa: F401
 from .tools import _get_all_tools  # noqa: F401
 from .runner import _create_run_wrapper, _create_run_streamed_wrapper  # noqa: F401
 from .agent_run import _patch_agent_run  # noqa: F401
