@@ -94,7 +94,11 @@ def _patch_agent_run() -> None:
     async def patched_run_single_turn(
         cls: "agents.Runner", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        """Patched _run_single_turn that creates agent invocation spans"""
+        """
+        Patched _run_single_turn that
+        - creates agent invocation spans if there is no already active agent invocation span.
+        - ends the agent invocation span if and only if an exception is raised in `_run_single_turn()`.
+        """
         agent = kwargs.get("agent")
         context_wrapper = kwargs.get("context_wrapper")
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
@@ -121,7 +125,12 @@ def _patch_agent_run() -> None:
     async def patched_execute_handoffs(
         cls: "agents.Runner", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        """Patched execute_handoffs that creates handoff spans and ends agent span for handoffs"""
+        """
+        Patched execute_handoffs that
+        - creates and manages handoff spans.
+        - ends the agent invocation span.
+        - ends the workflow span if the response is streamed and an exception is raised in `execute_handoffs()`.
+        """
 
         context_wrapper = kwargs.get("context_wrapper")
         run_handoffs = kwargs.get("run_handoffs")
@@ -156,7 +165,11 @@ def _patch_agent_run() -> None:
     async def patched_execute_final_output(
         cls: "agents.Runner", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        """Patched execute_final_output that ends agent span for final outputs"""
+        """
+        Patched execute_final_output that
+        - ends the agent invocation span.
+        - ends the workflow span if the response is streamed.
+        """
 
         agent = kwargs.get("agent")
         context_wrapper = kwargs.get("context_wrapper")
@@ -185,7 +198,10 @@ def _patch_agent_run() -> None:
     async def patched_run_single_turn_streamed(
         cls: "agents.Runner", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        """Patched _run_single_turn_streamed that creates agent invocation spans for streaming.
+        """
+        Patched _run_single_turn_streamed that
+        - creates agent invocation spans for streaming if there is no already active agent invocation span.
+        - ends the agent invocation span if and only if `_run_single_turn_streamed()` raises an exception.
 
         Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
         _run_single_turn_streamed uses positional arguments. The call signature is:
