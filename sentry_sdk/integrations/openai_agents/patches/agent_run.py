@@ -14,14 +14,99 @@ from ..utils import _record_exception_on_span
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Callable, Awaitable
 
     from sentry_sdk.tracing import Span
+
+    from agents.run_internal.run_steps import SingleStepResult
 
 try:
     import agents
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
+
+
+def _has_active_agent_span(context_wrapper: "agents.RunContextWrapper") -> bool:
+    """Check if there's an active agent span for this context"""
+    return getattr(context_wrapper, "_sentry_current_agent", None) is not None
+
+
+def _get_current_agent(
+    context_wrapper: "agents.RunContextWrapper",
+) -> "Optional[agents.Agent]":
+    """Get the current agent from context wrapper"""
+    return getattr(context_wrapper, "_sentry_current_agent", None)
+
+
+def _close_streaming_workflow_span(agent: "Optional[agents.Agent]") -> None:
+    """Close the workflow span for streaming executions if it exists."""
+    if agent and hasattr(agent, "_sentry_workflow_span"):
+        workflow_span = agent._sentry_workflow_span
+        workflow_span.__exit__(*sys.exc_info())
+        delattr(agent, "_sentry_workflow_span")
+
+
+def _maybe_start_agent_span(
+    context_wrapper: "agents.RunContextWrapper",
+    agent: "agents.Agent",
+    should_run_agent_start_hooks: bool,
+    span_kwargs: "dict[str, Any]",
+    is_streaming: bool = False,
+) -> "Optional[Span]":
+    """
+    Start an agent invocation span if conditions are met.
+    Handles ending any existing span for a different agent.
+
+    Returns the new span if started, or the existing span if conditions aren't met.
+    """
+    if not (should_run_agent_start_hooks and agent and context_wrapper):
+        return getattr(context_wrapper, "_sentry_agent_span", None)
+
+    # End any existing span for a different agent
+    if _has_active_agent_span(context_wrapper):
+        current_agent = _get_current_agent(context_wrapper)
+        if current_agent and current_agent != agent:
+            end_invoke_agent_span(context_wrapper, current_agent)
+
+    # Store the agent on the context wrapper so we can access it later
+    context_wrapper._sentry_current_agent = agent
+    span = invoke_agent_span(context_wrapper, agent, span_kwargs)
+    context_wrapper._sentry_agent_span = span
+    agent._sentry_agent_span = span
+
+    if is_streaming:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
+    return span
+
+
+async def _run_single_turn(
+    original_run_single_turn: "Callable[..., Awaitable[SingleStepResult]]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "SingleStepResult":
+    """
+    Patched _run_single_turn that
+    - creates agent invocation spans if there is no already active agent invocation span.
+    - ends the agent invocation span if and only if an exception is raised in `_run_single_turn()`.
+    """
+    agent = kwargs.get("agent")
+    context_wrapper = kwargs.get("context_wrapper")
+    should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
+
+    span = _maybe_start_agent_span(
+        context_wrapper, agent, should_run_agent_start_hooks, kwargs
+    )
+
+    try:
+        result = await original_run_single_turn(*args, **kwargs)
+    except Exception as exc:
+        if span is not None and span.timestamp is None:
+            _record_exception_on_span(span, exc)
+            end_invoke_agent_span(context_wrapper, agent)
+        reraise(*sys.exc_info())
+
+    return result
 
 
 def _patch_agent_run() -> None:
@@ -31,91 +116,9 @@ def _patch_agent_run() -> None:
     """
 
     # Store original methods
-    original_run_single_turn = agents.run.AgentRunner._run_single_turn
     original_run_single_turn_streamed = agents.run.AgentRunner._run_single_turn_streamed
     original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
-
-    def _has_active_agent_span(context_wrapper: "agents.RunContextWrapper") -> bool:
-        """Check if there's an active agent span for this context"""
-        return getattr(context_wrapper, "_sentry_current_agent", None) is not None
-
-    def _get_current_agent(
-        context_wrapper: "agents.RunContextWrapper",
-    ) -> "Optional[agents.Agent]":
-        """Get the current agent from context wrapper"""
-        return getattr(context_wrapper, "_sentry_current_agent", None)
-
-    def _close_streaming_workflow_span(agent: "Optional[agents.Agent]") -> None:
-        """Close the workflow span for streaming executions if it exists."""
-        if agent and hasattr(agent, "_sentry_workflow_span"):
-            workflow_span = agent._sentry_workflow_span
-            workflow_span.__exit__(*sys.exc_info())
-            delattr(agent, "_sentry_workflow_span")
-
-    def _maybe_start_agent_span(
-        context_wrapper: "agents.RunContextWrapper",
-        agent: "agents.Agent",
-        should_run_agent_start_hooks: bool,
-        span_kwargs: "dict[str, Any]",
-        is_streaming: bool = False,
-    ) -> "Optional[Span]":
-        """
-        Start an agent invocation span if conditions are met.
-        Handles ending any existing span for a different agent.
-
-        Returns the new span if started, or the existing span if conditions aren't met.
-        """
-        if not (should_run_agent_start_hooks and agent and context_wrapper):
-            return getattr(context_wrapper, "_sentry_agent_span", None)
-
-        # End any existing span for a different agent
-        if _has_active_agent_span(context_wrapper):
-            current_agent = _get_current_agent(context_wrapper)
-            if current_agent and current_agent != agent:
-                end_invoke_agent_span(context_wrapper, current_agent)
-
-        # Store the agent on the context wrapper so we can access it later
-        context_wrapper._sentry_current_agent = agent
-        span = invoke_agent_span(context_wrapper, agent, span_kwargs)
-        context_wrapper._sentry_agent_span = span
-        agent._sentry_agent_span = span
-
-        if is_streaming:
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
-
-        return span
-
-    @wraps(
-        original_run_single_turn.__func__
-        if hasattr(original_run_single_turn, "__func__")
-        else original_run_single_turn
-    )
-    async def patched_run_single_turn(
-        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        """
-        Patched _run_single_turn that
-        - creates agent invocation spans if there is no already active agent invocation span.
-        - ends the agent invocation span if and only if an exception is raised in `_run_single_turn()`.
-        """
-        agent = kwargs.get("agent")
-        context_wrapper = kwargs.get("context_wrapper")
-        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
-
-        span = _maybe_start_agent_span(
-            context_wrapper, agent, should_run_agent_start_hooks, kwargs
-        )
-
-        try:
-            result = await original_run_single_turn(*args, **kwargs)
-        except Exception as exc:
-            if span is not None and span.timestamp is None:
-                _record_exception_on_span(span, exc)
-                end_invoke_agent_span(context_wrapper, agent)
-            reraise(*sys.exc_info())
-
-        return result
 
     @wraps(
         original_execute_handoffs.__func__
@@ -252,7 +255,6 @@ def _patch_agent_run() -> None:
         return result
 
     # Apply patches
-    agents.run.AgentRunner._run_single_turn = classmethod(patched_run_single_turn)
     agents.run.AgentRunner._run_single_turn_streamed = classmethod(
         patched_run_single_turn_streamed
     )
