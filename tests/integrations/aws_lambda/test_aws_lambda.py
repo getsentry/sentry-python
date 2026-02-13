@@ -79,6 +79,9 @@ def test_environment():
         }
 
     finally:
+        with open(debug_log_file, "r", errors="replace") as f:
+            print(f.read())
+
         print("[test_environment fixture] Tearing down AWS Lambda test infrastructure")
 
         process.terminate()
