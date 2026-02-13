@@ -13,7 +13,10 @@ from sentry_sdk.integrations.celery.beat import (
     _patch_redbeat_apply_async,
     _setup_celery_beat_signals,
 )
-from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
+from sentry_sdk.integrations.celery.utils import (
+    _now_seconds_since_epoch,
+    _get_driver_type_from_url_scheme,
+)
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TransactionSource
 from sentry_sdk.tracing_utils import Baggage
@@ -394,7 +397,10 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
 
                 with capture_internal_exceptions():
                     task_broker_url = task.app.conf.broker_url
-                    driver_type = urlparse(task_broker_url).scheme
+
+                    scheme = urlparse(task_broker_url).scheme
+                    driver_type = _get_driver_type_from_url_scheme(scheme)
+
                     span.set_data(SPANDATA.MESSAGING_SYSTEM, driver_type)
 
                 return f(*args, **kwargs)

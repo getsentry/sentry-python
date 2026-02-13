@@ -689,8 +689,17 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_events):
     assert span["data"]["messaging.message.retry.count"] == 3
 
 
-@pytest.mark.parametrize("system", ("redis", "amqp"))
-def test_messaging_system(system, init_celery, capture_events):
+@pytest.mark.parametrize(
+    "system,expected_driver_type",
+    [
+        ("redis", "redis"),
+        ("rediss", "redis"),
+        ("amqp", "amqp"),
+        ("amqps", "amqp"),
+        ("slmq", "N/A"),
+    ],
+)
+def test_messaging_system(system, expected_driver_type, init_celery, capture_events):
     celery = init_celery(enable_tracing=True)
     events = capture_events()
 
@@ -704,7 +713,7 @@ def test_messaging_system(system, init_celery, capture_events):
 
     (event,) = events
     (span,) = event["spans"]
-    assert span["data"]["messaging.system"] == system
+    assert span["data"]["messaging.system"] == expected_driver_type
 
 
 @pytest.mark.parametrize("system", ("amqp", "redis"))
