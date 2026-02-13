@@ -166,6 +166,44 @@ async def _run_single_turn_streamed(
     return result
 
 
+async def _execute_handoffs(
+    original_execute_handoffs: "Callable[..., SingleStepResult]",
+    *args: "Any",
+    **kwargs: "Any",
+) -> "SingleStepResult":
+    """
+    Patched execute_handoffs that
+    - creates and manages handoff spans.
+    - ends the agent invocation span.
+    - ends the workflow span if the response is streamed and an exception is raised in `execute_handoffs()`.
+    """
+
+    context_wrapper = kwargs.get("context_wrapper")
+    run_handoffs = kwargs.get("run_handoffs")
+    agent = kwargs.get("agent")
+
+    # Create Sentry handoff span for the first handoff (agents library only processes the first one)
+    if run_handoffs:
+        first_handoff = run_handoffs[0]
+        handoff_agent_name = first_handoff.handoff.agent_name
+        handoff_span(context_wrapper, agent, handoff_agent_name)
+
+    # Call original method with all parameters
+    try:
+        result = await original_execute_handoffs(*args, **kwargs)
+    except Exception:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            _close_streaming_workflow_span(agent)
+        reraise(*exc_info)
+    finally:
+        # End span for current agent after handoff processing is complete
+        if agent and context_wrapper and _has_active_agent_span(context_wrapper):
+            end_invoke_agent_span(context_wrapper, agent)
+
+    return result
+
+
 def _patch_agent_run() -> None:
     """
     Patches AgentRunner methods to create agent invocation spans.
@@ -173,48 +211,7 @@ def _patch_agent_run() -> None:
     """
 
     # Store original methods
-    original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
-
-    @wraps(
-        original_execute_handoffs.__func__
-        if hasattr(original_execute_handoffs, "__func__")
-        else original_execute_handoffs
-    )
-    async def patched_execute_handoffs(
-        cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-    ) -> "Any":
-        """
-        Patched execute_handoffs that
-        - creates and manages handoff spans.
-        - ends the agent invocation span.
-        - ends the workflow span if the response is streamed and an exception is raised in `execute_handoffs()`.
-        """
-
-        context_wrapper = kwargs.get("context_wrapper")
-        run_handoffs = kwargs.get("run_handoffs")
-        agent = kwargs.get("agent")
-
-        # Create Sentry handoff span for the first handoff (agents library only processes the first one)
-        if run_handoffs:
-            first_handoff = run_handoffs[0]
-            handoff_agent_name = first_handoff.handoff.agent_name
-            handoff_span(context_wrapper, agent, handoff_agent_name)
-
-        # Call original method with all parameters
-        try:
-            result = await original_execute_handoffs(*args, **kwargs)
-        except Exception:
-            exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                _close_streaming_workflow_span(agent)
-            reraise(*exc_info)
-        finally:
-            # End span for current agent after handoff processing is complete
-            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-                end_invoke_agent_span(context_wrapper, agent)
-
-        return result
 
     @wraps(
         original_execute_final_output.__func__
@@ -250,7 +247,6 @@ def _patch_agent_run() -> None:
         return result
 
     # Apply patches
-    agents._run_impl.RunImpl.execute_handoffs = classmethod(patched_execute_handoffs)
     agents._run_impl.RunImpl.execute_final_output = classmethod(
         patched_execute_final_output
     )
