@@ -29,6 +29,8 @@ jobs:
     name: Cloud
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
+    env:
+      DOCKER_HOST: tcp://docker:2375
     strategy:
       fail-fast: false
       matrix:
