@@ -4,10 +4,12 @@ import pytest
 from unittest.mock import MagicMock, patch
 import os
 import json
+import logging
 
 import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.utils import parse_version
@@ -1196,6 +1198,12 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
             {"tool_input_guardrails": None, "tool_output_guardrails": None}
         )
 
+    if parse_version(OPENAI_AGENTS_VERSION) >= (
+        0,
+        8,
+    ):
+        available_tools[0]["needs_approval"] = False
+
     available_tools = safe_serialize(available_tools)
 
     assert transaction["transaction"] == "test_agent workflow"
@@ -1561,7 +1569,10 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
             mock_get_response.side_effect = Exception("Model Error")
 
             sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
+                integrations=[
+                    OpenAIAgentsIntegration(),
+                    LoggingIntegration(event_level=logging.CRITICAL),
+                ],
                 traces_sample_rate=1.0,
             )
 
@@ -1609,7 +1620,10 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
             mock_get_response.side_effect = Exception("API Error")
 
             sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
+                integrations=[
+                    OpenAIAgentsIntegration(),
+                    LoggingIntegration(event_level=logging.CRITICAL),
+                ],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
             )
@@ -1654,7 +1668,10 @@ async def test_span_status_error(sentry_init, capture_events, test_agent):
             mock_get_response.side_effect = ValueError("Model Error")
 
             sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
+                integrations=[
+                    OpenAIAgentsIntegration(),
+                    LoggingIntegration(event_level=logging.CRITICAL),
+                ],
                 traces_sample_rate=1.0,
             )
 

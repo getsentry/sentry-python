@@ -61,8 +61,6 @@ jobs:
           path: |
             dist/*
           if-no-files-found: 'error'
-          # since this artifact will be merged, compression is not necessary
-          compression-level: '0'
 
   docs:
     name: Build SDK API Doc
@@ -85,17 +83,3 @@ jobs:
           path: |
             docs/_build/gh-pages.zip
           if-no-files-found: 'error'
-          # since this artifact will be merged, compression is not necessary
-          compression-level: '0'
-
-  merge:
-    name: Create Release Artifact
-    runs-on: ubuntu-latest
-    needs: [build_lambda_layer, docs]
-    steps:
-      - uses: actions/upload-artifact/merge@v6
-        with:
-          # Craft expects release assets from github to be a single artifact named after the sha.
-          name: ${{ github.sha }}
-          pattern: artifact-*
-          delete-merged: true
