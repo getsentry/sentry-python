@@ -15,7 +15,7 @@
 
 #### Other
 
-- (celery) Close the connection we're reading driver_type from by @sentrivana in [#5427](https://github.com/getsentry/sentry-python/pull/5427)
+- Close the connection we're reading driver_type from by @sentrivana in [#5427](https://github.com/getsentry/sentry-python/pull/5427)
 
 ### Documentation 📚
 
