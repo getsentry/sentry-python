@@ -1,3 +1,4 @@
+import json
 import threading
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -13,10 +14,10 @@ if TYPE_CHECKING:
 
 
 class SpanBatcher(Batcher["StreamedSpan"]):
-    # TODO[span-first]: size-based flushes
     # TODO[span-first]: adjust flush/drop defaults
     MAX_BEFORE_FLUSH = 1000
-    MAX_BEFORE_DROP = 5000
+    MAX_BEFORE_DROP = 1000
+    MAX_KB_BEFORE_FLUSH = 5 * 1024  # 5 MB
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "span"
@@ -33,6 +34,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # envelope.
         # trace_id -> span buffer
         self._span_buffer: dict[str, list["StreamedSpan"]] = defaultdict(list)
+        self._running_size: dict[str, int] = defaultdict(lambda: 0)
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
@@ -62,8 +64,20 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return None
 
             self._span_buffer[span.trace_id].append(span)
+
             if size + 1 >= self.MAX_BEFORE_FLUSH:
                 self._flush_event.set()
+                return
+
+            self._running_size[span.trace_id] += self._estimate_size(span)
+            if self._running_size[span.trace_id] >= self.MAX_KB_BEFORE_FLUSH:
+                self._flush_event.set()
+                return
+
+    @staticmethod
+    def _estimate_size(item: "StreamedSpan") -> int:
+        span_dict = SpanBatcher._to_transport_format(item)
+        return len(str(span_dict).encode("utf-8")) / 1024
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
@@ -127,6 +141,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                     envelopes.append(envelope)
 
             self._span_buffer.clear()
+            self._running_size.clear()
 
         for envelope in envelopes:
             self._capture_func(envelope)
