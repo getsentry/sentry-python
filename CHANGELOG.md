@@ -30,7 +30,7 @@
 
 #### Other
 
-- (ci) Improve Craft config with title stripping and artifact filtering by @BYK in [#5444](https://github.com/getsentry/sentry-python/pull/5444)
+- Improve Craft config with title stripping and artifact filtering by @BYK in [#5444](https://github.com/getsentry/sentry-python/pull/5444)
 - Use fixed clickhouse action, remove aws-sam-cli dependency by @sentrivana in [#5457](https://github.com/getsentry/sentry-python/pull/5457)
 - Remove references to unsupported attribute types by @alexander-alderman-webb in [#5425](https://github.com/getsentry/sentry-python/pull/5425)
 - Pin setuptools for linting and chalice tests by @alexander-alderman-webb in [#5438](https://github.com/getsentry/sentry-python/pull/5438)
