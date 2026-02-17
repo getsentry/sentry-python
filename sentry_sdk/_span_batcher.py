@@ -77,7 +77,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     @staticmethod
     def _estimate_size(item: "StreamedSpan") -> int:
         span_dict = SpanBatcher._to_transport_format(item)
-        return len(str(span_dict).encode("utf-8")) / 1024
+        return len(str(span_dict).encode("utf-8")) // 1024
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
