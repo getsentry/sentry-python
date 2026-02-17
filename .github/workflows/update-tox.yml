@@ -42,7 +42,7 @@ jobs:
         run: |
           COMMIT_TITLE="ci: 🤖 Update test matrix with new releases"
           DATE=`date +%m/%d`
-          BRANCH_NAME="toxgen/update"
+          BRANCH_NAME="toxgen/update-$(date +%m-%d)"
 
           git checkout -B "$BRANCH_NAME"
           git add --all
@@ -108,4 +108,19 @@ jobs:
                 repo: context.repo.repo,
                 issue_number: pr.number,
                 labels: ['Component: CI', 'Component: Tests']
+            });
+
+            // Close and reopen the PR to trigger CI
+            // (PRs created by GITHUB_TOKEN don't trigger workflows)
+            await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                state: 'closed'
+            });
+            await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                state: 'open'
             });
