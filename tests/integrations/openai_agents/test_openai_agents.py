@@ -1191,6 +1191,8 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
             "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
             "strict_json_schema": True,
             "is_enabled": True,
+            "tool_input_guardrails": None,
+            "tool_output_guardrails": None,
         }
     ]
     if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
@@ -1203,6 +1205,18 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         8,
     ):
         available_tools[0]["needs_approval"] = False
+    if parse_version(OPENAI_AGENTS_VERSION) >= (
+        0,
+        9,
+        0,
+    ):
+        available_tools[0].update(
+            {
+                "timeout_seconds": None,
+                "timeout_behavior": "error_as_result",
+                "timeout_error_function": None,
+            }
+        )
 
     available_tools = safe_serialize(available_tools)
 
