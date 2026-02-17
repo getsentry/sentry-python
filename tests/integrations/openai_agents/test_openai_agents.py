@@ -1203,6 +1203,18 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         8,
     ):
         available_tools[0]["needs_approval"] = False
+    if parse_version(OPENAI_AGENTS_VERSION) >= (
+        0,
+        9,
+        0,
+    ):
+        available_tools[0].update(
+            {
+                "timeout_seconds": None,
+                "timeout_behavior": "error_as_result",
+                "timeout_error_function": None,
+            }
+        )
 
     available_tools = safe_serialize(available_tools)
 
