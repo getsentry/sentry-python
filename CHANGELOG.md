@@ -2,19 +2,42 @@
 
 ## 2.52.0a5
 
+This is an alpha release for internal testing of span streaming.
+
+## 2.53.0
+
+### Bug Fixes 🐛
+
+#### Openai Agents
+
+- Patch `execute_final_output()` functions following library refactor by @alexander-alderman-webb in [#5453](https://github.com/getsentry/sentry-python/pull/5453)
+- Patch `execute_handoffs()` functions following library refactor by @alexander-alderman-webb in [#5452](https://github.com/getsentry/sentry-python/pull/5452)
+- Patch `run_single_turn_streamed()` functions following library refactor by @alexander-alderman-webb in [#5451](https://github.com/getsentry/sentry-python/pull/5451)
+- Patch `run_single_turn()` functions following library refactor by @alexander-alderman-webb in [#5450](https://github.com/getsentry/sentry-python/pull/5450)
+- Patch models functions following library refactor by @alexander-alderman-webb in [#5449](https://github.com/getsentry/sentry-python/pull/5449)
+- Patch tool functions following library refactor by @alexander-alderman-webb in [#5445](https://github.com/getsentry/sentry-python/pull/5445)
+
+#### Other
+
+- Close the connection we're reading driver_type from by @sentrivana in [#5427](https://github.com/getsentry/sentry-python/pull/5427)
+
 ### Documentation 📚
 
 - Document `openai-agents` control-flow by @alexander-alderman-webb in [#5447](https://github.com/getsentry/sentry-python/pull/5447)
 
 ### Internal Changes 🔧
 
-- (ci) Improve Craft config with title stripping and artifact filtering by @BYK in [#5444](https://github.com/getsentry/sentry-python/pull/5444)
-- (openai-agents) Avoid calling SDK-internal functions by @alexander-alderman-webb in [#5437](https://github.com/getsentry/sentry-python/pull/5437)
+#### Openai Agents
+
+- New tool field and library error log by @alexander-alderman-webb in [#5454](https://github.com/getsentry/sentry-python/pull/5454)
+- Avoid calling SDK-internal functions by @alexander-alderman-webb in [#5437](https://github.com/getsentry/sentry-python/pull/5437)
+
+#### Other
+
+- Improve Craft config with title stripping and artifact filtering by @BYK in [#5444](https://github.com/getsentry/sentry-python/pull/5444)
+- Use fixed clickhouse action, remove aws-sam-cli dependency by @sentrivana in [#5457](https://github.com/getsentry/sentry-python/pull/5457)
 - Remove references to unsupported attribute types by @alexander-alderman-webb in [#5425](https://github.com/getsentry/sentry-python/pull/5425)
-
-### Other
-
-- [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
+- Pin setuptools for linting and chalice tests by @alexander-alderman-webb in [#5438](https://github.com/getsentry/sentry-python/pull/5438)
 
 ## 2.52.0a4
 
