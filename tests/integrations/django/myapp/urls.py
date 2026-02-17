@@ -157,5 +157,9 @@ try:
 except AttributeError:
     pass
 
+# django-ninja
+if views.ninja_api is not None:
+    urlpatterns.append(path("ninja/", views.ninja_api.urls))
+
 handler500 = views.handler500
 handler404 = views.handler404

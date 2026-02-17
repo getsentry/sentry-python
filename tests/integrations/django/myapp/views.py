@@ -370,3 +370,29 @@ def send_myapp_custom_signal(request):
     myapp_custom_signal.send(sender="hello")
     myapp_custom_signal_silenced.send(sender="hello")
     return HttpResponse("ok")
+
+
+# django-ninja integration
+try:
+    from ninja import NinjaAPI
+
+    ninja_api = NinjaAPI()
+
+    @ninja_api.get("/ninja-hello")
+    def ninja_hello(request):
+        """Ninja hello endpoint"""
+        return {"message": "Hello from Ninja"}
+
+    @ninja_api.post("/ninja-hello")
+    def ninja_hello_post(request):
+        """Ninja hello POST endpoint"""
+        return {"message": "POST Hello from Ninja"}
+
+    @ninja_api.get("/ninja-message")
+    def ninja_message(request):
+        """Ninja message endpoint that captures a message"""
+        capture_message("ninja message")
+        return {"message": "Ninja message sent"}
+
+except ImportError:
+    ninja_api = None

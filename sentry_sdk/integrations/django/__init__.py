@@ -382,6 +382,41 @@ def _patch_django_asgi_handler() -> None:
     patch_django_asgi_handler_impl(ASGIHandler)
 
 
+def _unwrap_django_ninja_view(fn: "Callable[..., Any]", request: "WSGIRequest") -> "Callable[..., Any]":
+    """
+    Unwrap django-ninja PathView to get the actual endpoint function.
+
+    Django-ninja wraps endpoint functions in PathView.get_view() which returns
+    a sync_view_wrapper or async_view_wrapper. These wrappers have a closure
+    that contains the PathView instance, which has the list of operations.
+    We need to find the operation that matches the request method to get the
+    actual endpoint function.
+    """
+    try:
+        # Check if this is a django-ninja view wrapper by looking for PathView in closure
+        if (
+            hasattr(fn, "__closure__")
+            and fn.__closure__
+            and hasattr(fn, "__qualname__")
+            and "PathView.get_view" in fn.__qualname__
+        ):
+            # Extract PathView from the closure
+            for cell in fn.__closure__:
+                path_view = cell.cell_contents
+                # Check if this is actually a PathView instance
+                if (
+                    type(path_view).__name__ == "PathView"
+                    and hasattr(path_view, "operations")
+                ):
+                    # Find the operation matching the request method
+                    for operation in path_view.operations:
+                        if request.method in operation.methods:
+                            return operation.view_func
+    except Exception:
+        pass
+    return fn
+
+
 def _set_transaction_name_and_source(
     scope: "sentry_sdk.Scope", transaction_style: str, request: "WSGIRequest"
 ) -> None:
@@ -389,6 +424,7 @@ def _set_transaction_name_and_source(
         transaction_name = None
         if transaction_style == "function_name":
             fn = resolve(request.path).func
+            fn = _unwrap_django_ninja_view(fn, request)
             transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
 
         elif transaction_style == "url":
