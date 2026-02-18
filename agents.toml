@@ -12,3 +12,7 @@ source = "getsentry/skills"
 [[skills]]
 name = "find-bugs"
 source = "getsentry/skills"
+
+[[skills]]
+name = "skill-scanner"
+source = "getsentry/skills"
