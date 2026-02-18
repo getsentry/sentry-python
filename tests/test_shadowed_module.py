@@ -128,3 +128,6 @@ def test_shadowed_modules_when_importing_integrations(
                 integration.setup_once()
             except integrations.DidNotEnable:
                 pass
+
+        for dependency in integration_dependencies:
+            del sys.modules[dependency]
