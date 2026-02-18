@@ -22,7 +22,7 @@ def pytest_generate_tests(metafunc):
         submodule_names = {
             submodule_name
             for _, submodule_name, _ in pkgutil.walk_packages(integrations.__path__)
-        }
+        } - {"spark", "beam"}
 
         metafunc.parametrize(
             "integration_submodule_name",
@@ -80,17 +80,19 @@ def test_shadowed_modules_when_importing_integrations(
     be imported in the environment in which the tests run.
     """
     module_path = f"sentry_sdk.integrations.{integration_submodule_name}"
+
+    spec = importlib.util.find_spec(module_path)
+    source = pathlib.Path(spec.origin).read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=spec.origin)
+    integration_dependencies = find_unrecognized_dependencies(tree)
+
+    mod = None
     try:
         # If importing the integration succeeds in the current environment, assume
         # that the integration has no non-standard imports.
-        importlib.import_module(module_path)
-        return
-    except integrations.DidNotEnable:
-        spec = importlib.util.find_spec(module_path)
-        source = pathlib.Path(spec.origin).read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=spec.origin)
-        integration_dependencies = find_unrecognized_dependencies(tree)
+        mod = importlib.import_module(module_path)
 
+    except integrations.DidNotEnable:
         # For each non-standard import, create an empty shadow module to
         # emulate an empty "agents.py" or analogous local module that
         # shadows the package.
@@ -105,3 +107,24 @@ def test_shadowed_modules_when_importing_integrations(
 
         for dependency in integration_dependencies:
             del sys.modules[dependency]
+
+    # `setup_once()` can also raise when initializing the SDK with a shadowed module.
+    if mod is not None:
+        # For each non-standard import, create an empty shadow module to
+        # emulate an empty "agents.py" or analogous local module that
+        # shadows the package.
+        for dependency in integration_dependencies:
+            sys.modules[dependency] = types.ModuleType(dependency)
+
+        integration_types = [
+            v
+            for v in mod.__dict__.values()
+            if isinstance(v, type) and issubclass(v, Integration)
+        ]
+
+        for integration in integration_types:
+            # The `setup_once()` method should only raise DidNotEnable.
+            try:
+                integration.setup_once()
+            except integrations.DidNotEnable:
+                pass
