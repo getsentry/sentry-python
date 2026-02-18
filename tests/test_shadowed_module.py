@@ -22,7 +22,7 @@ def pytest_generate_tests(metafunc):
         submodule_names = {
             submodule_name
             for _, submodule_name, _ in pkgutil.walk_packages(integrations.__path__)
-        } - {"spark", "beam", "unraisablehook"}
+        } - {"beam", "spark", "unraisablehook"}
 
         metafunc.parametrize(
             "integration_submodule_name",
@@ -79,18 +79,22 @@ def test_shadowed_modules_when_importing_integrations(
     An integration is determined to be for a third-party module if it cannot
     be imported in the environment in which the tests run.
     """
-    module_path = f"sentry_sdk.integrations.{integration_submodule_name}"
+    module_path = (
+        pathlib.Path("sentry_sdk") / "integrations" / integration_submodule_name
+    )
+    import_path = ".".join(module_path.with_suffix("").parts)
 
-    spec = importlib.util.find_spec(module_path)
-    source = pathlib.Path(spec.origin).read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=spec.origin)
-    integration_dependencies = find_unrecognized_dependencies(tree)
+    integration_dependencies = set()
+    for py_file in pathlib.Path(module_path).rglob("*.py"):
+        source = py_file.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(py_file))
+        integration_dependencies.update(find_unrecognized_dependencies(tree))
 
     mod = None
     try:
         # If importing the integration succeeds in the current environment, assume
         # that the integration has no non-standard imports.
-        mod = importlib.import_module(module_path)
+        mod = importlib.import_module(import_path)
 
     except integrations.DidNotEnable:
         # For each non-standard import, create an empty shadow module to
@@ -103,7 +107,7 @@ def test_shadowed_modules_when_importing_integrations(
         # SDK catches the exception type when attempting to activate
         # auto-enabling integrations.
         with pytest.raises(integrations.DidNotEnable):
-            importlib.import_module(module_path)
+            importlib.import_module(import_path)
 
         for dependency in integration_dependencies:
             del sys.modules[dependency]
