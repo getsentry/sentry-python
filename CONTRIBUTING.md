@@ -152,7 +152,7 @@ What's the concrete advice when writing a new integration?
   - In line with the point above, prefer using an include-list of valuable entries when setting a dictionary attribute. Otherwise, tests will break again and again ([#5454](https://github.com/getsentry/sentry-python/pull/5454), [#5471](https://github.com/getsentry/sentry-python/pull/5471)).
 
 3. Instrument all application instances by default. Prefer global signals/patches.
-  - Patching instances is just harder. Your patches may unexpectedly not apply to some instances, or unexpectedly be applied multiple times [!5195](https://github.com/getsentry/sentry-python/pull/5195).
+  - Patching instances is just harder. Your patches may unexpectedly not apply to some instances, or unexpectedly be applied multiple times ([!5195](https://github.com/getsentry/sentry-python/pull/5195)).
 
 4. Don't make the user pass anything to your integration for anything to work. Aim for zero configuration.
   - Users tend to only consult the documentation when something goes wrong. So the default values for integration options must lead to the best out-of-the-box experience for the majority of users.
