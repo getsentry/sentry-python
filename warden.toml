@@ -43,3 +43,10 @@ name = "find-bugs"
 [[skills.triggers]]
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
+
+[[skills]]
+name = "skill-scanner"
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
