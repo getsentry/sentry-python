@@ -112,7 +112,7 @@ tox -p auto -o -e <tox_env> -- <pytest_args>
 
 The SDK runs as part of users' applications. Users do not expect:
 
-- their application to crash ([#4690](https://github.com/getsentry/sentry-python/issues/4690), [#4718](https://github.com/getsentry/sentry-python/issues/4718), [#4776](https://github.com/getsentry/sentry-python/issues/4776), [#4925](https://github.com/getsentry/sentry-python/issues/4925), [#4951](https://github.com/getsentry/sentry-python/issues/4951), [#4975](https://github.com/getsentry/sentry-python/issues/4975), [#5067](https://github.com/getsentry/sentry-python/issues/5067), [#5071](https://github.com/getsentry/sentry-python/issues/5071), [#5129](https://github.com/getsentry/sentry-python/issues/5129), [#5134](https://github.com/getsentry/sentry-python/issues/5134), [#5298](https://github.com/getsentry/sentry-python/issues/5298), [#5350](https://github.com/getsentry/sentry-python/issues/5350)).
+- their application to crash ([#4690](https://github.com/getsentry/sentry-python/issues/4690), [#4718](https://github.com/getsentry/sentry-python/issues/4718), [#4776](https://github.com/getsentry/sentry-python/issues/4776), [#4925](https://github.com/getsentry/sentry-python/issues/4925), [#4951](https://github.com/getsentry/sentry-python/issues/4951), [#4975](https://github.com/getsentry/sentry-python/issues/4975), [#5067](https://github.com/getsentry/sentry-python/issues/5067), [#5071](https://github.com/getsentry/sentry-python/issues/5071), [#5129](https://github.com/getsentry/sentry-python/issues/5129), [#5134](https://github.com/getsentry/sentry-python/issues/5134), [#5277](https://github.com/getsentry/sentry-python/issues/5277), [#5298](https://github.com/getsentry/sentry-python/issues/5298), [#5350](https://github.com/getsentry/sentry-python/issues/5350)).
 - the SDK to mutate session cookies ([#4882](https://github.com/getsentry/sentry-python/issues/4882)).
 - the SDK to swallow their exceptions ([#4853](https://github.com/getsentry/sentry-python/issues/4853)).
 - their HTTP response streams to be consumed ([#4764](https://github.com/getsentry/sentry-python/issues/4764), [#4827](https://github.com/getsentry/sentry-python/issues/4827)).
@@ -146,12 +146,10 @@ What's the concrete advice when writing a new integration?
   - It should be clear what span is created and exited where and which patches apply which attributes on a given span.
 
 1. Do you even need to add this attribute on this span?
-  - Be intentional with supporting product features. Only adding what's necessary, or **be very sure that your addition provides value**.
-  - Why? Decisions about what data lives on what types of spans are hard to undo, and limits future design space.
+  - Be intentional with supporting product features. Only adding what's necessary, or **be very sure that your addition provides value**. Decisions about what data lives on what types of spans are hard to undo, and limits future design space.
 
 2. Avoid setting arbitrary objects.
-  - In line with the point above, prefer using an include-list of valuable entries when setting a dictionary attribute.
-  - Otherwise, tests will break again and again ([#5454](https://github.com/getsentry/sentry-python/pull/5454), [#5471](https://github.com/getsentry/sentry-python/pull/5471)).
+  - In line with the point above, prefer using an include-list of valuable entries when setting a dictionary attribute. Otherwise, tests will break again and again ([#5454](https://github.com/getsentry/sentry-python/pull/5454), [#5471](https://github.com/getsentry/sentry-python/pull/5471)).
 
 3. Instrument all application instances by default. Prefer global signals/patches.
   - Patching instances is just harder. Your patches may unexpectedly not apply to some instances, or unexpectedly be applied multiple times [!5195](https://github.com/getsentry/sentry-python/pull/5195).
@@ -184,8 +182,7 @@ What's the concrete advice when writing a new integration?
 
 10. Be defensive, but don't add dead code.
   - Don't assume the code you're patching will stay the same forever, especially if it's an internal function. Allow for future variability whenever it makes sense.
-  - Dead code adds cognitive overhead when reasoning about code.
-  - Insidiously, dead code paths can trigger when libraries evolve. Since they tend to not be tested, they are buggy ([#5277](https://github.com/getsentry/sentry-python/issues/5277)).
+  - Dead code adds cognitive overhead when reasoning about code, so don't account for impossible scenarios.
 
 11. Write tests, but don't write mocks.
   - You'd be surprised how many tests assert the wrong thing ([#5404](https://github.com/getsentry/sentry-python/pull/5404), [#5403](https://github.com/getsentry/sentry-python/pull/5403)).
