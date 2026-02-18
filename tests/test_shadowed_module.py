@@ -79,10 +79,9 @@ def test_shadowed_modules_when_importing_integrations(
     An integration is determined to be for a third-party module if it cannot
     be imported in the environment in which the tests run.
     """
-    module_path = (
-        pathlib.Path("sentry_sdk") / "integrations" / integration_submodule_name
-    )
-    import_path = ".".join(module_path.with_suffix("").parts)
+    parts = integration_submodule_name.split(".")
+    module_path = pathlib.Path("sentry_sdk") / "integrations" / pathlib.Path(*parts)
+    import_path = ".".join(("sentry_sdk", "integrations", *parts))
 
     integration_dependencies = set()
     for py_file in pathlib.Path(module_path).rglob("*.py"):
