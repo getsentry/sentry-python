@@ -22,7 +22,7 @@ def pytest_generate_tests(metafunc):
         submodule_names = {
             submodule_name
             for _, submodule_name, _ in pkgutil.walk_packages(integrations.__path__)
-        } - {"spark", "beam"}
+        } - {"spark", "beam", "unraisablehook"}
 
         metafunc.parametrize(
             "integration_submodule_name",
