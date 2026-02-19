@@ -14,7 +14,6 @@ Usage:
 
 Output: JSON to stdout with structured findings.
 """
-
 from __future__ import annotations
 
 import base64
@@ -33,90 +32,35 @@ import yaml
 
 PROMPT_INJECTION_PATTERNS: list[tuple[str, str, str]] = [
     # (pattern, description, severity)
-    (
-        r"(?i)ignore\s+(all\s+)?previous\s+instructions",
-        "Instruction override: ignore previous instructions",
-        "critical",
-    ),
-    (
-        r"(?i)disregard\s+(all\s+)?(previous|prior|above)\s+(instructions|rules|guidelines)",
-        "Instruction override: disregard previous",
-        "critical",
-    ),
-    (
-        r"(?i)forget\s+(all\s+)?(previous|prior|your)\s+(instructions|rules|training)",
-        "Instruction override: forget previous",
-        "critical",
-    ),
+    (r"(?i)ignore\s+(all\s+)?previous\s+instructions", "Instruction override: ignore previous instructions", "critical"),
+    (r"(?i)disregard\s+(all\s+)?(previous|prior|above)\s+(instructions|rules|guidelines)", "Instruction override: disregard previous", "critical"),
+    (r"(?i)forget\s+(all\s+)?(previous|prior|your)\s+(instructions|rules|training)", "Instruction override: forget previous", "critical"),
     (r"(?i)you\s+are\s+now\s+(a|an|in)\s+", "Role reassignment: 'you are now'", "high"),
-    (
-        r"(?i)act\s+as\s+(a|an)\s+unrestricted",
-        "Role reassignment: unrestricted mode",
-        "critical",
-    ),
-    (
-        r"(?i)enter\s+(developer|debug|admin|god)\s+mode",
-        "Jailbreak: developer/debug mode",
-        "critical",
-    ),
+    (r"(?i)act\s+as\s+(a|an)\s+unrestricted", "Role reassignment: unrestricted mode", "critical"),
+    (r"(?i)enter\s+(developer|debug|admin|god)\s+mode", "Jailbreak: developer/debug mode", "critical"),
     (r"(?i)DAN\s+(mode|prompt|jailbreak)", "Jailbreak: DAN pattern", "critical"),
     (r"(?i)do\s+anything\s+now", "Jailbreak: do anything now", "critical"),
-    (
-        r"(?i)bypass\s+(safety|security|content|filter|restriction)",
-        "Jailbreak: bypass safety",
-        "critical",
-    ),
-    (
-        r"(?i)override\s+(system|safety|security)\s+(prompt|message|instruction)",
-        "System prompt override",
-        "critical",
-    ),
+    (r"(?i)bypass\s+(safety|security|content|filter|restriction)", "Jailbreak: bypass safety", "critical"),
+    (r"(?i)override\s+(system|safety|security)\s+(prompt|message|instruction)", "System prompt override", "critical"),
     (r"(?i)\bsystem\s*:\s*you\s+are\b", "System prompt injection marker", "high"),
-    (
-        r"(?i)new\s+system\s+(prompt|instruction|message)\s*:",
-        "New system prompt injection",
-        "critical",
-    ),
-    (
-        r"(?i)from\s+now\s+on,?\s+(you|ignore|forget|disregard)",
-        "Temporal instruction override",
-        "high",
-    ),
-    (
-        r"(?i)pretend\s+(that\s+)?you\s+(have\s+no|don't\s+have|are\s+not\s+bound)",
-        "Pretend-based jailbreak",
-        "high",
-    ),
-    (
-        r"(?i)respond\s+(only\s+)?with\s+(the\s+)?(raw|full|complete)\s+(system|initial)\s+prompt",
-        "System prompt extraction",
-        "high",
-    ),
-    (
-        r"(?i)output\s+(your|the)\s+(system|initial|original)\s+(prompt|instructions)",
-        "System prompt extraction",
-        "high",
-    ),
+    (r"(?i)new\s+system\s+(prompt|instruction|message)\s*:", "New system prompt injection", "critical"),
+    (r"(?i)from\s+now\s+on,?\s+(you|ignore|forget|disregard)", "Temporal instruction override", "high"),
+    (r"(?i)pretend\s+(that\s+)?you\s+(have\s+no|don't\s+have|are\s+not\s+bound)", "Pretend-based jailbreak", "high"),
+    (r"(?i)respond\s+(only\s+)?with\s+(the\s+)?(raw|full|complete)\s+(system|initial)\s+prompt", "System prompt extraction", "high"),
+    (r"(?i)output\s+(your|the)\s+(system|initial|original)\s+(prompt|instructions)", "System prompt extraction", "high"),
 ]
 
 OBFUSCATION_PATTERNS: list[tuple[str, str]] = [
     # (description, detail)
     ("Zero-width characters", "Zero-width space, joiner, or non-joiner detected"),
     ("Right-to-left override", "RTL override character can hide text direction"),
-    (
-        "Homoglyph characters",
-        "Characters visually similar to ASCII but from different Unicode blocks",
-    ),
+    ("Homoglyph characters", "Characters visually similar to ASCII but from different Unicode blocks"),
 ]
 
 SECRET_PATTERNS: list[tuple[str, str, str]] = [
     # (pattern, description, severity)
     (r"(?i)AKIA[0-9A-Z]{16}", "AWS Access Key ID", "critical"),
-    (
-        r"(?i)aws.{0,20}secret.{0,20}['\"][0-9a-zA-Z/+]{40}['\"]",
-        "AWS Secret Access Key",
-        "critical",
-    ),
+    (r"(?i)aws.{0,20}secret.{0,20}['\"][0-9a-zA-Z/+]{40}['\"]", "AWS Secret Access Key", "critical"),
     (r"ghp_[0-9a-zA-Z]{36}", "GitHub Personal Access Token", "critical"),
     (r"ghs_[0-9a-zA-Z]{36}", "GitHub Server Token", "critical"),
     (r"gho_[0-9a-zA-Z]{36}", "GitHub OAuth Token", "critical"),
@@ -125,54 +69,22 @@ SECRET_PATTERNS: list[tuple[str, str, str]] = [
     (r"sk-ant-api03-[0-9a-zA-Z\-_]{90,}", "Anthropic API Key", "critical"),
     (r"xox[bpors]-[0-9a-zA-Z\-]{10,}", "Slack Token", "critical"),
     (r"-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----", "Private Key", "critical"),
-    (
-        r"(?i)(password|passwd|pwd)\s*[:=]\s*['\"][^'\"]{8,}['\"]",
-        "Hardcoded password",
-        "high",
-    ),
-    (
-        r"(?i)(api[_-]?key|apikey)\s*[:=]\s*['\"][0-9a-zA-Z]{16,}['\"]",
-        "Hardcoded API key",
-        "high",
-    ),
-    (
-        r"(?i)(secret|token)\s*[:=]\s*['\"][0-9a-zA-Z]{16,}['\"]",
-        "Hardcoded secret/token",
-        "high",
-    ),
+    (r"(?i)(password|passwd|pwd)\s*[:=]\s*['\"][^'\"]{8,}['\"]", "Hardcoded password", "high"),
+    (r"(?i)(api[_-]?key|apikey)\s*[:=]\s*['\"][0-9a-zA-Z]{16,}['\"]", "Hardcoded API key", "high"),
+    (r"(?i)(secret|token)\s*[:=]\s*['\"][0-9a-zA-Z]{16,}['\"]", "Hardcoded secret/token", "high"),
 ]
 
 DANGEROUS_SCRIPT_PATTERNS: list[tuple[str, str, str]] = [
     # (pattern, description, severity)
     # Data exfiltration
-    (
-        r"(?i)(requests\.(get|post|put)|urllib\.request|http\.client|aiohttp)\s*\(",
-        "HTTP request (potential exfiltration)",
-        "medium",
-    ),
+    (r"(?i)(requests\.(get|post|put)|urllib\.request|http\.client|aiohttp)\s*\(", "HTTP request (potential exfiltration)", "medium"),
     (r"(?i)(curl|wget)\s+", "Shell HTTP request", "medium"),
     (r"(?i)socket\.(connect|create_connection)", "Raw socket connection", "high"),
-    (
-        r"(?i)subprocess.*\b(nc|ncat|netcat)\b",
-        "Netcat usage (potential reverse shell)",
-        "critical",
-    ),
+    (r"(?i)subprocess.*\b(nc|ncat|netcat)\b", "Netcat usage (potential reverse shell)", "critical"),
     # Credential access
-    (
-        r"(?i)(~|HOME|USERPROFILE).*\.(ssh|aws|gnupg|config)",
-        "Sensitive directory access",
-        "high",
-    ),
-    (
-        r"(?i)open\s*\(.*(\.env|credentials|\.netrc|\.pgpass|\.my\.cnf)",
-        "Sensitive file access",
-        "high",
-    ),
-    (
-        r"(?i)os\.environ\s*\[.*(?:KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)",
-        "Environment secret access",
-        "medium",
-    ),
+    (r"(?i)(~|HOME|USERPROFILE).*\.(ssh|aws|gnupg|config)", "Sensitive directory access", "high"),
+    (r"(?i)open\s*\(.*(\.env|credentials|\.netrc|\.pgpass|\.my\.cnf)", "Sensitive file access", "high"),
+    (r"(?i)os\.environ\s*\[.*(?:KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)", "Environment secret access", "medium"),
     # Dangerous execution
     (r"\beval\s*\(", "eval() usage", "high"),
     (r"\bexec\s*\(", "exec() usage", "high"),
@@ -180,46 +92,22 @@ DANGEROUS_SCRIPT_PATTERNS: list[tuple[str, str, str]] = [
     (r"(?i)os\.(system|popen|exec[lv]p?e?)\s*\(", "OS command execution", "high"),
     (r"(?i)__import__\s*\(", "Dynamic import", "medium"),
     # File system manipulation
-    (
-        r"(?i)(open|write|Path).*\.(claude|bashrc|zshrc|profile|bash_profile)",
-        "Agent/shell config modification",
-        "critical",
-    ),
-    (
-        r"(?i)(open|write|Path).*(settings\.json|CLAUDE\.md|MEMORY\.md|\.mcp\.json)",
-        "Agent settings modification",
-        "critical",
-    ),
-    (
-        r"(?i)(open|write|Path).*(\.git/hooks|\.husky)",
-        "Git hooks modification",
-        "critical",
-    ),
+    (r"(?i)(open|write|Path).*\.(claude|bashrc|zshrc|profile|bash_profile)", "Agent/shell config modification", "critical"),
+    (r"(?i)(open|write|Path).*(settings\.json|CLAUDE\.md|MEMORY\.md|\.mcp\.json)", "Agent settings modification", "critical"),
+    (r"(?i)(open|write|Path).*(\.git/hooks|\.husky)", "Git hooks modification", "critical"),
     # Encoding/obfuscation in scripts
-    (
-        r"(?i)base64\.(b64decode|decodebytes)\s*\(",
-        "Base64 decoding (potential obfuscation)",
-        "medium",
-    ),
+    (r"(?i)base64\.(b64decode|decodebytes)\s*\(", "Base64 decoding (potential obfuscation)", "medium"),
     (r"(?i)codecs\.(decode|encode)\s*\(.*rot", "ROT encoding (obfuscation)", "high"),
     (r"(?i)compile\s*\(.*exec", "Dynamic code compilation", "high"),
 ]
 
 # Domains commonly trusted in skill contexts
 TRUSTED_DOMAINS = {
-    "github.com",
-    "api.github.com",
-    "raw.githubusercontent.com",
-    "docs.sentry.io",
-    "develop.sentry.dev",
-    "sentry.io",
-    "pypi.org",
-    "npmjs.com",
-    "crates.io",
-    "docs.python.org",
-    "docs.djangoproject.com",
-    "developer.mozilla.org",
-    "stackoverflow.com",
+    "github.com", "api.github.com", "raw.githubusercontent.com",
+    "docs.sentry.io", "develop.sentry.dev", "sentry.io",
+    "pypi.org", "npmjs.com", "crates.io",
+    "docs.python.org", "docs.djangoproject.com",
+    "developer.mozilla.org", "stackoverflow.com",
     "agentskills.io",
 }
 
@@ -247,64 +135,54 @@ def check_frontmatter(skill_dir: Path, content: str) -> list[dict[str, Any]]:
     fm, _ = parse_frontmatter(content)
 
     if fm is None:
-        findings.append(
-            {
-                "type": "Invalid Frontmatter",
-                "severity": "high",
-                "location": "SKILL.md:1",
-                "description": "Missing or unparseable YAML frontmatter",
-                "category": "Validation",
-            }
-        )
+        findings.append({
+            "type": "Invalid Frontmatter",
+            "severity": "high",
+            "location": "SKILL.md:1",
+            "description": "Missing or unparseable YAML frontmatter",
+            "category": "Validation",
+        })
         return findings
 
     # Required fields
     if "name" not in fm:
-        findings.append(
-            {
-                "type": "Missing Name",
-                "severity": "high",
-                "location": "SKILL.md frontmatter",
-                "description": "Required 'name' field missing from frontmatter",
-                "category": "Validation",
-            }
-        )
+        findings.append({
+            "type": "Missing Name",
+            "severity": "high",
+            "location": "SKILL.md frontmatter",
+            "description": "Required 'name' field missing from frontmatter",
+            "category": "Validation",
+        })
 
     if "description" not in fm:
-        findings.append(
-            {
-                "type": "Missing Description",
-                "severity": "medium",
-                "location": "SKILL.md frontmatter",
-                "description": "Required 'description' field missing from frontmatter",
-                "category": "Validation",
-            }
-        )
+        findings.append({
+            "type": "Missing Description",
+            "severity": "medium",
+            "location": "SKILL.md frontmatter",
+            "description": "Required 'description' field missing from frontmatter",
+            "category": "Validation",
+        })
 
     # Name-directory mismatch
     if "name" in fm and fm["name"] != skill_dir.name:
-        findings.append(
-            {
-                "type": "Name Mismatch",
-                "severity": "medium",
-                "location": "SKILL.md frontmatter",
-                "description": f"Frontmatter name '{fm['name']}' does not match directory name '{skill_dir.name}'",
-                "category": "Validation",
-            }
-        )
+        findings.append({
+            "type": "Name Mismatch",
+            "severity": "medium",
+            "location": "SKILL.md frontmatter",
+            "description": f"Frontmatter name '{fm['name']}' does not match directory name '{skill_dir.name}'",
+            "category": "Validation",
+        })
 
     # Unrestricted tools
     tools = fm.get("allowed-tools", "")
     if isinstance(tools, str) and tools.strip() == "*":
-        findings.append(
-            {
-                "type": "Unrestricted Tools",
-                "severity": "critical",
-                "location": "SKILL.md frontmatter",
-                "description": "allowed-tools is set to '*' (unrestricted access to all tools)",
-                "category": "Excessive Permissions",
-            }
-        )
+        findings.append({
+            "type": "Unrestricted Tools",
+            "severity": "critical",
+            "location": "SKILL.md frontmatter",
+            "description": "allowed-tools is set to '*' (unrestricted access to all tools)",
+            "category": "Excessive Permissions",
+        })
 
     return findings
 
@@ -317,16 +195,14 @@ def check_prompt_injection(content: str, filepath: str) -> list[dict[str, Any]]:
     for line_num, line in enumerate(lines, 1):
         for pattern, description, severity in PROMPT_INJECTION_PATTERNS:
             if re.search(pattern, line):
-                findings.append(
-                    {
-                        "type": "Prompt Injection Pattern",
-                        "severity": severity,
-                        "location": f"{filepath}:{line_num}",
-                        "description": description,
-                        "evidence": line.strip()[:200],
-                        "category": "Prompt Injection",
-                    }
-                )
+                findings.append({
+                    "type": "Prompt Injection Pattern",
+                    "severity": severity,
+                    "location": f"{filepath}:{line_num}",
+                    "description": description,
+                    "evidence": line.strip()[:200],
+                    "category": "Prompt Injection",
+                })
                 break  # One finding per line
 
     return findings
@@ -342,59 +218,43 @@ def check_obfuscation(content: str, filepath: str) -> list[dict[str, Any]]:
     for line_num, line in enumerate(lines, 1):
         if zwc_pattern.search(line):
             chars = [f"U+{ord(c):04X}" for c in zwc_pattern.findall(line)]
-            findings.append(
-                {
-                    "type": "Zero-Width Characters",
-                    "severity": "high",
-                    "location": f"{filepath}:{line_num}",
-                    "description": f"Zero-width characters detected: {', '.join(chars)}",
-                    "category": "Obfuscation",
-                }
-            )
+            findings.append({
+                "type": "Zero-Width Characters",
+                "severity": "high",
+                "location": f"{filepath}:{line_num}",
+                "description": f"Zero-width characters detected: {', '.join(chars)}",
+                "category": "Obfuscation",
+            })
 
     # RTL override
     rtl_pattern = re.compile(r"[\u202a-\u202e\u2066-\u2069]")
     for line_num, line in enumerate(lines, 1):
         if rtl_pattern.search(line):
-            findings.append(
-                {
-                    "type": "RTL Override",
-                    "severity": "high",
-                    "location": f"{filepath}:{line_num}",
-                    "description": "Right-to-left override or embedding character detected",
-                    "category": "Obfuscation",
-                }
-            )
+            findings.append({
+                "type": "RTL Override",
+                "severity": "high",
+                "location": f"{filepath}:{line_num}",
+                "description": "Right-to-left override or embedding character detected",
+                "category": "Obfuscation",
+            })
 
     # Suspicious base64 strings (long base64 that decodes to text with suspicious keywords)
     b64_pattern = re.compile(r"[A-Za-z0-9+/]{40,}={0,2}")
     for line_num, line in enumerate(lines, 1):
         for match in b64_pattern.finditer(line):
             try:
-                decoded = base64.b64decode(match.group()).decode(
-                    "utf-8", errors="ignore"
-                )
-                suspicious_keywords = [
-                    "ignore",
-                    "system",
-                    "override",
-                    "eval",
-                    "exec",
-                    "password",
-                    "secret",
-                ]
+                decoded = base64.b64decode(match.group()).decode("utf-8", errors="ignore")
+                suspicious_keywords = ["ignore", "system", "override", "eval", "exec", "password", "secret"]
                 for kw in suspicious_keywords:
                     if kw.lower() in decoded.lower():
-                        findings.append(
-                            {
-                                "type": "Suspicious Base64",
-                                "severity": "high",
-                                "location": f"{filepath}:{line_num}",
-                                "description": f"Base64 string decodes to text containing '{kw}'",
-                                "decoded_preview": decoded[:100],
-                                "category": "Obfuscation",
-                            }
-                        )
+                        findings.append({
+                            "type": "Suspicious Base64",
+                            "severity": "high",
+                            "location": f"{filepath}:{line_num}",
+                            "description": f"Base64 string decodes to text containing '{kw}'",
+                            "decoded_preview": decoded[:100],
+                            "category": "Obfuscation",
+                        })
                         break
             except Exception:
                 pass
@@ -407,17 +267,15 @@ def check_obfuscation(content: str, filepath: str) -> list[dict[str, Any]]:
         for pattern, description, severity in PROMPT_INJECTION_PATTERNS:
             if re.search(pattern, comment_text):
                 # Find line number
-                line_num = content[: match.start()].count("\n") + 1
-                findings.append(
-                    {
-                        "type": "Hidden Injection in Comment",
-                        "severity": "critical",
-                        "location": f"{filepath}:{line_num}",
-                        "description": f"HTML comment contains injection pattern: {description}",
-                        "evidence": comment_text.strip()[:200],
-                        "category": "Prompt Injection",
-                    }
-                )
+                line_num = content[:match.start()].count("\n") + 1
+                findings.append({
+                    "type": "Hidden Injection in Comment",
+                    "severity": "critical",
+                    "location": f"{filepath}:{line_num}",
+                    "description": f"HTML comment contains injection pattern: {description}",
+                    "evidence": comment_text.strip()[:200],
+                    "category": "Prompt Injection",
+                })
                 break
 
     return findings
@@ -433,16 +291,14 @@ def check_secrets(content: str, filepath: str) -> list[dict[str, Any]]:
             if re.search(pattern, line):
                 # Mask the actual secret in evidence
                 evidence = line.strip()[:200]
-                findings.append(
-                    {
-                        "type": "Secret Detected",
-                        "severity": severity,
-                        "location": f"{filepath}:{line_num}",
-                        "description": description,
-                        "evidence": evidence,
-                        "category": "Secret Exposure",
-                    }
-                )
+                findings.append({
+                    "type": "Secret Detected",
+                    "severity": severity,
+                    "location": f"{filepath}:{line_num}",
+                    "description": description,
+                    "evidence": evidence,
+                    "category": "Secret Exposure",
+                })
                 break  # One finding per line
 
     return findings
@@ -462,16 +318,14 @@ def check_scripts(script_path: Path) -> list[dict[str, Any]]:
     for line_num, line in enumerate(lines, 1):
         for pattern, description, severity in DANGEROUS_SCRIPT_PATTERNS:
             if re.search(pattern, line):
-                findings.append(
-                    {
-                        "type": "Dangerous Code Pattern",
-                        "severity": severity,
-                        "location": f"scripts/{relative}:{line_num}",
-                        "description": description,
-                        "evidence": line.strip()[:200],
-                        "category": "Malicious Code",
-                    }
-                )
+                findings.append({
+                    "type": "Dangerous Code Pattern",
+                    "severity": severity,
+                    "location": f"scripts/{relative}:{line_num}",
+                    "description": description,
+                    "evidence": line.strip()[:200],
+                    "category": "Malicious Code",
+                })
                 break  # One finding per line
 
     return findings
@@ -491,29 +345,23 @@ def extract_urls(content: str, filepath: str) -> list[dict[str, Any]]:
                 domain = url.split("//", 1)[1].split("/", 1)[0].split(":")[0]
                 # Check if root domain is trusted
                 domain_parts = domain.split(".")
-                root_domain = (
-                    ".".join(domain_parts[-2:]) if len(domain_parts) >= 2 else domain
-                )
+                root_domain = ".".join(domain_parts[-2:]) if len(domain_parts) >= 2 else domain
                 trusted = root_domain in TRUSTED_DOMAINS or domain in TRUSTED_DOMAINS
             except (IndexError, ValueError):
                 domain = "unknown"
                 trusted = False
 
-            urls.append(
-                {
-                    "url": url,
-                    "domain": domain,
-                    "trusted": trusted,
-                    "location": f"{filepath}:{line_num}",
-                }
-            )
+            urls.append({
+                "url": url,
+                "domain": domain,
+                "trusted": trusted,
+                "location": f"{filepath}:{line_num}",
+            })
 
     return urls
 
 
-def compute_description_body_overlap(
-    frontmatter: dict[str, Any] | None, body: str
-) -> float:
+def compute_description_body_overlap(frontmatter: dict[str, Any] | None, body: str) -> float:
     """Compute keyword overlap between description and body as a heuristic."""
     if not frontmatter or "description" not in frontmatter:
         return 0.0
@@ -583,9 +431,7 @@ def scan_skill(skill_dir: Path) -> dict[str, Any]:
                 sf = check_scripts(script_file)
                 script_findings.extend(sf)
                 try:
-                    script_content = script_file.read_text(
-                        encoding="utf-8", errors="replace"
-                    )
+                    script_content = script_file.read_text(encoding="utf-8", errors="replace")
                 except OSError:
                     continue
                 rel_path = f"scripts/{script_file.name}"
@@ -601,24 +447,10 @@ def scan_skill(skill_dir: Path) -> dict[str, Any]:
     # Build structure info
     structure = {
         "has_skill_md": True,
-        "has_references": refs_dir.is_dir()
-        if (refs_dir := skill_dir / "references")
-        else False,
-        "has_scripts": scripts_dir.is_dir()
-        if (scripts_dir := skill_dir / "scripts")
-        else False,
-        "reference_files": sorted(
-            f.name for f in (skill_dir / "references").iterdir() if f.suffix == ".md"
-        )
-        if (skill_dir / "references").is_dir()
-        else [],
-        "script_files": sorted(
-            f.name
-            for f in (skill_dir / "scripts").iterdir()
-            if f.suffix in (".py", ".sh", ".js", ".ts")
-        )
-        if (skill_dir / "scripts").is_dir()
-        else [],
+        "has_references": refs_dir.is_dir() if (refs_dir := skill_dir / "references") else False,
+        "has_scripts": scripts_dir.is_dir() if (scripts_dir := skill_dir / "scripts") else False,
+        "reference_files": sorted(f.name for f in (skill_dir / "references").iterdir() if f.suffix == ".md") if (skill_dir / "references").is_dir() else [],
+        "script_files": sorted(f.name for f in (skill_dir / "scripts").iterdir() if f.suffix in (".py", ".sh", ".js", ".ts")) if (skill_dir / "scripts").is_dir() else [],
     }
 
     # Summary counts
@@ -634,9 +466,7 @@ def scan_skill(skill_dir: Path) -> dict[str, Any]:
     if frontmatter and "allowed-tools" in frontmatter:
         tools_str = frontmatter["allowed-tools"]
         if isinstance(tools_str, str):
-            tools_list = [
-                t.strip() for t in tools_str.replace(",", " ").split() if t.strip()
-            ]
+            tools_list = [t.strip() for t in tools_str.replace(",", " ").split() if t.strip()]
             tools_info = {
                 "tools": tools_list,
                 "has_bash": "Bash" in tools_list,
