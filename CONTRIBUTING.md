@@ -173,9 +173,6 @@ What's the concrete advice when writing a new integration?
   - Dead code adds cognitive overhead when reasoning about code, so don't account for impossible scenarios.
 
 11. Write tests, but don't write mocks.
-  - You'd be surprised how many tests assert the wrong thing.
-  - Others packaging the SDK seem to run our test suite, so don't write racy or other environment-dependent tests.
-  - Don't test unreachable states, or your tests will be removed.
   - Don't call private SDK stuff directly, just use the patched library in a way that triggers the patch.
   - Mocks are _very expensive_ to maintain, particularly when testing patches for fast-moving libraries.
   - Consider the minimum versions supported, and document in `_MIN_VERSIONS` in `integrations/__init__.py`.
