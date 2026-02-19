@@ -114,7 +114,7 @@ The SDK runs as part of users' applications. Users do not expect their applicati
 
 So this means you should write the ugly code in the library to work around this?
 Well, there's another consequence of running on thousands of applications. Maintenance burden is higher than for application code, because all code paths of the SDK are hit across the enormous variety of applications the SDK finds itself in. The diversity includes different CPython versions, permutations of package versions, and operating systems.
-And once something you write is out there, you cannot remove it from the SDK without good reason.
+And once something you write is out there, you cannot change or remove it from the SDK without good reason (https://develop.sentry.dev/sdk/processes/breaking_changes/#introducing-breaking-changes).
 
 What's the concrete advice when writing a new integration?
 
