@@ -122,7 +122,7 @@ What's the concrete advice when writing a new integration?
 
 1. Are you supporting a product feature? Then ensure that product expectations are clearly documented in https://develop.sentry.dev/sdk/telemetry/traces/modules/.
 
-2. Confirm that all attributes are defined in https://github.com/getsentry/sentry-conventions.
+2. Confirm that all span, breadcrumb, log or metric attributes are defined in https://github.com/getsentry/sentry-conventions.
 
 3. Ensure that the **semantics** of the attribute are clear. If the attribute is not uniquely defined, do not add it.
 - For instance, do not attach a request model to an agent invocation span. On the other hand, a default request model can be well-defined.
