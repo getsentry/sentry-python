@@ -13,9 +13,8 @@ updating our test matrix.
 
 ### Step 1: Fetch CI status
 
-Check the getsentry/sentry-python repo on GitHub.
-
-Find the newest PR from the toxgen/update branch.
+Find the newest PR from the toxgen/update branch in the getsentry/sentry-python
+repo on GitHub.
 
 Check the results of the CI runs on the PR. If not all workflows have
 finished, wait for them to finish, checking periodically every ~10 seconds.
@@ -24,7 +23,7 @@ Look for failures of worfklows starting with "Test" (for example,
 user and don't continue with the next steps.
 
 The different jobs run the test suite for multiple integrations on one Python
-version. So for instance "DBs (3.12, ubuntu-22.04)" runs tests for database
+version. So for instance "DBs (3.12, ubuntu-22.04)" runs the tests for database
 integrations on Python 3.12. Multiple versions of a single integration might
 be run in a single job, so for example the Redis step in the
 "DBs (3.12, ubuntu-22.04)" job might run the test suite against Redis versions
@@ -39,11 +38,12 @@ one will look like this: "py3.14t-openai_agents-v0.9.1: OK".
 Compile a text summary that contains the following:
    - A list of all failing integrations.
    - For each integration:
-     * The specific toxgen targets that are failing
+     * The specific tox targets that are failing
      * The test failure message or error output from the failing tests
      * The command used in CI to run the test suite to reproduce the failure --
        it should use tox, check the job output for the specific command
-   - Show this to the user.
+   - Show the summary to the user.
+
 
 ### Step 2: Analyze failures
 
@@ -52,8 +52,8 @@ Do this for each integration that is failing.
 #### Determine if the failure is consistent
 
 The first step is to determine whether the failure is a flake, for example
-because of a temporary connection problem, or if it is related to a change
-introduced in a new version.
+because of a temporary connection problem, or if it persists, because it's
+related to a change introduced in a new version.
 - Check if the package version that's failing was newly added to tox.ini via
   the PR. If not, it's likely to be a flake.
 - Check whether the same package version is failing on other Python versions,
@@ -65,25 +65,26 @@ introduced in a new version.
 If it looks like a flake, offer to rerun the failing test suite. If the
 user accepts, wait for the result, polling periodically. If the run is
 successful, there's nothing else to do; move on to the next integration if
-there is another one that's failing. If it still fails, continue with the next
-step (analyzing the failure).
+there is another one that's failing.
 
 #### Analyze non-flake failures
 
-If the failure persists, run the affected test suite locally the same way it's
-run in CI, via tox.
+Run the test suite for the failing tox target locally via  `tox -e tox_target}`.
 
-Analyze the error message, then start localizing the source of the breakage:
+Analyze the error message from the local run, then start localizing
+the source of the breakage:
 
-1. Retrieve the diff between the last working version of the package (the
-   original max version in tox.ini before the PR) and the newly introduced,
+1. Retrieve the repo code. Use the checkout-project-code skill for that.
+2. Using git, retrieve the diff between the last working version of the package
+   (the original max version in tox.ini before the PR) and the newly introduced,
    failing version.
-2. Analyze the diff, looking for parts that could be related to the failing
-   tests.
+3. Analyze the diff, looking for parts that could be related to the failing
+   tests. Remember the specific code parts that are relevant so that you can
+   show them to the user.
 
-If the failure is reproducible, analyze the differences between the new
-(failing) version and the old (working) version of the package, figure out what
-change caused the failure. Make sure to link to the specific code snippets for
-double checking. Show this investigation to the user and ask them if you should
-propose a fix.
+Present the user with the results of your investigation. Make sure to link or
+point to the specific code snippets for double checking.
 
+#### Propose a fix
+
+Ask the user if you should propose a fix. If yes, do it.
