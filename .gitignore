@@ -31,6 +31,7 @@ pip-wheel-metadata
 .claude/
 .serena
 .tool-versions
+.agents
 
 # for running AWS Lambda tests using AWS SAM
 sam.template.yaml
