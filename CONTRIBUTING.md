@@ -134,7 +134,7 @@ What's the concrete advice when writing a new integration?
   - It should be clear what span is created and exited where and which patches apply which attributes on a given span.
 
 1. Do you even need to add this attribute on this span?
-  - Be intentional with supporting product features. Only adding what's necessary, or **be very sure that your addition provides value**. Decisions about what data lives on what types of spans are hard to undo, and limits future design space.
+  - Be intentional with supporting product features. Only add what's necessary, or **be very sure that your addition provides value**. Decisions about what data lives on what types of spans are hard to undo, and limits future design space.
 
 2. Avoid setting arbitrary objects.
   - In line with the point above, prefer using an include-list of valuable entries when setting a dictionary attribute. Otherwise, tests will break again and again.
