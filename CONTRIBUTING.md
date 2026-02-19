@@ -110,23 +110,11 @@ tox -p auto -o -e <tox_env> -- <pytest_args>
 
 ### SDK Contract
 
-The SDK runs as part of users' applications. Users do not expect:
-
-- their application to crash ([#4690](https://github.com/getsentry/sentry-python/issues/4690), [#4718](https://github.com/getsentry/sentry-python/issues/4718), [#4776](https://github.com/getsentry/sentry-python/issues/4776), [#4925](https://github.com/getsentry/sentry-python/issues/4925), [#4951](https://github.com/getsentry/sentry-python/issues/4951), [#4975](https://github.com/getsentry/sentry-python/issues/4975), [#5067](https://github.com/getsentry/sentry-python/issues/5067), [#5071](https://github.com/getsentry/sentry-python/issues/5071), [#5129](https://github.com/getsentry/sentry-python/issues/5129), [#5134](https://github.com/getsentry/sentry-python/issues/5134), [#5277](https://github.com/getsentry/sentry-python/issues/5277), [#5298](https://github.com/getsentry/sentry-python/issues/5298), [#5350](https://github.com/getsentry/sentry-python/issues/5350)).
-- the SDK to mutate session cookies ([#4882](https://github.com/getsentry/sentry-python/issues/4882)).
-- the SDK to swallow their exceptions ([#4853](https://github.com/getsentry/sentry-python/issues/4853)).
-- their HTTP response streams to be consumed ([#4764](https://github.com/getsentry/sentry-python/issues/4764), [#4827](https://github.com/getsentry/sentry-python/issues/4827)).
-- leaked file descriptors to eat their memory ([#5422](https://github.com/getsentry/sentry-python/issues/5422)).
-- SDK-initiated database requests ([#5274](https://github.com/getsentry/sentry-python/issues/5274), [#5414](https://github.com/getsentry/sentry-python/issues/5414)).
-- uWSGI performance degradation due to SDK patches ([#5107](https://github.com/getsentry/sentry-python/issues/5107)).
-- change the signature of functions or coroutines ([#5072](https://github.com/getsentry/sentry-python/issues/5072)).
+The SDK runs as part of users' applications. Users do not expect their application to crash, the SDK to mutate object references, the SDK to swallow their exceptions, leaked file descriptors to eat their memory, SDK-initiated database requests, or the SDK to alter the signature of functions or coroutines.
 
 So this means you should write the ugly code in the library to work around this?
 Well, there's another consequence of running on thousands of applications. Maintenance burden is higher than for application code, because all code paths of the SDK are hit across the enormous variety of applications the SDK finds itself in. The diversity includes different CPython versions, permutations of package versions, and operating systems.
 And once something you write is out there, you cannot remove it from the SDK without good reason.
-This means that the SDK is not a playground for the inappropriate use of AI-assisted coding.
-
-Oh, and did I mention that bugs in old SDK versions can still come to haunt you? Even if you have patched them in the meantime.
 
 What's the concrete advice when writing a new integration?
 
@@ -149,10 +137,10 @@ What's the concrete advice when writing a new integration?
   - Be intentional with supporting product features. Only adding what's necessary, or **be very sure that your addition provides value**. Decisions about what data lives on what types of spans are hard to undo, and limits future design space.
 
 2. Avoid setting arbitrary objects.
-  - In line with the point above, prefer using an include-list of valuable entries when setting a dictionary attribute. Otherwise, tests will break again and again ([#5454](https://github.com/getsentry/sentry-python/pull/5454), [#5471](https://github.com/getsentry/sentry-python/pull/5471)).
+  - In line with the point above, prefer using an include-list of valuable entries when setting a dictionary attribute. Otherwise, tests will break again and again.
 
 3. Instrument all application instances by default. Prefer global signals/patches.
-  - Patching instances is just harder. Your patches may unexpectedly not apply to some instances, or unexpectedly be applied multiple times ([!5195](https://github.com/getsentry/sentry-python/pull/5195)).
+  - Patching instances is just harder. Your patches may unexpectedly not apply to some instances, or unexpectedly be applied multiple times.
 
 4. Don't make the user pass anything to your integration for anything to work. Aim for zero configuration.
   - Users tend to only consult the documentation when something goes wrong. So the default values for integration options must lead to the best out-of-the-box experience for the majority of users.
@@ -165,18 +153,18 @@ What's the concrete advice when writing a new integration?
 
 6. Be explicit
   - You're developing against a library, and that library uses specific types.
-  - If you use `hasattr()` or `getattr()` to gate logic, you must verify the code path for all types that have this attribute. And Python has duck-typing, so good luck.
-  - If you use `type().__name__` to gate logic, you must verify the behavior for all types with a given name. And Python has duck-typing, so good luck.
-  - So just use `isinstance()` to save us a headache.
+  - If you use `hasattr()` or `getattr()` to gate logic, you must verify the code path for all types that have this attribute (and Python has duck typing).
+  - If you use `type().__name__` to gate logic, you must verify the behavior for all types with a given name (and Python has duck typing).
+  - So just use `isinstance()`.
 
 7. Heuristics will bite you later.
-  - If something you write is best-effort, make sure there are no alternatives ([#4980](https://github.com/getsentry/sentry-python/issues/4980)).
+  - If something you write is best-effort, make sure there are no alternatives.
 
 8. Obsess about the unhappy path.
   - Users are interested in seeing what went wrong when something doesn't work. If the code in the `catch` block is garbage, that's a problem.
   - Let exceptions bubble-up as far as possible when reporting unhandled exceptions.
   - Preserve the user's original exception. Python chains exceptions when code in a `catch` block throws, so if a `catch` block in the SDK throws, the SDK exception takes the foreground ([#5188](https://github.com/getsentry/sentry-python/issues/5188)).
-  - Please don't report exceptions that are caught further up in the library's call chain as unhandled ([#5232](https://github.com/getsentry/sentry-python/issues/5232), [#5473](https://github.com/getsentry/sentry-python/issues/5473)).
+  - Please don't report exceptions that are caught further up in the library's call chain as unhandled.
 
 9. Make sure your changes don't break end user contracts. The SDK should never alter the expected behavior of the underlying library or framework from the user's perspective and it shouldn't have any side effects.
 
@@ -185,20 +173,18 @@ What's the concrete advice when writing a new integration?
   - Dead code adds cognitive overhead when reasoning about code, so don't account for impossible scenarios.
 
 11. Write tests, but don't write mocks.
-  - You'd be surprised how many tests assert the wrong thing ([#5404](https://github.com/getsentry/sentry-python/pull/5404), [#5403](https://github.com/getsentry/sentry-python/pull/5403)).
-  - Others packaging the SDK seem to run our test suite, so don't write racy or other environment-dependent tests ([#4878](https://github.com/getsentry/sentry-python/issues/4878)).
-  - Actually look at the console output ([#4723](https://github.com/getsentry/sentry-python/issues/4723)).
-  - Don't test unreachable states, or your tests will be removed ([!5412](https://github.com/getsentry/sentry-python/pull/5412)).
-  - Don't call private SDK stuff directly, just use the patched library in a way that triggers the patch ([#5437](https://github.com/getsentry/sentry-python/pull/5437)).
-  - Don't write tests that are always skipped, that's just silly ([!5338](https://github.com/getsentry/sentry-python/pull/5338)).
-  - Mocks are _very expensive_ to maintain, particularly when testing patches for fast-moving libraries ([#5126](https://github.com/getsentry/sentry-python/pull/5126)).
+  - You'd be surprised how many tests assert the wrong thing.
+  - Others packaging the SDK seem to run our test suite, so don't write racy or other environment-dependent tests.
+  - Don't test unreachable states, or your tests will be removed.
+  - Don't call private SDK stuff directly, just use the patched library in a way that triggers the patch.
+  - Mocks are _very expensive_ to maintain, particularly when testing patches for fast-moving libraries.
   - Consider the minimum versions supported, and document in `_MIN_VERSIONS` in `integrations/__init__.py`.
   - Create a new folder in `tests/integrations/`, with an `__init__` file that skips the entire suite if the package is not installed.
   - Add the test suite to the script generating our test matrix. See [`scripts/populate_tox/README.md`](https://github.com/getsentry/sentry-python/blob/master/scripts/populate_tox/README.md#add-a-new-test-suite).
 
 12. Be careful patching decorators
-  - Does the library's decorator apply to sync or async functions ([#5415](https://github.com/getsentry/sentry-python/pull/5415))?
-  - Some decorators can be applied to classes and functions, and both with and without arguments. Make sure you handle all applicable cases ([#5225](https://github.com/getsentry/sentry-python/issues/5225)).
+  - Does the library's decorator apply to sync or async functions?
+  - Some decorators can be applied to classes and functions, and both with and without arguments. Make sure you handle all applicable cases.
 
 13. Avoid registering a new client or the like. The user drives the client, and the client owns integrations.
 
