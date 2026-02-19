@@ -120,7 +120,7 @@ What's the concrete advice when writing a new integration?
 
 ### Requirements
 
-1. Are you supporting a product feature? Then ensure that product expectations are clearly documented in https://develop.sentry.dev/sdk/telemetry/traces/modules/.
+1. Are you supporting a product feature? Then ensure that product expectations are clearly documented in the [develop docs](https://develop.sentry.dev/sdk/). Requirements for a given Insight Module must be available under https://develop.sentry.dev/sdk/telemetry/traces/modules/.
 
 2. Confirm that all span, breadcrumb, log or metric attributes are defined in https://github.com/getsentry/sentry-conventions.
 
@@ -151,28 +151,30 @@ What's the concrete advice when writing a new integration?
   - If the shared SDK logic will diverge for two patches, just don't force them through a common path in the first place.
   - If your shared code path has a bunch of conditionals today or will have a ton of conditionals in the future, that's the sign to not stick to DRY.
 
-6. Be explicit
+6. Be explicit.
   - You're developing against a library, and that library uses specific types.
   - If you use `hasattr()` or `getattr()` to gate logic, you must verify the code path for all types that have this attribute (and Python has duck typing).
   - If you use `type().__name__` to gate logic, you must verify the behavior for all types with a given name (and Python has duck typing).
   - So just use `isinstance()`.
 
 7. Heuristics will bite you later.
-  - If something you write is best-effort, make sure there are no alternatives.
+  - If something you write is best-effort, make sure there are no better alternatives.
 
 8. Obsess about the unhappy path.
-  - Users are interested in seeing what went wrong when something doesn't work. If the code in the `catch` block is garbage, that's a problem.
+  - Users are interested in seeing what went wrong when something doesn't work. The code in the `except` block should not be an afterthought.
   - Let exceptions bubble-up as far as possible when reporting unhandled exceptions.
-  - Preserve the user's original exception. Python chains exceptions when code in a `catch` block throws, so if a `catch` block in the SDK throws, the SDK exception takes the foreground ([#5188](https://github.com/getsentry/sentry-python/issues/5188)).
+  - Preserve the user's original exception. Python chains exceptions when code in a `except` block throws, so if a `except` block in the SDK throws, the SDK exception takes the foreground ([#5188](https://github.com/getsentry/sentry-python/issues/5188)).
   - Please don't report exceptions that are caught further up in the library's call chain as unhandled.
 
 9. Make sure your changes don't break end user contracts. The SDK should never alter the expected behavior of the underlying library or framework from the user's perspective and it shouldn't have any side effects.
+  - For example, it shouldn't open new connections or evaluate lazy queries early.
 
 10. Be defensive, but don't add dead code.
   - Don't assume the code you're patching will stay the same forever, especially if it's an internal function. Allow for future variability whenever it makes sense.
   - Dead code adds cognitive overhead when reasoning about code, so don't account for impossible scenarios.
 
 11. Write tests, but don't write mocks.
+  - Aim for end-to-end tests, not unit tests.
   - Don't call private SDK stuff directly, just use the patched library in a way that triggers the patch.
   - Mocks are _very expensive_ to maintain, particularly when testing patches for fast-moving libraries.
   - Consider the minimum versions supported, and document in `_MIN_VERSIONS` in `integrations/__init__.py`.
@@ -181,11 +183,11 @@ What's the concrete advice when writing a new integration?
 
 12. Be careful patching decorators
   - Does the library's decorator apply to sync or async functions?
-  - Some decorators can be applied to classes and functions, and both with and without arguments. Make sure you handle all applicable cases.
+  - Some decorators can be applied to classes and functions, and both with and without arguments. Make sure you handle and test all applicable cases.
 
 13. Avoid registering a new client or the like. The user drives the client, and the client owns integrations.
 
-14. Allow the user to turn off the integration by changing the client. Check `sentry_sdk.get_client().get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
+14. Allow the user to turn off the integration by changing the client. Check `sentry_sdk.get_client().get_integration(MyIntegration)` from within your signal handlers or patches to see if your integration is still active before you do anything impactful (such as sending an event). If it's not active, the patch my be no-op.
 
 ### Document
 
