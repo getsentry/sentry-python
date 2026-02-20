@@ -383,7 +383,8 @@ def _set_completions_api_input_data(
         _commmon_set_input_data(span, kwargs)
         return
 
-    if not isinstance(messages, Iterable):
+    # Special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
+    if not isinstance(messages, Iterable) or isinstance(messages, dict):
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         _commmon_set_input_data(span, kwargs)
         return
