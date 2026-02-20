@@ -2261,6 +2261,10 @@ def test_cache_tokens_nonstreaming(sentry_init, capture_events):
         )
 
     (span,) = events[0]["spans"]
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
@@ -2495,5 +2499,9 @@ def test_cache_tokens_streaming(sentry_init, capture_events):
             pass
 
     (span,) = events[0]["spans"]
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
