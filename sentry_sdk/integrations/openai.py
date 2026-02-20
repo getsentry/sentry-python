@@ -438,7 +438,7 @@ def _set_embeddings_input_data(
     kwargs["input"] = messages
 
     if len(messages) > 0:
-        normalized_messages = normalize_message_roles(messages)  # type: ignore
+        normalized_messages = normalize_message_roles(messages)
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_embedding_inputs(
             normalized_messages, span, scope
