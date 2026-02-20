@@ -371,13 +371,6 @@ def _set_completions_api_input_data(
         _commmon_set_input_data(span, kwargs)
         return
 
-    system_instructions = _get_system_instructions_completions(messages)
-    if len(system_instructions) > 0:
-        span.set_data(
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            json.dumps(_transform_system_instructions(system_instructions)),
-        )
-
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
         scope = sentry_sdk.get_current_scope()
@@ -389,6 +382,21 @@ def _set_completions_api_input_data(
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         _commmon_set_input_data(span, kwargs)
         return
+
+    if not isinstance(messages, Iterable):
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    messages = list(messages)
+    kwargs["messages"] = messages
+
+    system_instructions = _get_system_instructions_completions(messages)
+    if len(system_instructions) > 0:
+        span.set_data(
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(_transform_system_instructions(system_instructions)),
+        )
 
     non_system_messages = [
         message
