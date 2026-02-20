@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
-    from openai.types.responses import ResponseInputParam
+    from openai.types.responses import ResponseInputParam, SequenceNotStr
     from openai import Omit
 
 try:
@@ -218,20 +218,6 @@ def _calculate_token_usage(
         output_tokens_reasoning=output_tokens_reasoning,
         total_tokens=total_tokens,
     )
-
-
-def _get_input_messages(
-    kwargs: "dict[str, Any]",
-) -> "Optional[Union[Iterable[Any], list[str]]]":
-    # Input messages (the prompt or data sent to the model)
-    messages = kwargs.get("messages")
-    if messages is None:
-        messages = kwargs.get("input")
-
-    if isinstance(messages, str):
-        messages = [messages]
-
-    return messages
 
 
 def _commmon_set_input_data(
@@ -413,14 +399,45 @@ def _set_embeddings_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
-    messages = _get_input_messages(kwargs)
+    messages: "Union[str, SequenceNotStr[str], Iterable[int], Iterable[Iterable[int]]]" = kwargs.get(
+        "input"
+    )
 
     if (
-        messages is not None
-        and len(messages) > 0  # type: ignore
-        and should_send_default_pii()
-        and integration.include_prompts
+        not should_send_default_pii()
+        or not integration.include_prompts
+        or messages is None
     ):
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+        _commmon_set_input_data(span, kwargs)
+
+        return
+
+    if isinstance(messages, str):
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+        _commmon_set_input_data(span, kwargs)
+
+        normalized_messages = normalize_message_roles([messages])  # type: ignore
+        scope = sentry_sdk.get_current_scope()
+        messages_data = truncate_and_annotate_embedding_inputs(
+            normalized_messages, span, scope
+        )
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
+            )
+
+        return
+
+    if not isinstance(messages, Iterable):
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+        _commmon_set_input_data(span, kwargs)
+        return
+
+    messages = list(messages)
+    kwargs["input"] = messages
+
+    if len(messages) > 0:
         normalized_messages = normalize_message_roles(messages)  # type: ignore
         scope = sentry_sdk.get_current_scope()
         messages_data = truncate_and_annotate_embedding_inputs(
