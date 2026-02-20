@@ -473,7 +473,11 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
                 # Anthropic's input_tokens excludes cached/cache_write tokens.
                 # Normalize to total input tokens for correct cost calculations.
-                total_input = usage.input_tokens + (usage.cache_read_input_tokens or 0) + (usage.cache_write_input_tokens or 0)
+                total_input = (
+                    usage.input_tokens
+                    + (usage.cache_read_input_tokens or 0)
+                    + (usage.cache_write_input_tokens or 0)
+                )
 
                 _set_output_data(
                     span=span,
@@ -507,7 +511,11 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
                 # Anthropic's input_tokens excludes cached/cache_write tokens.
                 # Normalize to total input tokens for correct cost calculations.
-                total_input = usage.input_tokens + (usage.cache_read_input_tokens or 0) + (usage.cache_write_input_tokens or 0)
+                total_input = (
+                    usage.input_tokens
+                    + (usage.cache_read_input_tokens or 0)
+                    + (usage.cache_write_input_tokens or 0)
+                )
 
                 _set_output_data(
                     span=span,
