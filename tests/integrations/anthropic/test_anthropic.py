@@ -2265,6 +2265,156 @@ def test_cache_tokens_nonstreaming(sentry_init, capture_events):
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
+def test_input_tokens_include_cached_nonstreaming(sentry_init, capture_events):
+    """
+    Test that gen_ai.usage.input_tokens includes cached tokens.
+
+    Anthropic's usage.input_tokens excludes cached/cache_write tokens,
+    but gen_ai.usage.input_tokens should be the TOTAL input tokens
+    (including cached + cache_write) so that downstream cost calculations
+    don't produce negative values.
+
+    See: negative gen_ai.cost.input_tokens bug when cache_read > input_tokens.
+    """
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client = Anthropic(api_key="z")
+
+    # Simulate Anthropic response where input_tokens=100 EXCLUDES cached tokens
+    # cache_read=80 and cache_write=20 are separate
+    # Total input tokens processed = 100 + 80 + 20 = 200
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="id",
+            model="claude-3-5-sonnet-20241022",
+            role="assistant",
+            content=[TextBlock(type="text", text="Response")],
+            type="message",
+            usage=Usage(
+                input_tokens=100,
+                output_tokens=50,
+                cache_read_input_tokens=80,
+                cache_creation_input_tokens=20,
+            ),
+        )
+    )
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-3-5-sonnet-20241022",
+        )
+
+    (span,) = events[0]["spans"]
+
+    # input_tokens should be total: 100 (non-cached) + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+
+    # total_tokens should include the full input count
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250  # 200 + 50
+
+    # Cache fields should still be reported correctly
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+def test_input_tokens_include_cached_streaming(sentry_init, capture_events):
+    """
+    Test that gen_ai.usage.input_tokens includes cached tokens for streaming responses.
+
+    Same bug as non-streaming: Anthropic's input_tokens excludes cached tokens,
+    leading to negative cost calculations when cache_read > input_tokens.
+    """
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            type="message_start",
+            message=Message(
+                id="id",
+                model="claude-3-5-sonnet-20241022",
+                role="assistant",
+                content=[],
+                type="message",
+                usage=Usage(
+                    input_tokens=100,
+                    output_tokens=0,
+                    cache_read_input_tokens=80,
+                    cache_creation_input_tokens=20,
+                ),
+            ),
+        ),
+        MessageDeltaEvent(
+            type="message_delta",
+            delta=Delta(stop_reason="end_turn"),
+            usage=MessageDeltaUsage(output_tokens=50),
+        ),
+    ]
+
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    with start_transaction(name="anthropic"):
+        for _ in client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-3-5-sonnet-20241022",
+            stream=True,
+        ):
+            pass
+
+    (span,) = events[0]["spans"]
+
+    # input_tokens should be total: 100 + 80 + 20 = 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+
+    # total_tokens should include the full input count
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250  # 200 + 50
+
+    # Cache fields should still be reported correctly
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+def test_input_tokens_unchanged_without_caching(sentry_init, capture_events):
+    """
+    Test that input_tokens is unchanged when there are no cached tokens.
+    Ensures the fix doesn't break the non-caching case.
+    """
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client = Anthropic(api_key="z")
+
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="id",
+            model="claude-3-5-sonnet-20241022",
+            role="assistant",
+            content=[TextBlock(type="text", text="Response")],
+            type="message",
+            usage=Usage(
+                input_tokens=100,
+                output_tokens=50,
+            ),
+        )
+    )
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-3-5-sonnet-20241022",
+        )
+
+    (span,) = events[0]["spans"]
+
+    # Without caching, input_tokens should remain as-is
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 150  # 100 + 50
+
+
 def test_cache_tokens_streaming(sentry_init, capture_events):
     """Test cache tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
