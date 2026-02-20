@@ -108,6 +108,11 @@ def _get_token_usage(result: "Messages") -> "tuple[int, int, int, int]":
         ):
             cache_write_input_tokens = usage.cache_creation_input_tokens
 
+    # Anthropic's input_tokens excludes cached/cache_write tokens.
+    # Normalize to total input tokens so downstream cost calculations
+    # (input_tokens - cached) don't produce negative values.
+    input_tokens += cache_read_input_tokens + cache_write_input_tokens
+
     return (
         input_tokens,
         output_tokens,
@@ -466,11 +471,19 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     )
                     yield event
 
+                # Anthropic's input_tokens excludes cached/cache_write tokens.
+                # Normalize to total input tokens for correct cost calculations.
+                total_input = (
+                    usage.input_tokens
+                    + (usage.cache_read_input_tokens or 0)
+                    + (usage.cache_write_input_tokens or 0)
+                )
+
                 _set_output_data(
                     span=span,
                     integration=integration,
                     model=model,
-                    input_tokens=usage.input_tokens,
+                    input_tokens=total_input,
                     output_tokens=usage.output_tokens,
                     cache_read_input_tokens=usage.cache_read_input_tokens,
                     cache_write_input_tokens=usage.cache_write_input_tokens,
@@ -496,11 +509,19 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     )
                     yield event
 
+                # Anthropic's input_tokens excludes cached/cache_write tokens.
+                # Normalize to total input tokens for correct cost calculations.
+                total_input = (
+                    usage.input_tokens
+                    + (usage.cache_read_input_tokens or 0)
+                    + (usage.cache_write_input_tokens or 0)
+                )
+
                 _set_output_data(
                     span=span,
                     integration=integration,
                     model=model,
-                    input_tokens=usage.input_tokens,
+                    input_tokens=total_input,
                     output_tokens=usage.output_tokens,
                     cache_read_input_tokens=usage.cache_read_input_tokens,
                     cache_write_input_tokens=usage.cache_write_input_tokens,
