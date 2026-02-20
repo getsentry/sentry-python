@@ -7,6 +7,9 @@ help:
 	@echo
 	@echo "make apidocs: Build the API documentation"
 	@echo "make aws-lambda-layer: Build AWS Lambda layer directory for serverless integration"
+	@echo "make worktree-create NAME=<name>: Create a worktree with a new feature branch and virtual environment"
+	@echo "make worktree-delete NAME=<name>: Remove a worktree (prompts to delete branch)"
+	@echo "make worktree-list: List all active worktrees"
 	@echo
 	@echo "Also make sure to read ./CONTRIBUTING.md"
 	@echo
@@ -33,3 +36,19 @@ aws-lambda-layer: dist
 	$(VENV_PATH)/bin/pip install -r requirements-aws-lambda-layer.txt
 	$(VENV_PATH)/bin/python -m scripts.build_aws_lambda_layer
 .PHONY: aws-lambda-layer
+
+worktree-create:
+	@test -n "$(NAME)" || (echo "Error: NAME is required. Usage: make worktree-create NAME=<name>" && false)
+	@echo "$(NAME)" | grep -qE '^[a-zA-Z0-9_/-]+$$' || (echo "Error: NAME contains invalid characters" && false)
+	./scripts/worktree-create.sh "$(NAME)"
+.PHONY: worktree-create
+
+worktree-delete:
+	@test -n "$(NAME)" || (echo "Error: NAME is required. Usage: make worktree-delete NAME=<name>" && false)
+	@echo "$(NAME)" | grep -qE '^[a-zA-Z0-9_/-]+$$' || (echo "Error: NAME contains invalid characters" && false)
+	./scripts/worktree-delete.sh "$(NAME)"
+.PHONY: worktree-delete
+
+worktree-list:
+	@git worktree list
+.PHONY: worktree-list

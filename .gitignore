@@ -34,3 +34,5 @@ pip-wheel-metadata
 
 # for running AWS Lambda tests using AWS SAM
 sam.template.yaml
+
+.worktrees/
