@@ -928,7 +928,6 @@ async def test_bad_chat_completion_async(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
