@@ -103,7 +103,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     _get_metadata_dict(kwargs)["_sentry_span"] = span
 
     # Set basic data
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
+    set_data_normalized(span, SPANDATA.GEN_AI_PROVIDER_NAME, provider)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record input/messages if allowed

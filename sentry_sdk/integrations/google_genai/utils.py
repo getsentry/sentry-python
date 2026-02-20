@@ -789,7 +789,7 @@ def set_span_data_for_request(
     kwargs: "dict[str, Any]",
 ) -> None:
     """Set span data for the request."""
-    span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
+    span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, GEN_AI_SYSTEM)
     span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     if kwargs.get("stream", False):

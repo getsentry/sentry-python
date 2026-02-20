@@ -383,9 +383,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             ai_type = all_params.get("_type", "")
             if "anthropic" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
+                span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "anthropic")
             elif "openai" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+                span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "openai")
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
@@ -451,9 +451,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             ai_type = all_params.get("_type", "")
             if "anthropic" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
+                span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "anthropic")
             elif "openai" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+                span.set_data(SPANDATA.GEN_AI_PROVIDER_NAME, "openai")
 
             agent_name = _get_current_agent()
             if agent_name:

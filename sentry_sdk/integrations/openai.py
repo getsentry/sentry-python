@@ -239,7 +239,7 @@ def _commmon_set_input_data(
     kwargs: "dict[str, Any]",
 ) -> None:
     # Input attributes: Common
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
+    set_data_normalized(span, SPANDATA.GEN_AI_PROVIDER_NAME, "openai")
 
     # Input attributes: Optional
     kwargs_keys_to_attributes = {

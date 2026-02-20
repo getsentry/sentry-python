@@ -61,7 +61,7 @@ def _record_exception_on_span(span: "Span", error: Exception) -> "Any":
 
 def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "agents.Agent") -> None:
     span.set_data(
-        SPANDATA.GEN_AI_SYSTEM, "openai"
+        SPANDATA.GEN_AI_PROVIDER_NAME, "openai"
     )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
 
     span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
