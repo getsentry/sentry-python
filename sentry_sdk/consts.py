@@ -495,6 +495,12 @@ class SPANDATA:
     Example: "qa-pipeline"
     """
 
+    GEN_AI_PROVIDER_NAME = "gen_ai.provider.name"
+    """
+    The Generative AI provider as identified by the client or server instrumentation.
+    Example: "openai"
+    """
+
     GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
     """
     The reason why the model stopped generating.
@@ -605,6 +611,9 @@ class SPANDATA:
 
     GEN_AI_SYSTEM = "gen_ai.system"
     """
+    .. deprecated::
+        This attribute is deprecated. Use the GEN_AI_PROVIDER_NAME attribute instead.
+
     The name of the AI system being used.
     Example: "openai"
     """
