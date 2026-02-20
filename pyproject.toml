@@ -202,6 +202,7 @@ extend-exclude = [
     "*_pb2_grpc.py", # Protocol Buffer files (covers all pb2_grpc files including grpc_test_service_pb2_grpc.py)
     "checkouts",    # From flake8
     "lol*",         # From flake8
+    ".agents", # Developer tooling that will not be included in user applications where python 3.7 needs to be supported
 ]
 
 [tool.ruff.lint]
