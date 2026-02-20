@@ -73,7 +73,7 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
 
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        chat_span = sentry_sdk.start_span(
+        chat_span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
             name=f"chat {model_name}",
             origin=ORIGIN,
@@ -132,7 +132,7 @@ def _wrap_async_generate_content_stream(
 
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        chat_span = sentry_sdk.start_span(
+        chat_span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
             name=f"chat {model_name}",
             origin=ORIGIN,
@@ -187,7 +187,7 @@ def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=OP.GEN_AI_CHAT,
             name=f"chat {model_name}",
             origin=ORIGIN,
@@ -225,7 +225,7 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
 
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=OP.GEN_AI_CHAT,
             name=f"chat {model_name}",
             origin=ORIGIN,
@@ -259,7 +259,7 @@ def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=OP.GEN_AI_EMBEDDINGS,
             name=f"embeddings {model_name}",
             origin=ORIGIN,
@@ -294,7 +294,7 @@ def _wrap_async_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=OP.GEN_AI_EMBEDDINGS,
             name=f"embeddings {model_name}",
             origin=ORIGIN,
