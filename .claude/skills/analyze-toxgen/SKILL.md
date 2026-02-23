@@ -74,7 +74,7 @@ Run the test suite for the failing tox target locally via  `tox -e tox_target}`.
 Analyze the error message from the local run, then start localizing
 the source of the breakage:
 
-1. Retrieve the repo code. Use the checkout-project-code skill for that.
+1. Retrieve the repo code into a temporary directory.
 2. Using git, retrieve the diff between the last working version of the package
    (the original max version in tox.ini before the PR) and the newly introduced,
    failing version.
@@ -87,4 +87,8 @@ point to the specific code snippets for double checking.
 
 #### Propose a fix
 
-Ask the user if you should propose a fix. If yes, do it.
+Ask the user if you should propose a fix.
+
+When fixing, make sure the integration code supports both the current and the
+new way of integrating with the library, as we need to support users across
+different versions.
