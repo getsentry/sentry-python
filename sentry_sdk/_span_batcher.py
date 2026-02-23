@@ -17,7 +17,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     # TODO[span-first]: adjust flush/drop defaults
     MAX_BEFORE_FLUSH = 1000
     MAX_BEFORE_DROP = 1000
-    MAX_KB_BEFORE_FLUSH = 5 * 1024  # 5 MB
+    MAX_BYTES_BEFORE_FLUSH = 5 * 1024 * 1024  # 5 MB
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "span"
@@ -70,7 +70,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return
 
             self._running_size[span.trace_id] += self._estimate_size(span)
-            if self._running_size[span.trace_id] >= self.MAX_KB_BEFORE_FLUSH:
+            if self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH:
                 self._flush_event.set()
                 return
 
@@ -78,7 +78,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _estimate_size(item: "StreamedSpan") -> int:
         # This is just a quick approximation
         span_dict = SpanBatcher._to_transport_format(item)
-        return len(str(span_dict)) // 1024
+        return len(str(span_dict))
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
