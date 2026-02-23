@@ -23,6 +23,14 @@ try:
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
+try:
+    from rq.worker import BaseWorker
+
+    if not hasattr(BaseWorker, "perform_job"):
+        BaseWorker = None
+except ImportError:
+    BaseWorker = None
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -47,12 +55,7 @@ class RqIntegration(Integration):
         # instead of Worker, so we need to patch BaseWorker to cover both.
         # For older versions where BaseWorker doesn't exist or doesn't have
         # perform_job, we patch Worker.
-        try:
-            from rq.worker import BaseWorker
-
-            worker_cls = BaseWorker if hasattr(BaseWorker, "perform_job") else Worker
-        except ImportError:
-            worker_cls = Worker
+        worker_cls = BaseWorker if BaseWorker is not None else Worker
 
         old_perform_job = worker_cls.perform_job
 
