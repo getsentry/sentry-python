@@ -36,13 +36,14 @@ will look like this: "py3.14t-openai_agents-v0.9.1: FAIL", while a passing
 one will look like this: "py3.14t-openai_agents-v0.9.1: OK".
 
 Compile a text summary that contains the following:
-   - A list of all failing integrations.
+   - A list of all failing integrations
    - For each integration:
      * The specific tox targets that are failing
      * The test failure message or error output from the failing tests
      * The command used in CI to run the test suite to reproduce the failure --
-       it should use tox, check the job output for the specific command
-   - Show the summary to the user.
+       it should use the tox command (NOT pytest), check the job output for
+       the specific command
+   - Show the summary to the user
 
 
 ### Step 2: Analyze failures
@@ -69,7 +70,7 @@ there is another one that's failing.
 
 #### Analyze non-flake failures
 
-Run the test suite for the failing tox target locally via  `tox -e {tox_target}`.
+Run the test suite for the failing tox target locally via `tox -e {tox_target}`.
 
 Analyze the error message from the local run, then start localizing
 the source of the breakage:
@@ -92,3 +93,10 @@ Ask the user if you should propose a fix.
 First check out the toxgen/update branch locally. Then branch off of it for the
 fix. When fixing, make sure the integration code supports both the current and
 the new way of integrating with the library, as we need to support both.
+
+After you're done fixing, if the user agrees that you should open a PR, open
+one with the toxgen/update branch as merge target. Include an analysis of the
+failure in the PR description. Include links to PRs or commits from the upstream
+library that introduced the relevant change.
+
+Poll the CI on the new branch and if there are failures, address them.
