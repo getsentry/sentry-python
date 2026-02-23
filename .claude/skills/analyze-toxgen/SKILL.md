@@ -69,7 +69,7 @@ there is another one that's failing.
 
 #### Analyze non-flake failures
 
-Run the test suite for the failing tox target locally via  `tox -e tox_target}`.
+Run the test suite for the failing tox target locally via  `tox -e {tox_target}`.
 
 Analyze the error message from the local run, then start localizing
 the source of the breakage:
@@ -89,6 +89,6 @@ point to the specific code snippets for double checking.
 
 Ask the user if you should propose a fix.
 
-When fixing, make sure the integration code supports both the current and the
-new way of integrating with the library, as we need to support users across
-different versions.
+First check out the toxgen/update branch locally. Then branch off of it for the
+fix. When fixing, make sure the integration code supports both the current and
+the new way of integrating with the library, as we need to support both.
