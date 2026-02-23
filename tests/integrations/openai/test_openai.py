@@ -930,9 +930,13 @@ async def test_bad_chat_completion_async(sentry_init, capture_events):
 
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    [
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
 )
-def test_embeddings_create(
+def test_embeddings_create_no_pii(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     sentry_init(
@@ -966,10 +970,109 @@ def test_embeddings_create(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
-    if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+
+    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.parametrize(
+    "input",
+    [
+        pytest.param(
+            "hello",
+            id="string",
+        ),
+        pytest.param(
+            ["First text", "Second text", "Third text"],
+            id="string_sequence",
+        ),
+        pytest.param(
+            iter(["First text", "Second text", "Third text"]),
+            id="string_iterable",
+        ),
+        pytest.param(
+            [5, 8, 13, 21, 34],
+            id="tokens",
+        ),
+        pytest.param(
+            iter(
+                [5, 8, 13, 21, 34],
+            ),
+            id="token_iterable",
+        ),
+        pytest.param(
+            [
+                [5, 8, 13, 21, 34],
+                [8, 13, 21, 34, 55],
+            ],
+            id="tokens_sequence",
+        ),
+        pytest.param(
+            iter(
+                [
+                    [5, 8, 13, 21, 34],
+                    [8, 13, 21, 34, 55],
+                ]
+            ),
+            id="tokens_sequence_iterable",
+        ),
+    ],
+)
+def test_embeddings_create(sentry_init, capture_events, input, request):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = mock.Mock(return_value=returned_embedding)
+    with start_transaction(name="openai tx"):
+        response = client.embeddings.create(input=input, model="text-embedding-3-large")
+
+    assert len(response.data[0].embedding) == 3
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.embeddings"
+
+    param_id = request.node.callspec.id
+    if param_id == "string":
+        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
+    elif param_id == "string_sequence" or param_id == "string_iterable":
+        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
+            "First text",
+            "Second text",
+            "Third text",
+        ]
+    elif param_id == "tokens" or param_id == "token_iterable":
+        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
+            5,
+            8,
+            13,
+            21,
+            34,
+        ]
     else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
+            [5, 8, 13, 21, 34],
+            [8, 13, 21, 34, 55],
+        ]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
@@ -978,9 +1081,13 @@ def test_embeddings_create(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    [
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
 )
-async def test_embeddings_create_async(
+async def test_embeddings_create_async_no_pii(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     sentry_init(
@@ -1014,10 +1121,112 @@ async def test_embeddings_create_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
-    if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+
+    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "input",
+    [
+        pytest.param(
+            "hello",
+            id="string",
+        ),
+        pytest.param(
+            ["First text", "Second text", "Third text"],
+            id="string_sequence",
+        ),
+        pytest.param(
+            iter(["First text", "Second text", "Third text"]),
+            id="string_iterable",
+        ),
+        pytest.param(
+            [5, 8, 13, 21, 34],
+            id="tokens",
+        ),
+        pytest.param(
+            iter(
+                [5, 8, 13, 21, 34],
+            ),
+            id="token_iterable",
+        ),
+        pytest.param(
+            [
+                [5, 8, 13, 21, 34],
+                [8, 13, 21, 34, 55],
+            ],
+            id="tokens_sequence",
+        ),
+        pytest.param(
+            iter(
+                [
+                    [5, 8, 13, 21, 34],
+                    [8, 13, 21, 34, 55],
+                ]
+            ),
+            id="tokens_sequence_iterable",
+        ),
+    ],
+)
+async def test_embeddings_create_async(sentry_init, capture_events, input, request):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = AsyncMock(return_value=returned_embedding)
+    with start_transaction(name="openai tx"):
+        response = await client.embeddings.create(
+            input=input, model="text-embedding-3-large"
+        )
+
+    assert len(response.data[0].embedding) == 3
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.embeddings"
+
+    param_id = request.node.callspec.id
+    if param_id == "string":
+        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
+    elif param_id == "string_sequence" or param_id == "string_iterable":
+        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
+            "First text",
+            "Second text",
+            "Third text",
+        ]
+    elif param_id == "tokens" or param_id == "token_iterable":
+        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
+            5,
+            8,
+            13,
+            21,
+            34,
+        ]
     else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
+            [5, 8, 13, 21, 34],
+            [8, 13, 21, 34, 55],
+        ]
 
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
