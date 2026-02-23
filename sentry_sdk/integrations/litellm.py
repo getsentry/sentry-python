@@ -103,8 +103,8 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     _get_metadata_dict(kwargs)["_sentry_span"] = span
 
     # Set basic data
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
+    span.set_data(SPANDATA.GEN_AI_SYSTEM, provider)
+    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record input/messages if allowed
     if should_send_default_pii() and integration.include_prompts:
@@ -157,7 +157,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     for key, attribute in params.items():
         value = kwargs.get(key)
         if value is not None:
-            set_data_normalized(span, attribute, value)
+            span.set_data(attribute, value)
 
     # Record LiteLLM-specific parameters
     litellm_params = {
@@ -167,7 +167,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     }
     for key, value in litellm_params.items():
         if value is not None:
-            set_data_normalized(span, f"gen_ai.litellm.{key}", value)
+            span.set_data(f"gen_ai.litellm.{key}", value)
 
 
 def _success_callback(
@@ -189,9 +189,7 @@ def _success_callback(
     try:
         # Record model information
         if hasattr(completion_response, "model"):
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_MODEL, completion_response.model
-            )
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, completion_response.model)
 
         # Record response content if allowed
         if should_send_default_pii() and integration.include_prompts:
