@@ -977,7 +977,6 @@ def test_embeddings_create_no_pii(
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "input",
     [
