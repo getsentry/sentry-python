@@ -389,7 +389,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
-                    set_data_normalized(span, attribute, all_params[key], unpack=False)
+                    span.set_data(attribute, all_params[key])
 
             _set_tools_on_span(span, all_params.get("tools"))
 
