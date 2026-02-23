@@ -204,6 +204,21 @@ def test_nonstreaming_chat_completion_no_prompts(
             ],
             id="parts",
         ),
+        pytest.param(
+            iter(
+                [
+                    {
+                        "role": "system",
+                        "content": [
+                            {"type": "text", "text": "You are a helpful assistant."},
+                            {"type": "text", "text": "Be concise and clear."},
+                        ],
+                    },
+                    {"role": "user", "content": "hello"},
+                ]
+            ),
+            id="iterator",
+        ),
     ],
 )
 def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, request):
@@ -334,6 +349,21 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                 {"role": "user", "content": "hello"},
             ],
             id="parts",
+        ),
+        pytest.param(
+            iter(
+                [
+                    {
+                        "role": "system",
+                        "content": [
+                            {"type": "text", "text": "You are a helpful assistant."},
+                            {"type": "text", "text": "Be concise and clear."},
+                        ],
+                    },
+                    {"role": "user", "content": "hello"},
+                ]
+            ),
+            id="iterator",
         ),
     ],
 )
@@ -520,6 +550,21 @@ def test_streaming_chat_completion_no_prompts(
                 {"role": "user", "content": "hello"},
             ],
             id="parts",
+        ),
+        pytest.param(
+            iter(
+                [
+                    {
+                        "role": "system",
+                        "content": [
+                            {"type": "text", "text": "You are a helpful assistant."},
+                            {"type": "text", "text": "Be concise and clear."},
+                        ],
+                    },
+                    {"role": "user", "content": "hello"},
+                ]
+            ),
+            id="iterator",
         ),
     ],
 )
@@ -756,6 +801,21 @@ async def test_streaming_chat_completion_async_no_prompts(
                 {"role": "user", "content": "hello"},
             ],
             id="parts",
+        ),
+        pytest.param(
+            iter(
+                [
+                    {
+                        "role": "system",
+                        "content": [
+                            {"type": "text", "text": "You are a helpful assistant."},
+                            {"type": "text", "text": "Be concise and clear."},
+                        ],
+                    },
+                    {"role": "user", "content": "hello"},
+                ]
+            ),
+            id="iterator",
         ),
     ],
 )
