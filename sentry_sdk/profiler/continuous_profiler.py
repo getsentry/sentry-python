@@ -308,7 +308,7 @@ class ContinuousScheduler:
 
     @property
     def profiler_id(self) -> "Union[str, None]":
-        if self.buffer is None:
+        if not self.running or self.buffer is None:
             return None
         return self.buffer.profiler_id
 
@@ -436,9 +436,10 @@ class ContinuousScheduler:
             # timestamp so we can use it next iteration
             last = time.perf_counter()
 
-        if self.buffer is not None:
-            self.buffer.flush()
-            self.buffer = None
+        buffer = self.buffer
+        if buffer is not None:
+            buffer.flush()
+            buffer = None
 
 
 class ThreadContinuousScheduler(ContinuousScheduler):

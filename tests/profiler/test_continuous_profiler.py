@@ -621,3 +621,68 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
     ) as mock_teardown:
         stop_profiler_func()
         mock_teardown.assert_not_called()
+
+
+@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
+def test_continuous_profiler_run_does_not_null_buffer(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    """
+    Verifies that ContinuousScheduler.run() does not set self.buffer = None
+    after exiting its sampling loop.
+
+    Previously, run() would execute `self.buffer = None` after the while
+    loop exited. During rapid stop/start cycles, this could race with
+    ensure_running() which creates a new buffer: the old thread's cleanup
+    would destroy the newly-created buffer, causing the new profiler thread
+    to silently drop all samples (self.buffer is None in the sampler).
+
+    The fix uses a local buffer reference for flushing and never sets
+    self.buffer = None from run().
+    """
+    from sentry_sdk.profiler import continuous_profiler as cp
+    from sentry_sdk.profiler.continuous_profiler import ContinuousScheduler
+
+    options = get_client_options(True)(
+        mode="thread", profile_session_sample_rate=1.0, lifecycle="manual"
+    )
+    sentry_init(traces_sample_rate=1.0, **options)
+    envelopes = capture_envelopes()
+    thread = threading.current_thread()
+
+    # Start and verify profiler works
+    start_profiler()
+    envelopes.clear()
+    with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(op="op"):
+            time.sleep(0.1)
+    assert_single_transaction_with_profile_chunks(envelopes, thread)
+
+    # Get the scheduler and create a sentinel buffer.
+    # We'll call run() directly to verify it doesn't null out self.buffer.
+    scheduler = cp._scheduler
+    assert scheduler is not None
+
+    # Stop the profiler so the thread exits cleanly
+    stop_profiler()
+
+    # Now set up a fresh buffer and mark the scheduler as not running
+    # (simulating the state right after ensure_running() created a new buffer
+    # but the old thread hasn't done cleanup yet).
+    scheduler.reset_buffer()
+    buffer_before = scheduler.buffer
+    assert buffer_before is not None
+
+    # Simulate what happens when run() exits its while loop:
+    # self.running is already False, so the while loop exits immediately.
+    scheduler.running = False
+    scheduler.run()
+
+    # After the fix, run() should NOT have set self.buffer = None.
+    # It should only flush using a local reference.
+    assert scheduler.buffer is not None, (
+        "run() must not set self.buffer = None; "
+        "this would destroy buffers created by concurrent ensure_running() calls"
+    )
