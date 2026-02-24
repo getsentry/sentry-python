@@ -43,13 +43,16 @@ def _patch_execute_tool_call() -> None:
     async def wrapped_execute_tool_call(
         self: "Any", validated: "Any", *args: "Any", **kwargs: "Any"
     ) -> "Any":
+        if not validated or not hasattr(validated, "call"):
+            return await original_execute_tool_call(self, validated, *args, **kwargs)
+
         # Extract tool info before calling original
         call = validated.call
         name = call.tool_name
         tool = self.tools.get(name) if self.tools else None
 
         # Determine tool type by checking tool.toolset
-        tool_type = "function"  # default
+        tool_type = "function"
         if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
             tool_type = "mcp"
 
