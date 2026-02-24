@@ -22,7 +22,7 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         self: "ServerInterceptor",
         find_name: "Optional[Callable[[ServicerContext], str]]" = None,
     ) -> None:
-        self._find_method_name = find_name or ServerInterceptor._find_name
+        self._custom_find_name = find_name
 
         super().__init__()
 
@@ -35,9 +35,12 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         if not handler or not handler.unary_unary:
             return handler
 
+        method_name = handler_call_details.method
+        custom_find_name = self._custom_find_name
+
         def behavior(request: "Message", context: "ServicerContext") -> "Message":
             with sentry_sdk.isolation_scope():
-                name = self._find_method_name(context)
+                name = custom_find_name(context) if custom_find_name else method_name
 
                 if name:
                     metadata = dict(context.invocation_metadata())
@@ -63,7 +66,3 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             request_deserializer=handler.request_deserializer,
             response_serializer=handler.response_serializer,
         )
-
-    @staticmethod
-    def _find_name(context: "ServicerContext") -> str:
-        return context._rpc_event.call_details.method.decode()

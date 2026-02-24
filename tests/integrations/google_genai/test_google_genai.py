@@ -152,17 +152,8 @@ def test_nonstreaming_generate_content(
     assert event["type"] == "transaction"
     assert event["transaction"] == "google_genai"
 
-    # Should have 2 spans: invoke_agent and chat
-    assert len(event["spans"]) == 2
-    invoke_span, chat_span = event["spans"]
-
-    # Check invoke_agent span
-    assert invoke_span["op"] == OP.GEN_AI_INVOKE_AGENT
-    assert invoke_span["description"] == "invoke_agent"
-    assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "gemini-1.5-flash"
-    assert invoke_span["data"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
-    assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+    assert len(event["spans"]) == 1
+    chat_span = event["spans"][0]
 
     # Check chat span
     assert chat_span["op"] == OP.GEN_AI_CHAT
@@ -172,18 +163,12 @@ def test_nonstreaming_generate_content(
     assert chat_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
 
     if send_default_pii and include_prompts:
-        # Messages are serialized as JSON strings
-        messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-        assert messages == [{"role": "user", "content": "Tell me a joke"}]
-
         # Response text is stored as a JSON array
         response_text = chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         # Parse the JSON array
         response_texts = json.loads(response_text)
         assert response_texts == ["Hello! How can I help you today?"]
     else:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["data"]
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_span["data"]
 
     # Check token usage
@@ -193,10 +178,6 @@ def test_nonstreaming_generate_content(
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
-
-    # Check configuration parameters
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
 
 
 @pytest.mark.parametrize("generate_content_config", (False, True))
@@ -519,50 +500,30 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
 
     (event,) = events
 
-    # There should be 2 spans: invoke_agent and chat
-    assert len(event["spans"]) == 2
-    invoke_span = event["spans"][0]
-    chat_span = event["spans"][1]
+    assert len(event["spans"]) == 1
+    chat_span = event["spans"][0]
 
     # Check that streaming flag is set on both spans
-    assert invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
     # Verify accumulated response text (all chunks combined)
     expected_full_text = "Hello! How can I help you today?"
     # Response text is stored as a JSON string
     chat_response_text = json.loads(chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])
-    invoke_response_text = json.loads(
-        invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    )
     assert chat_response_text == [expected_full_text]
-    assert invoke_response_text == [expected_full_text]
 
     # Verify finish reasons (only the final chunk has a finish reason)
     # When there's a single finish reason, it's stored as a plain string (not JSON)
     assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in chat_span["data"]
-    assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in invoke_span["data"]
     assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
-    assert invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
-
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
-
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
-
     assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
-    assert invoke_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
 
     # Verify model name
     assert chat_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
-    assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "gemini-1.5-flash"
 
 
 def test_span_origin(sentry_init, capture_events, mock_genai_client):
@@ -625,7 +586,7 @@ def test_response_without_usage_metadata(
             )
 
     (event,) = events
-    chat_span = event["spans"][1]
+    chat_span = event["spans"][0]
 
     # Usage data should not be present
     assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in chat_span["data"]
@@ -679,7 +640,7 @@ def test_multiple_candidates(sentry_init, capture_events, mock_genai_client):
             )
 
     (event,) = events
-    chat_span = event["spans"][1]
+    chat_span = event["spans"][0]
 
     # Should capture all responses
     # Response text is stored as a JSON string when there are multiple responses
@@ -765,7 +726,7 @@ def test_empty_response(sentry_init, capture_events, mock_genai_client):
 
     (event,) = events
     # Should still create spans even with empty candidates
-    assert len(event["spans"]) == 2
+    assert len(event["spans"]) == 1
 
 
 def test_response_with_different_id_fields(
@@ -804,7 +765,7 @@ def test_response_with_different_id_fields(
             )
 
     (event,) = events
-    chat_span = event["spans"][1]
+    chat_span = event["spans"][0]
 
     assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "resp-456"
     assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gemini-1.5-flash-001"
@@ -916,7 +877,7 @@ def test_tool_calls_extraction(sentry_init, capture_events, mock_genai_client):
             )
 
     (event,) = events
-    chat_span = event["spans"][1]  # The chat span
+    chat_span = event["spans"][0]  # The chat span
 
     # Check that tool calls are extracted and stored
     assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_span["data"]

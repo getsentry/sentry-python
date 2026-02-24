@@ -23,6 +23,14 @@ try:
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
+try:
+    from rq.worker import BaseWorker
+
+    if not hasattr(BaseWorker, "perform_job"):
+        BaseWorker = None
+except ImportError:
+    BaseWorker = None
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -43,7 +51,13 @@ class RqIntegration(Integration):
         version = parse_version(RQ_VERSION)
         _check_minimum_version(RqIntegration, version)
 
-        old_perform_job = Worker.perform_job
+        # In rq 2.7.0+, SimpleWorker inherits from BaseWorker directly
+        # instead of Worker, so we need to patch BaseWorker to cover both.
+        # For older versions where BaseWorker doesn't exist or doesn't have
+        # perform_job, we patch Worker.
+        worker_cls = BaseWorker if BaseWorker is not None else Worker
+
+        old_perform_job = worker_cls.perform_job
 
         @ensure_integration_enabled(RqIntegration, old_perform_job)
         def sentry_patched_perform_job(
@@ -78,9 +92,9 @@ class RqIntegration(Integration):
 
             return rv
 
-        Worker.perform_job = sentry_patched_perform_job
+        worker_cls.perform_job = sentry_patched_perform_job
 
-        old_handle_exception = Worker.handle_exception
+        old_handle_exception = worker_cls.handle_exception
 
         def sentry_patched_handle_exception(
             self: "Worker", job: "Any", *exc_info: "Any", **kwargs: "Any"
@@ -96,7 +110,7 @@ class RqIntegration(Integration):
 
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
-        Worker.handle_exception = sentry_patched_handle_exception
+        worker_cls.handle_exception = sentry_patched_handle_exception
 
         old_enqueue_job = Queue.enqueue_job
 
