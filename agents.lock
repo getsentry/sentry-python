@@ -15,6 +15,13 @@ resolved_path = ".agents/skills/find-bugs"
 commit = "300f87e68926c4a89d664d730e87c2375ab6d215"
 integrity = "sha256-FWmCLdOj+x+XffiEg7Bx19drylVypeKz8me9OA757js="
 
+[skills.security-review]
+source = "getsentry/skills"
+resolved_url = "https://github.com/getsentry/skills.git"
+resolved_path = ".agents/skills/security-review"
+commit = "187c0022b3b676f72227a04f1cfc8921a58a5020"
+integrity = "sha256-/PngFJkQcji7nYQjh1yerMnxIBaEJNiClJJ8FuCGgAo="
+
 [skills.skill-scanner]
 source = "getsentry/skills"
 resolved_url = "https://github.com/getsentry/skills.git"

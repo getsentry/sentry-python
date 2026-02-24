@@ -207,7 +207,7 @@ def _set_output_data(span: "sentry_sdk.tracing.Span", response: "Any") -> None:
     if not response:
         return
 
-    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
     try:
         # Extract text from ModelResponse
         if hasattr(response, "parts"):
