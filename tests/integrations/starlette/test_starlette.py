@@ -144,7 +144,12 @@ def starlette_app_factory(middleware=None, debug=True):
             "request": request,
             "msg": "Hello Template World!",
         }
-        return templates.TemplateResponse("trace_meta.html", template_context)
+        if STARLETTE_VERSION >= (1,):
+            return templates.TemplateResponse(
+                request, "trace_meta.html", template_context
+            )
+        else:
+            return templates.TemplateResponse("trace_meta.html", template_context)
 
     all_methods = [
         "CONNECT",
