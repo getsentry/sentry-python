@@ -247,7 +247,7 @@ def _set_input_data(
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
     system_instructions: "Union[str, Iterable[TextBlockParam]]" = kwargs.get("system")  # type: ignore
     messages = kwargs.get("messages")
     if (
@@ -317,9 +317,7 @@ def _set_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
-    set_data_normalized(
-        span, SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False)
-    )
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False))
 
     kwargs_keys_to_attributes = {
         "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
@@ -332,14 +330,12 @@ def _set_input_data(
         value = kwargs.get(key)
 
         if value is not None and _is_given(value):
-            set_data_normalized(span, attribute, value)
+            span.set_data(attribute, value)
 
     # Input attributes: Tools
     tools = kwargs.get("tools")
     if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
+        span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
 
 
 def _set_output_data(
