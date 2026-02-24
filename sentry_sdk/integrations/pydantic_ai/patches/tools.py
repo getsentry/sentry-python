@@ -28,6 +28,85 @@ except ImportError:
 
 
 def _patch_tool_execution() -> None:
+    if hasattr(ToolManager, "execute_tool_call"):
+        _patch_execute_tool_call()
+
+    elif hasattr(ToolManager, "_call_tool"):
+        # older versions
+        _patch_call_tool()
+
+
+def _patch_execute_tool_call() -> None:
+    original_execute_tool_call = ToolManager.execute_tool_call
+
+    @wraps(original_execute_tool_call)
+    async def wrapped_execute_tool_call(
+        self: "Any", validated: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        if not validated or not hasattr(validated, "call"):
+            return await original_execute_tool_call(self, validated, *args, **kwargs)
+
+        # Extract tool info before calling original
+        call = validated.call
+        name = call.tool_name
+        tool = self.tools.get(name) if self.tools else None
+
+        # Determine tool type by checking tool.toolset
+        tool_type = "function"
+        if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
+            tool_type = "mcp"
+
+        # Get agent from contextvar
+        agent = get_current_agent()
+
+        if agent and tool:
+            try:
+                args_dict = call.args_as_dict()
+            except Exception:
+                args_dict = call.args if isinstance(call.args, dict) else {}
+
+            # Create execute_tool span
+            # Nesting is handled by isolation_scope() to ensure proper parent-child relationships
+            with sentry_sdk.isolation_scope():
+                with execute_tool_span(
+                    name,
+                    args_dict,
+                    agent,
+                    tool_type=tool_type,
+                ) as span:
+                    try:
+                        result = await original_execute_tool_call(
+                            self,
+                            validated,
+                            *args,
+                            **kwargs,
+                        )
+                        update_execute_tool_span(span, result)
+                        return result
+                    except ToolRetryError as exc:
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            # Avoid circular import due to multi-file integration structure
+                            from sentry_sdk.integrations.pydantic_ai import (
+                                PydanticAIIntegration,
+                            )
+
+                            integration = sentry_sdk.get_client().get_integration(
+                                PydanticAIIntegration
+                            )
+                            if (
+                                integration is not None
+                                and integration.handled_tool_call_exceptions
+                            ):
+                                _capture_exception(exc, handled=True)
+                        reraise(*exc_info)
+
+        return await original_execute_tool_call(self, validated, *args, **kwargs)
+
+    ToolManager.execute_tool_call = wrapped_execute_tool_call
+
+
+def _patch_call_tool() -> None:
     """
     Patch ToolManager._call_tool to create execute_tool spans.
 
@@ -39,7 +118,6 @@ def _patch_tool_execution() -> None:
     - Dealing with signature mismatches from instrumented MCP servers
     - Complex nested toolset handling
     """
-
     original_call_tool = ToolManager._call_tool
 
     @wraps(original_call_tool)

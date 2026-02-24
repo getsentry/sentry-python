@@ -106,6 +106,26 @@ In general, you use
 tox -p auto -o -e <tox_env> -- <pytest_args>
 ```
 
+## Debugging
+
+Normal Python breakpoints using `breakpoint()` will drop you into `pdb` by default.
+To inspect C applications like uWSGI or extension module code at runtime, `lldb` is useful.
+For example, to debug a Django application that interfaces with uWSGI, build uWSGI with debug symbols using
+
+```bash
+CFLAGS="-g -O0" python uwsgiconfig.py --build
+```
+
+and then run the Django app with `lldb` using a command analogous to the following (with paths updated)
+
+```bash
+lldb -- ../../uwsgi/uwsgi --pythonpath "$PWD/.venv/lib/python3.14/site-packages" \
+  --http :8000 \
+  --module mysite.wsgi:application \
+  --home "$PWD/.venv" \
+  --need-app \
+```
+
 ## Adding a New Integration
 
 ### SDK Contract
