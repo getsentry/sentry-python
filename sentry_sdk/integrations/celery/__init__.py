@@ -329,9 +329,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                 headers = args[3].get("headers") or {}
                 if span_streaming:
                     sentry_sdk.traces.continue_trace(headers)
-                    transaction = sentry_sdk.traces.start_span(
-                        name="unknown celery task"
-                    )
+                    transaction = sentry_sdk.traces.start_span(name=task.name)
                     transaction.set_origin(CeleryIntegration.origin)
                     transaction.set_source(TransactionSource.TASK)
                     transaction.set_op(OP.QUEUE_TASK_CELERY)
@@ -342,11 +340,10 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                     transaction = continue_trace(
                         headers,
                         op=OP.QUEUE_TASK_CELERY,
-                        name="unknown celery task",
+                        name=task.name,
                         source=TransactionSource.TASK,
                         origin=CeleryIntegration.origin,
                     )
-                    transaction.name = task.name
                     transaction.set_status(SPANSTATUS.OK)
 
                     span_ctx = sentry_sdk.start_transaction(
