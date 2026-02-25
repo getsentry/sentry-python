@@ -154,6 +154,7 @@ def graphql_span(
         if operation_name:
             _graphql_span.set_attribute("graphql.operation.name", operation_name)
         _graphql_span.set_attribute("graphql.operation.type", operation_type)
+        _graphql_span.start()
     else:
         _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
         _graphql_span.set_data("graphql.document", source)
@@ -163,4 +164,7 @@ def graphql_span(
     try:
         yield
     finally:
-        _graphql_span.finish()
+        if isinstance(_graphql_span, StreamedSpan):
+            _graphql_span.end()
+        else:
+            _graphql_span.finish()
