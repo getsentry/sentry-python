@@ -389,11 +389,7 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
     # Need to wrap task call because the exception is caught before we get to
     # see it. Also celery's reported stacktrace is untrustworthy.
 
-    # functools.wraps is important here because celery-once looks at this
-    # method's name. @ensure_integration_enabled internally calls functools.wraps,
-    # but if we ever remove the @ensure_integration_enabled decorator, we need
-    # to add @functools.wraps(f) here.
-    # https://github.com/getsentry/sentry-python/issues/421
+    @wraps(f)
     def _inner(*args: "Any", **kwargs: "Any") -> "Any":
         client = sentry_sdk.get_client()
         if client.get_integration(CeleryIntegration) is None:

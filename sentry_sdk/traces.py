@@ -416,7 +416,10 @@ class StreamedSpan:
             return
 
         if self.sampled is None:
-            logger.warning("Discarding transaction without sampling decision.")
+            logger.warning("Discarding span without sampling decision.")
+            if client.transport and has_tracing_enabled(client.options):
+                client.transport.record_lost_event("sample_rate", data_category="span")
+            return
 
         if self._finished is True:
             # This span is already finished, ignore.

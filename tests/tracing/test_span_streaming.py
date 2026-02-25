@@ -497,7 +497,7 @@ def test_sibling_segments(sentry_init, capture_envelopes):
     assert segment2["is_segment"] is True
     assert segment2["parent_span_id"] is None
 
-    assert segment1["trace_id"] == segment1["trace_id"]
+    assert segment1["trace_id"] == segment2["trace_id"]
 
 
 def test_sibling_segments_new_trace(sentry_init, capture_envelopes):
