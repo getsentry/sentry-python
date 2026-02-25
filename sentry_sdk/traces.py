@@ -188,6 +188,7 @@ def new_trace() -> None:
 
     new_trace() doesn't start any spans on its own.
     """
+    sentry_sdk.get_isolation_scope().set_new_propagation_context()
     sentry_sdk.get_current_scope().set_new_propagation_context()
 
 

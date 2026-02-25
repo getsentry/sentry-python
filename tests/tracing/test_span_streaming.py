@@ -853,6 +853,7 @@ def test_set_span_origin(sentry_init, capture_envelopes):
     [
         # no regexes
         ([], "/health", {}, False),
+        ([{}], "/health", {}, False),
         (["/health"], "/health", {}, True),
         (["/health"], "/health", {"custom": "custom"}, True),
         ([{"name": "/health"}], "/health", {}, True),

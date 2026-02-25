@@ -1495,7 +1495,7 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
             if _matches(rule, name):
                 return True
 
-        elif isinstance(rule, dict):
+        elif isinstance(rule, dict) and rule:
             name_matches = True
             attributes_match = True
 
