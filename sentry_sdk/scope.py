@@ -1302,7 +1302,7 @@ class Scope:
         propagation_context = self.get_active_propagation_context()
         baggage = propagation_context.baggage
 
-        if baggage is not None:
+        if baggage is not None and span.sample_rate is not None:
             baggage.sentry_items["sample_rate"] = str(span.sample_rate)
 
     def continue_trace(

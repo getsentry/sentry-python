@@ -217,6 +217,7 @@ class SentryAsgiMiddleware:
                     span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
                     if span_streaming:
                         segment: "Optional[StreamedSpan]" = None
+                        sentry_scope.set_custom_sampling_context({"asgi_scope": scope})
                         if ty in ("http", "websocket"):
                             if (
                                 ty == "websocket"

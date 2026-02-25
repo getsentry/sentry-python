@@ -315,6 +315,8 @@ class SentryAsyncExtension(SchemaExtension):
             span = sentry_sdk.traces.start_span(
                 parent_span=self.graphql_span, name=f"resolving {field_path}"
             )
+            span.set_op(OP.GRAPHQL_RESOLVE)
+            span.set_origin(StrawberryIntegration.origin)
             span.set_attribute("graphql.field_name", info.field_name)
             span.set_attribute("graphql.parent_type", info.parent_type.name)
             span.set_attribute("graphql.field_path", field_path)

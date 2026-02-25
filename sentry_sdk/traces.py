@@ -436,7 +436,7 @@ class StreamedSpan:
                 self.timestamp = datetime.now(timezone.utc)
 
         if self.segment.sampled:  # XXX this should just use its own sampled
-            sentry_sdk.get_current_scope()._capture_span(self)
+            scope._capture_span(self)
 
         self._finished = True
 
@@ -763,6 +763,13 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def is_segment(self) -> bool:
         return False
+
+    def to_traceparent(self) -> str:
+        propagation_context = (
+            sentry_sdk.get_current_scope().get_active_propagation_context()
+        )
+
+        return f"{propagation_context.trace_id}-{propagation_context.span_id}-0"
 
     @property
     def span_id(self) -> str:

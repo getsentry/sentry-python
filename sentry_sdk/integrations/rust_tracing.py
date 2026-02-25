@@ -218,6 +218,7 @@ class RustTracingLayer:
                 )
                 sentry_span.set_op("function")
                 sentry_span.set_origin(self.origin)
+                sentry_span.start()
             else:
                 sentry_span = parent_sentry_span.start_child(
                     op="function",
@@ -233,6 +234,7 @@ class RustTracingLayer:
                 )
                 sentry_span.set_op("function")
                 sentry_span.set_origin(self.origin)
+                sentry_span.start()
             else:
                 sentry_span = sentry_sdk.start_span(
                     op="function",
@@ -260,7 +262,10 @@ class RustTracingLayer:
             return
 
         parent_sentry_span, sentry_span = span_state
-        sentry_span.finish()
+        if isinstance(sentry_span, StreamedSpan):
+            sentry_span.end()
+        else:
+            sentry_span.finish()
         sentry_sdk.get_current_scope().span = parent_sentry_span
 
     def on_record(self, span_id: str, values: str, span_state: "TraceState") -> None:
