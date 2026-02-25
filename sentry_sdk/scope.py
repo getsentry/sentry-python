@@ -825,7 +825,10 @@ class Scope:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
         if self._span:
-            if isinstance(self._span, StreamedSpan):
+            if isinstance(self._span, NoOpStreamedSpan):
+                return
+
+            elif isinstance(self._span, StreamedSpan):
                 self._span.segment.set_name(name)
                 if source:
                     self._span.segment.set_source(source)

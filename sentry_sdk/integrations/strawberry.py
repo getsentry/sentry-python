@@ -260,6 +260,7 @@ class SentryAsyncExtension(SchemaExtension):
         if isinstance(self.graphql_span, StreamedSpan):
             self.parsing_span = sentry_sdk.traces.start_span(
                 name="parsing",
+                parent_span=self.graphql_span,
             )
             self.parsing_span.set_op(OP.GRAPHQL_PARSE)
             self.parsing_span.set_origin(StrawberryIntegration.origin)

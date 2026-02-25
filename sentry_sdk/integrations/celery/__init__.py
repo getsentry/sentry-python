@@ -321,7 +321,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
             transaction: "Optional[Union[Span, StreamedSpan]]" = None
-            span_ctx: "Union[Span, StreamedSpan]"
+            span_ctx: "Optional[Union[Span, StreamedSpan]]" = None
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
@@ -359,7 +359,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                         },
                     )
 
-            if transaction is None:
+            if transaction is None or span_ctx is None:
                 return f(*args, **kwargs)
 
             with span_ctx:
