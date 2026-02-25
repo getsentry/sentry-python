@@ -7,7 +7,6 @@ from sentry_sdk.utils import capture_internal_exceptions, reraise
 from ..spans import (
     invoke_agent_span,
     end_invoke_agent_span,
-    handoff_span,
 )
 from ..utils import _record_exception_on_span
 
@@ -162,44 +161,6 @@ async def _run_single_turn_streamed(
                 end_invoke_agent_span(context_wrapper, agent)
             _close_streaming_workflow_span(agent)
         reraise(*exc_info)
-
-    return result
-
-
-async def _execute_handoffs(
-    original_execute_handoffs: "Callable[..., SingleStepResult]",
-    *args: "Any",
-    **kwargs: "Any",
-) -> "SingleStepResult":
-    """
-    Patched execute_handoffs that
-    - creates and manages handoff spans.
-    - ends the agent invocation span.
-    - ends the workflow span if the response is streamed and an exception is raised in `execute_handoffs()`.
-    """
-
-    context_wrapper = kwargs.get("context_wrapper")
-    run_handoffs = kwargs.get("run_handoffs")
-    agent = kwargs.get("agent")
-
-    # Create Sentry handoff span for the first handoff (agents library only processes the first one)
-    if run_handoffs:
-        first_handoff = run_handoffs[0]
-        handoff_agent_name = first_handoff.handoff.agent_name
-        handoff_span(context_wrapper, agent, handoff_agent_name)
-
-    # Call original method with all parameters
-    try:
-        result = await original_execute_handoffs(*args, **kwargs)
-    except Exception:
-        exc_info = sys.exc_info()
-        with capture_internal_exceptions():
-            _close_streaming_workflow_span(agent)
-        reraise(*exc_info)
-    finally:
-        # End span for current agent after handoff processing is complete
-        if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-            end_invoke_agent_span(context_wrapper, agent)
 
     return result
 
