@@ -398,6 +398,9 @@ class StreamedSpan:
         scope: "Optional[sentry_sdk.Scope]" = (
             scope or self._scope or sentry_sdk.get_current_scope()
         )
+        if scope is None:
+            # Can't happen but mypy doesn't realize
+            return
 
         # Explicit check against False needed because self.sampled might be None
         if self.sampled is False:
