@@ -7,6 +7,7 @@ from werkzeug.test import Client
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk._werkzeug import get_host, _get_headers
 
 
 @pytest.fixture
@@ -39,6 +40,65 @@ class ExitingIterable:
         return type(self).__next__(self)
 
 
+@pytest.mark.parametrize(
+    ("environ", "expect"),
+    (
+        pytest.param({"HTTP_HOST": "spam"}, "spam", id="host"),
+        pytest.param({"HTTP_HOST": "spam:80"}, "spam", id="host, strip http port"),
+        pytest.param(
+            {"wsgi.url_scheme": "https", "HTTP_HOST": "spam:443"},
+            "spam",
+            id="host, strip https port",
+        ),
+        pytest.param({"HTTP_HOST": "spam:8080"}, "spam:8080", id="host, custom port"),
+        pytest.param(
+            {"HTTP_HOST": "spam", "SERVER_NAME": "eggs", "SERVER_PORT": "80"},
+            "spam",
+            id="prefer host",
+        ),
+        pytest.param(
+            {"SERVER_NAME": "eggs", "SERVER_PORT": "80"},
+            "eggs",
+            id="name, ignore http port",
+        ),
+        pytest.param(
+            {"wsgi.url_scheme": "https", "SERVER_NAME": "eggs", "SERVER_PORT": "443"},
+            "eggs",
+            id="name, ignore https port",
+        ),
+        pytest.param(
+            {"SERVER_NAME": "eggs", "SERVER_PORT": "8080"},
+            "eggs:8080",
+            id="name, custom port",
+        ),
+        pytest.param(
+            {"HTTP_HOST": "ham", "HTTP_X_FORWARDED_HOST": "eggs"},
+            "ham",
+            id="ignore x-forwarded-host",
+        ),
+        pytest.param(
+            {
+                "SERVER_NAME": "2001:0db8:85a3:0042:1000:8a2e:0370:7334",
+                "SERVER_PORT": "8080",
+            },
+            "[2001:0db8:85a3:0042:1000:8a2e:0370:7334]:8080",
+            id="IPv6, custom port",
+        ),
+        pytest.param(
+            {"SERVER_NAME": "eggs"},
+            "eggs",
+            id="name, no port",
+        ),
+    ),
+)
+#
+# https://github.com/pallets/werkzeug/blob/main/tests/test_wsgi.py#L60
+#
+def test_get_host(environ, expect):
+    environ.setdefault("wsgi.url_scheme", "http")
+    assert get_host(environ) == expect
+
+
 def test_basic(sentry_init, crashing_app, capture_events):
     sentry_init(send_default_pii=True)
     app = SentryWsgiMiddleware(crashing_app)
@@ -59,6 +119,21 @@ def test_basic(sentry_init, crashing_app, capture_events):
         "query_string": "",
         "url": "http://localhost/",
     }
+
+
+@pytest.mark.parametrize(
+    ("environ", "expect"),
+    (
+        pytest.param(
+            {"CONTENT_TYPE": "text/html", "CONTENT_LENGTH": "0"},
+            [("Content-Length", "0"), ("Content-Type", "text/html")],
+            id="headers",
+        ),
+    ),
+)
+def test_headers(environ, expect):
+    environ.setdefault("wsgi.url_scheme", "http")
+    assert sorted(_get_headers(environ)) == expect
 
 
 @pytest.mark.parametrize("path_info", ("bark/", "/bark/"))
