@@ -351,7 +351,7 @@ class SentrySyncExtension(SentryAsyncExtension):
         if isinstance(self.graphql_span, StreamedSpan):
             span = sentry_sdk.traces.start_span(
                 parent_span=self.graphql_span,
-                name="resolving {field_path}",
+                name=f"resolving {field_path}",
             )
             span.set_op(OP.GRAPHQL_RESOLVE)
             span.set_origin(StrawberryIntegration.origin)
