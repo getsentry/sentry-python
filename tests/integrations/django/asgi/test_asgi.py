@@ -9,10 +9,12 @@ from unittest import mock
 import django
 import pytest
 from channels.testing import HttpCommunicator
+
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
+from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
 try:
     from django.urls import reverse
@@ -737,3 +739,49 @@ async def test_transaction_http_method_custom(sentry_init, capture_events, appli
     (event1, event2) = events
     assert event1["request"]["method"] == "OPTIONS"
     assert event2["request"]["method"] == "HEAD"
+
+
+@pytest.mark.asyncio
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
+async def test_user_pii_in_asgi_with_auth(sentry_init, capture_events, settings):
+    settings.MIDDLEWARE = [
+        "django.contrib.sessions.middleware.SessionMiddleware",
+        "django.contrib.auth.middleware.AuthenticationMiddleware",
+    ]
+
+    asgi_application.load_middleware(is_async=True)
+
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    comm = HttpCommunicator(asgi_application, "GET", "/async_mylogin")
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 200
+
+    # Get session cookie from login response
+    set_cookie = next(v for k, v in response["headers"] if k.lower() == b"set-cookie")
+    headers = [(b"cookie", set_cookie)]
+
+    comm = HttpCommunicator(asgi_application, "GET", "/async_message", headers=headers)
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 200
+
+    (event,) = events
+    assert event["message"] == "hi"
+    assert event["user"] == {
+        "email": "lennon@thebeatles.com",
+        "username": "john_async",
+        "id": "1",
+    }
