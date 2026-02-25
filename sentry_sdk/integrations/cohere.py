@@ -1,7 +1,6 @@
 import sys
 from functools import wraps
 
-from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.ai.utils import (
@@ -41,9 +40,10 @@ try:
 except ImportError:
     from cohere import StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse
 
-
 COLLECTED_CHAT_PARAMS = {
     "model": SPANDATA.GEN_AI_REQUEST_MODEL,
+    "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+    "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
     "k": SPANDATA.GEN_AI_REQUEST_TOP_K,
     "p": SPANDATA.GEN_AI_REQUEST_TOP_P,
     "seed": SPANDATA.GEN_AI_REQUEST_SEED,
@@ -78,6 +78,10 @@ class CohereIntegration(Integration):
         BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
         Client.embed = _wrap_embed(Client.embed)
         BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
+
+        from sentry_sdk.integrations.cohere_v2 import setup_v2
+
+        setup_v2(_wrap_embed)
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -156,6 +160,8 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
         with capture_internal_exceptions():
             set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
             set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            if model:
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model)
 
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
@@ -182,7 +188,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             for k, v in COLLECTED_CHAT_PARAMS.items():
                 if k in kwargs:
                     set_data_normalized(span, v, kwargs[k])
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
 
             if streaming:
                 old_iterator = res
