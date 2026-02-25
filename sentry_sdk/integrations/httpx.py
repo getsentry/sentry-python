@@ -135,11 +135,8 @@ def _install_httpx_async_client() -> None:
                             key=key, value=value, url=request.url
                         )
                     )
-                    if key == BAGGAGE_HEADER_NAME and request.headers.get(
-                        BAGGAGE_HEADER_NAME
-                    ):
-                        # do not overwrite any existing baggage, just append to it
-                        request.headers[key] += "," + value
+                    if key == BAGGAGE_HEADER_NAME:
+                        add_sentry_baggage_to_headers(request.headers, value)
                     else:
                         request.headers[key] = value
 
