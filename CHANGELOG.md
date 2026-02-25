@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.52.0a7
+
+### Bug Fixes 🐛
+
+#### Openai
+
+- Avoid consuming iterables passed to the Completions API by @alexander-alderman-webb in [#5489](https://github.com/getsentry/sentry-python/pull/5489)
+- Avoid consuming iterables passed to the Embeddings API by @alexander-alderman-webb in [#5491](https://github.com/getsentry/sentry-python/pull/5491)
+
+#### Other
+
+- (grpc) Read method from handler_call_details for grpcio >= 1.76 compat by @yeung108 in [#5521](https://github.com/getsentry/sentry-python/pull/5521)
+- (httpx) Correctly append baggage in async client by @sentrivana in [#5530](https://github.com/getsentry/sentry-python/pull/5530)
+- (pydantic-ai) Adapt to missing `ToolManager._call_tool` by @sentrivana in [#5522](https://github.com/getsentry/sentry-python/pull/5522)
+- (utils) Use HEROKU_BUILD_COMMIT env var for default release by @ericapisani in [#5499](https://github.com/getsentry/sentry-python/pull/5499)
+
+### Documentation 📚
+
+- Add debugging advice by @alexander-alderman-webb in [#5517](https://github.com/getsentry/sentry-python/pull/5517)
+
+### Internal Changes 🔧
+
+- (agents) Add security-review skill to agent configuration by @ericapisani in [#5498](https://github.com/getsentry/sentry-python/pull/5498)
+- (anthropic) Remove `set_data_normalized` for primitive attributes by @alexander-alderman-webb in [#5504](https://github.com/getsentry/sentry-python/pull/5504)
+- (openai-agents) Remove `set_data_normalized` for primitive attributes by @alexander-alderman-webb in [#5509](https://github.com/getsentry/sentry-python/pull/5509)
+- (pydantic-ai) Remove `set_data_normalized` for the `gen_ai.response.model` attribute by @alexander-alderman-webb in [#5512](https://github.com/getsentry/sentry-python/pull/5512)
+- 🤖 Update test matrix with new releases (02/24) by @github-actions in [#5524](https://github.com/getsentry/sentry-python/pull/5524)
+- 🤖 Update test matrix with new releases (02/23) by @github-actions in [#5503](https://github.com/getsentry/sentry-python/pull/5503)
+
+### Other
+
+- [do not merge] feat: Span streaming & new span API by @sentrivana in [#5317](https://github.com/getsentry/sentry-python/pull/5317)
+
 ## 2.52.0a6
 
 ### Bug Fixes 🐛
