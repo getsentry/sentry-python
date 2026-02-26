@@ -13,7 +13,9 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.scope import should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Transaction, TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -22,7 +24,18 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterator, Optional, Protocol, Tuple, TypeVar
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Iterator,
+        Optional,
+        Protocol,
+        Tuple,
+        TypeVar,
+        Union,
+    )
 
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.utils import ExcInfo
@@ -92,6 +105,9 @@ class SentryWsgiMiddleware:
 
         _wsgi_middleware_applied.set(True)
         try:
+            client = sentry_sdk.get_client()
+            span_streaming = has_span_streaming_enabled(client.options)
+
             with sentry_sdk.isolation_scope() as scope:
                 with track_session(scope, session_mode="request"):
                     with capture_internal_exceptions():
@@ -104,31 +120,43 @@ class SentryWsgiMiddleware:
                         )
 
                     method = environ.get("REQUEST_METHOD", "").upper()
-                    transaction = None
-                    if method in self.http_methods_to_capture:
-                        transaction = continue_trace(
-                            environ,
-                            op=OP.HTTP_SERVER,
-                            name="generic WSGI request",
-                            source=TransactionSource.ROUTE,
-                            origin=self.span_origin,
+
+                    span_ctx: "ContextManager[Union[Transaction, StreamedSpan, None]]"
+                    if span_streaming:
+                        segment: "Optional[StreamedSpan]" = None
+                        if method in self.http_methods_to_capture:
+                            sentry_sdk.traces.continue_trace(environ)
+                            segment = sentry_sdk.traces.start_span(
+                                name="generic WSGI request"
+                            )
+                            segment.set_op(OP.HTTP_SERVER)
+                            segment.set_source(TransactionSource.ROUTE)
+                            segment.set_origin(self.span_origin)
+                        span_ctx = segment or nullcontext()
+                    else:
+                        transaction = None
+                        if method in self.http_methods_to_capture:
+                            transaction = continue_trace(
+                                environ,
+                                op=OP.HTTP_SERVER,
+                                name="generic WSGI request",
+                                source=TransactionSource.ROUTE,
+                                origin=self.span_origin,
+                            )
+                        span_ctx = (
+                            sentry_sdk.start_transaction(
+                                transaction,
+                                custom_sampling_context={"wsgi_environ": environ},
+                            )
+                            if transaction is not None
+                            else nullcontext()
                         )
 
-                    transaction_context = (
-                        sentry_sdk.start_transaction(
-                            transaction,
-                            custom_sampling_context={"wsgi_environ": environ},
-                        )
-                        if transaction is not None
-                        else nullcontext()
-                    )
-                    with transaction_context:
+                    with span_ctx as span:
                         try:
                             response = self.app(
                                 environ,
-                                partial(
-                                    _sentry_start_response, start_response, transaction
-                                ),
+                                partial(_sentry_start_response, start_response, span),
                             )
                         except BaseException:
                             reraise(*_capture_exception())
@@ -140,7 +168,7 @@ class SentryWsgiMiddleware:
 
 def _sentry_start_response(
     old_start_response: "StartResponse",
-    transaction: "Optional[Transaction]",
+    transaction: "Optional[Union[Transaction, StreamedSpan]]",
     status: str,
     response_headers: "WsgiResponseHeaders",
     exc_info: "Optional[WsgiExcInfo]" = None,
