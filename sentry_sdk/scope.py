@@ -575,40 +575,39 @@ class Scope:
 
     def get_traceparent(self, *args: "Any", **kwargs: "Any") -> "Optional[str]":
         """
-        Returns the Sentry "sentry-trace" header (aka the traceparent) from the
-        currently active span or the scopes Propagation Context.
+        Returns the Sentry "sentry-trace" header from the Propagation Context.
         """
-        client = self.get_client()
+        propagation_context = self.get_active_propagation_context()
 
-        # If we have an active span, return traceparent from there
-        if has_tracing_enabled(client.options) and self.span is not None:
-            return self.span.to_traceparent()
+        # Get sampled from current span if available (span.sampled may change after entering)
+        sampled = propagation_context.sampled
+        if self.span is not None:
+            sampled = self.span.sampled
 
-        # else return traceparent from the propagation context
-        return self.get_active_propagation_context().to_traceparent()
+        if sampled is True:
+            sampled_str = "1"
+        elif sampled is False:
+            sampled_str = "0"
+        else:
+            sampled_str = None
+
+        traceparent = f"{propagation_context.trace_id}-{propagation_context.span_id}"
+        if sampled_str is not None:
+            traceparent += f"-{sampled_str}"
+
+        return traceparent
 
     def get_baggage(self, *args: "Any", **kwargs: "Any") -> "Optional[Baggage]":
         """
-        Returns the Sentry "baggage" header containing trace information from the
-        currently active span or the scopes Propagation Context.
+        Returns the Sentry "baggage" header from the Propagation Context.
         """
-        client = self.get_client()
-
-        # If we have an active span, return baggage from there
-        if has_tracing_enabled(client.options) and self.span is not None:
-            return self.span.to_baggage()
-
-        # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
 
     def get_trace_context(self) -> "Dict[str, Any]":
         """
         Returns the Sentry "trace" context from the Propagation Context.
         """
-        if has_tracing_enabled(self.get_client().options) and self._span is not None:
-            return self._span.get_trace_context()
-
-        # if we are tracing externally (otel), those values take precedence
+        # External propagation context (OTel) takes precedence
         external_propagation_context = get_external_propagation_context()
         if external_propagation_context:
             trace_id, span_id = external_propagation_context
@@ -616,12 +615,36 @@ class Scope:
 
         propagation_context = self.get_active_propagation_context()
 
-        return {
+        # Base context from PropagationContext
+        rv: "Dict[str, Any]" = {
             "trace_id": propagation_context.trace_id,
             "span_id": propagation_context.span_id,
             "parent_span_id": propagation_context.parent_span_id,
             "dynamic_sampling_context": propagation_context.dynamic_sampling_context,
         }
+
+        # Add additional context from the current span if available
+        if self.span is not None:
+            rv["parent_span_id"] = self.span.parent_span_id
+            rv["op"] = self.span.op
+            rv["description"] = self.span.description
+            rv["origin"] = self.span.origin
+            if self.span.status:
+                rv["status"] = self.span.status
+            # Add thread data if available
+            data = {}
+            from sentry_sdk.consts import SPANDATA
+
+            thread_id = self.span._data.get(SPANDATA.THREAD_ID)
+            if thread_id is not None:
+                data["thread.id"] = thread_id
+            thread_name = self.span._data.get(SPANDATA.THREAD_NAME)
+            if thread_name is not None:
+                data["thread.name"] = thread_name
+            if data:
+                rv["data"] = data
+
+        return rv
 
     def trace_propagation_meta(self, *args: "Any", **kwargs: "Any") -> str:
         """
@@ -653,10 +676,7 @@ class Scope:
         self, *args: "Any", **kwargs: "Any"
     ) -> "Generator[Tuple[str, str], None, None]":
         """
-        Return HTTP headers which allow propagation of trace data.
-
-        If a span is given, the trace data will taken from the span.
-        If no span is given, the trace data is taken from the scope.
+        Return HTTP headers for trace propagation.
         """
         client = self.get_client()
         if not client.options.get("propagate_traces"):
@@ -668,18 +688,26 @@ class Scope:
             return
 
         span = kwargs.pop("span", None)
-        span = span or self.span
 
-        if has_tracing_enabled(client.options) and span is not None:
+        # When using external propagation (OTel), leave to external propagator
+        if has_external_propagation_context():
+            return
+
+        # If a span is explicitly passed, use that span's headers for backwards compatibility
+        # This is needed for integrations that create spans but don't use them as context managers
+        if span is not None:
             for header in span.iter_headers():
                 yield header
-        elif has_external_propagation_context():
-            # when we have an external_propagation_context (otlp)
-            # we leave outgoing propagation to the propagator
             return
-        else:
-            for header in self.get_active_propagation_context().iter_headers():
-                yield header
+
+        # Otherwise, use PropagationContext (with sampled from current span if available)
+        yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
+
+        baggage = self.get_baggage()
+        if baggage is not None:
+            serialized_baggage = baggage.serialize()
+            if serialized_baggage:
+                yield BAGGAGE_HEADER_NAME, serialized_baggage
 
     def get_active_propagation_context(self) -> "PropagationContext":
         if self._propagation_context is not None:

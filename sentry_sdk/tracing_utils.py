@@ -412,6 +412,7 @@ class PropagationContext:
         "_span_id",
         "parent_span_id",
         "parent_sampled",
+        "sampled",
         "baggage",
     )
 
@@ -421,6 +422,7 @@ class PropagationContext:
         span_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
+        sampled: "Optional[bool]" = None,
         dynamic_sampling_context: "Optional[Dict[str, str]]" = None,
         baggage: "Optional[Baggage]" = None,
     ) -> None:
@@ -438,6 +440,9 @@ class PropagationContext:
         """Boolean indicator if the parent span was sampled.
         Important when the parent span originated in an upstream service,
         because we want to sample the whole trace, or nothing from the trace."""
+
+        self.sampled = sampled
+        """Boolean indicator if the current span is sampled."""
 
         self.baggage = baggage
         """Parsed baggage header that is used for dynamic sampling decisions."""
@@ -506,7 +511,18 @@ class PropagationContext:
         return self.get_baggage().dynamic_sampling_context()
 
     def to_traceparent(self) -> str:
-        return f"{self.trace_id}-{self.span_id}"
+        if self.sampled is True:
+            sampled = "1"
+        elif self.sampled is False:
+            sampled = "0"
+        else:
+            sampled = None
+
+        traceparent = f"{self.trace_id}-{self.span_id}"
+        if sampled is not None:
+            traceparent += f"-{sampled}"
+
+        return traceparent
 
     def get_baggage(self) -> "Baggage":
         if self.baggage is None:
@@ -534,11 +550,12 @@ class PropagationContext:
                 pass
 
     def __repr__(self) -> str:
-        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} baggage={}>".format(
+        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} sampled={} baggage={}>".format(
             self._trace_id,
             self._span_id,
             self.parent_span_id,
             self.parent_sampled,
+            self.sampled,
             self.baggage,
         )
 
