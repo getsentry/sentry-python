@@ -948,7 +948,6 @@ def test_bad_chat_completion(sentry_init, capture_events):
         client.chat.completions.create(
             model="some-model",
             messages=[{"role": "system", "content": "hello"}],
-            stream=True,
         )
 
     (event,) = events
