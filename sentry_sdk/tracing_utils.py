@@ -159,8 +159,8 @@ def record_sql_queries(
     span: "Optional[Union[Span, StreamedSpan]]" = None
     if span_streaming:
         span = sentry_sdk.traces.start_span(name=query or "query")
-        span.set_op(OP.DB)
-        span.set_origin(span_origin)
+        span.set_attribute("sentry.op", OP.DB)
+        span.set_attribute("sentry.origin", span_origin)
     else:
         span = sentry_sdk.start_span(
             op=OP.DB,

@@ -44,8 +44,8 @@ def patch_redis_async_pipeline(
         span: "Union[Span, StreamedSpan]"
         if span_streaming:
             span = sentry_sdk.traces.start_span(name="redis.pipeline.execute")
-            span.set_origin(SPAN_ORIGIN)
-            span.set_op(OP.DB_REDIS)
+            span.set_attribute("sentry.origin", SPAN_ORIGIN)
+            span.set_attribute("sentry.op", OP.DB_REDIS)
         else:
             span = sentry_sdk.start_span(
                 op=OP.DB_REDIS,
@@ -109,8 +109,8 @@ def patch_redis_async_client(
                 cache_span = sentry_sdk.traces.start_span(
                     name=cache_properties["description"]
                 )
-                cache_span.set_op(cache_properties["op"])
-                cache_span.set_origin(SPAN_ORIGIN)
+                cache_span.set_attribute("sentry.op", cache_properties["op"])
+                cache_span.set_attribute("sentry.origin", SPAN_ORIGIN)
             else:
                 cache_span = sentry_sdk.start_span(
                     op=cache_properties["op"],
@@ -124,8 +124,8 @@ def patch_redis_async_client(
         db_span: "Union[Span, StreamedSpan]"
         if span_streaming:
             db_span = sentry_sdk.traces.start_span(name=db_properties["description"])
-            db_span.set_op(db_properties["op"])
-            db_span.set_origin(SPAN_ORIGIN)
+            db_span.set_attribute("sentry.op", db_properties["op"])
+            db_span.set_attribute("sentry.origin", SPAN_ORIGIN)
         else:
             db_span = sentry_sdk.start_span(
                 op=db_properties["op"],

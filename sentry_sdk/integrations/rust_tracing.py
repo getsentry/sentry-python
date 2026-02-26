@@ -216,8 +216,8 @@ class RustTracingLayer:
                 sentry_span = sentry_sdk.traces.start_span(
                     name=sentry_span_name, parent_span=parent_sentry_span
                 )
-                sentry_span.set_op("function")
-                sentry_span.set_origin(self.origin)
+                sentry_span.set_attribute("sentry.op", "function")
+                sentry_span.set_attribute("sentry.origin", self.origin)
                 sentry_span.start()
             else:
                 sentry_span = parent_sentry_span.start_child(
@@ -232,8 +232,8 @@ class RustTracingLayer:
                 sentry_span = sentry_sdk.traces.start_span(
                     name=sentry_span_name,
                 )
-                sentry_span.set_op("function")
-                sentry_span.set_origin(self.origin)
+                sentry_span.set_attribute("sentry.op", "function")
+                sentry_span.set_attribute("sentry.origin", self.origin)
                 sentry_span.start()
             else:
                 sentry_span = sentry_sdk.start_span(

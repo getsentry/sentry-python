@@ -227,17 +227,22 @@ class SentryAsgiMiddleware:
                                 segment = sentry_sdk.traces.start_span(
                                     name=transaction_name
                                 )
-                                segment.set_op(f"{ty}.server")
+                                segment.set_attribute("sentry.op", f"{ty}.server")
                         else:
                             sentry_sdk.traces.new_trace()
                             segment = sentry_sdk.traces.start_span(
                                 name=transaction_name,
                             )
-                            segment.set_op(OP.HTTP_SERVER)
+                            segment.set_attribute("sentry.op", OP.HTTP_SERVER)
 
                         if segment is not None:
-                            segment.set_source(transaction_source)
-                            segment.set_origin(self.span_origin)
+                            segment.set_attribute(
+                                "sentry.span.source",
+                                getattr(
+                                    transaction_source, "value", transaction_source
+                                ),
+                            )
+                            segment.set_attribute("sentry.origin", self.span_origin)
                             segment.set_attribute("asgi.type", ty)
 
                         span_ctx = segment or nullcontext()

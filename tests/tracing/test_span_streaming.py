@@ -813,7 +813,7 @@ def test_set_span_source(sentry_init, capture_envelopes):
     events = capture_envelopes()
 
     with sentry_sdk.traces.start_span(name="span") as span:
-        span.set_source(SegmentSource.TASK)
+        span.set_attribute("sentry.span.source", SegmentSource.TASK.value)
         assert span.get_attributes()["sentry.span.source"] == SegmentSource.TASK.value
 
     sentry_sdk.get_client().flush()

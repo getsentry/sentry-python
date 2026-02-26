@@ -281,8 +281,8 @@ def _wrap_task_run(f: "F") -> "F":
         if span_streaming:
             if not task_started_from_beat:
                 span_mgr = sentry_sdk.traces.start_span(name=task_name)
-                span_mgr.set_op(OP.QUEUE_SUBMIT_CELERY)
-                span_mgr.set_origin(CeleryIntegration.origin)
+                span_mgr.set_attribute("sentry.op", OP.QUEUE_SUBMIT_CELERY)
+                span_mgr.set_attribute("sentry.origin", CeleryIntegration.origin)
         else:
             if not task_started_from_beat:
                 span_mgr = sentry_sdk.start_span(
@@ -330,9 +330,11 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                 if span_streaming:
                     sentry_sdk.traces.continue_trace(headers)
                     transaction = sentry_sdk.traces.start_span(name=task.name)
-                    transaction.set_origin(CeleryIntegration.origin)
-                    transaction.set_source(TransactionSource.TASK)
-                    transaction.set_op(OP.QUEUE_TASK_CELERY)
+                    transaction.set_attribute("sentry.origin", CeleryIntegration.origin)
+                    transaction.set_attribute(
+                        "sentry.span.source", TransactionSource.TASK.value
+                    )
+                    transaction.set_attribute("sentry.op", OP.QUEUE_TASK_CELERY)
 
                     span_ctx = transaction
 
@@ -401,8 +403,8 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
             span: "Union[Span, StreamedSpan]"
             if span_streaming:
                 span = sentry_sdk.traces.start_span(name=task.name)
-                span.set_op(OP.QUEUE_PROCESS)
-                span.set_origin(CeleryIntegration.origin)
+                span.set_attribute("sentry.op", OP.QUEUE_PROCESS)
+                span.set_attribute("sentry.origin", CeleryIntegration.origin)
             else:
                 span = sentry_sdk.start_span(
                     op=OP.QUEUE_PROCESS,
@@ -547,8 +549,8 @@ def _patch_producer_publish() -> None:
         span: "Union[StreamedSpan, Span]"
         if span_streaming:
             span = sentry_sdk.traces.start_span(name=task_name)
-            span.set_op(OP.QUEUE_PUBLISH)
-            span.set_origin(CeleryIntegration.origin)
+            span.set_attribute("sentry.op", OP.QUEUE_PUBLISH)
+            span.set_attribute("sentry.origin", CeleryIntegration.origin)
         else:
             span = sentry_sdk.start_span(
                 op=OP.QUEUE_PUBLISH,

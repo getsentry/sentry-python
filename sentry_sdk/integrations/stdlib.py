@@ -110,8 +110,8 @@ def _install_httplib() -> None:
             span = sentry_sdk.traces.start_span(
                 name=f"{method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}"
             )
-            span.set_op(OP.HTTP_CLIENT)
-            span.set_origin("auto.http.stdlib.httplib")
+            span.set_attribute("sentry.op", OP.HTTP_CLIENT)
+            span.set_attribute("sentry.origin", "auto.http.stdlib.httplib")
 
             span.set_attribute(SPANDATA.HTTP_METHOD, method)
             if parsed_url is not None:
@@ -269,8 +269,8 @@ def _install_subprocess() -> None:
             span = sentry_sdk.traces.start_span(
                 name=description,
             )
-            span.set_op(OP.SUBPROCESS)
-            span.set_origin("auto.subprocess.stdlib.subprocess")
+            span.set_attribute("sentry.op", OP.SUBPROCESS)
+            span.set_attribute("sentry.origin", "auto.subprocess.stdlib.subprocess")
         else:
             span = sentry_sdk.start_span(
                 op=OP.SUBPROCESS,
@@ -321,8 +321,8 @@ def _install_subprocess() -> None:
         span: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
             span = sentry_sdk.traces.start_span(name="subprocess popen")
-            span.set_op(OP.SUBPROCESS_WAIT)
-            span.set_origin("auto.subprocess.stdlib.subprocess")
+            span.set_attribute("sentry.op", OP.SUBPROCESS_WAIT)
+            span.set_attribute("sentry.origin", "auto.subprocess.stdlib.subprocess")
             span.set_attribute("subprocess.pid", self.pid)
         else:
             span = sentry_sdk.start_span(
@@ -350,8 +350,8 @@ def _install_subprocess() -> None:
             span = sentry_sdk.traces.start_span(
                 name="subprocess communicate",
             )
-            span.set_op(OP.SUBPROCESS_COMMUNICATE)
-            span.set_origin("auto.subprocess.stdlib.subprocess")
+            span.set_attribute("sentry.op", OP.SUBPROCESS_COMMUNICATE)
+            span.set_attribute("sentry.origin", "auto.subprocess.stdlib.subprocess")
             span.set_attribute("subprocess.pid", self.pid)
         else:
             span = sentry_sdk.start_span(

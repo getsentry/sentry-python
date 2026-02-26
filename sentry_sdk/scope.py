@@ -831,7 +831,9 @@ class Scope:
             elif isinstance(self._span, StreamedSpan):
                 self._span.segment.set_name(name)
                 if source:
-                    self._span.segment.set_source(source)
+                    self._span.segment.set_attribute(
+                        "sentry.span.source", getattr(source, "value", source)
+                    )
 
             elif self._span.containing_transaction:
                 self._span.containing_transaction.name = name

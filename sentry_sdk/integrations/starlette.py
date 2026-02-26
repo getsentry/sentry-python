@@ -174,8 +174,8 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         middleware_span: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
             middleware_span = sentry_sdk.traces.start_span(name=middleware_name)
-            middleware_span.set_op(OP.MIDDLEWARE_STARLETTE)
-            middleware_span.set_origin(StarletteIntegration.origin)
+            middleware_span.set_attribute("sentry.op", OP.MIDDLEWARE_STARLETTE)
+            middleware_span.set_attribute("sentry.origin", StarletteIntegration.origin)
             middleware_span.set_attribute("starlette.middleware_name", middleware_name)
         else:
             middleware_span = sentry_sdk.start_span(
@@ -193,8 +193,8 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
                     span = sentry_sdk.traces.start_span(
                         name=getattr(receive, "__qualname__", str(receive)),
                     )
-                    span.set_origin(StarletteIntegration.origin)
-                    span.set_op(OP.MIDDLEWARE_STARLETTE_RECEIVE)
+                    span.set_attribute("sentry.origin", StarletteIntegration.origin)
+                    span.set_attribute("sentry.op", OP.MIDDLEWARE_STARLETTE_RECEIVE)
                     span.set_attribute("starlette.middleware_name", middleware_name)
                 else:
                     span = sentry_sdk.start_span(
@@ -218,8 +218,8 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
                     span = sentry_sdk.traces.start_span(
                         name=getattr(send, "__qualname__", str(send)),
                     )
-                    span.set_op(OP.MIDDLEWARE_STARLETTE_SEND)
-                    span.set_origin(StarletteIntegration.origin)
+                    span.set_attribute("sentry.op", OP.MIDDLEWARE_STARLETTE_SEND)
+                    span.set_attribute("sentry.origin", StarletteIntegration.origin)
                     span.set_attribute("starlette.middleware_name", middleware_name)
                 else:
                     span = sentry_sdk.start_span(

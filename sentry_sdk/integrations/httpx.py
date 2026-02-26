@@ -78,8 +78,8 @@ def _install_httpx_client() -> None:
 
         with span_ctx as span:
             if isinstance(span, StreamedSpan):
-                span.set_op(OP.HTTP_CLIENT)
-                span.set_origin(HttpxIntegration.origin)
+                span.set_attribute("sentry.op", OP.HTTP_CLIENT)
+                span.set_attribute("sentry.origin", HttpxIntegration.origin)
 
                 span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
                 if parsed_url is not None:
@@ -159,8 +159,8 @@ def _install_httpx_async_client() -> None:
 
         with span_ctx as span:
             if isinstance(span, StreamedSpan):
-                span.set_op(OP.HTTP_CLIENT)
-                span.set_origin(HttpxIntegration.origin)
+                span.set_attribute("sentry.op", OP.HTTP_CLIENT)
+                span.set_attribute("sentry.origin", HttpxIntegration.origin)
                 span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
                 if parsed_url is not None:
                     span.set_attribute("url", parsed_url.url)

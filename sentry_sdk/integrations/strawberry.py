@@ -192,8 +192,10 @@ class SentryAsyncExtension(SchemaExtension):
             self.graphql_span = sentry_sdk.traces.start_span(
                 name=description,
             )
-            self.graphql_span.set_op(op)
-            self.graphql_span.set_origin(StrawberryIntegration.origin)
+            self.graphql_span.set_attribute("sentry.op", op)
+            self.graphql_span.set_attribute(
+                "sentry.origin", StrawberryIntegration.origin
+            )
 
             self.graphql_span.set_attribute("graphql.operation.type", operation_type)
             if self._operation_name:
@@ -226,7 +228,7 @@ class SentryAsyncExtension(SchemaExtension):
                 TransactionSource.COMPONENT,
             )
             if isinstance(self.graphql_span, StreamedSpan):
-                self.graphql_span.segment.set_op(op)
+                self.graphql_span.segment.set_attribute("sentry.op", op)
             else:
                 if self.graphql_span.containing_transaction:
                     self.graphql_span.containing_transaction.op = op
@@ -243,8 +245,9 @@ class SentryAsyncExtension(SchemaExtension):
                 parent_span=self.graphql_span,
                 name="validation",
             )
-            self.validation_span.set_op(OP.GRAPHQL_VALIDATE)
-            self.validation_span.set_origin(
+            self.validation_span.set_attribute("sentry.op", OP.GRAPHQL_VALIDATE)
+            self.validation_span.set_attribute(
+                "sentry.origin",
                 StrawberryIntegration.origin,
             )
         else:
@@ -268,8 +271,10 @@ class SentryAsyncExtension(SchemaExtension):
                 name="parsing",
                 parent_span=self.graphql_span,
             )
-            self.parsing_span.set_op(OP.GRAPHQL_PARSE)
-            self.parsing_span.set_origin(StrawberryIntegration.origin)
+            self.parsing_span.set_attribute("sentry.op", OP.GRAPHQL_PARSE)
+            self.parsing_span.set_attribute(
+                "sentry.origin", StrawberryIntegration.origin
+            )
         else:
             self.parsing_span = self.graphql_span.start_child(
                 op=OP.GRAPHQL_PARSE,
@@ -324,8 +329,8 @@ class SentryAsyncExtension(SchemaExtension):
             span = sentry_sdk.traces.start_span(
                 parent_span=self.graphql_span, name=f"resolving {field_path}"
             )
-            span.set_op(OP.GRAPHQL_RESOLVE)
-            span.set_origin(StrawberryIntegration.origin)
+            span.set_attribute("sentry.op", OP.GRAPHQL_RESOLVE)
+            span.set_attribute("sentry.origin", StrawberryIntegration.origin)
             span.set_attribute("graphql.field_name", info.field_name)
             span.set_attribute("graphql.parent_type", info.parent_type.name)
             span.set_attribute("graphql.field_path", field_path)
@@ -365,8 +370,8 @@ class SentrySyncExtension(SentryAsyncExtension):
                 parent_span=self.graphql_span,
                 name=f"resolving {field_path}",
             )
-            span.set_op(OP.GRAPHQL_RESOLVE)
-            span.set_origin(StrawberryIntegration.origin)
+            span.set_attribute("sentry.op", OP.GRAPHQL_RESOLVE)
+            span.set_attribute("sentry.origin", StrawberryIntegration.origin)
             span.set_attribute("graphql.field_name", info.field_name)
             span.set_attribute("graphql.parent_type", info.parent_type.name)
             span.set_attribute("graphql.field_path", field_path)

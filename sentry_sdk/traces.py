@@ -267,7 +267,7 @@ class StreamedSpan:
         self._span_id: "Optional[str]" = None
 
         self.set_status(SpanStatus.OK)
-        self.set_source(SegmentSource.CUSTOM)
+        self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
         self._sampled: "Optional[bool]" = sampled
         self.sample_rate: "Optional[float]" = None
@@ -478,18 +478,6 @@ class StreamedSpan:
 
     def set_name(self, name: str) -> None:
         self._name = name
-
-    def set_op(self, op: str) -> None:
-        self.set_attribute("sentry.op", op)
-
-    def set_origin(self, origin: str) -> None:
-        self.set_attribute("sentry.origin", origin)
-
-    def set_source(self, source: "Union[str, SegmentSource]") -> None:
-        if isinstance(source, Enum):
-            source = source.value
-
-        self.set_attribute("sentry.span.source", source)
 
     def is_segment(self) -> bool:
         return self.segment == self
@@ -741,15 +729,6 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def get_name(self) -> str:
         return ""
-
-    def set_op(self, op: str) -> None:
-        pass
-
-    def set_origin(self, origin: str) -> None:
-        pass
-
-    def set_source(self, source: "Union[str, SegmentSource]") -> None:
-        pass
 
     def is_segment(self) -> bool:
         return False
