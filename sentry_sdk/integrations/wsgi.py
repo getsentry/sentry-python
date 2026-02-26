@@ -145,39 +145,20 @@ class SentryWsgiMiddleware:
         # To avoid this and ensure that the offloading mechanism works as expected when it's
         # enabled, we check if the response is a file-like object (determined by the presence
         # of `fileno`), if the wsgi.file_wrapper is available in the environment (as if so,
-        # it would've been used in handling the file in the response), and if uWSGI's
-        # offload-threads option is configured (since offloading only occurs when offload
-        # threads are enabled).
+        # it would've been used in handling the file in the response).
+        #
+        # Even if the offload mechanism is not enabled, there are optimizations that uWSGI does for file-like objects,
+        # so we want to make sure we don't interfere with those either.
         #
         # If all conditions are met, we return the original response object directly,
         # allowing uWSGI to handle it as intended.
         if (
-            _is_uwsgi_offload_threads_enabled()
-            and environ.get("wsgi.file_wrapper")
+            environ.get("wsgi.file_wrapper")
             and getattr(response, "fileno", None) is not None
         ):
             return response
 
         return _ScopedResponse(scope, response)
-
-
-def _is_uwsgi_offload_threads_enabled() -> bool:
-    try:
-        from uwsgi import opt  # type: ignore
-    except ImportError:
-        return False
-
-    value = opt.get("offload-threads") or opt.get(b"offload-threads")
-    if not value:
-        return False
-    if isinstance(value, bytes):
-        try:
-            return int(value.decode()) > 0
-        except (ValueError, UnicodeDecodeError):
-            return False
-    if isinstance(value, int):
-        return value > 0
-    return False
 
 
 def _sentry_start_response(

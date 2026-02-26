@@ -503,24 +503,16 @@ def test_span_origin_custom(sentry_init, capture_events):
 
 
 @pytest.mark.parametrize(
-    "uwsgi_opt, has_file_wrapper, has_fileno, expect_wrapped",
+    "has_file_wrapper, has_fileno, expect_wrapped",
     [
-        ({"offload-threads": 1}, True, True, False),  # all conditions met → unwrapped
-        ({"offload-threads": 0}, True, True, True),  # offload disabled → wrapped
-        ({"offload-threads": 1}, False, True, True),  # no file_wrapper → wrapped
-        ({"offload-threads": 1}, True, False, True),  # no fileno → wrapped
-        (None, True, True, True),  # uwsgi not installed → wrapped
-        ({"offload-threads": b"1"}, True, True, False),  # bytes value → unwrapped
-        (
-            {b"offload-threads": b"1"},
-            True,
-            True,
-            False,
-        ),  # bytes key + bytes value → unwrapped
+        (True, True, False),  # both conditions met → unwrapped
+        (False, True, True),  # no file_wrapper → wrapped
+        (True, False, True),  # no fileno → wrapped
+        (False, False, True),  # neither condition → wrapped
     ],
 )
-def test_uwsgi_offload_threads_response_wrapping(
-    sentry_init, uwsgi_opt, has_file_wrapper, has_fileno, expect_wrapped
+def test_file_response_wrapping(
+    sentry_init, has_file_wrapper, has_fileno, expect_wrapped
 ):
     sentry_init()
 
@@ -538,26 +530,18 @@ def test_uwsgi_offload_threads_response_wrapping(
 
     middleware = SentryWsgiMiddleware(app)
 
-    if uwsgi_opt is not None:
-        uwsgi_mock = mock.MagicMock()
-        uwsgi_mock.opt = uwsgi_opt
-        patch_ctx = mock.patch.dict("sys.modules", uwsgi=uwsgi_mock)
-    else:
-        patch_ctx = mock.patch.dict("sys.modules", {"uwsgi": None})
-
-    with patch_ctx:
-        result = middleware(
-            {
-                "REQUEST_METHOD": "GET",
-                "PATH_INFO": "/",
-                "SERVER_NAME": "localhost",
-                "SERVER_PORT": "80",
-                "wsgi.url_scheme": "http",
-                "wsgi.input": mock.MagicMock(),
-                **environ_extra,
-            },
-            lambda status, headers: None,
-        )
+    result = middleware(
+        {
+            "REQUEST_METHOD": "GET",
+            "PATH_INFO": "/",
+            "SERVER_NAME": "localhost",
+            "SERVER_PORT": "80",
+            "wsgi.url_scheme": "http",
+            "wsgi.input": mock.MagicMock(),
+            **environ_extra,
+        },
+        lambda status, headers: None,
+    )
 
     if expect_wrapped:
         assert isinstance(result, _ScopedResponse)
