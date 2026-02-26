@@ -163,7 +163,7 @@ class SentryWsgiMiddleware:
 
 def _is_uwsgi_offload_threads_enabled() -> bool:
     try:
-        from uwsgi import opt
+        from uwsgi import opt  # type: ignore
     except ImportError:
         return False
 
