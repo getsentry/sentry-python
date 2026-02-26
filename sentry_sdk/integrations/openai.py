@@ -746,14 +746,103 @@ def _set_streaming_completions_api_output_data(
     if messages is not None and isinstance(messages, str):
         messages = [messages]
 
-    _common_set_output_data(
-        span,
-        response,
-        messages,
-        integration,
-        start_time,
-        finish_span,
-    )
+    ttft: "Optional[float]" = None
+    data_buf: "list[list[str]]" = []  # one for each choice
+
+    old_iterator = response._iterator
+
+    def new_iterator() -> "Iterator[ChatCompletionChunk]":
+        nonlocal ttft
+        count_tokens_manually = True
+        for x in old_iterator:
+            with capture_internal_exceptions():
+                if hasattr(x, "choices"):
+                    choice_index = 0
+                    for choice in x.choices:
+                        if hasattr(choice, "delta") and hasattr(
+                            choice.delta, "content"
+                        ):
+                            if start_time is not None and ttft is None:
+                                ttft = time.perf_counter() - start_time
+                            content = choice.delta.content
+                            if len(data_buf) <= choice_index:
+                                data_buf.append([])
+                            data_buf[choice_index].append(content or "")
+                        choice_index += 1
+
+            yield x
+
+        with capture_internal_exceptions():
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if should_send_default_pii() and integration.include_prompts:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+                if count_tokens_manually:
+                    _calculate_token_usage(
+                        messages,
+                        response,
+                        span,
+                        all_responses,
+                        integration.count_tokens,
+                    )
+
+        if finish_span:
+            span.__exit__(None, None, None)
+
+    async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
+        nonlocal ttft
+        count_tokens_manually = True
+        async for x in old_iterator:
+            with capture_internal_exceptions():
+                # OpenAI chat completion API
+                if hasattr(x, "choices"):
+                    choice_index = 0
+                    for choice in x.choices:
+                        if hasattr(choice, "delta") and hasattr(
+                            choice.delta, "content"
+                        ):
+                            if start_time is not None and ttft is None:
+                                ttft = time.perf_counter() - start_time
+                            content = choice.delta.content
+                            if len(data_buf) <= choice_index:
+                                data_buf.append([])
+                            data_buf[choice_index].append(content or "")
+                        choice_index += 1
+
+            yield x
+
+        with capture_internal_exceptions():
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if should_send_default_pii() and integration.include_prompts:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+                if count_tokens_manually:
+                    _calculate_token_usage(
+                        messages,
+                        response,
+                        span,
+                        all_responses,
+                        integration.count_tokens,
+                    )
+        if finish_span:
+            span.__exit__(None, None, None)
+
+    if str(type(response._iterator)) == "<class 'async_generator'>":
+        response._iterator = new_iterator_async()
+    else:
+        response._iterator = new_iterator()
 
 
 def _set_responses_api_output_data(
@@ -792,14 +881,108 @@ def _set_streaming_responses_api_output_data(
     if input is not None and isinstance(input, str):
         input = [input]
 
-    _common_set_output_data(
-        span,
-        response,
-        input,
-        integration,
-        start_time,
-        finish_span,
-    )
+    ttft: "Optional[float]" = None
+    data_buf: "list[list[str]]" = []  # one for each choice
+
+    old_iterator = response._iterator
+
+    def new_iterator() -> "Iterator[ChatCompletionChunk]":
+        nonlocal ttft
+        count_tokens_manually = True
+        for x in old_iterator:
+            with capture_internal_exceptions():
+                if hasattr(x, "delta"):
+                    if start_time is not None and ttft is None:
+                        ttft = time.perf_counter() - start_time
+                    if len(data_buf) == 0:
+                        data_buf.append([])
+                    data_buf[0].append(x.delta or "")
+
+                if isinstance(x, ResponseCompletedEvent):
+                    _calculate_token_usage(
+                        input,
+                        x.response,
+                        span,
+                        None,
+                        integration.count_tokens,
+                    )
+                    count_tokens_manually = False
+
+            yield x
+
+        with capture_internal_exceptions():
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if should_send_default_pii() and integration.include_prompts:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+                if count_tokens_manually:
+                    _calculate_token_usage(
+                        input,
+                        response,
+                        span,
+                        all_responses,
+                        integration.count_tokens,
+                    )
+
+        if finish_span:
+            span.__exit__(None, None, None)
+
+    async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
+        nonlocal ttft
+        count_tokens_manually = True
+        async for x in old_iterator:
+            with capture_internal_exceptions():
+                if hasattr(x, "delta"):
+                    if start_time is not None and ttft is None:
+                        ttft = time.perf_counter() - start_time
+                    if len(data_buf) == 0:
+                        data_buf.append([])
+                    data_buf[0].append(x.delta or "")
+
+                if isinstance(x, ResponseCompletedEvent):
+                    _calculate_token_usage(
+                        input,
+                        x.response,
+                        span,
+                        None,
+                        integration.count_tokens,
+                    )
+                    count_tokens_manually = False
+
+            yield x
+
+        with capture_internal_exceptions():
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if should_send_default_pii() and integration.include_prompts:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+                if count_tokens_manually:
+                    _calculate_token_usage(
+                        input,
+                        response,
+                        span,
+                        all_responses,
+                        integration.count_tokens,
+                    )
+        if finish_span:
+            span.__exit__(None, None, None)
+
+    if str(type(response._iterator)) == "<class 'async_generator'>":
+        response._iterator = new_iterator_async()
+    else:
+        response._iterator = new_iterator()
 
 
 def _set_embeddings_output_data(
