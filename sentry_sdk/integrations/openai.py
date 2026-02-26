@@ -473,9 +473,6 @@ def _common_set_output_data(
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
-    if input is not None and isinstance(input, str):
-        input = [input]
-
     ttft: "Optional[float]" = None
 
     if hasattr(response, "choices"):
@@ -723,6 +720,9 @@ def _set_completions_api_output_data(
 ) -> None:
     messages = kwargs.get("messages")
 
+    if messages is not None and isinstance(messages, str):
+        messages = [messages]
+
     _common_set_output_data(
         span,
         response,
@@ -742,6 +742,9 @@ def _set_streaming_completions_api_output_data(
     finish_span: bool = True,
 ) -> None:
     messages = kwargs.get("messages")
+
+    if messages is not None and isinstance(messages, str):
+        messages = [messages]
 
     _common_set_output_data(
         span,
@@ -763,6 +766,9 @@ def _set_responses_api_output_data(
 ) -> None:
     input = kwargs.get("input")
 
+    if input is not None and isinstance(input, str):
+        input = [input]
+
     _common_set_output_data(
         span,
         response,
@@ -783,6 +789,9 @@ def _set_streaming_responses_api_output_data(
 ) -> None:
     input = kwargs.get("input")
 
+    if input is not None and isinstance(input, str):
+        input = [input]
+
     _common_set_output_data(
         span,
         response,
@@ -802,6 +811,9 @@ def _set_embeddings_output_data(
     finish_span: bool = True,
 ) -> None:
     input = kwargs.get("input")
+
+    if input is not None and isinstance(input, str):
+        input = [input]
 
     _common_set_output_data(
         span,
