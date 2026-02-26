@@ -231,7 +231,10 @@ class SentryAsyncExtension(SchemaExtension):
                 if self.graphql_span.containing_transaction:
                     self.graphql_span.containing_transaction.op = op
 
-        self.graphql_span.finish()
+        if isinstance(self.graphql_span, StreamedSpan):
+            self.graphql_span.end()
+        else:
+            self.graphql_span.finish()
 
     def on_validate(self) -> "Generator[None, None, None]":
         self.validation_span: "Union[StreamedSpan, Span]"
@@ -253,7 +256,10 @@ class SentryAsyncExtension(SchemaExtension):
 
         yield
 
-        self.validation_span.finish()
+        if isinstance(self.validation_span, StreamedSpan):
+            self.validation_span.end()
+        else:
+            self.validation_span.finish()
 
     def on_parse(self) -> "Generator[None, None, None]":
         self.parsing_span: "Union[StreamedSpan, Span]"
@@ -273,7 +279,10 @@ class SentryAsyncExtension(SchemaExtension):
 
         yield
 
-        self.parsing_span.finish()
+        if isinstance(self.parsing_span, StreamedSpan):
+            self.parsing_span.end()
+        else:
+            self.parsing_span.finish()
 
     def should_skip_tracing(
         self,
