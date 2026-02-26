@@ -2828,6 +2828,8 @@ async def test_streaming_responses_api_async(
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
