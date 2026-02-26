@@ -37,9 +37,6 @@ if TYPE_CHECKING:
     P = ParamSpec("P")
     R = TypeVar("R")
 
-
-FLAGS_CAPACITY = 10
-
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
@@ -98,7 +95,6 @@ TODO[span-first] / notes
 
 Notes:
 - removed ability to provide a start_timestamp
-- moved _flags_capacity to a const
 """
 
 
@@ -216,7 +212,6 @@ class StreamedSpan:
         "_status",
         "_start_timestamp_monotonic_ns",
         "_scope",
-        "_flags",
         "_context_manager_state",
         "_continuous_profile",
         "_baggage",
@@ -258,7 +253,6 @@ class StreamedSpan:
         self.parent_sampled = parent_sampled
         self.segment = segment or self
 
-        self._flags: dict[str, bool] = {}
         self.start_timestamp = datetime.now(timezone.utc)
 
         try:
@@ -484,10 +478,6 @@ class StreamedSpan:
 
     def set_name(self, name: str) -> None:
         self._name = name
-
-    def set_flag(self, flag: str, result: bool) -> None:
-        if len(self._flags) < FLAGS_CAPACITY:
-            self._flags[flag] = result
 
     def set_op(self, op: str) -> None:
         self.set_attribute("sentry.op", op)
@@ -751,9 +741,6 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def get_name(self) -> str:
         return ""
-
-    def set_flag(self, flag: str, result: bool) -> None:
-        pass
 
     def set_op(self, op: str) -> None:
         pass
