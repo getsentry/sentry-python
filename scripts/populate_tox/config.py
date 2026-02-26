@@ -110,6 +110,10 @@ TEST_SUITE_CONFIG = {
         "package": "dramatiq",
         "num_versions": 2,
     },
+    "elasticsearch": {
+        "package": "elasticsearch",
+        "python": ">=3.7",
+    },
     "falcon": {
         "package": "falcon",
         "python": "<3.13",

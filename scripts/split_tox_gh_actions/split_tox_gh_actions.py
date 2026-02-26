@@ -101,6 +101,7 @@ GROUPS = {
     "DBs": [
         "asyncpg",
         "clickhouse_driver",
+        "elasticsearch",
         "pymongo",
         "redis",
         "redis_py_cluster_legacy",

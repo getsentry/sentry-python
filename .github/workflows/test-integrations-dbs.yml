@@ -81,6 +81,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver"
+      - name: Test elasticsearch
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-elasticsearch"
       - name: Test pymongo
         run: |
           set -x # print commands that are executed
