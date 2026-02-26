@@ -987,11 +987,11 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
 
     is_streaming_response = kwargs.get("stream", False)
     if is_streaming_response:
-        _set_responses_api_output_data(
+        _set_streaming_responses_api_output_data(
             span, response, kwargs, integration, start_time, finish_span=True
         )
     else:
-        _set_streaming_responses_api_output_data(
+        _set_responses_api_output_data(
             span, response, kwargs, integration, start_time, finish_span=True
         )
 
