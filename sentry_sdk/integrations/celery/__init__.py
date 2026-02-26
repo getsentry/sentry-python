@@ -533,7 +533,11 @@ def _patch_producer_publish() -> None:
             # method will still work.
             kwargs_headers = {}
 
-        task_name = kwargs_headers.get("task") or "unknown celery task"
+        if "task" not in kwargs_headers:
+            # filter out heartbeat and other internal Celery events
+            return original_publish(self, *args, **kwargs)
+
+        task_name = kwargs_headers.get("task")
         task_id = kwargs_headers.get("id")
         retries = kwargs_headers.get("retries")
 
