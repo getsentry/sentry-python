@@ -462,7 +462,7 @@ def _set_embeddings_input_data(
     _commmon_set_input_data(span, kwargs)
 
 
-def _set_output_data(
+def _common_set_output_data(
     span: "Span",
     response: "Any",
     kwargs: "dict[str, Any]",
@@ -706,9 +706,65 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    _set_output_data(span, response, kwargs, integration, start_time, finish_span=True)
+    _set_completions_api_output_data(
+        span, response, kwargs, integration, start_time, finish_span=True
+    )
 
     return response
+
+
+def _set_completions_api_output_data(
+    span: "Span",
+    response: "Any",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+    start_time: "Optional[float]" = None,
+    finish_span: bool = True,
+) -> None:
+    _common_set_output_data(
+        span,
+        response,
+        kwargs,
+        integration,
+        start_time,
+        finish_span,
+    )
+
+
+def _set_responses_api_output_data(
+    span: "Span",
+    response: "Any",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+    start_time: "Optional[float]" = None,
+    finish_span: bool = True,
+) -> None:
+    _common_set_output_data(
+        span,
+        response,
+        kwargs,
+        integration,
+        start_time,
+        finish_span,
+    )
+
+
+def _set_embeddings_output_data(
+    span: "Span",
+    response: "Any",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+    start_time: "Optional[float]" = None,
+    finish_span: bool = True,
+) -> None:
+    _common_set_output_data(
+        span,
+        response,
+        kwargs,
+        integration,
+        start_time,
+        finish_span,
+    )
 
 
 def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
@@ -795,7 +851,9 @@ def _new_embeddings_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
         response = yield f, args, kwargs
 
-        _set_output_data(span, response, kwargs, integration, finish_span=False)
+        _set_embeddings_output_data(
+            span, response, kwargs, integration, finish_span=False
+        )
 
         return response
 
@@ -885,7 +943,9 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
     start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    _set_output_data(span, response, kwargs, integration, start_time, finish_span=True)
+    _set_responses_api_output_data(
+        span, response, kwargs, integration, start_time, finish_span=True
+    )
 
     return response
 
