@@ -1,8 +1,6 @@
 import json
 import pytest
 
-from typing import Union
-
 from sentry_sdk.utils import package_version
 
 try:
@@ -22,8 +20,6 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatComplet
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
-
-from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
 
 SKIP_RESPONSES_TESTS = False
 
