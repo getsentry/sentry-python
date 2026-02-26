@@ -760,6 +760,8 @@ def _set_streaming_responses_api_output_data(
                     data_buf[0].append(x.delta or "")
 
                 if isinstance(x, ResponseCompletedEvent):
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
+
                     _calculate_token_usage(
                         input,
                         x.response,
@@ -807,6 +809,8 @@ def _set_streaming_responses_api_output_data(
                     data_buf[0].append(x.delta or "")
 
                 if isinstance(x, ResponseCompletedEvent):
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
+
                     _calculate_token_usage(
                         input,
                         x.response,

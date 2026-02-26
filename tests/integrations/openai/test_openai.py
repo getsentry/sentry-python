@@ -2460,6 +2460,7 @@ async def test_ai_client_span_streaming_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
         "gen_ai.response.time_to_first_token": mock.ANY,
