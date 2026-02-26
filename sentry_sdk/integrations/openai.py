@@ -613,6 +613,8 @@ def _set_streaming_completions_api_output_data(
         nonlocal ttft
         count_tokens_manually = True
         for x in old_iterator:
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+
             with capture_internal_exceptions():
                 if hasattr(x, "choices"):
                     choice_index = 0
@@ -657,6 +659,8 @@ def _set_streaming_completions_api_output_data(
         nonlocal ttft
         count_tokens_manually = True
         async for x in old_iterator:
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+
             with capture_internal_exceptions():
                 # OpenAI chat completion API
                 if hasattr(x, "choices"):
