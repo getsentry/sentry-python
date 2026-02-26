@@ -3019,7 +3019,9 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
 
     with start_transaction(name="openai tx"):
         response_stream = client.chat.completions.create(
-            model="some-model", messages=[{"role": "user", "content": "Say hello"}]
+            model="some-model",
+            messages=[{"role": "user", "content": "Say hello"}],
+            stream=True,
         )
         # Consume the stream
         for _ in response_stream:
@@ -3083,7 +3085,9 @@ async def test_streaming_chat_completion_ttft_async(sentry_init, capture_events)
 
     with start_transaction(name="openai tx"):
         response_stream = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "user", "content": "Say hello"}]
+            model="some-model",
+            messages=[{"role": "user", "content": "Say hello"}],
+            stream=True,
         )
         # Consume the stream
         async for _ in response_stream:
