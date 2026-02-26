@@ -662,7 +662,6 @@ def _set_streaming_completions_api_output_data(
             span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
             with capture_internal_exceptions():
-                # OpenAI chat completion API
                 if hasattr(x, "choices"):
                     choice_index = 0
                     for choice in x.choices:
