@@ -480,6 +480,11 @@ def _patch_producer_publish() -> None:
             kwargs_headers = {}
 
         task_name = kwargs_headers.get("task")
+
+        if not task_name:
+            # Filter out heartbeat and other internal Celery events
+            return original_publish(self, *args, **kwargs)
+
         task_id = kwargs_headers.get("id")
         retries = kwargs_headers.get("retries")
 
