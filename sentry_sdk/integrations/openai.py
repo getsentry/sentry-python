@@ -465,7 +465,7 @@ def _set_embeddings_input_data(
 def _common_set_output_data(
     span: "Span",
     response: "Any",
-    kwargs: "dict[str, Any]",
+    input: "Any",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
@@ -473,14 +473,8 @@ def _common_set_output_data(
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
-    # Input messages (the prompt or data sent to the model)
-    # used for the token usage calculation
-    messages = kwargs.get("messages")
-    if messages is None:
-        messages = kwargs.get("input")
-
-    if messages is not None and isinstance(messages, str):
-        messages = [messages]
+    if input is not None and isinstance(input, str):
+        input = [input]
 
     ttft: "Optional[float]" = None
 
@@ -494,7 +488,7 @@ def _common_set_output_data(
             if len(response_text) > 0:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
 
-        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
+        _calculate_token_usage(input, response, span, None, integration.count_tokens)
 
         if finish_span:
             span.__exit__(None, None, None)
@@ -530,7 +524,7 @@ def _common_set_output_data(
                     span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                 )
 
-        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
+        _calculate_token_usage(input, response, span, None, integration.count_tokens)
 
         if finish_span:
             span.__exit__(None, None, None)
@@ -571,7 +565,7 @@ def _common_set_output_data(
                     # OpenAI responses API end of streaming response
                     if RESPONSES_API_ENABLED and isinstance(x, ResponseCompletedEvent):
                         _calculate_token_usage(
-                            messages,
+                            input,
                             x.response,
                             span,
                             None,
@@ -594,7 +588,7 @@ def _common_set_output_data(
                         )
                     if count_tokens_manually:
                         _calculate_token_usage(
-                            messages,
+                            input,
                             response,
                             span,
                             all_responses,
@@ -635,7 +629,7 @@ def _common_set_output_data(
                     # OpenAI responses API end of streaming response
                     if RESPONSES_API_ENABLED and isinstance(x, ResponseCompletedEvent):
                         _calculate_token_usage(
-                            messages,
+                            input,
                             x.response,
                             span,
                             None,
@@ -658,7 +652,7 @@ def _common_set_output_data(
                         )
                     if count_tokens_manually:
                         _calculate_token_usage(
-                            messages,
+                            input,
                             response,
                             span,
                             all_responses,
@@ -672,7 +666,7 @@ def _common_set_output_data(
         else:
             response._iterator = new_iterator()
     else:
-        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
+        _calculate_token_usage(input, response, span, None, integration.count_tokens)
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -727,10 +721,12 @@ def _set_completions_api_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
+    messages = kwargs.get("messages")
+
     _common_set_output_data(
         span,
         response,
-        kwargs,
+        messages,
         integration,
         start_time,
         finish_span,
@@ -745,10 +741,12 @@ def _set_streaming_completions_api_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
+    messages = kwargs.get("messages")
+
     _common_set_output_data(
         span,
         response,
-        kwargs,
+        messages,
         integration,
         start_time,
         finish_span,
@@ -763,10 +761,12 @@ def _set_responses_api_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
+    input = kwargs.get("input")
+
     _common_set_output_data(
         span,
         response,
-        kwargs,
+        input,
         integration,
         start_time,
         finish_span,
@@ -781,10 +781,12 @@ def _set_streaming_responses_api_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
+    input = kwargs.get("input")
+
     _common_set_output_data(
         span,
         response,
-        kwargs,
+        input,
         integration,
         start_time,
         finish_span,
@@ -799,10 +801,12 @@ def _set_embeddings_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
+    input = kwargs.get("input")
+
     _common_set_output_data(
         span,
         response,
-        kwargs,
+        input,
         integration,
         start_time,
         finish_span,
