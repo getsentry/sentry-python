@@ -2350,16 +2350,6 @@ async def test_ai_client_span_responses_async_api(
     assert spans[0]["data"] == expected_data
 
 
-async def example_response_stream():
-    yield EXAMPLE_RESPONSES_STREAM[0]
-    yield EXAMPLE_RESPONSES_STREAM[1]
-    yield EXAMPLE_RESPONSES_STREAM[2]
-    yield EXAMPLE_RESPONSES_STREAM[3]
-    yield EXAMPLE_RESPONSES_STREAM[4]
-
-    return
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "instructions",
@@ -2438,7 +2428,7 @@ async def test_ai_client_span_streaming_responses_async_api(
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = example_response_stream()
+    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
     client.responses._post = mock.AsyncMock(return_value=returned_stream)
 
     with start_transaction(name="openai tx"):
