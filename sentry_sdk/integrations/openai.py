@@ -467,7 +467,6 @@ def _common_set_output_data(
     response: "Any",
     input: "Any",
     integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     if hasattr(response, "model"):
@@ -565,7 +564,7 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         )
     else:
         _set_completions_api_output_data(
-            span, response, kwargs, integration, start_time, finish_span=True
+            span, response, kwargs, integration, finish_span=True
         )
 
     return response
@@ -576,7 +575,6 @@ def _set_completions_api_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     messages = kwargs.get("messages")
@@ -589,7 +587,6 @@ def _set_completions_api_output_data(
         response,
         messages,
         integration,
-        start_time,
         finish_span,
     )
 
@@ -711,7 +708,6 @@ def _set_responses_api_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     input = kwargs.get("input")
@@ -724,7 +720,6 @@ def _set_responses_api_output_data(
         response,
         input,
         integration,
-        start_time,
         finish_span,
     )
 
@@ -851,7 +846,6 @@ def _set_embeddings_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     input = kwargs.get("input")
@@ -864,7 +858,6 @@ def _set_embeddings_output_data(
         response,
         input,
         integration,
-        start_time,
         finish_span,
     )
 
@@ -1052,7 +1045,7 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
         )
     else:
         _set_responses_api_output_data(
-            span, response, kwargs, integration, start_time, finish_span=True
+            span, response, kwargs, integration, finish_span=True
         )
 
     return response
