@@ -290,25 +290,25 @@ def push_scope(  # noqa: F811
 
 
 @scopemethod
-def set_attribute(key: str, value: "Any") -> None:
+def set_attribute(attribute: str, value: "Any") -> None:
     """
     Set an attribute.
 
     Any attributes-based telemetry (logs, metrics) captured in this scope will
     include this attribute.
     """
-    return get_isolation_scope().set_attribute(key, value)
+    return get_isolation_scope().set_attribute(attribute, value)
 
 
 @scopemethod
-def remove_attribute(key: str) -> None:
+def remove_attribute(attribute: str) -> None:
     """
     Remove an attribute.
 
     If the attribute doesn't exist, this function will not have any effect and
     it will also not raise an exception.
     """
-    return get_isolation_scope().remove_attribute(key)
+    return get_isolation_scope().remove_attribute(attribute)
 
 
 @scopemethod
