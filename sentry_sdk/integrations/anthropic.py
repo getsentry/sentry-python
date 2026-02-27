@@ -402,12 +402,14 @@ def _set_output_data(
         span.__exit__(None, None, None)
 
 
-def _set_streaming_output_data(
+def _patch_streaming_response_iterator(
     result: "AsyncStream[RawMessageStreamEvent]",
     span: "sentry_sdk.tracing.Span",
-):
-    integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
-
+    integration: "AnthropicIntegration",
+) -> None:
+    """
+    Responsible for closing the `gen_ai.chat` span and setting attributes acquired during response consumption.
+    """
     old_iterator = result._iterator
 
     def new_iterator() -> "Iterator[MessageStreamEvent]":
@@ -548,7 +550,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
     is_streaming_response = kwargs.get("stream", False)
     if is_streaming_response:
-        _set_streaming_output_data(result, span)
+        _patch_streaming_response_iterator(result, span, integration)
         return result
 
     with capture_internal_exceptions():
