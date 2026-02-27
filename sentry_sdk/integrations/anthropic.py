@@ -283,7 +283,7 @@ def _common_set_input_data(
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
     if (
         messages is not None
-        and len(messages) > 0
+        and len(messages) > 0  # type: ignore
         and should_send_default_pii()
         and integration.include_prompts
     ):
@@ -357,7 +357,7 @@ def _common_set_input_data(
     if top_p is not None and _is_given(top_p):
         span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
-    if tools is not None and _is_given(tools) and len(tools) > 0:
+    if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
         span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
 
 
@@ -805,6 +805,9 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
     @wraps(f)
     def _sentry_patched_enter(self) -> "MessageStreamManager":
         stream_manager = f(self)
+        if not hasattr(self, "_max_tokens"):
+            return stream_manager
+
         _sentry_patched_stream_common(
             stream_manager=stream_manager,
             max_tokens=self._max_tokens,
