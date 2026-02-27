@@ -22,7 +22,7 @@ try:
     from django.template.base import Origin
 except ImportError:
     # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin
+    from django.template.loader import LoaderOrigin as Origin  # type: ignore[attr-defined, no-redef]
 
 
 def get_template_frame_from_exception(
@@ -62,18 +62,18 @@ def patch_templates() -> None:
 
     real_rendered_content = SimpleTemplateResponse.rendered_content
 
-    @property  # type: ignore
-    @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
+    @property  # type: ignore[misc]
+    @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)  # type: ignore[attr-defined]
     def rendered_content(self: "SimpleTemplateResponse") -> str:
         with sentry_sdk.start_span(
             op=OP.TEMPLATE_RENDER,
-            name=_get_template_name_description(self.template_name),
+            name=_get_template_name_description(self.template_name),  # type: ignore[arg-type]
             origin=DjangoIntegration.origin,
         ) as span:
             span.set_data("context", self.context_data)
-            return real_rendered_content.fget(self)
+            return real_rendered_content.fget(self)  # type: ignore[attr-defined]
 
-    SimpleTemplateResponse.rendered_content = rendered_content
+    SimpleTemplateResponse.rendered_content = rendered_content  # type: ignore[method-assign]
 
     if DJANGO_VERSION < (1, 7):
         return
@@ -82,7 +82,7 @@ def patch_templates() -> None:
     real_render = django.shortcuts.render
 
     @functools.wraps(real_render)
-    @ensure_integration_enabled(DjangoIntegration, real_render)
+    @ensure_integration_enabled(DjangoIntegration, real_render)  # type: ignore[arg-type]
     def render(
         request: "django.http.HttpRequest",
         template_name: str,
@@ -157,7 +157,7 @@ def _get_template_frame_from_source(
     filename = getattr(origin, "loadname", None)
     if filename is None:
         filename = "<django template>"
-    template_source = origin.reload()
+    template_source = origin.reload()  # type: ignore[attr-defined]
     lineno = None
     upto = 0
     pre_context = []

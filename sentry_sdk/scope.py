@@ -30,10 +30,10 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
     has_span_streaming_enabled,
-    normalize_incoming_data,
+    is_ignored_span,
     PropagationContext,
 )
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, NoOpStreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -695,6 +695,13 @@ class Scope:
             isolation_scope._propagation_context = PropagationContext()
         return isolation_scope._propagation_context
 
+    def set_custom_sampling_context(
+        self, custom_sampling_context: "dict[str, Any]"
+    ) -> None:
+        self.get_active_propagation_context()._set_custom_sampling_context(
+            custom_sampling_context
+        )
+
     def clear(self) -> None:
         """Clears the entire scope."""
         self._level: "Optional[LogLevelStr]" = None
@@ -711,7 +718,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture: bool = True
 
-        self._span: "Optional[Span]" = None
+        self._span: "Optional[Union[Span, StreamedSpan]]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
 
@@ -765,6 +772,14 @@ class Scope:
         if self._span is None:
             return None
 
+        if isinstance(self._span, StreamedSpan):
+            warnings.warn(
+                "Scope.transaction is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return None
+
         # there is an orphan span on the scope
         if self._span.containing_transaction is None:
             return None
@@ -794,17 +809,36 @@ class Scope:
             "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
         )
         self._transaction = value
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = value
+        if self._span:
+            if isinstance(self._span, StreamedSpan):
+                warnings.warn(
+                    "Scope.transaction is not available in streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return None
+
+            if self._span.containing_transaction:
+                self._span.containing_transaction.name = value
 
     def set_transaction_name(self, name: str, source: "Optional[str]" = None) -> None:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
+        if self._span:
+            if isinstance(self._span, NoOpStreamedSpan):
+                return
 
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = name
-            if source:
-                self._span.containing_transaction.source = source
+            elif isinstance(self._span, StreamedSpan):
+                self._span.segment.set_name(name)
+                if source:
+                    self._span.segment.set_attribute(
+                        "sentry.span.source", getattr(source, "value", source)
+                    )
+
+            elif self._span.containing_transaction:
+                self._span.containing_transaction.name = name
+                if source:
+                    self._span.containing_transaction.source = source
 
         if source:
             self._transaction_info["source"] = source
@@ -827,12 +861,12 @@ class Scope:
             session.update(user=value)
 
     @property
-    def span(self) -> "Optional[Span]":
+    def span(self) -> "Optional[Union[Span, StreamedSpan]]":
         """Get/set current tracing span or transaction."""
         return self._span
 
     @span.setter
-    def span(self, span: "Optional[Span]") -> None:
+    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -1141,6 +1175,15 @@ class Scope:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        client = sentry_sdk.get_client()
+        if has_span_streaming_enabled(client.options):
+            warnings.warn(
+                "Scope.start_span is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return NoOpSpan()
+
         if kwargs.get("description") is not None:
             warnings.warn(
                 "The `description` parameter is deprecated. Please use `name` instead.",
@@ -1160,6 +1203,9 @@ class Scope:
 
             # get current span or transaction
             span = self.span or self.get_isolation_scope().span
+            if isinstance(span, StreamedSpan):
+                # make mypy happy
+                return NoOpSpan()
 
             if span is None:
                 # New spans get the `trace_id` from the scope
@@ -1173,6 +1219,93 @@ class Scope:
                 span = span.start_child(**kwargs)
 
             return span
+
+    def start_streamed_span(
+        self,
+        name: str,
+        attributes: "Optional[Attributes]" = None,
+        parent_span: "Optional[StreamedSpan]" = None,
+        **kwargs: "Any",  # TODO[span-first]: remove, just for expediting seer testing
+    ) -> "StreamedSpan":
+        # TODO: rename to start_span once we drop the old API
+        if name is None:
+            # TODO[span-first]: remove, just here for debugging
+            logger.debug("Span missing a name, ignoring, call stack:")
+            import traceback
+
+            for line in traceback.format_stack():
+                logger.debug(line)
+
+            return NoOpStreamedSpan(scope=self)
+
+        if isinstance(parent_span, NoOpStreamedSpan):
+            # parent_span is only set if the user explicitly set it
+            logger.debug(
+                "Ignored parent span provided. Span will be parented to the "
+                "currently active span instead."
+            )
+
+        if parent_span is None or isinstance(parent_span, NoOpStreamedSpan):
+            parent_span = self.span or self.get_current_scope().span  # type: ignore
+
+        # If no eligible parent_span was provided and there is no currently
+        # active span, this is a segment
+        if parent_span is None:
+            propagation_context = self.get_active_propagation_context()
+
+            if is_ignored_span(name, attributes):
+                return NoOpStreamedSpan(scope=self)
+
+            return StreamedSpan(
+                name=name,
+                attributes=attributes,
+                scope=self,
+                segment=None,
+                trace_id=propagation_context.trace_id,
+                parent_span_id=propagation_context.parent_span_id,
+                parent_sampled=propagation_context.parent_sampled,
+                baggage=propagation_context.baggage,
+            )
+
+        # This is a child span; take propagation context from the parent span
+        with new_scope():
+            if is_ignored_span(name, attributes) or isinstance(
+                parent_span, NoOpStreamedSpan
+            ):
+                return NoOpStreamedSpan()
+
+            return StreamedSpan(
+                name=name,
+                attributes=attributes,
+                scope=self,
+                trace_id=parent_span.trace_id,
+                parent_span_id=parent_span.span_id,
+                parent_sampled=parent_span.sampled,
+                segment=parent_span.segment,
+            )
+
+    def _start_profile_on_segment(self, span: "StreamedSpan") -> None:
+        try_autostart_continuous_profiler()
+
+        if not span.sampled:
+            return
+
+        span._continuous_profile = try_profile_lifecycle_trace_start()
+
+        # Typically, the profiler is set when the segment is created. But when
+        # using the auto lifecycle, the profiler isn't running when the first
+        # segment is started. So make sure we update the profiler id on it.
+        if span._continuous_profile is not None:
+            span._set_profile_id(get_profiler_id())
+
+    def _update_sample_rate_from_segment(self, span: "StreamedSpan") -> None:
+        # If we had to adjust the sample rate when setting the sampling decision
+        # for the spans, it needs to be updated in the propagation context too
+        propagation_context = self.get_active_propagation_context()
+        baggage = propagation_context.baggage
+
+        if baggage is not None and span.sample_rate is not None:
+            baggage.sentry_items["sample_rate"] = str(span.sample_rate)
 
     def continue_trace(
         self,
@@ -1206,6 +1339,9 @@ class Scope:
             same_process_as_parent=False,
             **optional_kwargs,
         )
+
+    def set_propagation_context(self, environ_or_headers: "dict[str, Any]") -> None:
+        self.generate_propagation_context(environ_or_headers)
 
     def capture_event(
         self,

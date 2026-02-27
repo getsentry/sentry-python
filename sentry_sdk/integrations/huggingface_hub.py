@@ -8,7 +8,9 @@ from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
+from sentry_sdk.tracing_utils import has_span_streaming_enabled, set_span_errored
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -18,7 +20,7 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable
+    from typing import Any, Callable, Iterable, Union
 
 try:
     import huggingface_hub.inference._client
@@ -66,7 +68,8 @@ def _capture_exception(exc: "Any") -> None:
 def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., Any]":
     @wraps(f)
     def new_huggingface_task(*args: "Any", **kwargs: "Any") -> "Any":
-        integration = sentry_sdk.get_client().get_integration(HuggingfaceHubIntegration)
+        sentry_client = sentry_sdk.get_client()
+        integration = sentry_client.get_integration(HuggingfaceHubIntegration)
         if integration is None:
             return f(*args, **kwargs)
 
@@ -87,17 +90,30 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         model = client.model or kwargs.get("model") or ""
         operation_name = op.split(".")[-1]
 
-        span = sentry_sdk.start_span(
-            op=op,
-            name=f"{operation_name} {model}",
-            origin=HuggingfaceHubIntegration.origin,
-        )
+        span_streaming = has_span_streaming_enabled(sentry_client.options)
+        span: "Union[StreamedSpan, Span]"
+        if span_streaming:
+            span = sentry_sdk.traces.start_span(name=f"{operation_name} {model}")
+            span.set_attribute("sentry.op", op)
+            span.set_attribute("sentry.origin", HuggingfaceHubIntegration.origin)
+        else:
+            span = sentry_sdk.start_span(
+                op=op,
+                name=f"{operation_name} {model}",
+                origin=HuggingfaceHubIntegration.origin,
+            )
+
         span.__enter__()
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
+        if isinstance(span, StreamedSpan):
+            set_on_span = span.set_attribute
+        else:
+            set_on_span = span.set_data
+
+        set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
 
         if model:
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+            set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
         # Input attributes
         if should_send_default_pii() and integration.include_prompts:
@@ -120,7 +136,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             value = kwargs.get(attribute, None)
             if value is not None:
                 if isinstance(value, (int, float, bool, str)):
-                    span.set_data(span_attribute, value)
+                    set_on_span(span_attribute, value)
                 else:
                     set_data_normalized(span, span_attribute, value, unpack=False)
 
@@ -181,7 +197,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                         response_text_buffer.append(choice.message.content)
 
             if response_model is not None:
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+                set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
             if finish_reason is not None:
                 set_data_normalized(
@@ -332,9 +348,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             yield chunk
 
                         if response_model is not None:
-                            span.set_data(
-                                SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
-                            )
+                            set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
                         if finish_reason is not None:
                             set_data_normalized(

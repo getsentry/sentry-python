@@ -1,24 +1,23 @@
+import json
 import threading
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.utils import format_timestamp, serialize_attribute, safe_repr
+from sentry_sdk.utils import format_timestamp, serialize_attribute
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
     from sentry_sdk.traces import StreamedSpan
-    from sentry_sdk._types import SerializedAttributeValue
 
 
 class SpanBatcher(Batcher["StreamedSpan"]):
-    # TODO[span-first]: size-based flushes
     # TODO[span-first]: adjust flush/drop defaults
     MAX_BEFORE_FLUSH = 1000
-    MAX_BEFORE_DROP = 5000
+    MAX_BEFORE_DROP = 1000
+    MAX_BYTES_BEFORE_FLUSH = 5 * 1024 * 1024  # 5 MB
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "span"
@@ -35,6 +34,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # envelope.
         # trace_id -> span buffer
         self._span_buffer: dict[str, list["StreamedSpan"]] = defaultdict(list)
+        self._running_size: dict[str, int] = defaultdict(lambda: 0)
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
@@ -64,17 +64,38 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return None
 
             self._span_buffer[span.trace_id].append(span)
+
             if size + 1 >= self.MAX_BEFORE_FLUSH:
                 self._flush_event.set()
+                return
+
+            self._running_size[span.trace_id] += self._estimate_size(span)
+            if self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH:
+                self._flush_event.set()
+                return
+
+    @staticmethod
+    def _estimate_size(item: "StreamedSpan") -> int:
+        # This is just a quick approximation
+        span_dict = SpanBatcher._to_transport_format(item)
+        return len(str(span_dict))
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
-        # TODO[span-first]
         res: "dict[str, Any]" = {
+            "trace_id": item.trace_id,
             "span_id": item.span_id,
             "name": item._name,
             "status": item._status,
+            "is_segment": item.is_segment(),
+            "start_timestamp": item.start_timestamp.timestamp(),
         }
+
+        if item.timestamp:
+            res["end_timestamp"] = item.timestamp.timestamp()
+
+        if item.parent_span_id:
+            res["parent_span_id"] = item.parent_span_id
 
         if item._attributes:
             res["attributes"] = {
@@ -89,11 +110,9 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return None
 
             envelopes = []
-            for trace_id, spans in self._span_buffer.items():
+            for spans in self._span_buffer.values():
                 if spans:
-                    # TODO[span-first]
-                    # dsc = spans[0].dynamic_sampling_context()
-                    dsc = None
+                    dsc = spans[0].dynamic_sampling_context()
 
                     envelope = Envelope(
                         headers={
@@ -123,6 +142,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                     envelopes.append(envelope)
 
             self._span_buffer.clear()
+            self._running_size.clear()
 
         for envelope in envelopes:
             self._capture_func(envelope)

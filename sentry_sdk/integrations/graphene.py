@@ -4,6 +4,8 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -25,6 +27,8 @@ if TYPE_CHECKING:
     from graphql.execution import ExecutionResult
     from graphql.type import GraphQLSchema
     from sentry_sdk._types import Event
+    from sentry_sdk.tracing import Span
+    from sentry_sdk.traces import StreamedSpan
 
 
 class GrapheneIntegration(Integration):
@@ -141,17 +145,27 @@ def graphql_span(
         },
     )
 
-    scope = sentry_sdk.get_current_scope()
-    if scope.span:
-        _graphql_span = scope.span.start_child(op=op, name=operation_name)
+    client = sentry_sdk.get_client()
+    span_streaming = has_span_streaming_enabled(client.options)
+    _graphql_span: "Union[Span, StreamedSpan]"
+    if span_streaming:
+        _graphql_span = sentry_sdk.traces.start_span(name=operation_name or "operation")
+        _graphql_span.set_attribute("sentry.op", op)
+        _graphql_span.set_attribute("graphql.document", source)
+        if operation_name:
+            _graphql_span.set_attribute("graphql.operation.name", operation_name)
+        _graphql_span.set_attribute("graphql.operation.type", operation_type)
+        _graphql_span.start()
     else:
         _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
-
-    _graphql_span.set_data("graphql.document", source)
-    _graphql_span.set_data("graphql.operation.name", operation_name)
-    _graphql_span.set_data("graphql.operation.type", operation_type)
+        _graphql_span.set_data("graphql.document", source)
+        _graphql_span.set_data("graphql.operation.name", operation_name)
+        _graphql_span.set_data("graphql.operation.type", operation_type)
 
     try:
         yield
     finally:
-        _graphql_span.finish()
+        if isinstance(_graphql_span, StreamedSpan):
+            _graphql_span.end()
+        else:
+            _graphql_span.finish()

@@ -63,8 +63,8 @@ def patch_views() -> None:
 
         return sentry_wrapped_callback
 
-    SimpleTemplateResponse.render = sentry_patched_render
-    BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
+    SimpleTemplateResponse.render = sentry_patched_render  # type: ignore[method-assign]
+    BaseHandler.make_view_atomic = sentry_patched_make_view_atomic  # type: ignore[method-assign]
 
 
 def _wrap_sync_view(callback: "Any") -> "Any":

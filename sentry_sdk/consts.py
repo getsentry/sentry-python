@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         Dict,
         List,
         Optional,
+        Pattern,
         Sequence,
         Tuple,
         Type,
@@ -52,6 +53,7 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        IgnoreSpansConfig,
         Log,
         MeasurementUnit,
         Metric,
@@ -83,6 +85,7 @@ if TYPE_CHECKING:
             "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
+            "ignore_spans": Optional[IgnoreSpansConfig],
         },
         total=False,
     )
@@ -1490,4 +1493,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.53.0"
+VERSION = "2.52.0a7"

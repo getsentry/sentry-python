@@ -127,7 +127,7 @@ def _patch_cache(
     if not hasattr(cache, "_sentry_patched"):
         for method_name in METHODS_TO_INSTRUMENT:
             _patch_cache_method(cache, method_name, address, port)
-        cache._sentry_patched = True
+        cache._sentry_patched = True  # type: ignore[attr-defined]
 
 
 def _get_address_port(
@@ -186,12 +186,12 @@ def patch_caching() -> None:
                         settings.CACHES[alias or "default"]
                     )
 
-                    _patch_cache(cache, address, port)
+                    _patch_cache(cache, address, port)  # type: ignore[arg-type]
 
                 return cache
 
-            CacheHandler.__getitem__ = sentry_get_item
-            CacheHandler._sentry_patched = True
+            CacheHandler.__getitem__ = sentry_get_item  # type: ignore[method-assign, assignment]
+            CacheHandler._sentry_patched = True  # type: ignore[attr-defined]
 
         else:
             original_create_connection = CacheHandler.create_connection
@@ -203,9 +203,9 @@ def patch_caching() -> None:
                 if should_enable_cache_spans():
                     address, port = _get_address_port(self.settings[alias or "default"])
 
-                    _patch_cache(cache, address, port)
+                    _patch_cache(cache, address, port)  # type: ignore[arg-type]
 
                 return cache
 
-            CacheHandler.create_connection = sentry_create_connection
-            CacheHandler._sentry_patched = True
+            CacheHandler.create_connection = sentry_create_connection  # type: ignore[method-assign]
+            CacheHandler._sentry_patched = True  # type: ignore[attr-defined]

@@ -11,34 +11,47 @@ from sentry_sdk.integrations.redis.utils import (
     _set_pipeline_data,
 )
 from sentry_sdk.tracing import Span
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import capture_internal_exceptions
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any
+    from typing import Any, Optional, Union
+    from sentry_sdk.traces import StreamedSpan
 
 
 def patch_redis_pipeline(
     pipeline_cls: "Any",
     is_cluster: bool,
     get_command_args_fn: "Any",
-    set_db_data_fn: "Callable[[Span, Any], None]",
+    set_db_data_fn: "Callable[[Union[Span, StreamedSpan], Any], None]",
 ) -> None:
     old_execute = pipeline_cls.execute
 
     from sentry_sdk.integrations.redis import RedisIntegration
 
     def sentry_patched_execute(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        if sentry_sdk.get_client().get_integration(RedisIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(RedisIntegration) is None:
             return old_execute(self, *args, **kwargs)
 
-        with sentry_sdk.start_span(
-            op=OP.DB_REDIS,
-            name="redis.pipeline.execute",
-            origin=SPAN_ORIGIN,
-        ) as span:
+        span_streaming = has_span_streaming_enabled(client.options)
+
+        span: "Union[Span, StreamedSpan]"
+        if span_streaming:
+            span = sentry_sdk.traces.start_span(name="redis.pipeline.execute")
+            span.set_attribute("sentry.origin", SPAN_ORIGIN)
+            span.set_attribute("sentry.op", OP.DB_REDIS)
+        else:
+            span = sentry_sdk.start_span(
+                op=OP.DB_REDIS,
+                name="redis.pipeline.execute",
+                origin=SPAN_ORIGIN,
+            )
+
+        with span:
             with capture_internal_exceptions():
                 command_seq = None
                 try:
@@ -61,7 +74,9 @@ def patch_redis_pipeline(
 
 
 def patch_redis_client(
-    cls: "Any", is_cluster: bool, set_db_data_fn: "Callable[[Span, Any], None]"
+    cls: "Any",
+    is_cluster: bool,
+    set_db_data_fn: "Callable[[Union[Span, StreamedSpan], Any], None]",
 ) -> None:
     """
     This function can be used to instrument custom redis client classes or
@@ -74,9 +89,12 @@ def patch_redis_client(
     def sentry_patched_execute_command(
         self: "Any", name: str, *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        integration = sentry_sdk.get_client().get_integration(RedisIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(RedisIntegration)
         if integration is None:
             return old_execute_command(self, name, *args, **kwargs)
+
+        span_streaming = has_span_streaming_enabled(client.options)
 
         cache_properties = _compile_cache_span_properties(
             name,
@@ -85,34 +103,51 @@ def patch_redis_client(
             integration,
         )
 
-        cache_span = None
+        cache_span: "Optional[Union[Span, StreamedSpan]]" = None
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
-            cache_span = sentry_sdk.start_span(
-                op=cache_properties["op"],
-                name=cache_properties["description"],
-                origin=SPAN_ORIGIN,
-            )
+            if span_streaming:
+                cache_span = sentry_sdk.traces.start_span(
+                    name=cache_properties["description"]
+                )
+                cache_span.set_attribute("sentry.op", cache_properties["op"])
+                cache_span.set_attribute("sentry.origin", SPAN_ORIGIN)
+            else:
+                cache_span = sentry_sdk.start_span(
+                    op=cache_properties["op"],
+                    name=cache_properties["description"],
+                    origin=SPAN_ORIGIN,
+                )
             cache_span.__enter__()
 
         db_properties = _compile_db_span_properties(integration, name, args)
 
-        db_span = sentry_sdk.start_span(
-            op=db_properties["op"],
-            name=db_properties["description"],
-            origin=SPAN_ORIGIN,
-        )
+        db_span: "Union[Span, StreamedSpan]"
+        if span_streaming:
+            db_span = sentry_sdk.traces.start_span(name=db_properties["description"])
+            db_span.set_attribute("sentry.op", db_properties["op"])
+            db_span.set_attribute("sentry.origin", SPAN_ORIGIN)
+        else:
+            db_span = sentry_sdk.start_span(
+                op=db_properties["op"],
+                name=db_properties["description"],
+                origin=SPAN_ORIGIN,
+            )
         db_span.__enter__()
 
-        set_db_data_fn(db_span, self)
-        _set_client_data(db_span, is_cluster, name, *args)
+        with capture_internal_exceptions():
+            set_db_data_fn(db_span, self)
+            _set_client_data(db_span, is_cluster, name, *args)
 
-        value = old_execute_command(self, name, *args, **kwargs)
+        try:
+            value = old_execute_command(self, name, *args, **kwargs)
+        finally:
+            db_span.__exit__(None, None, None)
 
-        db_span.__exit__(None, None, None)
+            if cache_span:
+                with capture_internal_exceptions():
+                    _set_cache_data(cache_span, self, cache_properties, value)
 
-        if cache_span:
-            _set_cache_data(cache_span, self, cache_properties, value)
-            cache_span.__exit__(None, None, None)
+                cache_span.__exit__(None, None, None)
 
         return value
 

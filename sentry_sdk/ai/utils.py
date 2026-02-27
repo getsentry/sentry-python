@@ -8,12 +8,14 @@ from typing import TYPE_CHECKING
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
 from sentry_sdk.utils import logger
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 # Maximum characters when only a single message is left after bytes truncation
@@ -489,13 +491,19 @@ def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
 
 
 def set_data_normalized(
-    span: "Span", key: str, value: "Any", unpack: bool = True
+    span: "Union[Span, StreamedSpan]", key: str, value: "Any", unpack: bool = True
 ) -> None:
     normalized = _normalize_data(value, unpack=unpack)
-    if isinstance(normalized, (int, float, bool, str)):
-        span.set_data(key, normalized)
+
+    if isinstance(span, StreamedSpan):
+        set_on_span = span.set_attribute
     else:
-        span.set_data(key, json.dumps(normalized))
+        set_on_span = span.set_data
+
+    if isinstance(normalized, (int, float, bool, str)):
+        set_on_span(key, normalized)
+    else:
+        set_on_span(key, json.dumps(normalized))
 
 
 def normalize_message_role(role: str) -> str:
@@ -525,7 +533,14 @@ def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str,
 
 
 def get_start_span_function() -> "Callable[..., Any]":
+    client = sentry_sdk.get_client()
+
     current_span = sentry_sdk.get_current_span()
+    if isinstance(current_span, StreamedSpan) or has_span_streaming_enabled(
+        client.options
+    ):
+        return sentry_sdk.traces.start_span
+
     transaction_exists = (
         current_span is not None and current_span.containing_transaction is not None
     )
