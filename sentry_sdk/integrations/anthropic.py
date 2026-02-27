@@ -49,6 +49,9 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
+    from anthropic import AsyncStream
+    from anthropic.types import RawMessageStreamEvent
+
 
 class _RecordedUsage:
     output_tokens: int = 0
@@ -389,6 +392,96 @@ def _set_output_data(
         span.__exit__(None, None, None)
 
 
+def _set_streaming_output_data(
+    result: "AsyncStream[RawMessageStreamEvent]",
+    span: "sentry_sdk.tracing.Span",
+):
+    integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+
+    old_iterator = result._iterator
+
+    def new_iterator() -> "Iterator[MessageStreamEvent]":
+        model = None
+        usage = _RecordedUsage()
+        content_blocks: "list[str]" = []
+
+        for event in old_iterator:
+            (
+                model,
+                usage,
+                content_blocks,
+            ) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+            )
+            yield event
+
+        # Anthropic's input_tokens excludes cached/cache_write tokens.
+        # Normalize to total input tokens for correct cost calculations.
+        total_input = (
+            usage.input_tokens
+            + (usage.cache_read_input_tokens or 0)
+            + (usage.cache_write_input_tokens or 0)
+        )
+
+        _set_output_data(
+            span=span,
+            integration=integration,
+            model=model,
+            input_tokens=total_input,
+            output_tokens=usage.output_tokens,
+            cache_read_input_tokens=usage.cache_read_input_tokens,
+            cache_write_input_tokens=usage.cache_write_input_tokens,
+            content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+            finish_span=True,
+        )
+
+    async def new_iterator_async() -> "AsyncIterator[MessageStreamEvent]":
+        model = None
+        usage = _RecordedUsage()
+        content_blocks: "list[str]" = []
+
+        async for event in old_iterator:
+            (
+                model,
+                usage,
+                content_blocks,
+            ) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+            )
+            yield event
+
+        # Anthropic's input_tokens excludes cached/cache_write tokens.
+        # Normalize to total input tokens for correct cost calculations.
+        total_input = (
+            usage.input_tokens
+            + (usage.cache_read_input_tokens or 0)
+            + (usage.cache_write_input_tokens or 0)
+        )
+
+        _set_output_data(
+            span=span,
+            integration=integration,
+            model=model,
+            input_tokens=total_input,
+            output_tokens=usage.output_tokens,
+            cache_read_input_tokens=usage.cache_read_input_tokens,
+            cache_write_input_tokens=usage.cache_write_input_tokens,
+            content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+            finish_span=True,
+        )
+
+    if str(type(result._iterator)) == "<class 'async_generator'>":
+        result._iterator = new_iterator_async()
+    else:
+        result._iterator = new_iterator()
+
+
 def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = kwargs.pop("integration")
     if integration is None:
@@ -414,6 +507,11 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
     _set_input_data(span, kwargs, integration)
 
     result = yield f, args, kwargs
+
+    is_streaming_response = kwargs.get("stream", False)
+    if is_streaming_response:
+        _set_streaming_output_data(result, span)
+        return result
 
     with capture_internal_exceptions():
         if hasattr(result, "content"):
@@ -444,92 +542,6 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 content_blocks=content_blocks,
                 finish_span=True,
             )
-
-        # Streaming response
-        elif hasattr(result, "_iterator"):
-            old_iterator = result._iterator
-
-            def new_iterator() -> "Iterator[MessageStreamEvent]":
-                model = None
-                usage = _RecordedUsage()
-                content_blocks: "list[str]" = []
-
-                for event in old_iterator:
-                    (
-                        model,
-                        usage,
-                        content_blocks,
-                    ) = _collect_ai_data(
-                        event,
-                        model,
-                        usage,
-                        content_blocks,
-                    )
-                    yield event
-
-                # Anthropic's input_tokens excludes cached/cache_write tokens.
-                # Normalize to total input tokens for correct cost calculations.
-                total_input = (
-                    usage.input_tokens
-                    + (usage.cache_read_input_tokens or 0)
-                    + (usage.cache_write_input_tokens or 0)
-                )
-
-                _set_output_data(
-                    span=span,
-                    integration=integration,
-                    model=model,
-                    input_tokens=total_input,
-                    output_tokens=usage.output_tokens,
-                    cache_read_input_tokens=usage.cache_read_input_tokens,
-                    cache_write_input_tokens=usage.cache_write_input_tokens,
-                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-                    finish_span=True,
-                )
-
-            async def new_iterator_async() -> "AsyncIterator[MessageStreamEvent]":
-                model = None
-                usage = _RecordedUsage()
-                content_blocks: "list[str]" = []
-
-                async for event in old_iterator:
-                    (
-                        model,
-                        usage,
-                        content_blocks,
-                    ) = _collect_ai_data(
-                        event,
-                        model,
-                        usage,
-                        content_blocks,
-                    )
-                    yield event
-
-                # Anthropic's input_tokens excludes cached/cache_write tokens.
-                # Normalize to total input tokens for correct cost calculations.
-                total_input = (
-                    usage.input_tokens
-                    + (usage.cache_read_input_tokens or 0)
-                    + (usage.cache_write_input_tokens or 0)
-                )
-
-                _set_output_data(
-                    span=span,
-                    integration=integration,
-                    model=model,
-                    input_tokens=total_input,
-                    output_tokens=usage.output_tokens,
-                    cache_read_input_tokens=usage.cache_read_input_tokens,
-                    cache_write_input_tokens=usage.cache_write_input_tokens,
-                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-                    finish_span=True,
-                )
-
-            if str(type(result._iterator)) == "<class 'async_generator'>":
-                result._iterator = new_iterator_async()
-            else:
-                result._iterator = new_iterator()
-
         else:
             span.set_data("unknown_response", True)
             span.__exit__(None, None, None)
