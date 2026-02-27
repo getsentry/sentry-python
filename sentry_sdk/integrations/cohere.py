@@ -21,6 +21,7 @@ import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
+from sentry_sdk.integrations.cohere_v2 import setup_v2
 
 try:
     from cohere.client import Client
@@ -79,9 +80,6 @@ class CohereIntegration(Integration):
         BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
         Client.embed = _wrap_embed(Client.embed)
         BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
-
-        from sentry_sdk.integrations.cohere_v2 import setup_v2
-
         setup_v2(_wrap_embed)
 
 
@@ -167,18 +165,9 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
                 for x in kwargs.get("chat_history", []):
-<<<<<<< HEAD
                     messages.append(
                         {
                             "role": getattr(x, "role", "").lower(),
-=======
-                    role = getattr(x, "role", "").lower()
-                    if role == "chatbot":
-                        role = "assistant"
-                    messages.append(
-                        {
-                            "role": role,
->>>>>>> c51eeb90 (correct model)
                             "content": getattr(x, "message", ""),
                         }
                     )
