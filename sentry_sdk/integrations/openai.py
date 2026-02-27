@@ -225,7 +225,7 @@ def _commmon_set_input_data(
     kwargs: "dict[str, Any]",
 ) -> None:
     # Input attributes: Common
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
+    span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
 
     # Input attributes: Optional
     kwargs_keys_to_attributes = {
@@ -241,14 +241,12 @@ def _commmon_set_input_data(
         value = kwargs.get(key)
 
         if value is not None and _is_given(value):
-            set_data_normalized(span, attribute, value)
+            span.set_data(attribute, value)
 
     # Input attributes: Tools
     tools = kwargs.get("tools")
     if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
+        span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
 
 
 def _set_responses_api_input_data(
@@ -256,11 +254,12 @@ def _set_responses_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
+    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+
     explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
     messages: "Optional[Union[str, ResponseInputParam]]" = kwargs.get("input")
 
     if not should_send_default_pii() or not integration.include_prompts:
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         _commmon_set_input_data(span, kwargs)
         return
 
@@ -281,12 +280,10 @@ def _set_responses_api_input_data(
             ),
         )
 
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         _commmon_set_input_data(span, kwargs)
         return
 
     if messages is None:
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         _commmon_set_input_data(span, kwargs)
         return
 
@@ -319,7 +316,6 @@ def _set_responses_api_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         _commmon_set_input_data(span, kwargs)
         return
 
@@ -335,7 +331,6 @@ def _set_responses_api_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
     _commmon_set_input_data(span, kwargs)
 
 
@@ -344,6 +339,8 @@ def _set_completions_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
+    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+
     messages: "Optional[Union[str, Iterable[ChatCompletionMessageParam]]]" = kwargs.get(
         "messages"
     )
@@ -353,7 +350,6 @@ def _set_completions_api_input_data(
         or not integration.include_prompts
         or messages is None
     ):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         _commmon_set_input_data(span, kwargs)
         return
 
@@ -365,13 +361,11 @@ def _set_completions_api_input_data(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         _commmon_set_input_data(span, kwargs)
         return
 
     # dict special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
     if not isinstance(messages, Iterable) or isinstance(messages, dict):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         _commmon_set_input_data(span, kwargs)
         return
 
@@ -399,7 +393,6 @@ def _set_completions_api_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
     _commmon_set_input_data(span, kwargs)
 
 
@@ -408,6 +401,8 @@ def _set_embeddings_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
+    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+
     messages: "Union[str, SequenceNotStr[str], Iterable[int], Iterable[Iterable[int]]]" = kwargs.get(
         "input"
     )
@@ -417,13 +412,11 @@ def _set_embeddings_input_data(
         or not integration.include_prompts
         or messages is None
     ):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
         _commmon_set_input_data(span, kwargs)
 
         return
 
     if isinstance(messages, str):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
         _commmon_set_input_data(span, kwargs)
 
         normalized_messages = normalize_message_roles([messages])  # type: ignore
@@ -440,7 +433,6 @@ def _set_embeddings_input_data(
 
     # dict special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
     if not isinstance(messages, Iterable) or isinstance(messages, dict):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
         _commmon_set_input_data(span, kwargs)
         return
 
@@ -458,7 +450,6 @@ def _set_embeddings_input_data(
                 span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
             )
 
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
     _commmon_set_input_data(span, kwargs)
 
 
@@ -471,7 +462,7 @@ def _set_output_data(
     finish_span: bool = True,
 ) -> None:
     if hasattr(response, "model"):
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
     # Input messages (the prompt or data sent to the model)
     # used for the token usage calculation
@@ -583,9 +574,7 @@ def _set_output_data(
 
             with capture_internal_exceptions():
                 if ttft is not None:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
-                    )
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft)
                 if len(data_buf) > 0:
                     all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
