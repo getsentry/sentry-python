@@ -372,8 +372,8 @@ def _set_create_input_data(
     _common_set_input_data(
         span=span,
         integration=integration,
-        max_tokens=kwargs.get("max_tokens"),
-        messages=kwargs.get("messages"),
+        max_tokens=kwargs.get("max_tokens"),  # type: ignore
+        messages=kwargs.get("messages"),  # type: ignore
         model=kwargs.get("model"),
         system=kwargs.get("system"),
         temperature=kwargs.get("temperature"),
@@ -724,7 +724,7 @@ def _wrap_message_create_async(f: "Any") -> "Any":
 
 
 def _sentry_patched_stream_common(
-    result,
+    stream_manager: "MessageStreamManager",
     max_tokens: "int",
     messages: "Iterable[MessageParam]",
     model: "ModelParam",
@@ -733,19 +733,19 @@ def _sentry_patched_stream_common(
     top_k: "int",
     top_p: "float",
     tools: "Iterable[ToolUnionParam]",
-):
+) -> None:
     integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
 
     if integration is None:
-        return result
+        return stream_manager
 
     if messages is None:
-        return result
+        return stream_manager
 
     try:
         iter(messages)
     except TypeError:
-        return result
+        return stream_manager
 
     if model is None:
         model = ""
@@ -770,9 +770,7 @@ def _sentry_patched_stream_common(
         top_p=top_p,
         tools=tools,
     )
-    _patch_streaming_response_iterator(result, span, integration)
-
-    return result
+    _patch_streaming_response_iterator(stream_manager, span, integration)
 
 
 def _wrap_message_stream(f: "Any") -> "Any":
@@ -782,19 +780,19 @@ def _wrap_message_stream(f: "Any") -> "Any":
     """
 
     @wraps(f)
-    def _sentry_patched_stream(*args, **kwargs):
-        stream = f(*args, **kwargs)
+    def _sentry_patched_stream(*args, **kwargs) -> "MessageStreamManager":
+        stream_manager = f(*args, **kwargs)
 
-        stream._max_tokens = kwargs.get("max_tokens")
-        stream._messages = kwargs.get("messages")
-        stream._model = kwargs.get("model")
-        stream._system = kwargs.get("system")
-        stream._temperature = kwargs.get("temperature")
-        stream._top_k = kwargs.get("top_k")
-        stream._top_p = kwargs.get("top_p")
-        stream._tools = kwargs.get("tools")
+        stream_manager._max_tokens = kwargs.get("max_tokens")
+        stream_manager._messages = kwargs.get("messages")
+        stream_manager._model = kwargs.get("model")
+        stream_manager._system = kwargs.get("system")
+        stream_manager._temperature = kwargs.get("temperature")
+        stream_manager._top_k = kwargs.get("top_k")
+        stream_manager._top_p = kwargs.get("top_p")
+        stream_manager._tools = kwargs.get("tools")
 
-        return stream
+        return stream_manager
 
     return _sentry_patched_stream
 
@@ -805,10 +803,10 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
     """
 
     @wraps(f)
-    def _sentry_patched_enter(self):
-        stream = f(self)
+    def _sentry_patched_enter(self) -> "MessageStreamManager":
+        stream_manager = f(self)
         _sentry_patched_stream_common(
-            stream,
+            stream_manager=stream_manager,
             max_tokens=self._max_tokens,
             messages=self._messages,
             model=self._model,
@@ -818,7 +816,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
             top_p=self._top_p,
             tools=self._tools,
         )
-        return stream
+        return stream_manager
 
     return _sentry_patched_enter
 
