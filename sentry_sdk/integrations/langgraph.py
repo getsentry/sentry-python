@@ -347,7 +347,7 @@ def _set_response_model_name(span: "sentry_sdk.tracing.Span", messages: "Any") -
     if model_name is None:
         return
 
-    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model_name)
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model_name)
 
 
 def _set_response_attributes(
@@ -378,9 +378,7 @@ def _set_response_attributes(
 
     tool_calls = _extract_tool_calls(new_messages)
     if tool_calls:
-        set_data_normalized(
-            span,
+        span.set_data(
             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             safe_serialize(tool_calls),
-            unpack=False,
         )
