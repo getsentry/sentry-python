@@ -39,24 +39,6 @@ try:
 
     from anthropic.resources import AsyncMessages, Messages
 
-    try:
-        # http://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
-        from anthropic.types import (
-            RawMessageStartEvent,
-            RawMessageDeltaEvent,
-            RawMessageStopEvent,
-            RawContentBlockStartEvent,
-            RawContentBlockDeltaEvent,
-            RawContentBlockStopEvent,
-        )
-    except ImportError:
-        RawMessageStartEvent = None
-        RawMessageDeltaEvent = None
-        RawMessageStopEvent = None
-        RawContentBlockStartEvent = None
-        RawContentBlockDeltaEvent = None
-        RawContentBlockStopEvent = None
-
     from anthropic.types import (
         MessageStartEvent,
         MessageDeltaEvent,
@@ -435,20 +417,7 @@ def _patch_streaming_response_iterator(
         content_blocks: "list[str]" = []
 
         for event in old_iterator:
-            if (
-                RawMessageStartEvent is not None
-                and not isinstance(
-                    event,
-                    (
-                        RawMessageStartEvent,
-                        RawMessageDeltaEvent,
-                        RawMessageStopEvent,
-                        RawContentBlockStartEvent,
-                        RawContentBlockDeltaEvent,
-                        RawContentBlockStopEvent,
-                    ),
-                )
-            ) or not isinstance(
+            if not isinstance(
                 event,
                 (
                     MessageStartEvent,
@@ -500,20 +469,7 @@ def _patch_streaming_response_iterator(
         content_blocks: "list[str]" = []
 
         async for event in old_iterator:
-            if (
-                RawMessageStartEvent is not None
-                and not isinstance(
-                    event,
-                    (
-                        RawMessageStartEvent,
-                        RawMessageDeltaEvent,
-                        RawMessageStopEvent,
-                        RawContentBlockStartEvent,
-                        RawContentBlockDeltaEvent,
-                        RawContentBlockStopEvent,
-                    ),
-                )
-            ) or not isinstance(
+            if not isinstance(
                 event,
                 (
                     MessageStartEvent,
