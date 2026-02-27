@@ -38,6 +38,16 @@ try:
         Omit = None
 
     from anthropic.resources import AsyncMessages, Messages
+    from anthropic.types import RawMessageStreamEvent
+
+    from anthropic.types import (
+        RawMessageStartEvent,
+        RawMessageDeltaEvent,
+        RawMessageStopEvent,
+        RawContentBlockStartEvent,
+        RawContentBlockDeltaEvent,
+        RawContentBlockStopEvent,
+    )
 
     if TYPE_CHECKING:
         from anthropic.types import MessageStreamEvent, TextBlockParam
@@ -406,6 +416,20 @@ def _set_streaming_output_data(
         content_blocks: "list[str]" = []
 
         for event in old_iterator:
+            if not isinstance(
+                event,
+                (
+                    RawMessageStartEvent,
+                    RawMessageDeltaEvent,
+                    RawMessageStopEvent,
+                    RawContentBlockStartEvent,
+                    RawContentBlockDeltaEvent,
+                    RawContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
             (
                 model,
                 usage,
@@ -444,6 +468,20 @@ def _set_streaming_output_data(
         content_blocks: "list[str]" = []
 
         async for event in old_iterator:
+            if not isinstance(
+                event,
+                (
+                    RawMessageStartEvent,
+                    RawMessageDeltaEvent,
+                    RawMessageStopEvent,
+                    RawContentBlockStartEvent,
+                    RawContentBlockDeltaEvent,
+                    RawContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
             (
                 model,
                 usage,
