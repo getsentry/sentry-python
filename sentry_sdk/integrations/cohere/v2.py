@@ -55,7 +55,7 @@ def setup_v2(wrap_embed_fn):
     # type: (Callable[..., Any]) -> None
     """Called from CohereIntegration.setup_once() to patch V2Client methods.
 
-    The embed wrapper is passed in from cohere.py to reuse the same _wrap_embed
+    The embed wrapper is passed in from __init__.py to reuse the same _wrap_embed
     for both V1 and V2, since the embed response format (.meta.billed_units)
     is identical across both API versions.
     """

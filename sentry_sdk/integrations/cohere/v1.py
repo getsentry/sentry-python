@@ -11,47 +11,19 @@ from sentry_sdk.ai.utils import (
 
 from typing import TYPE_CHECKING
 
-from sentry_sdk.tracing_utils import set_span_errored
-
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
-from sentry_sdk.integrations.cohere_v2 import setup_v2
+from sentry_sdk.utils import capture_internal_exceptions, reraise
 
-try:
-    from cohere.client import Client
-    from cohere.base_client import BaseCohere
-    from cohere import (
-        ChatStreamEndEvent,
-        NonStreamedChatResponse,
-    )
-
-    if TYPE_CHECKING:
-        from cohere import StreamedChatResponse
-except ImportError:
-    raise DidNotEnable("Cohere not installed")
-
-try:
-    # cohere 5.9.3+
-    from cohere import StreamEndStreamedChatResponse
-except ImportError:
-    from cohere import StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse
-
-COLLECTED_CHAT_PARAMS = {
-    "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-    "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-    "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-    "k": SPANDATA.GEN_AI_REQUEST_TOP_K,
-    "p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-    "seed": SPANDATA.GEN_AI_REQUEST_SEED,
-    "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-    "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-}
+from sentry_sdk.integrations.cohere import (
+    CohereIntegration,
+    COLLECTED_CHAT_PARAMS,
+    _capture_exception,
+)
 
 COLLECTED_PII_CHAT_PARAMS = {
     "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
@@ -68,36 +40,44 @@ COLLECTED_PII_CHAT_RESP_ATTRS = {
 }
 
 
-class CohereIntegration(Integration):
-    identifier = "cohere"
-    origin = f"auto.ai.{identifier}"
+def setup_v1(wrap_embed_fn):
+    # type: (Callable[..., Any]) -> None
+    """Called from CohereIntegration.setup_once() to patch V1 Client methods."""
+    try:
+        from cohere.client import Client
+        from cohere.base_client import BaseCohere
+    except ImportError:
+        return
 
-    def __init__(self: "CohereIntegration", include_prompts: bool = True) -> None:
-        self.include_prompts = include_prompts
-
-    @staticmethod
-    def setup_once() -> None:
-        BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
-        Client.embed = _wrap_embed(Client.embed)
-        BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
-        setup_v2(_wrap_embed)
-
-
-def _capture_exception(exc: "Any") -> None:
-    set_span_errored()
-
-    event, hint = event_from_exception(
-        exc,
-        client_options=sentry_sdk.get_client().options,
-        mechanism={"type": "cohere", "handled": False},
-    )
-    sentry_sdk.capture_event(event, hint=hint)
+    BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
+    BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
+    Client.embed = wrap_embed_fn(Client.embed)
 
 
-def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]":
-    def collect_chat_response_fields(
-        span: "Span", res: "NonStreamedChatResponse", include_pii: bool
-    ) -> None:
+def _wrap_chat(f, streaming):
+    # type: (Callable[..., Any], bool) -> Callable[..., Any]
+
+    try:
+        from cohere import (
+            ChatStreamEndEvent,
+            NonStreamedChatResponse,
+        )
+
+        if TYPE_CHECKING:
+            from cohere import StreamedChatResponse
+    except ImportError:
+        return f
+
+    try:
+        # cohere 5.9.3+
+        from cohere import StreamEndStreamedChatResponse
+    except ImportError:
+        from cohere import (
+            StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse,
+        )
+
+    def collect_chat_response_fields(span, res, include_pii):
+        # type: (Span, NonStreamedChatResponse, bool) -> None
         if include_pii:
             if hasattr(res, "text"):
                 set_data_normalized(
@@ -128,7 +108,8 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                 )
 
     @wraps(f)
-    def new_chat(*args: "Any", **kwargs: "Any") -> "Any":
+    def new_chat(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         integration = sentry_sdk.get_client().get_integration(CohereIntegration)
 
         if (
@@ -194,7 +175,8 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             if streaming:
                 old_iterator = res
 
-                def new_iterator() -> "Iterator[StreamedChatResponse]":
+                def new_iterator():
+                    # type: () -> Iterator[StreamedChatResponse]
                     with capture_internal_exceptions():
                         for x in old_iterator:
                             if isinstance(x, ChatStreamEndEvent) or isinstance(
@@ -225,62 +207,3 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             return res
 
     return new_chat
-
-
-def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
-    @wraps(f)
-    def new_embed(*args: "Any", **kwargs: "Any") -> "Any":
-        integration = sentry_sdk.get_client().get_integration(CohereIntegration)
-        if integration is None:
-            return f(*args, **kwargs)
-
-        model = kwargs.get("model", "")
-
-        with sentry_sdk.start_span(
-            op=OP.GEN_AI_EMBEDDINGS,
-            name=f"embeddings {model}".strip(),
-            origin=CohereIntegration.origin,
-        ) as span:
-            set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-            set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-
-            if "texts" in kwargs and (
-                should_send_default_pii() and integration.include_prompts
-            ):
-                if isinstance(kwargs["texts"], str):
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, [kwargs["texts"]]
-                    )
-                elif (
-                    isinstance(kwargs["texts"], list)
-                    and len(kwargs["texts"]) > 0
-                    and isinstance(kwargs["texts"][0], str)
-                ):
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, kwargs["texts"]
-                    )
-
-            if "model" in kwargs:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"]
-                )
-            try:
-                res = f(*args, **kwargs)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                reraise(*exc_info)
-            if (
-                hasattr(res, "meta")
-                and hasattr(res.meta, "billed_units")
-                and hasattr(res.meta.billed_units, "input_tokens")
-            ):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.billed_units.input_tokens,
-                    total_tokens=res.meta.billed_units.input_tokens,
-                )
-            return res
-
-    return new_embed
