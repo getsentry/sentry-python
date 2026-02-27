@@ -6,6 +6,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.ai.utils import (
     set_data_normalized,
     normalize_message_roles,
+    truncate_and_annotate_messages,
 )
 
 from typing import TYPE_CHECKING
@@ -166,21 +167,23 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
                 for x in kwargs.get("chat_history", []):
-                    role = getattr(x, "role", "").lower()
-                    if role == "chatbot":
-                        role = "assistant"
                     messages.append({
-                        "role": role,
+                        "role": getattr(x, "role", "").lower(),
                         "content": getattr(x, "message", ""),
                     })
                 messages.append({"role": "user", "content": message})
                 messages = normalize_message_roles(messages)
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages,
-                    unpack=False,
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    messages, span, scope
                 )
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
                 for k, v in COLLECTED_PII_CHAT_PARAMS.items():
                     if k in kwargs:
                         set_data_normalized(span, v, kwargs[k])

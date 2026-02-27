@@ -6,6 +6,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.ai.utils import (
     set_data_normalized,
     normalize_message_roles,
+    truncate_and_annotate_messages,
 )
 
 from typing import TYPE_CHECKING
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
+from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from sentry_sdk.integrations.cohere import (
     CohereIntegration,
@@ -26,11 +27,24 @@ from sentry_sdk.integrations.cohere import (
 
 try:
     from cohere.v2.client import V2Client as CohereV2Client
-    from cohere.v2.types import V2ChatResponse
-    from cohere.v2.types.v2chat_stream_response import MessageEndV2ChatStreamResponse
 
-    if TYPE_CHECKING:
-        from cohere.v2.types import V2ChatStreamResponse
+    # Type locations changed between cohere versions:
+    # 5.13.x: cohere.types (ChatResponse, MessageEndStreamedChatResponseV2)
+    # 5.20+:  cohere.v2.types (V2ChatResponse, MessageEndV2ChatStreamResponse)
+    try:
+        from cohere.v2.types import V2ChatResponse
+        from cohere.v2.types import MessageEndV2ChatStreamResponse
+
+        if TYPE_CHECKING:
+            from cohere.v2.types import V2ChatStreamResponse
+    except ImportError:
+        from cohere.types import ChatResponse as V2ChatResponse
+        from cohere.types import (
+            MessageEndStreamedChatResponseV2 as MessageEndV2ChatStreamResponse,
+        )
+
+        if TYPE_CHECKING:
+            from cohere.types import StreamedChatResponseV2 as V2ChatStreamResponse
 
     _has_v2 = True
 except ImportError:
@@ -39,7 +53,12 @@ except ImportError:
 
 def setup_v2(wrap_embed_fn):
     # type: (Callable[..., Any]) -> None
-    """Called from CohereIntegration.setup_once() to patch V2Client methods."""
+    """Called from CohereIntegration.setup_once() to patch V2Client methods.
+
+    The embed wrapper is passed in from cohere.py to reuse the same _wrap_embed
+    for both V1 and V2, since the embed response format (.meta.billed_units)
+    is identical across both API versions.
+    """
     if not _has_v2:
         return
 
@@ -52,16 +71,25 @@ def setup_v2(wrap_embed_fn):
 
 def _extract_messages_v2(messages):
     # type: (Any) -> list[dict[str, str]]
-    """Extract role/content dicts from V2-style message objects."""
+    """Extract role/content dicts from V2-style message objects.
+
+    Handles both plain dicts and Pydantic model instances.
+    """
     result = []
     for msg in messages:
-        role = getattr(msg, "role", "unknown")
-        content = getattr(msg, "content", "")
+        if isinstance(msg, dict):
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+        else:
+            role = getattr(msg, "role", "unknown")
+            content = getattr(msg, "content", "")
         if isinstance(content, str):
             text = content
         elif isinstance(content, list):
             text = " ".join(
-                getattr(item, "text", "") for item in content if hasattr(item, "text")
+                (item.get("text", "") if isinstance(item, dict) else getattr(item, "text", ""))
+                for item in content
+                if (isinstance(item, dict) and "text" in item) or hasattr(item, "text")
             )
         else:
             text = str(content) if content else ""
@@ -138,7 +166,7 @@ def _wrap_chat_v2(f, streaming):
 
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_CHAT,
-            name="chat {}".format(model).strip(),
+            name=f"chat {model}".strip(),
             origin=CohereIntegration.origin,
         )
         span.__enter__()
@@ -160,12 +188,17 @@ def _wrap_chat_v2(f, streaming):
             if should_send_default_pii() and integration.include_prompts:
                 messages = _extract_messages_v2(kwargs.get("messages", []))
                 messages = normalize_message_roles(messages)
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages,
-                    unpack=False,
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    messages, span, scope
                 )
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
                 if "tools" in kwargs:
                     set_data_normalized(
                         span,
