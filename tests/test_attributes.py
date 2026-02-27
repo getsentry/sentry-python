@@ -10,9 +10,9 @@ def test_top_level_api(sentry_init, capture_envelopes):
 
     sentry_sdk.set_attribute("set", "value")
     sentry_sdk.set_attribute("remove", "value")
-    sentry_sdk.remove_attribute("removed", "value")
+    sentry_sdk.remove_attribute("removed")
     # Attempting to remove a nonexistent attribute should not raise
-    sentry_sdk.remove_attribute("nonexistent", "value")
+    sentry_sdk.remove_attribute("nonexistent")
 
     sentry_sdk.metrics.count("test", 1)
     sentry_sdk.get_client().flush()
