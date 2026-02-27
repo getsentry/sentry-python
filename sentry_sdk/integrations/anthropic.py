@@ -38,7 +38,6 @@ try:
         Omit = None
 
     from anthropic.resources import AsyncMessages, Messages
-    from anthropic.types import RawMessageStreamEvent
 
     message_types_have_raw_prefix = False
     try:
