@@ -640,6 +640,13 @@ def _set_streaming_completions_api_output_data(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
+                _calculate_token_usage(
+                    messages,
+                    response,
+                    span,
+                    all_responses,
+                    integration.count_tokens,
+                )
 
         if finish_span:
             span.__exit__(None, None, None)
@@ -675,6 +682,13 @@ def _set_streaming_completions_api_output_data(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
+                _calculate_token_usage(
+                    messages,
+                    response,
+                    span,
+                    all_responses,
+                    integration.count_tokens,
+                )
 
         if finish_span:
             span.__exit__(None, None, None)
