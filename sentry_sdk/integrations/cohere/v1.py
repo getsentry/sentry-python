@@ -142,6 +142,7 @@ def _wrap_chat(f, streaming):
             set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
             if model:
                 set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model)
 
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
