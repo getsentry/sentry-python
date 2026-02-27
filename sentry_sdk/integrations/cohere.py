@@ -162,14 +162,23 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
             set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
             if model:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
                 for x in kwargs.get("chat_history", []):
+<<<<<<< HEAD
                     messages.append(
                         {
                             "role": getattr(x, "role", "").lower(),
+=======
+                    role = getattr(x, "role", "").lower()
+                    if role == "chatbot":
+                        role = "assistant"
+                    messages.append(
+                        {
+                            "role": role,
+>>>>>>> c51eeb90 (correct model)
                             "content": getattr(x, "message", ""),
                         }
                     )
