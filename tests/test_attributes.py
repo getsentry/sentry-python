@@ -9,7 +9,7 @@ def test_top_level_api(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     sentry_sdk.set_attribute("set", "value")
-    sentry_sdk.set_attribute("remove", "value")
+    sentry_sdk.set_attribute("removed", "value")
     sentry_sdk.remove_attribute("removed")
     # Attempting to remove a nonexistent attribute should not raise
     sentry_sdk.remove_attribute("nonexistent")
