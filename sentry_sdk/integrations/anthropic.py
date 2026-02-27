@@ -780,7 +780,7 @@ def _wrap_message_stream(f: "Any") -> "Any":
     """
 
     @wraps(f)
-    def _sentry_patched_stream(*args, **kwargs) -> "MessageStreamManager":
+    def _sentry_patched_stream(*args: "Any", **kwargs: "Any") -> "MessageStreamManager":
         stream_manager = f(*args, **kwargs)
 
         stream_manager._max_tokens = kwargs.get("max_tokens")
@@ -803,7 +803,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
     """
 
     @wraps(f)
-    def _sentry_patched_enter(self) -> "MessageStreamManager":
+    def _sentry_patched_enter(self: "MessageStreamManager") -> "MessageStreamManager":
         stream_manager = f(self)
         if not hasattr(self, "_max_tokens"):
             return stream_manager
