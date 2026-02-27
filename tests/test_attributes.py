@@ -3,6 +3,27 @@ import sentry_sdk
 from tests.test_metrics import envelopes_to_metrics
 
 
+def test_top_level_api(sentry_init, capture_envelopes):
+    sentry_init()
+
+    envelopes = capture_envelopes()
+
+    sentry_sdk.set_attribute("set", "value")
+    sentry_sdk.set_attribute("removed", "value")
+    sentry_sdk.remove_attribute("removed")
+    # Attempting to remove a nonexistent attribute should not raise
+    sentry_sdk.remove_attribute("nonexistent")
+
+    sentry_sdk.metrics.count("test", 1)
+    sentry_sdk.get_client().flush()
+
+    metrics = envelopes_to_metrics(envelopes)
+    (metric,) = metrics
+
+    assert metric["attributes"]["set"] == "value"
+    assert "removed" not in metric["attributes"]
+
+
 def test_scope_precedence(sentry_init, capture_envelopes):
     # Order of precedence, from most important to least:
     # 1. telemetry attributes (directly supplying attributes on creation or using set_attribute)
