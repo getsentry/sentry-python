@@ -612,6 +612,8 @@ def _set_streaming_completions_api_output_data(
     def new_iterator() -> "Iterator[ChatCompletionChunk]":
         nonlocal ttft
         for x in old_iterator:
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+
             with capture_internal_exceptions():
                 if hasattr(x, "choices"):
                     choice_index = 0
@@ -654,6 +656,8 @@ def _set_streaming_completions_api_output_data(
     async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
         nonlocal ttft
         async for x in old_iterator:
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+
             with capture_internal_exceptions():
                 if hasattr(x, "choices"):
                     choice_index = 0
