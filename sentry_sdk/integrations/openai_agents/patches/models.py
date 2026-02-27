@@ -133,8 +133,6 @@ def _get_model(
 
         @wraps(original_stream_response)
         async def wrapped_stream_response(*args: "Any", **kwargs: "Any") -> "Any":
-            # Uses explicit try/finally instead of context manager to ensure cleanup
-            # even if the consumer abandons the stream (GeneratorExit).
             span_kwargs = dict(kwargs)
             if len(args) > 0:
                 span_kwargs["system_instructions"] = args[0]
