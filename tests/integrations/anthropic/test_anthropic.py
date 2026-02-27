@@ -3,7 +3,7 @@ from unittest import mock
 import json
 
 try:
-    from unittest.mock import AsyncMock
+    from unittest.mock import Mock, AsyncMock
 except ImportError:
 
     class AsyncMock(mock.MagicMock):
@@ -313,6 +313,108 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_stream_messages(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=Mock(), client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            message=EXAMPLE_MESSAGE,
+            type="message_start",
+        ),
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block=TextBlock(type="text", text=""),
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="Hi", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockStopEvent(type="content_block_stop", index=0),
+        MessageDeltaEvent(
+            delta=Delta(),
+            usage=MessageDeltaUsage(output_tokens=10),
+            type="message_delta",
+        ),
+    ]
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        with client.messages.stream(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+        ) as stream:
+            for event in stream:
+                pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    assert len(event["spans"]) == 1
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -541,6 +643,142 @@ def test_streaming_create_message_with_input_json_delta(
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
             == "{'location': 'San Francisco, CA'}"
+        )
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
+)
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_stream_messages_with_input_json_delta(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=Mock(), client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            message=Message(
+                id="msg_0",
+                content=[],
+                model="claude-3-5-sonnet-20240620",
+                role="assistant",
+                stop_reason=None,
+                stop_sequence=None,
+                type="message",
+                usage=Usage(input_tokens=366, output_tokens=10),
+            ),
+            type="message_start",
+        ),
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block=ToolUseBlock(
+                id="toolu_0", input={}, name="get_weather", type="tool_use"
+            ),
+        ),
+        ContentBlockDeltaEvent(
+            delta=InputJSONDelta(partial_json="", type="input_json_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=InputJSONDelta(
+                partial_json='{"location": "', type="input_json_delta"
+            ),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=InputJSONDelta(partial_json="S", type="input_json_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=InputJSONDelta(partial_json="an ", type="input_json_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=InputJSONDelta(partial_json="Francisco, C", type="input_json_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=InputJSONDelta(partial_json='A"}', type="input_json_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockStopEvent(type="content_block_stop", index=0),
+        MessageDeltaEvent(
+            delta=Delta(stop_reason="tool_use", stop_sequence=None),
+            usage=MessageDeltaUsage(output_tokens=41),
+            type="message_delta",
+        ),
+    ]
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    messages = [
+        {
+            "role": "user",
+            "content": "What is the weather like in San Francisco?",
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        with client.messages.stream(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+        ) as stream:
+            for event in stream:
+                pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    assert len(event["spans"]) == 1
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '{"location": "San Francisco, CA"}'
         )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1309,6 +1547,120 @@ def test_streaming_create_message_with_system_prompt(
             pass
 
     assert message == returned_stream
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    assert len(event["spans"]) == 1
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
+
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_stream_messages_with_system_prompt(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
+    """Test that system prompts are properly captured in streaming mode."""
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=Mock(), client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            message=EXAMPLE_MESSAGE,
+            type="message_start",
+        ),
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block=TextBlock(type="text", text=""),
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="Hi", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockStopEvent(type="content_block_stop", index=0),
+        MessageDeltaEvent(
+            delta=Delta(),
+            usage=MessageDeltaUsage(output_tokens=10),
+            type="message_delta",
+        ),
+    ]
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        with client.messages.stream(
+            max_tokens=1024,
+            messages=messages,
+            model="model",
+            system="You are a helpful assistant.",
+        ) as stream:
+            for event in stream:
+                pass
+
     assert len(events) == 1
     (event,) = events
 
@@ -2412,6 +2764,62 @@ def test_input_tokens_include_cache_read_streaming(sentry_init, capture_events):
 
     (span,) = events[0]["spans"]
 
+    # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+
+
+def test_stream_messages_input_tokens_include_cache_read_streaming(
+    sentry_init, capture_events
+):
+    """
+    Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
+
+    Same cache-hit scenario as non-streaming, using realistic streaming events.
+    """
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=Mock(), client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            type="message_start",
+            message=Message(
+                id="id",
+                model="claude-sonnet-4-20250514",
+                role="assistant",
+                content=[],
+                type="message",
+                usage=Usage(
+                    input_tokens=19,
+                    output_tokens=0,
+                    cache_read_input_tokens=2846,
+                    cache_creation_input_tokens=0,
+                ),
+            ),
+        ),
+        MessageDeltaEvent(
+            type="message_delta",
+            delta=Delta(stop_reason="end_turn"),
+            usage=MessageDeltaUsage(output_tokens=14),
+        ),
+    ]
+
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    with start_transaction(name="anthropic"):
+        with client.messages.stream(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "What is 5+5?"}],
+            model="claude-sonnet-4-20250514",
+        ) as stream:
+            for event in stream:
+                pass
+
+    (span,) = events[0]["spans"]
+
     # input_tokens should be total: 19 + 2846 = 2865
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
@@ -2497,6 +2905,56 @@ def test_cache_tokens_streaming(sentry_init, capture_events):
             stream=True,
         ):
             pass
+
+    (span,) = events[0]["spans"]
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+def test_stream_messages_cache_tokens(sentry_init, capture_events):
+    """Test cache tokens are tracked for streaming responses."""
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=Mock(), client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            type="message_start",
+            message=Message(
+                id="id",
+                model="claude-3-5-sonnet-20241022",
+                role="assistant",
+                content=[],
+                type="message",
+                usage=Usage(
+                    input_tokens=100,
+                    output_tokens=0,
+                    cache_read_input_tokens=80,
+                    cache_creation_input_tokens=20,
+                ),
+            ),
+        ),
+        MessageDeltaEvent(
+            type="message_delta",
+            delta=Delta(stop_reason="end_turn"),
+            usage=MessageDeltaUsage(output_tokens=10),
+        ),
+    ]
+
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    with start_transaction(name="anthropic"):
+        with client.messages.stream(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello"}],
+            model="claude-3-5-sonnet-20241022",
+        ) as stream:
+            for event in stream:
+                pass
 
     (span,) = events[0]["spans"]
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
