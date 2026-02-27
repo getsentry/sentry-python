@@ -167,16 +167,16 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
                 for x in kwargs.get("chat_history", []):
-                    messages.append({
-                        "role": getattr(x, "role", "").lower(),
-                        "content": getattr(x, "message", ""),
-                    })
+                    messages.append(
+                        {
+                            "role": getattr(x, "role", "").lower(),
+                            "content": getattr(x, "message", ""),
+                        }
+                    )
                 messages.append({"role": "user", "content": message})
                 messages = normalize_message_roles(messages)
                 scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    messages, span, scope
-                )
+                messages_data = truncate_and_annotate_messages(messages, span, scope)
                 if messages_data is not None:
                     set_data_normalized(
                         span,
@@ -263,7 +263,9 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     )
 
             if "model" in kwargs:
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"])
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"]
+                )
             try:
                 res = f(*args, **kwargs)
             except Exception as e:
