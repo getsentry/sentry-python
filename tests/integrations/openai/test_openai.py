@@ -2445,6 +2445,7 @@ async def test_ai_client_span_streaming_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
         "gen_ai.response.time_to_first_token": mock.ANY,
@@ -2769,6 +2770,8 @@ def test_streaming_responses_api(
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
@@ -2823,6 +2826,8 @@ async def test_streaming_responses_api_async(
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
