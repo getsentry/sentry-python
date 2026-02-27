@@ -21,7 +21,7 @@ def test_top_level_api(sentry_init, capture_envelopes):
     (metric,) = metrics
 
     assert metric["attributes"]["set"] == "value"
-    assert "remove" not in metric["attributes"]
+    assert "removed" not in metric["attributes"]
 
 
 def test_scope_precedence(sentry_init, capture_envelopes):

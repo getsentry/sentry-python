@@ -37,6 +37,8 @@ __all__ = [  # noqa
     "last_event_id",
     "new_scope",
     "push_scope",
+    "remove_attribute",
+    "set_attribute",
     "set_context",
     "set_extra",
     "set_level",
