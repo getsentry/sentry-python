@@ -40,13 +40,27 @@ try:
     from anthropic.resources import AsyncMessages, Messages
     from anthropic.types import RawMessageStreamEvent
 
+    message_types_have_raw_prefix = False
+    try:
+        # http://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+        from anthropic.types import (
+            RawMessageStartEvent,
+            RawMessageDeltaEvent,
+            RawMessageStopEvent,
+            RawContentBlockStartEvent,
+            RawContentBlockDeltaEvent,
+            RawContentBlockStopEvent,
+        )
+    except ImportError:
+        message_types_have_raw_prefix = True
+
     from anthropic.types import (
-        RawMessageStartEvent,
-        RawMessageDeltaEvent,
-        RawMessageStopEvent,
-        RawContentBlockStartEvent,
-        RawContentBlockDeltaEvent,
-        RawContentBlockStopEvent,
+        MessageStartEvent,
+        MessageDeltaEvent,
+        MessageStopEvent,
+        ContentBlockStartEvent,
+        ContentBlockDeltaEvent,
+        ContentBlockStopEvent,
     )
 
     if TYPE_CHECKING:
@@ -418,15 +432,28 @@ def _patch_streaming_response_iterator(
         content_blocks: "list[str]" = []
 
         for event in old_iterator:
-            if not isinstance(
+            if (
+                message_types_have_raw_prefix
+                and not isinstance(
+                    event,
+                    (
+                        RawMessageStartEvent,
+                        RawMessageDeltaEvent,
+                        RawMessageStopEvent,
+                        RawContentBlockStartEvent,
+                        RawContentBlockDeltaEvent,
+                        RawContentBlockStopEvent,
+                    ),
+                )
+            ) or not isinstance(
                 event,
                 (
-                    RawMessageStartEvent,
-                    RawMessageDeltaEvent,
-                    RawMessageStopEvent,
-                    RawContentBlockStartEvent,
-                    RawContentBlockDeltaEvent,
-                    RawContentBlockStopEvent,
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
                 ),
             ):
                 yield event
@@ -470,15 +497,28 @@ def _patch_streaming_response_iterator(
         content_blocks: "list[str]" = []
 
         async for event in old_iterator:
-            if not isinstance(
+            if (
+                message_types_have_raw_prefix
+                and not isinstance(
+                    event,
+                    (
+                        RawMessageStartEvent,
+                        RawMessageDeltaEvent,
+                        RawMessageStopEvent,
+                        RawContentBlockStartEvent,
+                        RawContentBlockDeltaEvent,
+                        RawContentBlockStopEvent,
+                    ),
+                )
+            ) or not isinstance(
                 event,
                 (
-                    RawMessageStartEvent,
-                    RawMessageDeltaEvent,
-                    RawMessageStopEvent,
-                    RawContentBlockStartEvent,
-                    RawContentBlockDeltaEvent,
-                    RawContentBlockStopEvent,
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
                 ),
             ):
                 yield event
