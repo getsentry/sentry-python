@@ -39,6 +39,15 @@ try:
 
     from anthropic.resources import AsyncMessages, Messages
 
+    from anthropic.types import (
+        MessageStartEvent,
+        MessageDeltaEvent,
+        MessageStopEvent,
+        ContentBlockStartEvent,
+        ContentBlockDeltaEvent,
+        ContentBlockStopEvent,
+    )
+
     if TYPE_CHECKING:
         from anthropic.types import MessageStreamEvent, TextBlockParam
 except ImportError:
@@ -408,6 +417,20 @@ def _patch_streaming_response_iterator(
         content_blocks: "list[str]" = []
 
         for event in old_iterator:
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
             (
                 model,
                 usage,
@@ -446,6 +469,20 @@ def _patch_streaming_response_iterator(
         content_blocks: "list[str]" = []
 
         async for event in old_iterator:
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
             (
                 model,
                 usage,
