@@ -881,8 +881,8 @@ def set_span_data_for_response(
 
     finish_reasons = extract_finish_reasons(response)
     if finish_reasons:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reasons
+        span.set_data(
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, json.dumps(finish_reasons)
         )
 
     if getattr(response, "response_id", None):
