@@ -467,13 +467,10 @@ def _common_set_output_data(
     response: "Any",
     input: "Any",
     integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
-
-    ttft: "Optional[float]" = None
 
     if hasattr(response, "choices"):
         if should_send_default_pii() and integration.include_prompts:
@@ -525,143 +522,6 @@ def _common_set_output_data(
 
         if finish_span:
             span.__exit__(None, None, None)
-
-    elif hasattr(response, "_iterator"):
-        data_buf: "list[list[str]]" = []  # one for each choice
-
-        old_iterator = response._iterator
-
-        def new_iterator() -> "Iterator[ChatCompletionChunk]":
-            nonlocal ttft
-            count_tokens_manually = True
-            for x in old_iterator:
-                with capture_internal_exceptions():
-                    # OpenAI chat completion API
-                    if hasattr(x, "choices"):
-                        choice_index = 0
-                        for choice in x.choices:
-                            if hasattr(choice, "delta") and hasattr(
-                                choice.delta, "content"
-                            ):
-                                if start_time is not None and ttft is None:
-                                    ttft = time.perf_counter() - start_time
-                                content = choice.delta.content
-                                if len(data_buf) <= choice_index:
-                                    data_buf.append([])
-                                data_buf[choice_index].append(content or "")
-                            choice_index += 1
-
-                    # OpenAI responses API
-                    elif hasattr(x, "delta"):
-                        if start_time is not None and ttft is None:
-                            ttft = time.perf_counter() - start_time
-                        if len(data_buf) == 0:
-                            data_buf.append([])
-                        data_buf[0].append(x.delta or "")
-
-                    # OpenAI responses API end of streaming response
-                    if RESPONSES_API_ENABLED and isinstance(x, ResponseCompletedEvent):
-                        _calculate_token_usage(
-                            input,
-                            x.response,
-                            span,
-                            None,
-                            integration.count_tokens,
-                        )
-                        count_tokens_manually = False
-
-                yield x
-
-            with capture_internal_exceptions():
-                if ttft is not None:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
-                    )
-                if len(data_buf) > 0:
-                    all_responses = ["".join(chunk) for chunk in data_buf]
-                    if should_send_default_pii() and integration.include_prompts:
-                        set_data_normalized(
-                            span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
-                        )
-                    if count_tokens_manually:
-                        _calculate_token_usage(
-                            input,
-                            response,
-                            span,
-                            all_responses,
-                            integration.count_tokens,
-                        )
-
-            if finish_span:
-                span.__exit__(None, None, None)
-
-        async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
-            nonlocal ttft
-            count_tokens_manually = True
-            async for x in old_iterator:
-                with capture_internal_exceptions():
-                    # OpenAI chat completion API
-                    if hasattr(x, "choices"):
-                        choice_index = 0
-                        for choice in x.choices:
-                            if hasattr(choice, "delta") and hasattr(
-                                choice.delta, "content"
-                            ):
-                                if start_time is not None and ttft is None:
-                                    ttft = time.perf_counter() - start_time
-                                content = choice.delta.content
-                                if len(data_buf) <= choice_index:
-                                    data_buf.append([])
-                                data_buf[choice_index].append(content or "")
-                            choice_index += 1
-
-                    # OpenAI responses API
-                    elif hasattr(x, "delta"):
-                        if start_time is not None and ttft is None:
-                            ttft = time.perf_counter() - start_time
-                        if len(data_buf) == 0:
-                            data_buf.append([])
-                        data_buf[0].append(x.delta or "")
-
-                    # OpenAI responses API end of streaming response
-                    if RESPONSES_API_ENABLED and isinstance(x, ResponseCompletedEvent):
-                        _calculate_token_usage(
-                            input,
-                            x.response,
-                            span,
-                            None,
-                            integration.count_tokens,
-                        )
-                        count_tokens_manually = False
-
-                yield x
-
-            with capture_internal_exceptions():
-                if ttft is not None:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
-                    )
-                if len(data_buf) > 0:
-                    all_responses = ["".join(chunk) for chunk in data_buf]
-                    if should_send_default_pii() and integration.include_prompts:
-                        set_data_normalized(
-                            span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
-                        )
-                    if count_tokens_manually:
-                        _calculate_token_usage(
-                            input,
-                            response,
-                            span,
-                            all_responses,
-                            integration.count_tokens,
-                        )
-            if finish_span:
-                span.__exit__(None, None, None)
-
-        if str(type(response._iterator)) == "<class 'async_generator'>":
-            response._iterator = new_iterator_async()
-        else:
-            response._iterator = new_iterator()
     else:
         _calculate_token_usage(input, response, span, None, integration.count_tokens)
         if finish_span:
@@ -704,7 +564,7 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         )
     else:
         _set_completions_api_output_data(
-            span, response, kwargs, integration, start_time, finish_span=True
+            span, response, kwargs, integration, finish_span=True
         )
 
     return response
@@ -715,7 +575,6 @@ def _set_completions_api_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     messages = kwargs.get("messages")
@@ -728,7 +587,6 @@ def _set_completions_api_output_data(
         response,
         messages,
         integration,
-        start_time,
         finish_span,
     )
 
@@ -746,14 +604,99 @@ def _set_streaming_completions_api_output_data(
     if messages is not None and isinstance(messages, str):
         messages = [messages]
 
-    _common_set_output_data(
-        span,
-        response,
-        messages,
-        integration,
-        start_time,
-        finish_span,
-    )
+    ttft: "Optional[float]" = None
+    data_buf: "list[list[str]]" = []  # one for each choice
+
+    old_iterator = response._iterator
+
+    def new_iterator() -> "Iterator[ChatCompletionChunk]":
+        nonlocal ttft
+        for x in old_iterator:
+            with capture_internal_exceptions():
+                if hasattr(x, "choices"):
+                    choice_index = 0
+                    for choice in x.choices:
+                        if hasattr(choice, "delta") and hasattr(
+                            choice.delta, "content"
+                        ):
+                            if start_time is not None and ttft is None:
+                                ttft = time.perf_counter() - start_time
+                            content = choice.delta.content
+                            if len(data_buf) <= choice_index:
+                                data_buf.append([])
+                            data_buf[choice_index].append(content or "")
+                        choice_index += 1
+
+            yield x
+
+        with capture_internal_exceptions():
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if should_send_default_pii() and integration.include_prompts:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+                _calculate_token_usage(
+                    messages,
+                    response,
+                    span,
+                    all_responses,
+                    integration.count_tokens,
+                )
+
+        if finish_span:
+            span.__exit__(None, None, None)
+
+    async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
+        nonlocal ttft
+        async for x in old_iterator:
+            with capture_internal_exceptions():
+                if hasattr(x, "choices"):
+                    choice_index = 0
+                    for choice in x.choices:
+                        if hasattr(choice, "delta") and hasattr(
+                            choice.delta, "content"
+                        ):
+                            if start_time is not None and ttft is None:
+                                ttft = time.perf_counter() - start_time
+                            content = choice.delta.content
+                            if len(data_buf) <= choice_index:
+                                data_buf.append([])
+                            data_buf[choice_index].append(content or "")
+                        choice_index += 1
+
+            yield x
+
+        with capture_internal_exceptions():
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if should_send_default_pii() and integration.include_prompts:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+                _calculate_token_usage(
+                    messages,
+                    response,
+                    span,
+                    all_responses,
+                    integration.count_tokens,
+                )
+
+        if finish_span:
+            span.__exit__(None, None, None)
+
+    if str(type(response._iterator)) == "<class 'async_generator'>":
+        response._iterator = new_iterator_async()
+    else:
+        response._iterator = new_iterator()
 
 
 def _set_responses_api_output_data(
@@ -761,7 +704,6 @@ def _set_responses_api_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     input = kwargs.get("input")
@@ -774,7 +716,6 @@ def _set_responses_api_output_data(
         response,
         input,
         integration,
-        start_time,
         finish_span,
     )
 
@@ -792,14 +733,108 @@ def _set_streaming_responses_api_output_data(
     if input is not None and isinstance(input, str):
         input = [input]
 
-    _common_set_output_data(
-        span,
-        response,
-        input,
-        integration,
-        start_time,
-        finish_span,
-    )
+    ttft: "Optional[float]" = None
+    data_buf: "list[list[str]]" = []  # one for each choice
+
+    old_iterator = response._iterator
+
+    def new_iterator() -> "Iterator[ChatCompletionChunk]":
+        nonlocal ttft
+        count_tokens_manually = True
+        for x in old_iterator:
+            with capture_internal_exceptions():
+                if hasattr(x, "delta"):
+                    if start_time is not None and ttft is None:
+                        ttft = time.perf_counter() - start_time
+                    if len(data_buf) == 0:
+                        data_buf.append([])
+                    data_buf[0].append(x.delta or "")
+
+                if isinstance(x, ResponseCompletedEvent):
+                    _calculate_token_usage(
+                        input,
+                        x.response,
+                        span,
+                        None,
+                        integration.count_tokens,
+                    )
+                    count_tokens_manually = False
+
+            yield x
+
+        with capture_internal_exceptions():
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if should_send_default_pii() and integration.include_prompts:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+                if count_tokens_manually:
+                    _calculate_token_usage(
+                        input,
+                        response,
+                        span,
+                        all_responses,
+                        integration.count_tokens,
+                    )
+
+        if finish_span:
+            span.__exit__(None, None, None)
+
+    async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
+        nonlocal ttft
+        count_tokens_manually = True
+        async for x in old_iterator:
+            with capture_internal_exceptions():
+                if hasattr(x, "delta"):
+                    if start_time is not None and ttft is None:
+                        ttft = time.perf_counter() - start_time
+                    if len(data_buf) == 0:
+                        data_buf.append([])
+                    data_buf[0].append(x.delta or "")
+
+                if isinstance(x, ResponseCompletedEvent):
+                    _calculate_token_usage(
+                        input,
+                        x.response,
+                        span,
+                        None,
+                        integration.count_tokens,
+                    )
+                    count_tokens_manually = False
+
+            yield x
+
+        with capture_internal_exceptions():
+            if ttft is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
+                )
+            if len(data_buf) > 0:
+                all_responses = ["".join(chunk) for chunk in data_buf]
+                if should_send_default_pii() and integration.include_prompts:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+                if count_tokens_manually:
+                    _calculate_token_usage(
+                        input,
+                        response,
+                        span,
+                        all_responses,
+                        integration.count_tokens,
+                    )
+        if finish_span:
+            span.__exit__(None, None, None)
+
+    if str(type(response._iterator)) == "<class 'async_generator'>":
+        response._iterator = new_iterator_async()
+    else:
+        response._iterator = new_iterator()
 
 
 def _set_embeddings_output_data(
@@ -807,7 +842,6 @@ def _set_embeddings_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     input = kwargs.get("input")
@@ -820,7 +854,6 @@ def _set_embeddings_output_data(
         response,
         input,
         integration,
-        start_time,
         finish_span,
     )
 
@@ -1008,7 +1041,7 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
         )
     else:
         _set_responses_api_output_data(
-            span, response, kwargs, integration, start_time, finish_span=True
+            span, response, kwargs, integration, finish_span=True
         )
 
     return response

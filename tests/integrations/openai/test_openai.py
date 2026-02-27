@@ -500,6 +500,7 @@ def test_streaming_chat_completion_no_prompts(
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "hello"},
             ],
+            stream=True,
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -624,6 +625,7 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
         response_stream = client.chat.completions.create(
             model="some-model",
             messages=messages,
+            stream=True,
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -747,6 +749,7 @@ async def test_streaming_chat_completion_async_no_prompts(
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "hello"},
             ],
+            stream=True,
         )
 
         response_string = ""
@@ -881,6 +884,7 @@ async def test_streaming_chat_completion_async(
         response_stream = await client.chat.completions.create(
             model="some-model",
             messages=messages,
+            stream=True,
         )
 
         response_string = ""
@@ -942,7 +946,8 @@ def test_bad_chat_completion(sentry_init, capture_events):
     )
     with pytest.raises(OpenAIError):
         client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+            model="some-model",
+            messages=[{"role": "system", "content": "hello"}],
         )
 
     (event,) = events
@@ -2417,15 +2422,19 @@ async def test_ai_client_span_streaming_responses_async_api(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
+    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
+    client.responses._post = mock.AsyncMock(return_value=returned_stream)
 
     with start_transaction(name="openai tx"):
-        await client.responses.create(
+        result = await client.responses.create(
             model="gpt-4o",
             instructions=instructions,
             input=input,
             stream=True,
         )
+        async for _ in result:
+            pass
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -2438,14 +2447,14 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.operation.name": "responses",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
-        "gen_ai.response.model": "response-model-id",
+        "gen_ai.response.time_to_first_token": mock.ANY,
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.request.model": "gpt-4o",
-        "gen_ai.response.text": "the model response",
+        "gen_ai.response.text": "hello world",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -2994,7 +3003,9 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
 
     with start_transaction(name="openai tx"):
         response_stream = client.chat.completions.create(
-            model="some-model", messages=[{"role": "user", "content": "Say hello"}]
+            model="some-model",
+            messages=[{"role": "user", "content": "Say hello"}],
+            stream=True,
         )
         # Consume the stream
         for _ in response_stream:
@@ -3058,7 +3069,9 @@ async def test_streaming_chat_completion_ttft_async(sentry_init, capture_events)
 
     with start_transaction(name="openai tx"):
         response_stream = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "user", "content": "Say hello"}]
+            model="some-model",
+            messages=[{"role": "user", "content": "Say hello"}],
+            stream=True,
         )
         # Consume the stream
         async for _ in response_stream:
