@@ -462,7 +462,7 @@ def _set_embeddings_input_data(
     _commmon_set_input_data(span, kwargs)
 
 
-def _common_set_output_data(
+def _set_common_output_data(
     span: "Span",
     response: "Any",
     input: "Any",
@@ -723,7 +723,7 @@ def _set_completions_api_output_data(
     if messages is not None and isinstance(messages, str):
         messages = [messages]
 
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         messages,
@@ -746,7 +746,7 @@ def _set_streaming_completions_api_output_data(
     if messages is not None and isinstance(messages, str):
         messages = [messages]
 
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         messages,
@@ -769,7 +769,7 @@ def _set_responses_api_output_data(
     if input is not None and isinstance(input, str):
         input = [input]
 
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         input,
@@ -792,7 +792,7 @@ def _set_streaming_responses_api_output_data(
     if input is not None and isinstance(input, str):
         input = [input]
 
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         input,
@@ -815,7 +815,7 @@ def _set_embeddings_output_data(
     if input is not None and isinstance(input, str):
         input = [input]
 
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         input,
