@@ -126,6 +126,20 @@ lldb -- ../../uwsgi/uwsgi --pythonpath "$PWD/.venv/lib/python3.14/site-packages"
   --need-app \
 ```
 
+### Troubleshooting "module not found" error in relation to the `sentry-sdk` when it's installed in editable mode
+
+If you are trying to debug a Django applicaton such as that described above, and have the Sentry SDK installed in editable mode in the Django project, you will likely encounter this error because the editable package is not being found in the uWSGI's python path. To fix this, the above command needs to be updated to include a `--pythonpath` argument that passes in where your local `sentry-python` codebase is:
+
+```bash
+lldb -- ../../uwsgi/uwsgi --pythonpath "$PWD/.venv/lib/python3.14/site-packages" \
+  --pythonpath "<path-to-local-sentry-python-directory>" \
+  --http :8000 \
+  --module mysite.wsgi:application \
+  --home "$PWD/.venv" \
+  --need-app \
+```
+
+
 ## Adding a New Integration
 
 ### SDK Contract
