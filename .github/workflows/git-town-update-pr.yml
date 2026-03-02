@@ -1,0 +1,22 @@
+name: Update PR with git-town Stack Visualization
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  git-town:
+    name: Display the branch stack
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - uses: git-town/action@429e2e458481f3b4f362c94b3bb234a1bce8dcec # v1
