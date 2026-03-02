@@ -4,6 +4,7 @@ This script populates tox.ini automatically using release data from PyPI.
 See scripts/populate_tox/README.md for more info.
 """
 
+import re
 import functools
 import hashlib
 import json
@@ -201,6 +202,12 @@ def _fetch_package_dependencies_from_cache(
 def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> None:
     with open(RELEASES_CACHE_FILE, "a") as releases_cache:
         releases_cache.write(json.dumps(_normalize_release(release)) + "\n")
+
+    if package == "zope_interface":
+        print("saving zope_interface", package)
+
+    if package == "zope.interface":
+        print("saving zope_interface", package)
 
     CACHE[_normalize_name(package)][str(version)] = release
     CACHE[_normalize_name(package)][str(version)]["_accessed"] = True
@@ -872,7 +879,10 @@ def get_last_updated() -> Optional[datetime]:
 
 
 def _normalize_name(package: str) -> str:
-    return package.lower().replace("-", "_")
+    # From https://peps.python.org/pep-0503/#normalized-names
+    # but normalizing to underscores instead of hyphens since tox-formatted packages
+    # use underscores.
+    return re.sub(r"[-_.]+", "_", package).lower()
 
 
 def _extract_wheel_info_to_cache(wheel: dict):
