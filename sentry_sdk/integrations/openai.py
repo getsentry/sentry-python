@@ -462,7 +462,7 @@ def _set_embeddings_input_data(
     _commmon_set_input_data(span, kwargs)
 
 
-def _common_set_output_data(
+def _set_common_output_data(
     span: "Span",
     response: "Any",
     kwargs: "dict[str, Any]",
@@ -727,7 +727,7 @@ def _set_completions_api_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         kwargs,
@@ -745,7 +745,7 @@ def _set_streaming_completions_api_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         kwargs,
@@ -763,7 +763,7 @@ def _set_responses_api_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         kwargs,
@@ -781,7 +781,7 @@ def _set_streaming_responses_api_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         kwargs,
@@ -799,7 +799,7 @@ def _set_embeddings_output_data(
     start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
-    _common_set_output_data(
+    _set_common_output_data(
         span,
         response,
         kwargs,
