@@ -69,6 +69,7 @@ if TYPE_CHECKING:
         ModelParam,
         TextBlockParam,
         ToolUnionParam,
+        MessageStream,
         AsyncMessageStream,
     )
 
@@ -735,7 +736,7 @@ def _wrap_message_create_async(f: "Any") -> "Any":
 
 
 def _sentry_patched_stream_common(
-    stream_manager: "MessageStreamManager",
+    stream: "MessageStream",
     max_tokens: "int",
     messages: "Iterable[MessageParam]",
     model: "ModelParam",
@@ -748,15 +749,15 @@ def _sentry_patched_stream_common(
     integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
 
     if integration is None:
-        return stream_manager
+        return stream
 
     if messages is None:
-        return stream_manager
+        return stream
 
     try:
         iter(messages)
     except TypeError:
-        return stream_manager
+        return stream
 
     if model is None:
         model = ""
@@ -781,7 +782,7 @@ def _sentry_patched_stream_common(
         top_p=top_p,
         tools=tools,
     )
-    _patch_streaming_response_iterator(stream_manager, span, integration)
+    _patch_streaming_response_iterator(stream, span, integration)
 
 
 def _wrap_message_stream(f: "Any") -> "Any":
@@ -814,13 +815,13 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
     """
 
     @wraps(f)
-    def _sentry_patched_enter(self: "MessageStreamManager") -> "MessageStreamManager":
-        stream_manager = f(self)
+    def _sentry_patched_enter(self: "MessageStreamManager") -> "MessageStream":
+        stream = f(self)
         if not hasattr(self, "_max_tokens"):
-            return stream_manager
+            return stream
 
         _sentry_patched_stream_common(
-            stream_manager=stream_manager,
+            stream=stream,
             max_tokens=self._max_tokens,
             messages=self._messages,
             model=self._model,
@@ -830,7 +831,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
             top_p=self._top_p,
             tools=self._tools,
         )
-        return stream_manager
+        return stream
 
     return _sentry_patched_enter
 
