@@ -511,6 +511,8 @@ def test_streaming_chat_completion_no_prompts(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -656,6 +658,8 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
             },
         ]
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
     assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -761,6 +765,8 @@ async def test_streaming_chat_completion_async_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -896,6 +902,8 @@ async def test_streaming_chat_completion_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
