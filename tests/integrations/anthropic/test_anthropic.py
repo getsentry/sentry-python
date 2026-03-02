@@ -593,7 +593,7 @@ async def test_stream_message_async(
         ),
     )
     returned_stream = AsyncStream(
-        cast_to=RawMessageStreamEvent, response=response, client=client
+        cast_to=MessageStreamEvent, response=response, client=client
     )
 
     sentry_init(
@@ -1171,7 +1171,7 @@ async def test_stream_message_with_input_json_delta_async(
         ),
     )
     returned_stream = AsyncStream(
-        cast_to=RawMessageStreamEvent, response=response, client=client
+        cast_to=MessageStreamEvent, response=response, client=client
     )
 
     sentry_init(
@@ -2068,7 +2068,7 @@ async def test_stream_message_with_system_prompt_async(
         ),
     )
     returned_stream = AsyncStream(
-        cast_to=RawMessageStreamEvent, response=response, client=client
+        cast_to=MessageStreamEvent, response=response, client=client
     )
 
     sentry_init(
