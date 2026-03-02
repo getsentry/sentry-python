@@ -1,5 +1,67 @@
 # Changelog
 
+## 2.54.0
+
+### New Features ✨
+
+- Add `set_attribute`, `remove_attribute` to global API by @sentrivana in [#5555](https://github.com/getsentry/sentry-python/pull/5555)
+
+### Bug Fixes 🐛
+
+#### Openai
+
+- Attach response model with streamed Completions API by @alexander-alderman-webb in [#5557](https://github.com/getsentry/sentry-python/pull/5557)
+- Attach response model with streamed Responses API by @alexander-alderman-webb in [#5554](https://github.com/getsentry/sentry-python/pull/5554)
+- Avoid consuming iterables passed to the Completions API by @alexander-alderman-webb in [#5489](https://github.com/getsentry/sentry-python/pull/5489)
+- Avoid consuming iterables passed to the Embeddings API by @alexander-alderman-webb in [#5491](https://github.com/getsentry/sentry-python/pull/5491)
+
+#### Other
+
+- (anthropic) Fix token accounting by @shellmayr in [#5490](https://github.com/getsentry/sentry-python/pull/5490)
+- (google-genai) Remove agent spans for simple requests by @alexander-alderman-webb in [#5443](https://github.com/getsentry/sentry-python/pull/5443)
+- (grpc) Read method from handler_call_details for grpcio >= 1.76 compat by @yeung108 in [#5521](https://github.com/getsentry/sentry-python/pull/5521)
+- (httpx) Correctly append baggage in async client by @sentrivana in [#5530](https://github.com/getsentry/sentry-python/pull/5530)
+- (pydantic-ai) Adapt to missing `ToolManager._call_tool` by @sentrivana in [#5522](https://github.com/getsentry/sentry-python/pull/5522)
+- (utils) Use HEROKU_BUILD_COMMIT env var for default release by @ericapisani in [#5499](https://github.com/getsentry/sentry-python/pull/5499)
+- (wsgi) Do not wrap file responses when uWSGI offload-threads is enabled by @ericapisani in [#5556](https://github.com/getsentry/sentry-python/pull/5556)
+
+### Documentation 📚
+
+- Add troubleshooting note for editable installs with uWSGI by @ericapisani in [#5552](https://github.com/getsentry/sentry-python/pull/5552)
+- Add debugging advice by @alexander-alderman-webb in [#5517](https://github.com/getsentry/sentry-python/pull/5517)
+- New integration guide by @alexander-alderman-webb in [#5476](https://github.com/getsentry/sentry-python/pull/5476)
+
+### Internal Changes 🔧
+
+#### Agents
+
+- Add security-review skill to agent configuration by @ericapisani in [#5498](https://github.com/getsentry/sentry-python/pull/5498)
+- Add sentry skills to be used by warden in CI reviews by @ericapisani in [#5485](https://github.com/getsentry/sentry-python/pull/5485)
+
+#### Openai
+
+- Only handle streamed results when applicable by @alexander-alderman-webb in [#5553](https://github.com/getsentry/sentry-python/pull/5553)
+- Extract input in API-specific functions by @alexander-alderman-webb in [#5546](https://github.com/getsentry/sentry-python/pull/5546)
+- Separate output handling by @alexander-alderman-webb in [#5543](https://github.com/getsentry/sentry-python/pull/5543)
+
+#### Openai Agents
+
+- Remove `set_data_normalized` for primitive attributes by @alexander-alderman-webb in [#5509](https://github.com/getsentry/sentry-python/pull/5509)
+- Expect new tool fields by @alexander-alderman-webb in [#5471](https://github.com/getsentry/sentry-python/pull/5471)
+
+#### Other
+
+- (ai) Add configuration for dotagents by @ericapisani in [#5480](https://github.com/getsentry/sentry-python/pull/5480)
+- (anthropic) Remove `set_data_normalized` for primitive attributes by @alexander-alderman-webb in [#5504](https://github.com/getsentry/sentry-python/pull/5504)
+- (github) Add warden configuration by @ericapisani in [#5484](https://github.com/getsentry/sentry-python/pull/5484)
+- (pydantic-ai) Remove `set_data_normalized` for the `gen_ai.response.model` attribute by @alexander-alderman-webb in [#5512](https://github.com/getsentry/sentry-python/pull/5512)
+- (repo) Add .serena to .gitignore by @ericapisani in [#5464](https://github.com/getsentry/sentry-python/pull/5464)
+- Updated codecov.yml by @MathurAditya724 in [#5571](https://github.com/getsentry/sentry-python/pull/5571)
+- 🤖 Update test matrix with new releases (02/24) by @github-actions in [#5524](https://github.com/getsentry/sentry-python/pull/5524)
+- 🤖 Update test matrix with new releases (02/23) by @github-actions in [#5503](https://github.com/getsentry/sentry-python/pull/5503)
+- 🤖 Update test matrix with new releases (02/19) by @github-actions in [#5483](https://github.com/getsentry/sentry-python/pull/5483)
+- 🤖 Update test matrix with new releases (02/18) by @github-actions in [#5475](https://github.com/getsentry/sentry-python/pull/5475)
+
 ## 2.53.0
 
 ### Bug Fixes 🐛

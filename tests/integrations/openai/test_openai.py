@@ -511,6 +511,8 @@ def test_streaming_chat_completion_no_prompts(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
     assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -656,6 +658,8 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
             },
         ]
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
     assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -761,6 +765,8 @@ async def test_streaming_chat_completion_async_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -896,6 +902,8 @@ async def test_streaming_chat_completion_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -2445,6 +2453,7 @@ async def test_ai_client_span_streaming_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
         "gen_ai.response.time_to_first_token": mock.ANY,
@@ -2769,6 +2778,8 @@ def test_streaming_responses_api(
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
@@ -2823,6 +2834,8 @@ async def test_streaming_responses_api_async(
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
