@@ -6,7 +6,7 @@ from werkzeug.test import Client
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware, _ScopedResponse
 
 
 @pytest.fixture
@@ -500,3 +500,50 @@ def test_span_origin_custom(sentry_init, capture_events):
     (event,) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.dogpark.deluxe"
+
+
+@pytest.mark.parametrize(
+    "has_file_wrapper, has_fileno, expect_wrapped",
+    [
+        (True, True, False),  # both conditions met → unwrapped
+        (False, True, True),  # no file_wrapper → wrapped
+        (True, False, True),  # no fileno → wrapped
+        (False, False, True),  # neither condition → wrapped
+    ],
+)
+def test_file_response_wrapping(
+    sentry_init, has_file_wrapper, has_fileno, expect_wrapped
+):
+    sentry_init()
+
+    response_mock = mock.MagicMock()
+    if not has_fileno:
+        del response_mock.fileno
+
+    def app(environ, start_response):
+        start_response("200 OK", [])
+        return response_mock
+
+    environ_extra = {}
+    if has_file_wrapper:
+        environ_extra["wsgi.file_wrapper"] = mock.MagicMock()
+
+    middleware = SentryWsgiMiddleware(app)
+
+    result = middleware(
+        {
+            "REQUEST_METHOD": "GET",
+            "PATH_INFO": "/",
+            "SERVER_NAME": "localhost",
+            "SERVER_PORT": "80",
+            "wsgi.url_scheme": "http",
+            "wsgi.input": mock.MagicMock(),
+            **environ_extra,
+        },
+        lambda status, headers: None,
+    )
+
+    if expect_wrapped:
+        assert isinstance(result, _ScopedResponse)
+    else:
+        assert result is response_mock
