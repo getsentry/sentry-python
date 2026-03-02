@@ -86,7 +86,7 @@ class SentryWsgiMiddleware:
 
     def __call__(
         self, environ: "Dict[str, str]", start_response: "Callable[..., Any]"
-    ) -> "_ScopedResponse":
+    ) -> "Any":
         if _wsgi_middleware_applied.get(False):
             return self.app(environ, start_response)
 
@@ -134,6 +134,29 @@ class SentryWsgiMiddleware:
                             reraise(*_capture_exception())
         finally:
             _wsgi_middleware_applied.set(False)
+
+        # Within the uWSGI subhandler, the use of the "offload" mechanism for file responses
+        # is determined by a pointer equality check on the response object
+        # (see https://github.com/unbit/uwsgi/blob/8d116f7ea2b098c11ce54d0b3a561c54dcd11929/plugins/python/wsgi_subhandler.c#L278).
+        #
+        # If we were to return a _ScopedResponse, this would cause the check to always fail
+        # since it's checking the files are exactly the same.
+        #
+        # To avoid this and ensure that the offloading mechanism works as expected when it's
+        # enabled, we check if the response is a file-like object (determined by the presence
+        # of `fileno`), if the wsgi.file_wrapper is available in the environment (as if so,
+        # it would've been used in handling the file in the response).
+        #
+        # Even if the offload mechanism is not enabled, there are optimizations that uWSGI does for file-like objects,
+        # so we want to make sure we don't interfere with those either.
+        #
+        # If all conditions are met, we return the original response object directly,
+        # allowing uWSGI to handle it as intended.
+        if (
+            environ.get("wsgi.file_wrapper")
+            and getattr(response, "fileno", None) is not None
+        ):
+            return response
 
         return _ScopedResponse(scope, response)
 
