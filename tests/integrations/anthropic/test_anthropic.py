@@ -13,7 +13,7 @@ except ImportError:
 
 
 from anthropic import Anthropic, AnthropicError, AsyncAnthropic, AsyncStream, Stream
-from anthropic.types import MessageDeltaUsage, TextDelta, Usage, RawMessageStreamEvent
+from anthropic.types import MessageDeltaUsage, TextDelta, Usage, MessageStreamEvent
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
 from anthropic.types.content_block_stop_event import ContentBlockStopEvent
@@ -375,7 +375,7 @@ def test_stream_messages(
         ),
     )
     returned_stream = Stream(
-        cast_to=RawMessageStreamEvent, response=response, client=client
+        cast_to=MessageStreamEvent, response=response, client=client
     )
 
     sentry_init(
@@ -877,7 +877,7 @@ def test_stream_messages_with_input_json_delta(
         ),
     )
     returned_stream = Stream(
-        cast_to=RawMessageStreamEvent, response=response, client=client
+        cast_to=MessageStreamEvent, response=response, client=client
     )
 
     sentry_init(
@@ -1943,7 +1943,7 @@ def test_stream_messages_with_system_prompt(
         ),
     )
     returned_stream = Stream(
-        cast_to=RawMessageStreamEvent, response=response, client=client
+        cast_to=MessageStreamEvent, response=response, client=client
     )
 
     sentry_init(
@@ -3246,7 +3246,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
         ),
     )
     returned_stream = Stream(
-        cast_to=RawMessageStreamEvent, response=response, client=client
+        cast_to=MessageStreamEvent, response=response, client=client
     )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
@@ -3394,7 +3394,7 @@ def test_stream_messages_cache_tokens(sentry_init, capture_events):
         ),
     )
     returned_stream = Stream(
-        cast_to=RawMessageStreamEvent, response=response, client=client
+        cast_to=MessageStreamEvent, response=response, client=client
     )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
