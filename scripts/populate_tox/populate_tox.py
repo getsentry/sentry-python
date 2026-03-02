@@ -203,12 +203,6 @@ def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> N
     with open(RELEASES_CACHE_FILE, "a") as releases_cache:
         releases_cache.write(json.dumps(_normalize_release(release)) + "\n")
 
-    if package == "zope_interface":
-        print("saving zope_interface", package)
-
-    if package == "zope.interface":
-        print("saving zope_interface", package)
-
     CACHE[_normalize_name(package)][str(version)] = release
     CACHE[_normalize_name(package)][str(version)]["_accessed"] = True
 
