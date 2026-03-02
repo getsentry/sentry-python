@@ -2261,8 +2261,200 @@ def test_cache_tokens_nonstreaming(sentry_init, capture_events):
         )
 
     (span,) = events[0]["spans"]
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 250
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+def test_input_tokens_include_cache_write_nonstreaming(sentry_init, capture_events):
+    """
+    Test that gen_ai.usage.input_tokens includes cache_write tokens (non-streaming).
+
+    Reproduces a real Anthropic cache-write response. Anthropic's usage.input_tokens
+    only counts non-cached tokens, but gen_ai.usage.input_tokens should be the TOTAL
+    so downstream cost calculations don't produce negative values.
+
+    Real Anthropic response (from E2E test):
+        Usage(input_tokens=19, output_tokens=14,
+              cache_creation_input_tokens=2846, cache_read_input_tokens=0)
+    """
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client = Anthropic(api_key="z")
+
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="id",
+            model="claude-sonnet-4-20250514",
+            role="assistant",
+            content=[TextBlock(type="text", text="3 + 3 equals 6.")],
+            type="message",
+            usage=Usage(
+                input_tokens=19,
+                output_tokens=14,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=2846,
+            ),
+        )
+    )
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "What is 3+3?"}],
+            model="claude-sonnet-4-20250514",
+        )
+
+    (span,) = events[0]["spans"]
+
+    # input_tokens should be total: 19 (non-cached) + 2846 (cache_write) = 2865
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 0
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 2846
+
+
+def test_input_tokens_include_cache_read_nonstreaming(sentry_init, capture_events):
+    """
+    Test that gen_ai.usage.input_tokens includes cache_read tokens (non-streaming).
+
+    Reproduces a real Anthropic cache-hit response. This is the scenario that
+    caused negative gen_ai.cost.input_tokens: input_tokens=19 but cached=2846,
+    so the backend computed 19 - 2846 = -2827 "regular" tokens.
+
+    Real Anthropic response (from E2E test):
+        Usage(input_tokens=19, output_tokens=14,
+              cache_creation_input_tokens=0, cache_read_input_tokens=2846)
+    """
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client = Anthropic(api_key="z")
+
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="id",
+            model="claude-sonnet-4-20250514",
+            role="assistant",
+            content=[TextBlock(type="text", text="5 + 5 = 10.")],
+            type="message",
+            usage=Usage(
+                input_tokens=19,
+                output_tokens=14,
+                cache_read_input_tokens=2846,
+                cache_creation_input_tokens=0,
+            ),
+        )
+    )
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "What is 5+5?"}],
+            model="claude-sonnet-4-20250514",
+        )
+
+    (span,) = events[0]["spans"]
+
+    # input_tokens should be total: 19 (non-cached) + 2846 (cache_read) = 2865
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+
+
+def test_input_tokens_include_cache_read_streaming(sentry_init, capture_events):
+    """
+    Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
+
+    Same cache-hit scenario as non-streaming, using realistic streaming events.
+    """
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            type="message_start",
+            message=Message(
+                id="id",
+                model="claude-sonnet-4-20250514",
+                role="assistant",
+                content=[],
+                type="message",
+                usage=Usage(
+                    input_tokens=19,
+                    output_tokens=0,
+                    cache_read_input_tokens=2846,
+                    cache_creation_input_tokens=0,
+                ),
+            ),
+        ),
+        MessageDeltaEvent(
+            type="message_delta",
+            delta=Delta(stop_reason="end_turn"),
+            usage=MessageDeltaUsage(output_tokens=14),
+        ),
+    ]
+
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    with start_transaction(name="anthropic"):
+        for _ in client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "What is 5+5?"}],
+            model="claude-sonnet-4-20250514",
+            stream=True,
+        ):
+            pass
+
+    (span,) = events[0]["spans"]
+
+    # input_tokens should be total: 19 + 2846 = 2865
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+
+
+def test_input_tokens_unchanged_without_caching(sentry_init, capture_events):
+    """
+    Test that input_tokens is unchanged when there are no cached tokens.
+
+    Real Anthropic response (from E2E test, simple call without caching):
+        Usage(input_tokens=20, output_tokens=12)
+    """
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client = Anthropic(api_key="z")
+
+    client.messages._post = mock.Mock(
+        return_value=Message(
+            id="id",
+            model="claude-sonnet-4-20250514",
+            role="assistant",
+            content=[TextBlock(type="text", text="2+2 equals 4.")],
+            type="message",
+            usage=Usage(
+                input_tokens=20,
+                output_tokens=12,
+            ),
+        )
+    )
+
+    with start_transaction(name="anthropic"):
+        client.messages.create(
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "What is 2+2?"}],
+            model="claude-sonnet-4-20250514",
+        )
+
+    (span,) = events[0]["spans"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
 
 
 def test_cache_tokens_streaming(sentry_init, capture_events):
@@ -2307,5 +2499,9 @@ def test_cache_tokens_streaming(sentry_init, capture_events):
             pass
 
     (span,) = events[0]["spans"]
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20

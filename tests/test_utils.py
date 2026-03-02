@@ -721,6 +721,36 @@ def test_get_default_release_other_release_env(monkeypatch):
     assert release == "other-env-release"
 
 
+def test_get_default_release_heroku_build_commit(monkeypatch):
+    monkeypatch.setenv("HEROKU_BUILD_COMMIT", "heroku-build-commit-sha")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "heroku-build-commit-sha"
+
+
+def test_get_default_release_heroku_slug_commit_fallback(monkeypatch):
+    # Although deprecated by Heroku, HEROKU_SLUG_COMMIT should still be used if HEROKU_BUILD_COMMIT is not set
+    monkeypatch.setenv("HEROKU_SLUG_COMMIT", "heroku-slug-commit-sha")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "heroku-slug-commit-sha"
+
+
+def test_get_default_release_heroku_build_commit_takes_priority(monkeypatch):
+    # HEROKU_BUILD_COMMIT should take priority over HEROKU_SLUG_COMMIT since it's the non-deprecated variable
+    monkeypatch.setenv("HEROKU_BUILD_COMMIT", "heroku-build-commit-sha")
+    monkeypatch.setenv("HEROKU_SLUG_COMMIT", "heroku-slug-commit-sha")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "heroku-build-commit-sha"
+
+
 def test_ensure_integration_enabled_integration_enabled(sentry_init):
     def original_function():
         return "original"
