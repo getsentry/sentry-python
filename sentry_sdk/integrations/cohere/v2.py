@@ -218,50 +218,54 @@ def _wrap_chat_v2(f, streaming):
                 def new_iterator():
                     # type: () -> Iterator[V2ChatStreamResponse]
                     collected_text = []
-                    with capture_internal_exceptions():
+                    try:
                         for x in old_iterator:
-                            if (
-                                hasattr(x, "type")
-                                and x.type == "content-delta"
-                                and hasattr(x, "delta")
-                                and x.delta is not None
-                            ):
-                                msg = getattr(x.delta, "message", None)
-                                if msg is not None:
-                                    content = getattr(msg, "content", None)
-                                    if content is not None and hasattr(content, "text"):
-                                        collected_text.append(content.text)
+                            with capture_internal_exceptions():
+                                if (
+                                    hasattr(x, "type")
+                                    and x.type == "content-delta"
+                                    and hasattr(x, "delta")
+                                    and x.delta is not None
+                                ):
+                                    msg = getattr(x.delta, "message", None)
+                                    if msg is not None:
+                                        content = getattr(msg, "content", None)
+                                        if content is not None and hasattr(content, "text"):
+                                            collected_text.append(content.text)
 
-                            if isinstance(x, MessageEndV2ChatStreamResponse):
-                                include_pii = (
-                                    should_send_default_pii()
-                                    and integration.include_prompts
-                                )
-                                if include_pii and collected_text:
-                                    set_data_normalized(
-                                        span,
-                                        SPANDATA.GEN_AI_RESPONSE_TEXT,
-                                        ["".join(collected_text)],
+                                if isinstance(x, MessageEndV2ChatStreamResponse):
+                                    include_pii = (
+                                        should_send_default_pii()
+                                        and integration.include_prompts
                                     )
-                                if hasattr(x, "id"):
-                                    set_data_normalized(
-                                        span, SPANDATA.GEN_AI_RESPONSE_ID, x.id
-                                    )
-                                if hasattr(x, "delta") and x.delta is not None:
-                                    if hasattr(x.delta, "finish_reason"):
+                                    if include_pii and collected_text:
                                         set_data_normalized(
                                             span,
-                                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
-                                            x.delta.finish_reason,
+                                            SPANDATA.GEN_AI_RESPONSE_TEXT,
+                                            ["".join(collected_text)],
                                         )
-                                    if (
-                                        hasattr(x.delta, "usage")
-                                        and x.delta.usage is not None
-                                    ):
-                                        _record_token_usage_v2(span, x.delta.usage)
+                                    if hasattr(x, "id"):
+                                        set_data_normalized(
+                                            span, SPANDATA.GEN_AI_RESPONSE_ID, x.id
+                                        )
+                                    if hasattr(x, "delta") and x.delta is not None:
+                                        if hasattr(x.delta, "finish_reason"):
+                                            set_data_normalized(
+                                                span,
+                                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                                x.delta.finish_reason,
+                                            )
+                                        if (
+                                            hasattr(x.delta, "usage")
+                                            and x.delta.usage is not None
+                                        ):
+                                            _record_token_usage_v2(span, x.delta.usage)
                             yield x
-
-                    span.__exit__(None, None, None)
+                    except Exception as exc:
+                        _capture_exception(exc)
+                        raise
+                    finally:
+                        span.__exit__(None, None, None)
 
                 return new_iterator()
             elif isinstance(res, V2ChatResponse):

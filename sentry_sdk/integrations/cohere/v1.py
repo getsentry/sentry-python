@@ -178,20 +178,24 @@ def _wrap_chat(f, streaming):
 
                 def new_iterator():
                     # type: () -> Iterator[StreamedChatResponse]
-                    with capture_internal_exceptions():
+                    try:
                         for x in old_iterator:
-                            if isinstance(x, ChatStreamEndEvent) or isinstance(
-                                x, StreamEndStreamedChatResponse
-                            ):
-                                collect_chat_response_fields(
-                                    span,
-                                    x.response,
-                                    include_pii=should_send_default_pii()
-                                    and integration.include_prompts,
-                                )
+                            with capture_internal_exceptions():
+                                if isinstance(x, ChatStreamEndEvent) or isinstance(
+                                    x, StreamEndStreamedChatResponse
+                                ):
+                                    collect_chat_response_fields(
+                                        span,
+                                        x.response,
+                                        include_pii=should_send_default_pii()
+                                        and integration.include_prompts,
+                                    )
                             yield x
-
-                    span.__exit__(None, None, None)
+                    except Exception as exc:
+                        _capture_exception(exc)
+                        raise
+                    finally:
+                        span.__exit__(None, None, None)
 
                 return new_iterator()
             elif isinstance(res, NonStreamedChatResponse):
