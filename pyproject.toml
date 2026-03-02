@@ -196,6 +196,9 @@ ignore_missing_imports = true
 # Target Python 3.7+ (minimum version supported by ruff)
 target-version = "py37"
 
+# Include files and directories
+include = ["sentry_sdk/**/*.py", "tests/**/*.py"]
+
 # Exclude files and directories
 extend-exclude = [
     "*_pb2.py",     # Protocol Buffer files (covers all pb2 files including grpc_test_service_pb2.py)
