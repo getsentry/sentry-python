@@ -38,7 +38,10 @@ try:
         Omit = None
 
     from anthropic.resources import AsyncMessages, Messages
-    from anthropic.lib.streaming._messages import MessageStreamManager
+    from anthropic.lib.streaming._messages import (
+        MessageStreamManager,
+        AsyncMessageStreamManager,
+    )
 
     from anthropic.types import (
         MessageStartEvent,
@@ -66,6 +69,7 @@ if TYPE_CHECKING:
         ModelParam,
         TextBlockParam,
         ToolUnionParam,
+        AsyncMessageStream,
     )
 
 
@@ -94,6 +98,13 @@ class AnthropicIntegration(Integration):
         Messages.stream = _wrap_message_stream(Messages.stream)
         MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
             MessageStreamManager.__enter__
+        )
+
+        AsyncMessages.stream = _wrap_async_message_stream(AsyncMessages.stream)
+        AsyncMessageStreamManager.__aenter__ = (
+            _wrap_async_message_stream_manager_aenter(
+                AsyncMessageStreamManager.__aenter__
+            )
         )
 
 
@@ -822,6 +833,61 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         return stream_manager
 
     return _sentry_patched_enter
+
+
+def _wrap_async_message_stream(f: "Any") -> "Any":
+    """
+    Attaches user-provided arguments to the returned context manager.
+    The attributes are set on `gen_ai.chat` spans in the patch for the context manager.
+    """
+
+    @wraps(f)
+    def _sentry_patched_stream(
+        *args: "Any", **kwargs: "Any"
+    ) -> "AsyncMessageStreamManager":
+        stream_manager = f(*args, **kwargs)
+
+        stream_manager._max_tokens = kwargs.get("max_tokens")
+        stream_manager._messages = kwargs.get("messages")
+        stream_manager._model = kwargs.get("model")
+        stream_manager._system = kwargs.get("system")
+        stream_manager._temperature = kwargs.get("temperature")
+        stream_manager._top_k = kwargs.get("top_k")
+        stream_manager._top_p = kwargs.get("top_p")
+        stream_manager._tools = kwargs.get("tools")
+
+        return stream_manager
+
+    return _sentry_patched_stream
+
+
+def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
+    """
+    Creates and manages `gen_ai.chat` spans.
+    """
+
+    @wraps(f)
+    async def _sentry_patched_aenter(
+        self: "MessageStreamManager",
+    ) -> "AsyncMessageStream":
+        stream = await f(self)
+        if not hasattr(self, "_max_tokens"):
+            return stream
+
+        _sentry_patched_stream_common(
+            stream=stream,
+            max_tokens=self._max_tokens,
+            messages=self._messages,
+            model=self._model,
+            system=self._system,
+            temperature=self._temperature,
+            top_k=self._top_k,
+            top_p=self._top_p,
+            tools=self._tools,
+        )
+        return stream
+
+    return _sentry_patched_aenter
 
 
 def _is_given(obj: "Any") -> bool:
