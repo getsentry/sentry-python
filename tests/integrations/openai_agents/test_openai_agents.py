@@ -1313,6 +1313,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         ),
     )
 
+    # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
     with patch.object(
         agent_with_tool.model._client._client,
         "send",
