@@ -231,8 +231,6 @@ def _update_celery_task_headers(
                 if key.startswith("sentry-"):
                     updated_headers["headers"][key] = value
 
-            # Preserve user-provided custom headers in the inner "headers" dict
-            # so they survive to task.request.headers on the worker (celery#4875).
         # Preserve user-provided custom headers in the inner "headers" dict
         # so they survive to task.request.headers on the worker (celery#4875).
         inner_headers = updated_headers.setdefault("headers", {})
