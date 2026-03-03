@@ -1322,7 +1322,8 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
     with patch.object(
         model._client.responses,
         "create",
-        return_value=api_response,
+        # based on https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1763
+        return_value=await api_response.parse(),
     ) as create, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
@@ -2925,7 +2926,8 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent, async_iterat
     with patch.object(
         model._client.responses,
         "create",
-        return_value=api_response,
+        # based on https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1763
+        return_value=await api_response.parse(),
     ) as _:
         with sentry_sdk.start_transaction(
             name="test_ttft", sampled=True
