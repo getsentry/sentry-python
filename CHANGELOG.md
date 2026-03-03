@@ -2,44 +2,6 @@
 
 ## 2.52.0a8
 
-### New Features ✨
-
-- Add `set_attribute`, `remove_attribute` to global API by @sentrivana in [#5555](https://github.com/getsentry/sentry-python/pull/5555)
-
-### Bug Fixes 🐛
-
-#### Openai
-
-- Attach response model with streamed Completions API by @alexander-alderman-webb in [#5557](https://github.com/getsentry/sentry-python/pull/5557)
-- Attach response model with streamed Responses API by @alexander-alderman-webb in [#5554](https://github.com/getsentry/sentry-python/pull/5554)
-
-#### Other
-
-- (wsgi) Do not wrap file responses when uWSGI offload-threads is enabled by @ericapisani in [#5556](https://github.com/getsentry/sentry-python/pull/5556)
-
-### Documentation 📚
-
-- Add `set_attribute` example to changelog by @sentrivana in [#5578](https://github.com/getsentry/sentry-python/pull/5578)
-- Add troubleshooting note for editable installs with uWSGI by @ericapisani in [#5552](https://github.com/getsentry/sentry-python/pull/5552)
-
-### Internal Changes 🔧
-
-#### Openai
-
-- Only handle streamed results when applicable by @alexander-alderman-webb in [#5553](https://github.com/getsentry/sentry-python/pull/5553)
-- Extract input in API-specific functions by @alexander-alderman-webb in [#5546](https://github.com/getsentry/sentry-python/pull/5546)
-- Separate output handling by @alexander-alderman-webb in [#5543](https://github.com/getsentry/sentry-python/pull/5543)
-
-#### Other
-
-- Updated codecov.yml by @MathurAditya724 in [#5571](https://github.com/getsentry/sentry-python/pull/5571)
-
-### Other
-
-- release: 2.54.0 by @ericapisani in [0b31018c](https://github.com/getsentry/sentry-python/commit/0b31018c469d1867b4b3ebf7d3ee3d95576ff156)
-
-## 2.52.0a7
-
 This is an alpha release for internal testing.
 
 ## 2.54.0
