@@ -1,6 +1,4 @@
-import json
 import threading
-import math
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -118,7 +116,9 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
                     # Max per envelope is 1000, so if we happen to have more than
                     # 1000 spans in one bucket, we'll need to separate them.
-                    for i in range(math.ceil(len(spans) / self.MAX_ENVELOPE_SIZE)):
+                    for start in range(0, len(spans), self.MAX_ENVELOPE_SIZE):
+                        end = min(start + self.MAX_ENVELOPE_SIZE, len(spans))
+
                         envelope = Envelope(
                             headers={
                                 "sent_at": format_timestamp(datetime.now(timezone.utc)),
@@ -131,16 +131,13 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                                 type="span",
                                 content_type="application/vnd.sentry.items.span.v2+json",
                                 headers={
-                                    "item_count": len(spans),
+                                    "item_count": end - start,
                                 },
                                 payload=PayloadRef(
                                     json={
                                         "items": [
-                                            self._to_transport_format(span)
-                                            for span in spans[
-                                                i * self.MAX_ENVELOPE_SIZE : (i + 1)
-                                                * self.MAX_ENVELOPE_SIZE
-                                            ]
+                                            self._to_transport_format(spans[j])
+                                            for j in range(start, end)
                                         ]
                                     }
                                 ),
