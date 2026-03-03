@@ -1,25 +1,29 @@
 # Agent Instructions
 
+## Tox
+
+- Always run tox from the main `.venv`
+- If there is no `tox.venv`, create one with `python -m venv tox.venv`, active it and run `pip install tox`
+
 ## Package Manager
 
 Use **tox** for testing (not pytest directly):
-- Always run tox from the main `.venv`. If there is no `.venv`, create it and install `pip install -r requirements-lint.txt -r requirements-test.txt tox`
-- Test matrix config is in `tox.ini`
+- Test matrix configuration is in `tox.ini`
 - Integration tests: `tox -e py3.14-{integration}-v{version}`
 - Common tests: `tox -e py3.14-common`
 
 ## Type Checking
 
-- Always run mypy from the main `.venv`. If there is no `.venv`, create it and install `pip install -r requirements-lint.txt -r requirements-test.txt`
-- Run `mypy sentry_sdk` before committing (must pass with zero errors)
+Use **tox** for type checking (not mypy directly):
+- Run `tox -e mypy` before committing (must pass with zero errors)
 - Strict mode enabled (`check_untyped_defs`, `disallow_untyped_defs`)
 
 ## Linting & Formatting
 
-- **Ruff** for linting and formatting
-- `ruff check tests sentry_sdk`
-- `ruff format --check tests sentry_sdk`
+Use **tox** for linting (not ruff directly):
+- `tox -e ruff`
 - Full lint suite: `tox -e linters`
+- Full lint suite must pass before committing
 
 ## Commit Attribution
 
