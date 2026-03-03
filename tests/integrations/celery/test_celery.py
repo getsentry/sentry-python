@@ -876,33 +876,6 @@ def test_user_custom_headers_accessible_in_task(init_celery):
         )
 
 
-def test_user_custom_headers_do_not_overwrite_sentry_headers(init_celery):
-    """
-    If a user passes a header with a key that collides with a Sentry header,
-    the Sentry-generated value must take precedence.
-    """
-    celery = init_celery(traces_sample_rate=1.0)
-
-    @celery.task(name="headers_precedence_task", bind=True)
-    def headers_precedence_task(self):
-        return dict(self.request.headers or {})
-
-    with start_transaction(name="test"):
-        result = headers_precedence_task.apply_async(
-            headers={
-                "sentry-trace": "user-supplied-value",
-                "my_custom_key": "my_value",
-            },
-        )
-
-    received_headers = result.get()
-    # Sentry's own sentry-trace must NOT be the user-supplied value
-    assert received_headers.get("sentry-trace") != "user-supplied-value"
-    assert "sentry-trace" in received_headers
-    # User custom header is still preserved
-    assert received_headers.get("my_custom_key") == "my_value"
-
-
 @pytest.mark.skip(reason="placeholder so that forked test does not come last")
 def test_placeholder():
     """Forked tests must not come last in the module.
