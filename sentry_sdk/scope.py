@@ -1225,6 +1225,7 @@ class Scope:
         name: str,
         attributes: "Optional[Attributes]" = None,
         parent_span: "Optional[StreamedSpan]" = None,
+        active: bool = True,
         **kwargs: "Any",  # TODO[span-first]: remove, just for expediting seer testing
     ) -> "StreamedSpan":
         # TODO: rename to start_span once we drop the old API
@@ -1259,6 +1260,7 @@ class Scope:
             return StreamedSpan(
                 name=name,
                 attributes=attributes,
+                active=active,
                 scope=self,
                 segment=None,
                 trace_id=propagation_context.trace_id,
@@ -1277,6 +1279,7 @@ class Scope:
             return StreamedSpan(
                 name=name,
                 attributes=attributes,
+                active=active,
                 scope=self,
                 trace_id=parent_span.trace_id,
                 parent_span_id=parent_span.span_id,

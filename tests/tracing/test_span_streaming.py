@@ -428,6 +428,43 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
     assert span_id_in_traces_sampler == segment.span_id
 
 
+def test_start_inactive_span(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="segment") as segment:
+        with sentry_sdk.traces.start_span(name="child1", active=False):
+            with sentry_sdk.traces.start_span(name="child2"):
+                # Should have segment as parent since child1 is inactive
+                pass
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 3
+    child2, child1, segment = spans
+
+    assert segment["is_segment"] is True
+    assert segment["name"] == "segment"
+    assert segment["attributes"]["sentry.segment.name"] == "segment"
+
+    assert child1["is_segment"] is False
+    assert child1["name"] == "child1"
+    assert child1["attributes"]["sentry.segment.name"] == "segment"
+    assert child1["parent_span_id"] == segment["span_id"]
+    assert child1["trace_id"] == segment["trace_id"]
+
+    assert child2["is_segment"] is False
+    assert child2["name"] == "child2"
+    assert child2["attributes"]["sentry.segment.name"] == "segment"
+    assert child2["parent_span_id"] == segment["span_id"]
+    assert child2["trace_id"] == segment["trace_id"]
+
+
 def test_start_span_override_parent(sentry_init, capture_envelopes):
     sentry_init(
         traces_sample_rate=1.0,
@@ -685,6 +722,33 @@ def test_trace_decorator_arguments(sentry_init, capture_envelopes):
     assert span["status"] == "ok"
 
 
+def test_trace_decorator_inactive(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    @sentry_sdk.traces.trace(name="outer", active=False)
+    def traced_function():
+        with sentry_sdk.traces.start_span(name="inner"):
+            ...
+
+    traced_function()
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 2
+    (span1, span2) = spans
+
+    assert span1["name"] == "inner"
+    assert span1["parent_span_id"] != span2["span_id"]
+
+    assert span2["name"] == "outer"
+
+
 @minimum_python_38
 def test_trace_decorator_async(sentry_init, capture_envelopes):
     sentry_init(
@@ -735,6 +799,34 @@ def test_trace_decorator_async_arguments(sentry_init, capture_envelopes):
     assert span["name"] == "traced"
     assert span["attributes"]["traced.attribute"] == 123
     assert span["status"] == "ok"
+
+
+@minimum_python_38
+def test_trace_decorator_async_inactive(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    @sentry_sdk.traces.trace(name="outer", active=False)
+    async def traced_function():
+        with sentry_sdk.traces.start_span(name="inner"):
+            ...
+
+    asyncio.run(traced_function())
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 2
+    (span1, span2) = spans
+
+    assert span1["name"] == "inner"
+    assert span1["parent_span_id"] != span2["span_id"]
+
+    assert span2["name"] == "outer"
 
 
 def test_set_span_status(sentry_init, capture_envelopes):

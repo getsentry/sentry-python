@@ -102,6 +102,7 @@ def start_span(
     name: str,
     attributes: "Optional[Attributes]" = None,
     parent_span: "Optional[StreamedSpan]" = None,
+    active: bool = True,
 ) -> "StreamedSpan":
     """
     Start a span.
@@ -136,19 +137,28 @@ def start_span(
 
     :param name: The name to identify this span by.
     :type name: str
+
     :param attributes: Key-value attributes to set on the span from the start.
         When provided via the `start_span()` function, these will also be
         accessible in the traces sampler.
     :type attributes: "Optional[Attributes]"
+
     :param parent_span: A span instance that the new span should be parented to.
         If not provided, the parent will be set to the currently active span,
         if any.
     :type parent_span: "Optional[StreamedSpan]"
+
+    :param active: Controls whether spans started while this span is running
+        will automatically become its children. That's the default behavior. If
+        you want to create a span that shouldn't have any children (unless
+        provided explicitly via the `parent_span` argument), set this to False.
+    :type active: bool
+
     :return: A span.
     :rtype: StreamedSpan
     """
     return sentry_sdk.get_current_scope().start_streamed_span(
-        name, attributes, parent_span
+        name, attributes, parent_span, active
     )
 
 
@@ -201,6 +211,7 @@ class StreamedSpan:
     __slots__ = (
         "_name",
         "_attributes",
+        "_active",
         "_span_id",
         "_trace_id",
         "parent_span_id",
@@ -227,6 +238,7 @@ class StreamedSpan:
         name: str,
         scope: "sentry_sdk.Scope",
         attributes: "Optional[Attributes]" = None,
+        active: bool = True,
         # TODO[span-first]: would be good to actually take this propagation
         # context stuff directly from the PropagationContext, but for that
         # we'd actually need to refactor PropagationContext to stay in sync
@@ -241,6 +253,7 @@ class StreamedSpan:
         last_valid_parent_id: "Optional[str]" = None,
     ) -> None:
         self._scope = scope
+        self._active = active
 
         self._name: str = name
         self._attributes: "Attributes" = {}
@@ -295,14 +308,16 @@ class StreamedSpan:
             f"trace_id={self.trace_id}, "
             f"span_id={self.span_id}, "
             f"parent_span_id={self.parent_span_id}, "
-            f"sampled={self.sampled})>"
+            f"sampled={self.sampled}, "
+            f"active={self._active})>"
         )
 
     def __enter__(self) -> "StreamedSpan":
         scope = self._scope or sentry_sdk.get_current_scope()
-        old_span = scope.span
-        scope.span = self
-        self._context_manager_state = (scope, old_span)
+        if self._active:
+            old_span = scope.span
+            scope.span = self
+            self._context_manager_state = (scope, old_span)
 
         if self.is_segment():
             sampling_context = {
@@ -338,11 +353,15 @@ class StreamedSpan:
         if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SpanStatus.ERROR)
 
-        with capture_internal_exceptions():
-            scope, old_span = self._context_manager_state
-            del self._context_manager_state
-            self._end(scope=scope)
-            scope.span = old_span
+        if self._active:
+            with capture_internal_exceptions():
+                scope, old_span = self._context_manager_state
+                del self._context_manager_state
+                scope.span = old_span
+        else:
+            scope = self._scope
+
+        self._end(scope=self._scope)
 
     def start(self) -> "StreamedSpan":
         """
@@ -761,6 +780,7 @@ def trace(
     *,
     name: "Optional[str]" = None,
     attributes: "Optional[dict[str, Any]]" = None,
+    active: bool = True,
 ) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
     """
     Decorator to start a span around a function call.
@@ -782,6 +802,12 @@ def trace(
         Attribute values must be strings, integers, floats, or booleans. These
         attributes provide additional context about the span's execution.
     :type attributes: dict[str, Any] or None
+
+    :param active: Controls whether spans started while this span is running
+        will automatically become its children. That's the default behavior. If
+        you want to create a span that shouldn't have any children (unless
+        provided explicitly via the `parent_span` argument), set this to False.
+    :type active: bool
 
     :returns: When used as ``@trace``, returns the decorated function. When used as
         ``@trace(...)`` with parameters, returns a decorator function.
@@ -811,6 +837,7 @@ def trace(
     decorator = create_streaming_span_decorator(
         name=name,
         attributes=attributes,
+        active=active,
     )
 
     if func:

@@ -1046,14 +1046,10 @@ def create_span_decorator(
 def create_streaming_span_decorator(
     name: "Optional[str]" = None,
     attributes: "Optional[dict[str, Any]]" = None,
+    active: bool = True,
 ) -> "Any":
     """
-    Create a span decorator that can wrap both sync and async functions.
-
-    :param name: The name of the span.
-    :type name: str or None
-    :param attributes: Additional attributes to set on the span.
-    :type attributes: dict or None
+    Create a span creating decorator that can wrap both sync and async functions.
     """
     from sentry_sdk.scope import should_send_default_pii
 
@@ -1066,7 +1062,9 @@ def create_streaming_span_decorator(
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             span_name = name or qualname_from_function(f) or ""
 
-            with start_streaming_span(name=span_name, attributes=attributes):
+            with start_streaming_span(
+                name=span_name, attributes=attributes, active=active
+            ):
                 result = await f(*args, **kwargs)
                 return result
 
@@ -1079,7 +1077,9 @@ def create_streaming_span_decorator(
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             span_name = name or qualname_from_function(f) or ""
 
-            with start_streaming_span(name=span_name, attributes=attributes):
+            with start_streaming_span(
+                name=span_name, attributes=attributes, active=active
+            ):
                 return f(*args, **kwargs)
 
         try:
