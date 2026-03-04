@@ -1530,7 +1530,7 @@ def make_sampling_decision(
             reason = "traces_sample_rate is set to 0"
 
         logger.debug(f"[Tracing] Discarding {name} because {reason}")
-        if client.monitor.downsample_factor > 0:
+        if client.monitor and client.monitor.downsample_factor > 0:
             outcome = "backpressure"
         else:
             outcome = "sample_rate"
