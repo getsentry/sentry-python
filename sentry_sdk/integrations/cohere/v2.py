@@ -3,11 +3,8 @@ from functools import wraps
 
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.ai.utils import (
-    set_data_normalized,
-    normalize_message_roles,
-    truncate_and_annotate_messages,
-)
+from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.span_config import set_input_span_data
 
 from typing import TYPE_CHECKING
 
@@ -101,6 +98,15 @@ def _extract_messages_v2(messages):
     return result
 
 
+COHERE_V2_CHAT_CONFIG = {
+    "system": "cohere",
+    "operation": "chat",
+    "params": COLLECTED_CHAT_PARAMS,
+    "pii_params": {"tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS},
+    "extract_messages": lambda kw: _extract_messages_v2(kw.get("messages", [])),
+}
+
+
 def _record_token_usage_v2(span, usage):
     # type: (Span, Any) -> None
     """Extract and record token usage from a V2 Usage object."""
@@ -180,36 +186,13 @@ def _wrap_chat_v2(f, streaming):
                 reraise(*exc_info)
 
             with capture_internal_exceptions():
-                set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-                set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+                extra = {SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming}
                 if model:
-                    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-
-                if should_send_default_pii() and integration.include_prompts:
-                    messages = _extract_messages_v2(kwargs.get("messages", []))
-                    messages = normalize_message_roles(messages)
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        messages, span, scope
-                    )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
-                    if "tools" in kwargs:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                            kwargs["tools"],
-                        )
-
-                for k, v in COLLECTED_CHAT_PARAMS.items():
-                    if k in kwargs:
-                        set_data_normalized(span, v, kwargs[k])
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
+                    extra[SPANDATA.GEN_AI_RESPONSE_MODEL] = model
+                set_input_span_data(span, kwargs, integration, {
+                    **COHERE_V2_CHAT_CONFIG,
+                    "extra_static": extra,
+                })
 
                 if streaming:
                     old_iterator = res

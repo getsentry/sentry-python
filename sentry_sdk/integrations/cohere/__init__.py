@@ -3,7 +3,7 @@ from functools import wraps
 
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.span_config import set_input_span_data
 
 from typing import TYPE_CHECKING
 
@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from typing import Any, Callable
 
 import sentry_sdk
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
 
@@ -41,6 +40,16 @@ def _normalize_embedding_input(texts):
     if isinstance(texts, tuple):
         return list(texts)
     return [texts]
+
+
+COHERE_EMBED_CONFIG = {
+    "system": "cohere",
+    "operation": "embeddings",
+    "params": {"model": SPANDATA.GEN_AI_REQUEST_MODEL},
+    "extract_messages": lambda kw: _normalize_embedding_input(kw["texts"]) if "texts" in kw else None,
+    "message_target": SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+    "truncation_fn": None,
+}
 
 
 class CohereIntegration(Integration):
@@ -91,22 +100,7 @@ def _wrap_embed(f):
             name=f"embeddings {model}".strip(),
             origin=CohereIntegration.origin,
         ) as span:
-            set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-            set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-
-            if "texts" in kwargs and (
-                should_send_default_pii() and integration.include_prompts
-            ):
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
-                    _normalize_embedding_input(kwargs["texts"]),
-                )
-
-            if "model" in kwargs:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"]
-                )
+            set_input_span_data(span, kwargs, integration, COHERE_EMBED_CONFIG)
 
             try:
                 res = f(*args, **kwargs)

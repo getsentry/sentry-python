@@ -3,11 +3,8 @@ from functools import wraps
 
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.ai.utils import (
-    set_data_normalized,
-    normalize_message_roles,
-    truncate_and_annotate_messages,
-)
+from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.span_config import set_input_span_data
 
 from typing import TYPE_CHECKING
 
@@ -48,6 +45,32 @@ COLLECTED_PII_CHAT_PARAMS = {
     "preamble": SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
 }
 
+
+def _extract_messages_v1(kwargs):
+    # type: (dict[str, Any]) -> list[dict[str, str]]
+    """Extract role/content dicts from V1-style chat_history + message."""
+    messages = []
+    for x in kwargs.get("chat_history", []):
+        messages.append(
+            {
+                "role": getattr(x, "role", "").lower(),
+                "content": getattr(x, "message", ""),
+            }
+        )
+    message = kwargs.get("message")
+    if message:
+        messages.append({"role": "user", "content": message})
+    return messages
+
+
+COHERE_V1_CHAT_CONFIG = {
+    "system": "cohere",
+    "operation": "chat",
+    "params": COLLECTED_CHAT_PARAMS,
+    "pii_params": COLLECTED_PII_CHAT_PARAMS,
+    "extract_messages": _extract_messages_v1,
+}
+
 COLLECTED_CHAT_RESP_ATTRS = {
     "generation_id": SPANDATA.GEN_AI_RESPONSE_ID,
     "finish_reason": SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
@@ -77,36 +100,6 @@ def _wrap_chat(f, streaming):
     if not _has_chat_types:
         return f
 
-    def collect_chat_response_fields(span, res, include_pii):
-        # type: (Span, NonStreamedChatResponse, bool) -> None
-        if include_pii:
-            if hasattr(res, "text"):
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    [res.text],
-                )
-            for attr, spandata_key in COLLECTED_PII_CHAT_RESP_ATTRS.items():
-                if hasattr(res, attr):
-                    set_data_normalized(span, spandata_key, getattr(res, attr))
-
-        for attr, spandata_key in COLLECTED_CHAT_RESP_ATTRS.items():
-            if hasattr(res, attr):
-                set_data_normalized(span, spandata_key, getattr(res, attr))
-
-        if hasattr(res, "meta"):
-            if hasattr(res.meta, "billed_units"):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.billed_units.input_tokens,
-                    output_tokens=res.meta.billed_units.output_tokens,
-                )
-            elif hasattr(res.meta, "tokens"):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.tokens.input_tokens,
-                    output_tokens=res.meta.tokens.output_tokens,
-                )
 
     @wraps(f)
     def new_chat(*args, **kwargs):
@@ -120,7 +113,6 @@ def _wrap_chat(f, streaming):
         ):
             return f(*args, **kwargs)
 
-        message = kwargs.get("message")
         model = kwargs.get("model", "")
 
         with sentry_sdk.start_span(
@@ -137,41 +129,10 @@ def _wrap_chat(f, streaming):
                 reraise(*exc_info)
 
             with capture_internal_exceptions():
-                set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-                set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-                if model:
-                    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-
-                if should_send_default_pii() and integration.include_prompts:
-                    messages = []
-                    for x in kwargs.get("chat_history", []):
-                        messages.append(
-                            {
-                                "role": getattr(x, "role", "").lower(),
-                                "content": getattr(x, "message", ""),
-                            }
-                        )
-                    messages.append({"role": "user", "content": message})
-                    messages = normalize_message_roles(messages)
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        messages, span, scope
-                    )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
-                    for k, v in COLLECTED_PII_CHAT_PARAMS.items():
-                        if k in kwargs:
-                            set_data_normalized(span, v, kwargs[k])
-
-                for k, v in COLLECTED_CHAT_PARAMS.items():
-                    if k in kwargs:
-                        set_data_normalized(span, v, kwargs[k])
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
+                set_input_span_data(span, kwargs, integration, {
+                    **COHERE_V1_CHAT_CONFIG,
+                    "extra_static": {SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming},
+                })
 
                 if streaming:
                     old_iterator = res
@@ -203,4 +164,34 @@ def _wrap_chat(f, streaming):
                     set_data_normalized(span, "unknown_response", True)
                 return res
 
+    def collect_chat_response_fields(span, res, include_pii):
+        # type: (Span, NonStreamedChatResponse, bool) -> None
+        if include_pii:
+            if hasattr(res, "text"):
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    [res.text],
+                )
+            for attr, spandata_key in COLLECTED_PII_CHAT_RESP_ATTRS.items():
+                if hasattr(res, attr):
+                    set_data_normalized(span, spandata_key, getattr(res, attr))
+
+        for attr, spandata_key in COLLECTED_CHAT_RESP_ATTRS.items():
+            if hasattr(res, attr):
+                set_data_normalized(span, spandata_key, getattr(res, attr))
+
+        if hasattr(res, "meta"):
+            if hasattr(res.meta, "billed_units"):
+                record_token_usage(
+                    span,
+                    input_tokens=res.meta.billed_units.input_tokens,
+                    output_tokens=res.meta.billed_units.output_tokens,
+                )
+            elif hasattr(res.meta, "tokens"):
+                record_token_usage(
+                    span,
+                    input_tokens=res.meta.tokens.input_tokens,
+                    output_tokens=res.meta.tokens.output_tokens,
+                )
     return new_chat
