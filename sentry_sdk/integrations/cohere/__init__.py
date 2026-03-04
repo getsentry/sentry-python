@@ -21,17 +21,6 @@ try:
 except ImportError:
     raise DidNotEnable("Cohere not installed")
 
-COLLECTED_CHAT_PARAMS = {
-    "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-    "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-    "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-    "k": SPANDATA.GEN_AI_REQUEST_TOP_K,
-    "p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-    "seed": SPANDATA.GEN_AI_REQUEST_SEED,
-    "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-    "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-}
-
 
 def _normalize_embedding_input(texts):
     # type: (Any) -> Any
@@ -66,7 +55,6 @@ class CohereIntegration(Integration):
     def setup_once():
         # type: () -> None
         # Lazy imports to avoid circular dependencies:
-        # v1/v2 import COLLECTED_CHAT_PARAMS and _capture_exception from this module.
         from sentry_sdk.integrations.cohere.v1 import setup_v1
         from sentry_sdk.integrations.cohere.v2 import setup_v2
 
