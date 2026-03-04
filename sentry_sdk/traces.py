@@ -16,14 +16,12 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.tracing_utils import (
     Baggage,
-    _generate_sample_rand,
     has_tracing_enabled,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
     get_current_thread_meta,
-    is_valid_sample_rate,
     logger,
     nanosecond_time,
     should_be_treated_as_error,
@@ -226,10 +224,10 @@ class StreamedSpan:
         "_context_manager_state",
         "_continuous_profile",
         "_baggage",
-        "sample_rate",
-        "_sample_rand",
         "_finished",
         "_last_valid_parent_id",
+        "_sample_rand",
+        "_sample_rate",
     )
 
     def __init__(
@@ -250,6 +248,8 @@ class StreamedSpan:
         baggage: "Optional[Baggage]" = None,
         segment: "Optional[StreamedSpan]" = None,
         sampled: "Optional[bool]" = None,
+        sample_rate: "Optional[float]" = None,
+        sample_rand: "Optional[float]" = None,
         last_valid_parent_id: "Optional[str]" = None,
     ) -> None:
         self._scope = scope
@@ -282,19 +282,11 @@ class StreamedSpan:
         self.set_status(SpanStatus.OK)
         self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
-        self._sampled: "Optional[bool]" = sampled
-        self.sample_rate: "Optional[float]" = None
         self._last_valid_parent_id: "Optional[str]" = last_valid_parent_id
 
-        # XXX[span-first]: just do this for segments?
         self._baggage = baggage
-        baggage_sample_rand = (
-            None if self._baggage is None else self._baggage._sample_rand()
-        )
-        if baggage_sample_rand is not None:
-            self._sample_rand = baggage_sample_rand
-        else:
-            self._sample_rand = _generate_sample_rand(self.trace_id)
+        self._sample_rand = sample_rand
+        self._sample_rate = sample_rate
 
         self._continuous_profile: "Optional[ContinuousProfile]" = None
 
@@ -320,24 +312,6 @@ class StreamedSpan:
             self._context_manager_state = (scope, old_span)
 
         if self.is_segment():
-            sampling_context = {
-                "name": self._name,
-                "trace_id": self.trace_id,
-                "span_id": self.span_id,
-                "parent_span_id": self.parent_span_id,
-                "parent_sampled": self.parent_sampled,
-                "attributes": self._attributes,
-            }
-            custom_sampling_context = (
-                scope.get_active_propagation_context()._custom_sampling_context
-            )
-            if custom_sampling_context:
-                sampling_context.update(custom_sampling_context)
-
-            # Use traces_sample_rate, traces_sampler, and/or inheritance to make a
-            # sampling decision
-            self._set_sampling_decision(sampling_context=sampling_context)
-
             scope._update_sample_rate_from_segment(self)
             scope._start_profile_on_segment(self)
 
@@ -517,13 +491,7 @@ class StreamedSpan:
 
     @property
     def sampled(self) -> "Optional[bool]":
-        if self._sampled is not None:
-            return self._sampled
-
-        if not self.is_segment():
-            self._sampled = self.segment.sampled
-
-        return self._sampled
+        return True
 
     def dynamic_sampling_context(self) -> "dict[str, str]":
         return self.segment.get_baggage().dynamic_sampling_context()
@@ -586,70 +554,6 @@ class StreamedSpan:
 
         return self._baggage
 
-    def _set_sampling_decision(self, sampling_context: "SamplingContext") -> None:
-        """Set a segment's sampling decision."""
-        client = sentry_sdk.get_client()
-
-        if not has_tracing_enabled(client.options):
-            self._sampled = False
-            return
-
-        if not self.is_segment():
-            return
-
-        if self._sampled is not None:
-            return
-
-        traces_sampler_defined = callable(client.options.get("traces_sampler"))
-
-        # We would have bailed already if neither `traces_sampler` nor
-        # `traces_sample_rate` were defined, so one of these should work; prefer
-        # the hook if so
-        if traces_sampler_defined:
-            sample_rate = client.options["traces_sampler"](sampling_context)
-        else:
-            if sampling_context["parent_sampled"] is not None:
-                sample_rate = sampling_context["parent_sampled"]
-            else:
-                sample_rate = client.options["traces_sample_rate"]
-
-        # Since this is coming from the user (or from a function provided by the
-        # user), who knows what we might get. (The only valid values are
-        # booleans or numbers between 0 and 1.)
-        if not is_valid_sample_rate(sample_rate, source="Tracing"):
-            logger.warning(
-                f"[Tracing] Discarding {self._name} because of invalid sample rate."
-            )
-            self._sampled = False
-            return
-
-        self.sample_rate = float(sample_rate)
-
-        if client.monitor:
-            self.sample_rate /= 2**client.monitor.downsample_factor
-
-        # if the function returned 0 (or false), or if `traces_sample_rate` is
-        # 0, it's a sign the transaction should be dropped
-        if not self.sample_rate:
-            if traces_sampler_defined:
-                reason = "traces_sampler returned 0 or False"
-            else:
-                reason = "traces_sample_rate is set to 0"
-
-            logger.debug(f"[Tracing] Discarding {self._name} because {reason}")
-            self._sampled = False
-            return
-
-        # Now we roll the dice.
-        self._sampled = self._sample_rand < self.sample_rate
-
-        if self.sampled:
-            logger.debug(f"[Tracing] Starting {self._name}")
-        else:
-            logger.debug(
-                f"[Tracing] Discarding {self._name} because it's not included in the random sample (sampling rate = {self.sample_rate})"
-            )
-
     # TODO: Populate other fields as necessary
     def get_trace_context(self) -> "dict[str, Any]":
         warnings.warn(
@@ -674,15 +578,18 @@ class StreamedSpan:
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
         "_name",
+        "_span_id",
+        "_trace_id",
         "segment",
         "_scope",
         "_context_manager_state",
     )
 
     def __init__(
-        self, scope: "Optional[sentry_sdk.Scope]" = None, **kwargs: "Any"
+        self, trace_id: str, scope: "Optional[sentry_sdk.Scope]" = None, **kwargs: "Any"
     ) -> None:
         self.segment = None  # type: ignore[assignment]
+        self._trace_id = trace_id
         self._scope = scope  # type: ignore[assignment]
 
     def __repr__(self) -> str:
@@ -758,14 +665,6 @@ class NoOpStreamedSpan(StreamedSpan):
         )
 
         return f"{propagation_context.trace_id}-{propagation_context.span_id}-0"
-
-    @property
-    def span_id(self) -> str:
-        return "000000"
-
-    @property
-    def trace_id(self) -> str:
-        return "000000"
 
     @property
     def sampled(self) -> "Optional[bool]":

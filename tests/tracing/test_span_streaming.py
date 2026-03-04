@@ -118,13 +118,12 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
     assert segment["status"] == "ok"
 
 
-def test_span_sampled_at_start(sentry_init, capture_envelopes):
+def test_span_sampled_at_create(sentry_init, capture_envelopes):
     # Test that if a span is created without the context manager, it is sampled
-    # at .start() time rather than creation time
+    # at start_span() time
 
     def traces_sampler(sampling_context):
-        assert "delayed_attribute" in sampling_context["attributes"]
-        assert sampling_context["attributes"]["delayed_attribute"] == 12
+        assert "delayed_attribute" not in sampling_context["attributes"]
         return 1.0
 
     sentry_init(
@@ -203,16 +202,12 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes)
 
 def test_sampling_context(sentry_init, capture_envelopes):
     received_trace_id = None
-    received_span_id = None
 
     def traces_sampler(sampling_context):
-        nonlocal received_span_id, received_trace_id
+        nonlocal received_trace_id
 
         assert "trace_id" in sampling_context
         received_trace_id = sampling_context["trace_id"]
-
-        assert "span_id" in sampling_context
-        received_span_id = sampling_context["span_id"]
 
         assert "parent_span_id" in sampling_context
         assert sampling_context["parent_span_id"] is None
@@ -233,10 +228,8 @@ def test_sampling_context(sentry_init, capture_envelopes):
 
     with sentry_sdk.traces.start_span(name="span") as span:
         trace_id = span._trace_id
-        span_id = span._span_id
 
     assert received_trace_id == trace_id
-    assert received_span_id == span_id
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -404,12 +397,12 @@ def test_traces_sampler_drops_span(sentry_init, capture_envelopes):
 
 def test_traces_sampler_called_once_per_segment(sentry_init):
     traces_sampler_called = 0
-    span_id_in_traces_sampler = None
+    span_name_in_traces_sampler = None
 
     def traces_sampler(sampling_context):
-        nonlocal traces_sampler_called, span_id_in_traces_sampler
+        nonlocal traces_sampler_called, span_name_in_traces_sampler
         traces_sampler_called += 1
-        span_id_in_traces_sampler = sampling_context["span_id"]
+        span_name_in_traces_sampler = sampling_context["name"]
         return 1.0
 
     sentry_init(
@@ -425,7 +418,7 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
                 ...
 
     assert traces_sampler_called == 1
-    assert span_id_in_traces_sampler == segment.span_id
+    assert span_name_in_traces_sampler == segment.get_name()
 
 
 def test_start_inactive_span(sentry_init, capture_envelopes):
@@ -637,9 +630,6 @@ def test_continue_trace_unsampled(sentry_init, capture_envelopes):
         ...
 
     assert span.sampled is False
-    assert span.trace_id == trace_id
-    assert span.parent_span_id == parent_span_id
-    assert span._sample_rand == float(sample_rand)
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -658,8 +648,8 @@ def test_outgoing_traceparent_and_baggage(sentry_init, capture_envelopes):
     with sentry_sdk.traces.start_span(name="span") as span:
         assert span.sampled is True
 
-        trace_id = span._trace_id
-        span_id = span._span_id
+        trace_id = span.trace_id
+        span_id = span.span_id
 
         traceparent = sentry_sdk.get_traceparent()
         assert traceparent == f"{trace_id}-{span_id}-1"

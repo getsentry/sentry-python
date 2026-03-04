@@ -24,6 +24,7 @@ from sentry_sdk.utils import (
     to_string,
     try_convert,
     is_sentry_url,
+    is_valid_sample_rate,
     _is_external_source,
     _is_in_project_root,
     _module_in_list,
@@ -441,7 +442,7 @@ class PropagationContext:
         "parent_span_id",
         "parent_sampled",
         "baggage",
-        "_custom_sampling_context",
+        "custom_sampling_context",
     )
 
     def __init__(
@@ -475,7 +476,7 @@ class PropagationContext:
         if baggage is None and dynamic_sampling_context is not None:
             self.baggage = Baggage(dynamic_sampling_context)
 
-        self._custom_sampling_context: "Optional[dict[str, Any]]" = None
+        self.custom_sampling_context: "Optional[dict[str, Any]]" = None
 
     @classmethod
     def from_incoming_data(
@@ -567,7 +568,7 @@ class PropagationContext:
     def _set_custom_sampling_context(
         self, custom_sampling_context: "dict[str, Any]"
     ) -> None:
-        self._custom_sampling_context = custom_sampling_context
+        self.custom_sampling_context = custom_sampling_context
 
     def __repr__(self) -> str:
         return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} baggage={}>".format(
@@ -819,8 +820,8 @@ class Baggage:
         ) and segment._name:
             sentry_items["transaction"] = segment._name
 
-        if segment.sample_rate is not None:
-            sentry_items["sample_rate"] = str(segment.sample_rate)
+        if segment._sample_rate is not None:
+            sentry_items["sample_rate"] = str(segment._sample_rate)
 
         if segment.sampled is not None:
             sentry_items["sampled"] = "true" if segment.sampled else "false"
@@ -1472,6 +1473,75 @@ def add_sentry_baggage_to_headers(
     headers[BAGGAGE_HEADER_NAME] = (
         stripped_existing_baggage + separator + sentry_baggage
     )
+
+
+def make_sampling_decision(
+    name: str,
+    attributes: "Optional[Attributes]",
+    scope: "sentry_sdk.Scope",
+) -> "tuple[bool, Optional[float], Optional[float]]":
+    client = sentry_sdk.get_client()
+
+    if not has_tracing_enabled(client.options):
+        return False, None, None
+
+    propagation_context = scope.get_active_propagation_context()
+
+    if propagation_context.baggage is not None:
+        sample_rand = propagation_context.baggage._sample_rand()
+    else:
+        sample_rand = _generate_sample_rand(propagation_context.trace_id)
+
+    sampling_context = {
+        "name": name,
+        "trace_id": propagation_context.trace_id,
+        "parent_span_id": propagation_context.parent_span_id,
+        "parent_sampled": propagation_context.parent_sampled,
+        "attributes": attributes or {},
+    }
+    if propagation_context.custom_sampling_context:
+        sampling_context.update(propagation_context.custom_sampling_context)
+
+    # If there's a traces_sampler, use that; otherwise use traces_sample_rate
+    traces_sampler_defined = callable(client.options.get("traces_sampler"))
+    if traces_sampler_defined:
+        sample_rate = client.options["traces_sampler"](sampling_context)
+    else:
+        if sampling_context["parent_sampled"] is not None:
+            sample_rate = sampling_context["parent_sampled"]
+        else:
+            sample_rate = client.options["traces_sample_rate"]
+
+    # Validate whether the sample_rate we got is actually valid. Since
+    # traces_sampler is user provided, it could return anything.
+    if not is_valid_sample_rate(sample_rate, source="Tracing"):
+        logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
+        return False, None, None
+
+    sample_rate = float(sample_rate)
+
+    if client.monitor:
+        sample_rate /= 2**client.monitor.downsample_factor
+
+    if not sample_rate:
+        if traces_sampler_defined:
+            reason = "traces_sampler returned 0 or False"
+        else:
+            reason = "traces_sample_rate is set to 0"
+
+        logger.debug(f"[Tracing] Discarding {name} because {reason}")
+        return False, 0.0, None
+
+    sampled = sample_rand < sample_rate
+
+    if sampled:
+        logger.debug(f"[Tracing] Starting {name}")
+    else:
+        logger.debug(
+            f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
+        )
+
+    return sampled, sample_rate, sample_rand
 
 
 def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:

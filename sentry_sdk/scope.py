@@ -31,6 +31,7 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     has_span_streaming_enabled,
     is_ignored_span,
+    make_sampling_decision,
     PropagationContext,
 )
 from sentry_sdk.traces import StreamedSpan, NoOpStreamedSpan
@@ -1255,7 +1256,19 @@ class Scope:
             propagation_context = self.get_active_propagation_context()
 
             if is_ignored_span(name, attributes):
-                return NoOpStreamedSpan(scope=self)
+                return NoOpStreamedSpan(
+                    trace_id=propagation_context.trace_id, scope=self
+                )
+
+            sampled, sample_rate, sample_rand = make_sampling_decision(
+                name,
+                attributes,
+                self,
+            )
+            if sampled is False:
+                return NoOpStreamedSpan(
+                    trace_id=propagation_context.trace_id, scope=self
+                )
 
             return StreamedSpan(
                 name=name,
@@ -1267,6 +1280,8 @@ class Scope:
                 parent_span_id=propagation_context.parent_span_id,
                 parent_sampled=propagation_context.parent_sampled,
                 baggage=propagation_context.baggage,
+                sample_rand=sample_rand,
+                sample_rate=sample_rate,
             )
 
         # This is a child span; take propagation context from the parent span
@@ -1274,7 +1289,7 @@ class Scope:
             if is_ignored_span(name, attributes) or isinstance(
                 parent_span, NoOpStreamedSpan
             ):
-                return NoOpStreamedSpan()
+                return NoOpStreamedSpan(trace_id=parent_span.trace_id)
 
             return StreamedSpan(
                 name=name,
@@ -1307,8 +1322,8 @@ class Scope:
         propagation_context = self.get_active_propagation_context()
         baggage = propagation_context.baggage
 
-        if baggage is not None and span.sample_rate is not None:
-            baggage.sentry_items["sample_rate"] = str(span.sample_rate)
+        if baggage is not None and span._sample_rate is not None:
+            baggage.sentry_items["sample_rate"] = str(span._sample_rate)
 
     def continue_trace(
         self,
