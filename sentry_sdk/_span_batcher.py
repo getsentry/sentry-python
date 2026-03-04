@@ -128,8 +128,8 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
                         envelope.add_item(
                             Item(
-                                type="span",
-                                content_type="application/vnd.sentry.items.span.v2+json",
+                                type=self.TYPE,
+                                content_type=self.CONTENT_TYPE,
                                 headers={
                                     "item_count": end - start,
                                 },
