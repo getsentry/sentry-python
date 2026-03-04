@@ -189,10 +189,15 @@ def _wrap_chat_v2(f, streaming):
                 extra = {SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming}
                 if model:
                     extra[SPANDATA.GEN_AI_RESPONSE_MODEL] = model
-                set_input_span_data(span, kwargs, integration, {
-                    **COHERE_V2_CHAT_CONFIG,
-                    "extra_static": extra,
-                })
+                set_input_span_data(
+                    span,
+                    kwargs,
+                    integration,
+                    {
+                        **COHERE_V2_CHAT_CONFIG,
+                        "extra_static": extra,
+                    },
+                )
 
                 if streaming:
                     old_iterator = res

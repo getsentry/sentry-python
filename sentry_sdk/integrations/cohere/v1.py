@@ -100,7 +100,6 @@ def _wrap_chat(f, streaming):
     if not _has_chat_types:
         return f
 
-
     @wraps(f)
     def new_chat(*args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -129,10 +128,15 @@ def _wrap_chat(f, streaming):
                 reraise(*exc_info)
 
             with capture_internal_exceptions():
-                set_input_span_data(span, kwargs, integration, {
-                    **COHERE_V1_CHAT_CONFIG,
-                    "extra_static": {SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming},
-                })
+                set_input_span_data(
+                    span,
+                    kwargs,
+                    integration,
+                    {
+                        **COHERE_V1_CHAT_CONFIG,
+                        "extra_static": {SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming},
+                    },
+                )
 
                 if streaming:
                     old_iterator = res
@@ -194,4 +198,5 @@ def _wrap_chat(f, streaming):
                     input_tokens=res.meta.tokens.input_tokens,
                     output_tokens=res.meta.tokens.output_tokens,
                 )
+
     return new_chat

@@ -46,7 +46,9 @@ COHERE_EMBED_CONFIG = {
     "system": "cohere",
     "operation": "embeddings",
     "params": {"model": SPANDATA.GEN_AI_REQUEST_MODEL},
-    "extract_messages": lambda kw: _normalize_embedding_input(kw["texts"]) if "texts" in kw else None,
+    "extract_messages": lambda kw: (
+        _normalize_embedding_input(kw["texts"]) if "texts" in kw else None
+    ),
     "message_target": SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
     "truncation_fn": None,
 }
