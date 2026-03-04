@@ -34,6 +34,15 @@ COLLECTED_CHAT_PARAMS = {
 }
 
 
+def _normalize_embedding_input(texts):
+    # type: (Any) -> Any
+    if isinstance(texts, list):
+        return texts
+    if isinstance(texts, tuple):
+        return list(texts)
+    return [texts]
+
+
 class CohereIntegration(Integration):
     identifier = "cohere"
     origin = f"auto.ai.{identifier}"
@@ -85,26 +94,23 @@ def _wrap_embed(f):
             set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
             set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
 
+            # attach embeddings input
+            # should this be truncated and annotated?
             if "texts" in kwargs and (
                 should_send_default_pii() and integration.include_prompts
             ):
-                if isinstance(kwargs["texts"], str):
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, [kwargs["texts"]]
-                    )
-                elif (
-                    isinstance(kwargs["texts"], list)
-                    and len(kwargs["texts"]) > 0
-                    and isinstance(kwargs["texts"][0], str)
-                ):
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, kwargs["texts"]
-                    )
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                    _normalize_embedding_input(kwargs["texts"]),
+                )
 
             if "model" in kwargs:
                 set_data_normalized(
                     span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"]
                 )
+
+            # call the function and capture any exceptions
             try:
                 res = f(*args, **kwargs)
             except Exception as e:
@@ -112,6 +118,8 @@ def _wrap_embed(f):
                 with capture_internal_exceptions():
                     _capture_exception(e)
                 reraise(*exc_info)
+
+            # record token usage
             if (
                 hasattr(res, "meta")
                 and hasattr(res.meta, "billed_units")

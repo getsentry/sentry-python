@@ -166,61 +166,57 @@ def _wrap_chat_v2(f, streaming):
 
         model = kwargs.get("model", "")
 
-        span = sentry_sdk.start_span(
+        with sentry_sdk.start_span(
             op=OP.GEN_AI_CHAT,
             name=f"chat {model}".strip(),
             origin=CohereIntegration.origin,
-        )
-        span.__enter__()
-        try:
-            res = f(*args, **kwargs)
-        except Exception as e:
-            exc_info = sys.exc_info()
+        ) as span:
+            try:
+                res = f(*args, **kwargs)
+            except Exception as e:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e)
+                reraise(*exc_info)
+
             with capture_internal_exceptions():
-                _capture_exception(e)
-                span.__exit__(None, None, None)
-            reraise(*exc_info)
+                set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
+                set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+                if model:
+                    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-        with capture_internal_exceptions():
-            set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-            set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-            if model:
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+                if should_send_default_pii() and integration.include_prompts:
+                    messages = _extract_messages_v2(kwargs.get("messages", []))
+                    messages = normalize_message_roles(messages)
+                    scope = sentry_sdk.get_current_scope()
+                    messages_data = truncate_and_annotate_messages(messages, span, scope)
+                    if messages_data is not None:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                            messages_data,
+                            unpack=False,
+                        )
+                    if "tools" in kwargs:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                            kwargs["tools"],
+                        )
 
-            if should_send_default_pii() and integration.include_prompts:
-                messages = _extract_messages_v2(kwargs.get("messages", []))
-                messages = normalize_message_roles(messages)
-                scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(messages, span, scope)
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
-                if "tools" in kwargs:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                        kwargs["tools"],
-                    )
+                for k, v in COLLECTED_CHAT_PARAMS.items():
+                    if k in kwargs:
+                        set_data_normalized(span, v, kwargs[k])
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
 
-            for k, v in COLLECTED_CHAT_PARAMS.items():
-                if k in kwargs:
-                    set_data_normalized(span, v, kwargs[k])
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
+                if streaming:
+                    old_iterator = res
 
-            if streaming:
-                old_iterator = res
-
-                def new_iterator():
-                    # type: () -> Iterator[V2ChatStreamResponse]
-                    collected_text = []
-                    try:
-                        for x in old_iterator:
-                            with capture_internal_exceptions():
+                    def new_iterator():
+                        # type: () -> Iterator[V2ChatStreamResponse]
+                        collected_text = []
+                        with capture_internal_exceptions():
+                            for x in old_iterator:
                                 if (
                                     hasattr(x, "type")
                                     and x.type == "content-delta"
@@ -260,25 +256,18 @@ def _wrap_chat_v2(f, streaming):
                                             and x.delta.usage is not None
                                         ):
                                             _record_token_usage_v2(span, x.delta.usage)
-                            yield x
-                    except Exception as exc:
-                        _capture_exception(exc)
-                        raise
-                    finally:
-                        span.__exit__(None, None, None)
+                                yield x
 
-                return new_iterator()
-            elif isinstance(res, V2ChatResponse):
-                collect_v2_response_fields(
-                    span,
-                    res,
-                    include_pii=should_send_default_pii()
-                    and integration.include_prompts,
-                )
-                span.__exit__(None, None, None)
-            else:
-                set_data_normalized(span, "unknown_response", True)
-                span.__exit__(None, None, None)
-            return res
+                    return new_iterator()
+                elif isinstance(res, V2ChatResponse):
+                    collect_v2_response_fields(
+                        span,
+                        res,
+                        include_pii=should_send_default_pii()
+                        and integration.include_prompts,
+                    )
+                else:
+                    set_data_normalized(span, "unknown_response", True)
+                return res
 
     return new_chat
