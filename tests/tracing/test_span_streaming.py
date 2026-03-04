@@ -627,11 +627,53 @@ def test_continue_trace_unsampled(sentry_init, capture_envelopes):
         ...
 
     assert span.sampled is False
+    assert span.get_name() == ""
+    assert span.trace_id == "00000000000000000000000000000000"
+    assert span.span_id == "0000000000000000"
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
 
     assert len(spans) == 0
+
+
+def test_continue_trace_no_sample_rand(sentry_init, capture_envelopes):
+    sentry_init(
+        # parent sampling decision takes precedence over traces_sample_rate
+        traces_sample_rate=0.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    events = capture_envelopes()
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+    sampled = "1"
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
+            "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="segment") as span:
+        ...
+
+    assert span.sampled is True
+    assert span.trace_id == trace_id
+    assert span.parent_span_id == parent_span_id
+    assert isinstance(span._sample_rand, float)
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 1
+    (segment,) = spans
+
+    assert segment["is_segment"] is True
+    assert segment["parent_span_id"] == parent_span_id
+    assert segment["trace_id"] == trace_id
 
 
 def test_outgoing_traceparent_and_baggage(sentry_init, capture_envelopes):

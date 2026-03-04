@@ -539,8 +539,6 @@ class StreamedSpan:
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
         "_name",
-        "_span_id",
-        "_trace_id",
         "segment",
         "_scope",
         "_context_manager_state",
@@ -549,13 +547,11 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def __init__(
         self,
-        trace_id: str,
         unsampled_reason: "Optional[str]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
         **kwargs: "Any",
     ) -> None:
         self.segment = None  # type: ignore[assignment]
-        self._trace_id = trace_id
         self._scope = scope  # type: ignore[assignment]
         self._unsampled_reason = unsampled_reason
 
@@ -571,6 +567,14 @@ class NoOpStreamedSpan(StreamedSpan):
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
         self._end()
+
+    @property
+    def span_id(self) -> str:
+        return "0000000000000000"
+
+    @property
+    def trace_id(self) -> str:
+        return "00000000000000000000000000000000"
 
     def _start(self) -> None:
         if self._scope is None:
