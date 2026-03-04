@@ -86,9 +86,7 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
     events = capture_envelopes()
 
     segment = sentry_sdk.traces.start_span(name="segment")
-    segment.start()
     child = sentry_sdk.traces.start_span(name="child")
-    child.start()
     assert child.segment == segment
     child.end()
     segment.end()
@@ -118,7 +116,7 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
     assert segment["status"] == "ok"
 
 
-def test_span_sampled_at_create(sentry_init, capture_envelopes):
+def test_span_sampled_when_created(sentry_init, capture_envelopes):
     # Test that if a span is created without the context manager, it is sampled
     # at start_span() time
 
@@ -135,7 +133,6 @@ def test_span_sampled_at_create(sentry_init, capture_envelopes):
 
     segment = sentry_sdk.traces.start_span(name="segment")
     segment.set_attribute("delayed_attribute", 12)
-    segment.start()
     segment.end()
 
     sentry_sdk.get_client().flush()
@@ -1065,17 +1062,14 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
     lost_event_calls = capture_record_lost_event_calls()
 
     ignored_span = sentry_sdk.traces.start_span(name="ignored")
-    ignored_span.start()
     assert isinstance(ignored_span, NoOpStreamedSpan)
     assert ignored_span.sampled is False
 
     span1 = sentry_sdk.traces.start_span(name="not ignored 1", parent_span=ignored_span)
-    span1.start()
     assert isinstance(span1, NoOpStreamedSpan)
     assert span1.sampled is False
 
     span2 = sentry_sdk.traces.start_span(name="not ignored 2", parent_span=ignored_span)
-    span2.start()
     assert isinstance(span2, NoOpStreamedSpan)
     assert span2.sampled is False
 
@@ -1152,25 +1146,21 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     lost_event_calls = capture_record_lost_event_calls()
 
     segment = sentry_sdk.traces.start_span(name="segment")
-    segment.start()
     assert not isinstance(segment, NoOpStreamedSpan)
     assert segment.sampled is True
     assert segment.parent_span_id is None
 
     ignored_span1 = sentry_sdk.traces.start_span(name="ignored", parent_span=segment)
-    ignored_span1.start()
     assert isinstance(ignored_span1, NoOpStreamedSpan)
     assert ignored_span1.sampled is False
 
     ignored_span2 = sentry_sdk.traces.start_span(
         name="ignored", parent_span=ignored_span1
     )
-    ignored_span2.start()
     assert isinstance(ignored_span2, NoOpStreamedSpan)
     assert ignored_span2.sampled is False
 
     span = sentry_sdk.traces.start_span(name="child", parent_span=ignored_span2)
-    span.start()
     assert not isinstance(span, NoOpStreamedSpan)
     assert span.sampled is True
     assert span.parent_span_id == segment.span_id

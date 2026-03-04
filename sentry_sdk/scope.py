@@ -1257,17 +1257,21 @@ class Scope:
 
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
-                    trace_id=propagation_context.trace_id, scope=self
+                    trace_id=propagation_context.trace_id,
+                    unsampled_reason="ignored",
+                    scope=self,
                 )
 
-            sampled, sample_rate, sample_rand = make_sampling_decision(
+            sampled, sample_rate, sample_rand, outcome = make_sampling_decision(
                 name,
                 attributes,
                 self,
             )
             if sampled is False:
                 return NoOpStreamedSpan(
-                    trace_id=propagation_context.trace_id, scope=self
+                    trace_id=propagation_context.trace_id,
+                    unsampled_reason=outcome,
+                    scope=self,
                 )
 
             return StreamedSpan(
@@ -1289,7 +1293,9 @@ class Scope:
             if is_ignored_span(name, attributes) or isinstance(
                 parent_span, NoOpStreamedSpan
             ):
-                return NoOpStreamedSpan(trace_id=parent_span.trace_id)
+                return NoOpStreamedSpan(
+                    trace_id=parent_span.trace_id, unsampled_reason="ignored"
+                )
 
             return StreamedSpan(
                 name=name,

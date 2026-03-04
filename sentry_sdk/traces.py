@@ -293,6 +293,8 @@ class StreamedSpan:
         self._update_active_thread()
         self._set_profile_id(get_profiler_id())
 
+        self._start()
+
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__}("
@@ -305,6 +307,17 @@ class StreamedSpan:
         )
 
     def __enter__(self) -> "StreamedSpan":
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        if value is not None and should_be_treated_as_error(ty, value):
+            self.set_status(SpanStatus.ERROR)
+
+        self._end()
+
+    def _start(self) -> None:
         scope = self._scope or sentry_sdk.get_current_scope()
         if self._active:
             old_span = scope.span
@@ -315,36 +328,42 @@ class StreamedSpan:
             scope._update_sample_rate_from_segment(self)
             scope._start_profile_on_segment(self)
 
-        return self
+    def _end(self) -> None:
+        if self._finished is True:
+            # This span is already finished, ignore.
+            return
 
-    def __exit__(
-        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
-    ) -> None:
+        # Stop the profiler
         if self.is_segment():
             if self._continuous_profile is not None:
                 self._continuous_profile.stop()
 
-        if value is not None and should_be_treated_as_error(ty, value):
-            self.set_status(SpanStatus.ERROR)
-
+        # Detach from scope
         if self._active:
             with capture_internal_exceptions():
                 scope, old_span = self._context_manager_state
                 del self._context_manager_state
                 scope.span = old_span
         else:
-            scope = self._scope
+            scope = self._scope or sentry_sdk.get_current_scope()
 
-        self._end(scope=self._scope)
+        client = sentry_sdk.get_client()
+        if not client.is_active():
+            return
 
-    def start(self) -> "StreamedSpan":
-        """
-        Start this span.
+        self._set_segment_attributes()
 
-        Only usable if the span was not started via the `with start_span():`
-        context manager, since that starts it automatically.
-        """
-        return self.__enter__()
+        if self.timestamp is None:
+            try:
+                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+                self.timestamp = self.start_timestamp + timedelta(
+                    microseconds=elapsed / 1000
+                )
+            except AttributeError:
+                self.timestamp = datetime.now(timezone.utc)
+
+        self._finished = True
+        scope._capture_span(self)
 
     def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         """
@@ -361,7 +380,7 @@ class StreamedSpan:
         except AttributeError:
             pass
 
-        self.__exit__(None, None, None)
+        self._end()
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         warnings.warn(
@@ -371,64 +390,6 @@ class StreamedSpan:
         )
 
         self.end(end_timestamp)
-
-    def _end(
-        self,
-        scope: "Optional[sentry_sdk.Scope]" = None,
-    ) -> None:
-        client = sentry_sdk.get_client()
-        if not client.is_active():
-            return
-
-        self._set_segment_attributes()
-
-        scope: "Optional[sentry_sdk.Scope]" = (
-            scope or self._scope or sentry_sdk.get_current_scope()
-        )
-        if scope is None:
-            # Can't happen but mypy doesn't realize
-            return
-
-        # Explicit check against False needed because self.sampled might be None
-        if self.sampled is False:
-            logger.debug("Discarding span because sampled = False")
-
-            # This is not entirely accurate because discards here are not
-            # exclusively based on sample rate but also traces sampler, but
-            # we handle this the same here.
-            if client.transport and has_tracing_enabled(client.options):
-                if client.monitor and client.monitor.downsample_factor > 0:
-                    reason = "backpressure"
-                else:
-                    reason = "sample_rate"
-
-                client.transport.record_lost_event(reason, data_category="span")
-
-            return
-
-        if self.sampled is None:
-            logger.warning("Discarding span without sampling decision.")
-            if client.transport and has_tracing_enabled(client.options):
-                client.transport.record_lost_event("sample_rate", data_category="span")
-            return
-
-        if self._finished is True:
-            # This span is already finished, ignore.
-            return
-
-        if self.timestamp is None:
-            try:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-                self.timestamp = self.start_timestamp + timedelta(
-                    microseconds=elapsed / 1000
-                )
-            except AttributeError:
-                self.timestamp = datetime.now(timezone.utc)
-
-        if self.segment.sampled:  # XXX this should just use its own sampled
-            scope._capture_span(self)
-
-        self._finished = True
 
     def get_attributes(self) -> "Attributes":
         return self._attributes
@@ -583,19 +544,35 @@ class NoOpStreamedSpan(StreamedSpan):
         "segment",
         "_scope",
         "_context_manager_state",
+        "_unsampled_reason",
     )
 
     def __init__(
-        self, trace_id: str, scope: "Optional[sentry_sdk.Scope]" = None, **kwargs: "Any"
+        self,
+        trace_id: str,
+        unsampled_reason: "Optional[str]" = None,
+        scope: "Optional[sentry_sdk.Scope]" = None,
+        **kwargs: "Any",
     ) -> None:
         self.segment = None  # type: ignore[assignment]
         self._trace_id = trace_id
         self._scope = scope  # type: ignore[assignment]
+        self._unsampled_reason = unsampled_reason
+
+        self._start()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(sampled={self.sampled})>"
 
     def __enter__(self) -> "NoOpStreamedSpan":
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        self._end()
+
+    def _start(self) -> None:
         if self._scope is None:
             return self
 
@@ -603,11 +580,8 @@ class NoOpStreamedSpan(StreamedSpan):
         old_span = scope.span
         scope.span = self
         self._context_manager_state = (scope, old_span)
-        return self
 
-    def __exit__(
-        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
-    ) -> None:
+    def _end(self) -> None:
         client = sentry_sdk.get_client()
         if not client.is_active():
             return
@@ -615,8 +589,9 @@ class NoOpStreamedSpan(StreamedSpan):
         if not transport:
             return
 
+        logger.debug("Discarding span because sampled = False")
         transport.record_lost_event(
-            reason="ignored",
+            reason=self._unsampled_reason or "sample_rate",
             data_category="span",
             quantity=1,
         )
@@ -629,14 +604,11 @@ class NoOpStreamedSpan(StreamedSpan):
             del self._context_manager_state
             scope.span = old_span
 
-    def start(self) -> "NoOpStreamedSpan":
-        return self.__enter__()
-
     def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        self.__exit__(None, None, None)
+        self._end()
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        pass
+        self._end()
 
     def get_attributes(self) -> "Attributes":
         return {}

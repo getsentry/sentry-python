@@ -1479,11 +1479,11 @@ def make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
     scope: "sentry_sdk.Scope",
-) -> "tuple[bool, Optional[float], Optional[float]]":
+) -> "tuple[bool, Optional[float], Optional[float], Optional[str]]":
     client = sentry_sdk.get_client()
 
     if not has_tracing_enabled(client.options):
-        return False, None, None
+        return False, None, None, None
 
     propagation_context = scope.get_active_propagation_context()
 
@@ -1516,7 +1516,7 @@ def make_sampling_decision(
     # traces_sampler is user provided, it could return anything.
     if not is_valid_sample_rate(sample_rate, source="Tracing"):
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
-        return False, None, None
+        return False, None, None, None
 
     sample_rate = float(sample_rate)
 
@@ -1530,18 +1530,25 @@ def make_sampling_decision(
             reason = "traces_sample_rate is set to 0"
 
         logger.debug(f"[Tracing] Discarding {name} because {reason}")
-        return False, 0.0, None
+        if client.monitor.downsample_factor > 0:
+            outcome = "backpressure"
+        else:
+            outcome = "sample_rate"
+
+        return False, 0.0, None, outcome
 
     sampled = sample_rand < sample_rate
 
     if sampled:
         logger.debug(f"[Tracing] Starting {name}")
+        outcome = None
     else:
         logger.debug(
             f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
         )
+        outcome = "sample_rate"
 
-    return sampled, sample_rate, sample_rand
+    return sampled, sample_rate, sample_rand, outcome
 
 
 def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
