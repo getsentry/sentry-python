@@ -106,48 +106,50 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
     def _flush(self) -> None:
         with self._lock:
-            if len(self._span_buffer) == 0:
-                return
-
             envelopes = []
-            for spans in self._span_buffer.values():
-                if spans:
-                    dsc = spans[0].dynamic_sampling_context()
+            flushed_trace_ids = []
+            for trace_id, spans in self._span_buffer.items():
+                if len(spans) < self.MAX_BEFORE_FLUSH:
+                    continue
 
-                    # Max per envelope is 1000, so if we happen to have more than
-                    # 1000 spans in one bucket, we'll need to separate them.
-                    for start in range(0, len(spans), self.MAX_ENVELOPE_SIZE):
-                        end = min(start + self.MAX_ENVELOPE_SIZE, len(spans))
+                flushed_trace_ids.append(trace_id)
+                dsc = spans[0].dynamic_sampling_context()
 
-                        envelope = Envelope(
+                # Max per envelope is 1000, so if we happen to have more than
+                # 1000 spans in one bucket, we'll need to separate them.
+                for start in range(0, len(spans), self.MAX_ENVELOPE_SIZE):
+                    end = min(start + self.MAX_ENVELOPE_SIZE, len(spans))
+
+                    envelope = Envelope(
+                        headers={
+                            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+                            "trace": dsc,
+                        }
+                    )
+
+                    envelope.add_item(
+                        Item(
+                            type=self.TYPE,
+                            content_type=self.CONTENT_TYPE,
                             headers={
-                                "sent_at": format_timestamp(datetime.now(timezone.utc)),
-                                "trace": dsc,
-                            }
+                                "item_count": end - start,
+                            },
+                            payload=PayloadRef(
+                                json={
+                                    "items": [
+                                        self._to_transport_format(spans[j])
+                                        for j in range(start, end)
+                                    ]
+                                }
+                            ),
                         )
+                    )
 
-                        envelope.add_item(
-                            Item(
-                                type="span",
-                                content_type="application/vnd.sentry.items.span.v2+json",
-                                headers={
-                                    "item_count": end - start,
-                                },
-                                payload=PayloadRef(
-                                    json={
-                                        "items": [
-                                            self._to_transport_format(spans[j])
-                                            for j in range(start, end)
-                                        ]
-                                    }
-                                ),
-                            )
-                        )
+                    envelopes.append(envelope)
 
-                        envelopes.append(envelope)
-
-            self._span_buffer.clear()
-            self._running_size.clear()
+            for trace_id in flushed_trace_ids:
+                del self._span_buffer[trace_id]
+                del self._running_size[trace_id]
 
         for envelope in envelopes:
             self._capture_func(envelope)
