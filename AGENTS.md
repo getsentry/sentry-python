@@ -3,7 +3,7 @@
 ## Tox
 
 - Always run tox from the main `tox.venv`
-- If there is no `tox.venv`, create one with `python -m venv tox.venv`, active it and run `pip install tox`
+- If there is no `tox.venv`, create one with `python -m venv tox.venv`, activate it and run `pip install tox`
 
 ## Package Manager
 
