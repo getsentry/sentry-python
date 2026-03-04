@@ -154,7 +154,9 @@ def _wrap_chat(f, streaming):
                     messages.append({"role": "user", "content": message})
                     messages = normalize_message_roles(messages)
                     scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(messages, span, scope)
+                    messages_data = truncate_and_annotate_messages(
+                        messages, span, scope
+                    )
                     if messages_data is not None:
                         set_data_normalized(
                             span,

@@ -189,7 +189,9 @@ def _wrap_chat_v2(f, streaming):
                     messages = _extract_messages_v2(kwargs.get("messages", []))
                     messages = normalize_message_roles(messages)
                     scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(messages, span, scope)
+                    messages_data = truncate_and_annotate_messages(
+                        messages, span, scope
+                    )
                     if messages_data is not None:
                         set_data_normalized(
                             span,
@@ -226,7 +228,9 @@ def _wrap_chat_v2(f, streaming):
                                     msg = getattr(x.delta, "message", None)
                                     if msg is not None:
                                         content = getattr(msg, "content", None)
-                                        if content is not None and hasattr(content, "text"):
+                                        if content is not None and hasattr(
+                                            content, "text"
+                                        ):
                                             collected_text.append(content.text)
 
                                 if isinstance(x, MessageEndV2ChatStreamResponse):
