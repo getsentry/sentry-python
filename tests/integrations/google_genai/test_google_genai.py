@@ -1625,7 +1625,7 @@ def test_generate_content_with_function_response(
     assert messages[0]["role"] == "tool"
     assert messages[0]["content"]["toolCallId"] == "call_123"
     assert messages[0]["content"]["toolName"] == "get_weather"
-    assert messages[0]["content"]["output"] == '"Sunny, 72F"'
+    assert messages[0]["content"]["output"] == "Sunny, 72F"
 
 
 def test_generate_content_with_mixed_string_and_content(
@@ -1891,7 +1891,7 @@ def test_extract_contents_messages_function_response():
     assert result[0]["role"] == "tool"
     assert result[0]["content"]["toolCallId"] == "call_123"
     assert result[0]["content"]["toolName"] == "get_weather"
-    assert result[0]["content"]["output"] == '"sunny"'
+    assert result[0]["content"]["output"] == "sunny"
 
 
 def test_extract_contents_messages_function_response_with_output_key():
@@ -1908,7 +1908,7 @@ def test_extract_contents_messages_function_response_with_output_key():
     assert result[0]["content"]["toolCallId"] == "call_456"
     assert result[0]["content"]["toolName"] == "get_time"
     # Should prefer "output" key
-    assert result[0]["content"]["output"] == '"3:00 PM"'
+    assert result[0]["content"]["output"] == "3:00 PM"
 
 
 def test_extract_contents_messages_mixed_parts():
