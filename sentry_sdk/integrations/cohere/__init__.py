@@ -94,8 +94,6 @@ def _wrap_embed(f):
             set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
             set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
 
-            # attach embeddings input
-            # should this be truncated and annotated?
             if "texts" in kwargs and (
                 should_send_default_pii() and integration.include_prompts
             ):
@@ -110,7 +108,6 @@ def _wrap_embed(f):
                     span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"]
                 )
 
-            # call the function and capture any exceptions
             try:
                 res = f(*args, **kwargs)
             except Exception as e:
@@ -119,7 +116,6 @@ def _wrap_embed(f):
                     _capture_exception(e)
                 reraise(*exc_info)
 
-            # record token usage
             if (
                 hasattr(res, "meta")
                 and hasattr(res.meta, "billed_units")
