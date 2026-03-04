@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     from graphql import GraphQLError, GraphQLResolveInfo
     from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext
-    from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk._types import Attributes, Event, EventProcessor
     from sentry_sdk.tracing import Span
 
 
@@ -189,7 +189,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         self.graphql_span: "Union[Span, StreamedSpan]"
         if span_streaming:
-            attributes = {
+            attributes: "Attributes" = {
                 "sentry.op": op,
                 "sentry.origin": StrawberryIntegration.origin,
                 "graphql.operation.type": operation_type,
