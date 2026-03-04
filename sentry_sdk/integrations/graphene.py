@@ -149,13 +149,16 @@ def graphql_span(
     span_streaming = has_span_streaming_enabled(client.options)
     _graphql_span: "Union[Span, StreamedSpan]"
     if span_streaming:
-        _graphql_span = sentry_sdk.traces.start_span(name=operation_name or "operation")
-        _graphql_span.set_attribute("sentry.op", op)
-        _graphql_span.set_attribute("graphql.document", source)
+        attributes = {
+            "sentry.op": op,
+            "graphql.document": source,
+            "graphql.operation.type": operation_type,
+        }
         if operation_name:
-            _graphql_span.set_attribute("graphql.operation.name", operation_name)
-        _graphql_span.set_attribute("graphql.operation.type", operation_type)
-        _graphql_span.start()
+            attributes["graphql.operation.name"] = operation_name
+        _graphql_span = sentry_sdk.traces.start_span(
+            name=operation_name or "operation", attributes=attributes
+        )
     else:
         _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
         _graphql_span.set_data("graphql.document", source)

@@ -88,14 +88,14 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             "name": item._name,
             "status": item._status,
             "is_segment": item.is_segment(),
-            "start_timestamp": item.start_timestamp.timestamp(),
+            "start_timestamp": item._start_timestamp.timestamp(),
         }
 
-        if item.timestamp:
-            res["end_timestamp"] = item.timestamp.timestamp()
+        if item._timestamp:
+            res["end_timestamp"] = item._timestamp.timestamp()
 
-        if item.parent_span_id:
-            res["parent_span_id"] = item.parent_span_id
+        if item._parent_span_id:
+            res["parent_span_id"] = item._parent_span_id
 
         if item._attributes:
             res["attributes"] = {

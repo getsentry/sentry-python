@@ -102,7 +102,7 @@ def _set_status(status: str) -> None:
         scope = sentry_sdk.get_current_scope()
         if scope.span is not None:
             if isinstance(scope.span, StreamedSpan):
-                scope.span.set_status(SpanStatus.ERROR)
+                scope.span.status = SpanStatus.ERROR
             else:
                 scope.span.set_status(status)
 
@@ -286,9 +286,14 @@ def _wrap_task_run(f: "F") -> "F":
         span_mgr: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
         if span_streaming:
             if not task_started_from_beat:
-                span_mgr = sentry_sdk.traces.start_span(name=task_name)
-                span_mgr.set_attribute("sentry.op", OP.QUEUE_SUBMIT_CELERY)
-                span_mgr.set_attribute("sentry.origin", CeleryIntegration.origin)
+                span_mgr = sentry_sdk.traces.start_span(
+                    name=task_name,
+                    attributes={
+                        "sentry.op": OP.QUEUE_SUBMIT_CELERY,
+                        "sentry.origin": CeleryIntegration.origin,
+                    },
+                )
+
         else:
             if not task_started_from_beat:
                 span_mgr = sentry_sdk.start_span(
@@ -335,12 +340,14 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                 headers = args[3].get("headers") or {}
                 if span_streaming:
                     sentry_sdk.traces.continue_trace(headers)
-                    transaction = sentry_sdk.traces.start_span(name=task.name)
-                    transaction.set_attribute("sentry.origin", CeleryIntegration.origin)
-                    transaction.set_attribute(
-                        "sentry.span.source", TransactionSource.TASK.value
+                    transaction = sentry_sdk.traces.start_span(
+                        name=task.name,
+                        attributes={
+                            "sentry.origin": CeleryIntegration.origin,
+                            "sentry.span.source": TransactionSource.TASK.value,
+                            "sentry.op": OP.QUEUE_TASK_CELERY,
+                        },
                     )
-                    transaction.set_attribute("sentry.op", OP.QUEUE_TASK_CELERY)
 
                     span_ctx = transaction
 

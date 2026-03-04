@@ -830,9 +830,9 @@ class Scope:
                 return
 
             elif isinstance(self._span, StreamedSpan):
-                self._span.segment.set_name(name)
+                self._span._segment.name = name
                 if source:
-                    self._span.segment.set_attribute(
+                    self._span._segment.set_attribute(
                         "sentry.span.source", getattr(source, "value", source)
                     )
 
@@ -1227,19 +1227,8 @@ class Scope:
         attributes: "Optional[Attributes]" = None,
         parent_span: "Optional[StreamedSpan]" = None,
         active: bool = True,
-        **kwargs: "Any",  # TODO[span-first]: remove, just for expediting seer testing
     ) -> "StreamedSpan":
         # TODO: rename to start_span once we drop the old API
-        if name is None:
-            # TODO[span-first]: remove, just here for debugging
-            logger.debug("Span missing a name, ignoring, call stack:")
-            import traceback
-
-            for line in traceback.format_stack():
-                logger.debug(line)
-
-            return NoOpStreamedSpan(scope=self)
-
         if isinstance(parent_span, NoOpStreamedSpan):
             # parent_span is only set if the user explicitly set it
             logger.debug(
@@ -1274,6 +1263,9 @@ class Scope:
                     scope=self,
                 )
 
+            if sample_rate is not None:
+                self._update_sample_rate(sample_rate)
+
             return StreamedSpan(
                 name=name,
                 attributes=attributes,
@@ -1302,34 +1294,20 @@ class Scope:
                 attributes=attributes,
                 active=active,
                 scope=self,
+                segment=parent_span._segment,
                 trace_id=parent_span.trace_id,
                 parent_span_id=parent_span.span_id,
                 parent_sampled=parent_span.sampled,
-                segment=parent_span.segment,
             )
 
-    def _start_profile_on_segment(self, span: "StreamedSpan") -> None:
-        try_autostart_continuous_profiler()
-
-        if not span.sampled:
-            return
-
-        span._continuous_profile = try_profile_lifecycle_trace_start()
-
-        # Typically, the profiler is set when the segment is created. But when
-        # using the auto lifecycle, the profiler isn't running when the first
-        # segment is started. So make sure we update the profiler id on it.
-        if span._continuous_profile is not None:
-            span._set_profile_id(get_profiler_id())
-
-    def _update_sample_rate_from_segment(self, span: "StreamedSpan") -> None:
+    def _update_sample_rate(self, sample_rate: float) -> None:
         # If we had to adjust the sample rate when setting the sampling decision
         # for the spans, it needs to be updated in the propagation context too
         propagation_context = self.get_active_propagation_context()
         baggage = propagation_context.baggage
 
-        if baggage is not None and span._sample_rate is not None:
-            baggage.sentry_items["sample_rate"] = str(span._sample_rate)
+        if baggage is not None:
+            baggage.sentry_items["sample_rate"] = str(sample_rate)
 
     def continue_trace(
         self,

@@ -124,8 +124,6 @@ def _install_httplib() -> None:
                 span.set_attribute(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
                 span.set_attribute(SPANDATA.NETWORK_PEER_PORT, self.port)
 
-            span.start()
-
         else:
             span = sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
@@ -174,10 +172,11 @@ def _install_httplib() -> None:
         try:
             rv = real_getresponse(self, *args, **kwargs)
 
-            span.set_http_status(int(rv.status))
             if isinstance(span, StreamedSpan):
+                span.status = "error" if int(rv.status) >= 400 else "ok"
                 span.set_attribute("reason", rv.reason)
             else:
+                span.set_http_status(int(rv.status))
                 span.set_data("reason", rv.reason)
         finally:
             if isinstance(span, StreamedSpan):

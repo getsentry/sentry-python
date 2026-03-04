@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Union
 
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk._types import Attributes, Event, Hint
     from sentry_sdk.tracing import NoOpSpan
 
 
@@ -217,6 +217,7 @@ class SentryAsgiMiddleware:
                     span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
                     if span_streaming:
                         segment: "Optional[StreamedSpan]" = None
+                        attributes: "Attributes" = {}
                         sentry_scope.set_custom_sampling_context({"asgi_scope": scope})
                         if ty in ("http", "websocket"):
                             if (
@@ -224,27 +225,19 @@ class SentryAsgiMiddleware:
                                 or method in self.http_methods_to_capture
                             ):
                                 sentry_sdk.traces.continue_trace(_get_headers(scope))
-                                segment = sentry_sdk.traces.start_span(
-                                    name=transaction_name
-                                )
-                                segment.set_attribute("sentry.op", f"{ty}.server")
+                                attributes["sentry.op"] = f"{ty}.server"
                         else:
                             sentry_sdk.traces.new_trace()
-                            segment = sentry_sdk.traces.start_span(
-                                name=transaction_name,
-                            )
-                            segment.set_attribute("sentry.op", OP.HTTP_SERVER)
+                            attributes["sentry.op"] = OP.HTTP_SERVER
 
-                        if segment is not None:
-                            segment.set_attribute(
-                                "sentry.span.source",
-                                getattr(
-                                    transaction_source, "value", transaction_source
-                                ),
-                            )
-                            segment.set_attribute("sentry.origin", self.span_origin)
-                            segment.set_attribute("asgi.type", ty)
-
+                        attributes["sentry.span.source"] = getattr(
+                            transaction_source, "value", transaction_source
+                        )
+                        attributes["sentry.origin"] = self.span_origin
+                        attributes["asgi.type"] = ty
+                        segment = sentry_sdk.traces.start_span(
+                            name=transaction_name, attributes=attributes
+                        )
                         span_ctx = segment or nullcontext()
 
                     else:
@@ -293,7 +286,14 @@ class SentryAsgiMiddleware:
                                         and "status" in event
                                     )
                                     if is_http_response:
-                                        span.set_http_status(event["status"])
+                                        if isinstance(span, StreamedSpan):
+                                            span.status = (
+                                                "error"
+                                                if event["status"] >= 400
+                                                else "ok"
+                                            )
+                                        else:
+                                            span.set_http_status(event["status"])
 
                                 return await send(event)
 

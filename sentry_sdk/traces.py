@@ -13,7 +13,11 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.profiler.continuous_profiler import get_profiler_id
+from sentry_sdk.profiler.continuous_profiler import (
+    get_profiler_id,
+    try_autostart_continuous_profiler,
+    try_profile_lifecycle_trace_start,
+)
 from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
@@ -79,22 +83,6 @@ SOURCE_FOR_STYLE = {
     "url": SegmentSource.ROUTE,
 }
 
-"""
-TODO[span-first] / notes
-- tags
-- dropped spans are not migrated
-- recheck transaction.finish <-> Streamedspan.end
-- profiling: drop transaction based
-- profiling: actually send profiles
-- maybe: use getters/setter OR properties but not both
-- add size-based flushing to buffer(s)
-- migrate transaction sample_rand logic
-- check where we're auto filtering out spans in integrations (health checks etc?)
-
-Notes:
-- removed ability to provide a start_timestamp
-"""
-
 
 def start_span(
     name: str,
@@ -106,11 +94,12 @@ def start_span(
     Start a span.
 
     The span's parent, unless provided explicitly via the `parent_span` argument,
-    will be the currently active span, if any.
+    will be the current active span, if any. If there is none, this span will
+    become the root of a new span tree.
 
     `start_span()` can either be used as context manager or you can use the span
-    object it returns and explicitly start and end it via the `span.start()` and
-    `span.end()` interface. The following is equivalent:
+    object it returns and explicitly end it via `span.end()`. The following is
+    equivalent:
 
     ```python
     import sentry_sdk
@@ -125,34 +114,32 @@ def start_span(
     import sentry_sdk
 
     span = sentry_sdk.traces.start_span(name="My Span")
-    span.start()
     # do something
     span.end()
     ```
 
     To continue a trace from another service, call
-    sentry_sdk.traces.continue_trace() prior to creating the top-level span.
+    `sentry_sdk.traces.continue_trace()` prior to creating the top-level span.
 
     :param name: The name to identify this span by.
     :type name: str
 
     :param attributes: Key-value attributes to set on the span from the start.
-        When provided via the `start_span()` function, these will also be
-        accessible in the traces sampler.
+        These will also be accessible in the traces sampler.
     :type attributes: "Optional[Attributes]"
 
-    :param parent_span: A span instance that the new span should be parented to.
-        If not provided, the parent will be set to the currently active span,
-        if any.
+    :param parent_span: A span instance that the new span should consider its
+        parent. If not provided, the parent will be set to the currently active
+        span, if any.
     :type parent_span: "Optional[StreamedSpan]"
 
     :param active: Controls whether spans started while this span is running
         will automatically become its children. That's the default behavior. If
         you want to create a span that shouldn't have any children (unless
-        provided explicitly via the `parent_span` argument), set this to False.
+        provided explicitly via the `parent_span` argument), set this to `False`.
     :type active: bool
 
-    :return: A span.
+    :return: The span that has been started.
     :rtype: StreamedSpan
     """
     return sentry_sdk.get_current_scope().start_streamed_span(
@@ -168,7 +155,8 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
     in the updated scope will belong under the trace extracted from the
     provided propagation headers or environment variables.
 
-    continue_trace() doesn't start any spans on its own.
+    continue_trace() doesn't start any spans on its own. Use the start_span()
+    API for that.
     """
     # This is set both on the isolation and the current scope for compatibility
     # reasons. Conceptually, it belongs on the isolation scope, and it also
@@ -190,7 +178,8 @@ def new_trace() -> None:
     This function sets the propagation context on the scope. Any span started
     in the updated scope will start its own trace.
 
-    new_trace() doesn't start any spans on its own.
+    new_trace() doesn't start any spans on its own. Use the start_span() API
+    for that.
     """
     sentry_sdk.get_isolation_scope().set_new_propagation_context()
     sentry_sdk.get_current_scope().set_new_propagation_context()
@@ -200,10 +189,10 @@ class StreamedSpan:
     """
     A span holds timing information of a block of code.
 
-    Spans can have multiple child spans thus forming a span tree.
+    Spans can have multiple child spans, thus forming a span tree.
 
-    This is the Span First span implementation. The original transaction-based
-    span implementation lives in tracing.Span.
+    This is the Span First span implementation that streams spans. The original
+    transaction-based span implementation lives in tracing.Span.
     """
 
     __slots__ = (
@@ -212,12 +201,12 @@ class StreamedSpan:
         "_active",
         "_span_id",
         "_trace_id",
-        "parent_span_id",
-        "segment",
+        "_parent_span_id",
+        "_segment",
         "_sampled",
-        "parent_sampled",
-        "start_timestamp",
-        "timestamp",
+        "_parent_sampled",
+        "_start_timestamp",
+        "_timestamp",
         "_status",
         "_start_timestamp_monotonic_ns",
         "_scope",
@@ -225,7 +214,6 @@ class StreamedSpan:
         "_continuous_profile",
         "_baggage",
         "_finished",
-        "_last_valid_parent_id",
         "_sample_rand",
         "_sample_rate",
     )
@@ -234,39 +222,36 @@ class StreamedSpan:
         self,
         *,
         name: str,
-        scope: "sentry_sdk.Scope",
         attributes: "Optional[Attributes]" = None,
         active: bool = True,
-        # TODO[span-first]: would be good to actually take this propagation
-        # context stuff directly from the PropagationContext, but for that
-        # we'd actually need to refactor PropagationContext to stay in sync
-        # with what's going on (e.g. update the current span_id) and not just
-        # update when a trace is continued
+        scope: "sentry_sdk.Scope",
+        segment: "Optional[StreamedSpan]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
         baggage: "Optional[Baggage]" = None,
-        segment: "Optional[StreamedSpan]" = None,
-        sampled: "Optional[bool]" = None,
         sample_rate: "Optional[float]" = None,
         sample_rand: "Optional[float]" = None,
-        last_valid_parent_id: "Optional[str]" = None,
     ) -> None:
-        self._scope = scope
-        self._active = active
-
         self._name: str = name
+        self._active: bool = active
         self._attributes: "Attributes" = {}
         if attributes:
             for attribute, value in attributes.items():
                 self.set_attribute(attribute, value)
 
-        self._trace_id: "Optional[str]" = trace_id
-        self.parent_span_id = parent_span_id
-        self.parent_sampled = parent_sampled
-        self.segment = segment or self
+        self._scope = scope
 
-        self.start_timestamp = datetime.now(timezone.utc)
+        self._segment = segment or self
+
+        self._trace_id: "Optional[str]" = trace_id
+        self._parent_span_id = parent_span_id
+        self._parent_sampled = parent_sampled
+        self._baggage = baggage
+        self._sample_rand = sample_rand
+        self._sample_rate = sample_rate
+
+        self._start_timestamp = datetime.now(timezone.utc)
 
         try:
             # profiling depends on this value and requires that
@@ -275,21 +260,15 @@ class StreamedSpan:
         except AttributeError:
             pass
 
-        self.timestamp: "Optional[datetime]" = None
+        self._timestamp: "Optional[datetime]" = None
         self._finished: bool = False
         self._span_id: "Optional[str]" = None
 
-        self.set_status(SpanStatus.OK)
+        self._status = SpanStatus.OK.value
         self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
-        self._last_valid_parent_id: "Optional[str]" = last_valid_parent_id
-
-        self._baggage = baggage
-        self._sample_rand = sample_rand
-        self._sample_rate = sample_rate
-
         self._continuous_profile: "Optional[ContinuousProfile]" = None
-
+        self._start_profile()
         self._update_active_thread()
         self._set_profile_id(get_profiler_id())
 
@@ -301,7 +280,7 @@ class StreamedSpan:
             f"name={self._name}, "
             f"trace_id={self.trace_id}, "
             f"span_id={self.span_id}, "
-            f"parent_span_id={self.parent_span_id}, "
+            f"parent_span_id={self._parent_span_id}, "
             f"sampled={self.sampled}, "
             f"active={self._active})>"
         )
@@ -313,7 +292,7 @@ class StreamedSpan:
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
         if value is not None and should_be_treated_as_error(ty, value):
-            self.set_status(SpanStatus.ERROR)
+            self.status = SpanStatus.ERROR
 
         self._end()
 
@@ -323,10 +302,6 @@ class StreamedSpan:
             old_span = scope.span
             scope.span = self
             self._context_manager_state = (scope, old_span)
-
-        if self.is_segment():
-            scope._update_sample_rate_from_segment(self)
-            scope._start_profile_on_segment(self)
 
     def _end(self) -> None:
         if self._finished is True:
@@ -351,16 +326,17 @@ class StreamedSpan:
         if not client.is_active():
             return
 
-        self._set_segment_attributes()
+        self.set_attribute("sentry.segment.id", self._segment.span_id)
+        self.set_attribute("sentry.segment.name", self._segment.name)
 
-        if self.timestamp is None:
+        if self._timestamp is None:
             try:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-                self.timestamp = self.start_timestamp + timedelta(
+                self._timestamp = self._start_timestamp + timedelta(
                     microseconds=elapsed / 1000
                 )
             except AttributeError:
-                self.timestamp = datetime.now(timezone.utc)
+                self._timestamp = datetime.now(timezone.utc)
 
         self._finished = True
         scope._capture_span(self)
@@ -373,10 +349,10 @@ class StreamedSpan:
         :type end_timestamp: "Optional[Union[float, datetime]]"
         """
         try:
-            if end_timestamp:
+            if end_timestamp and self._timestamp is None:
                 if isinstance(end_timestamp, float):
                     end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
-                self.timestamp = end_timestamp
+                self._timestamp = end_timestamp
         except AttributeError:
             pass
 
@@ -407,34 +383,31 @@ class StreamedSpan:
         except KeyError:
             pass
 
-    def get_status(self) -> "Union[SpanStatus, str]":
+    @property
+    def status(self) -> "Union[SpanStatus, str]":
         if self._status in {s.value for s in SpanStatus}:
             return SpanStatus(self._status)
 
         return self._status
 
-    def set_status(self, status: "Union[SpanStatus, str]") -> None:
+    @status.setter
+    def status(self, status: "Union[SpanStatus, str]") -> None:
         if isinstance(status, Enum):
             status = status.value
 
         self._status = status
 
-    def set_http_status(self, http_status: int) -> None:
-        self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
-
-        if http_status >= 400:
-            self.set_status(SpanStatus.ERROR)
-        else:
-            self.set_status(SpanStatus.OK)
-
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return self._name
 
-    def set_name(self, name: str) -> None:
+    @name.setter
+    def name(self, name: str) -> None:
         self._name = name
 
-    def is_segment(self) -> bool:
-        return self.segment == self
+    @property
+    def active(self) -> bool:
+        return self._active
 
     @property
     def span_id(self) -> str:
@@ -454,8 +427,19 @@ class StreamedSpan:
     def sampled(self) -> "Optional[bool]":
         return True
 
+    @property
+    def timestamp(self) -> "Optional[datetime]":
+        return self._timestamp
+
+    @property
+    def start_timestamp(self) -> "Optional[datetime]":
+        return self._start_timestamp
+
+    def is_segment(self) -> bool:
+        return self._segment == self
+
     def dynamic_sampling_context(self) -> "dict[str, str]":
-        return self.segment.get_baggage().dynamic_sampling_context()
+        return self._segment.get_baggage().dynamic_sampling_context()
 
     def to_traceparent(self) -> str:
         if self.sampled is True:
@@ -472,17 +456,17 @@ class StreamedSpan:
         return traceparent
 
     def to_baggage(self) -> "Optional[Baggage]":
-        if self.segment:
-            return self.segment.get_baggage()
+        if self._segment:
+            return self._segment.get_baggage()
         return None
 
     def iter_headers(self) -> "Iterator[tuple[str, str]]":
-        if not self.segment:
+        if not self._segment:
             return
 
         yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
 
-        baggage = self.segment.get_baggage().serialize()
+        baggage = self._segment.get_baggage().serialize()
         if baggage:
             yield BAGGAGE_HEADER_NAME, baggage
 
@@ -526,20 +510,27 @@ class StreamedSpan:
         return {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
-            "parent_span_id": self.parent_span_id,
+            "parent_span_id": self._parent_span_id,
         }
 
-    def _set_segment_attributes(self) -> None:
+    def _start_profile(self) -> None:
         if not self.is_segment():
-            self.set_attribute("sentry.segment.id", self.segment.span_id)
+            return
 
-        self.set_attribute("sentry.segment.name", self.segment._name)
+        try_autostart_continuous_profiler()
+
+        self._continuous_profile = try_profile_lifecycle_trace_start()
+
+        # Typically, the profiler is set when the segment is created. But when
+        # using the auto lifecycle, the profiler isn't running when the first
+        # segment is started. So make sure we update the profiler id on it.
+        if self._continuous_profile is not None:
+            self._set_profile_id(get_profiler_id())
 
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
-        "_name",
-        "segment",
+        "_segment",
         "_scope",
         "_context_manager_state",
         "_unsampled_reason",
@@ -551,7 +542,7 @@ class NoOpStreamedSpan(StreamedSpan):
         scope: "Optional[sentry_sdk.Scope]" = None,
         **kwargs: "Any",
     ) -> None:
-        self.segment = None  # type: ignore[assignment]
+        self._segment = None  # type: ignore[assignment]
         self._scope = scope  # type: ignore[assignment]
         self._unsampled_reason = unsampled_reason
 
@@ -567,6 +558,14 @@ class NoOpStreamedSpan(StreamedSpan):
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
         self._end()
+
+    @property
+    def name(self) -> str:
+        return ""
+
+    @name.setter
+    def name(self, value: str) -> None:
+        pass
 
     @property
     def span_id(self) -> str:
@@ -611,9 +610,6 @@ class NoOpStreamedSpan(StreamedSpan):
     def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         self._end()
 
-    def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        self._end()
-
     def get_attributes(self) -> "Attributes":
         return {}
 
@@ -625,12 +621,6 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def remove_attribute(self, key: str) -> None:
         pass
-
-    def set_name(self, name: str) -> None:
-        pass
-
-    def get_name(self) -> str:
-        return ""
 
     def is_segment(self) -> bool:
         return False
@@ -645,9 +635,6 @@ class NoOpStreamedSpan(StreamedSpan):
     @property
     def sampled(self) -> "Optional[bool]":
         return False
-
-    def _set_segment_attributes(self) -> None:
-        pass
 
 
 def trace(

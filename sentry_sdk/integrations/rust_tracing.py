@@ -214,11 +214,10 @@ class RustTracingLayer:
         if parent_sentry_span:
             if isinstance(parent_sentry_span, StreamedSpan):
                 sentry_span = sentry_sdk.traces.start_span(
-                    name=sentry_span_name, parent_span=parent_sentry_span
+                    name=sentry_span_name,
+                    parent_span=parent_sentry_span,
+                    attributes={"sentry.op": "function", "sentry.origin": self.origin},
                 )
-                sentry_span.set_attribute("sentry.op", "function")
-                sentry_span.set_attribute("sentry.origin", self.origin)
-                sentry_span.start()
             else:
                 sentry_span = parent_sentry_span.start_child(
                     op="function",
@@ -231,10 +230,8 @@ class RustTracingLayer:
             if has_span_streaming_enabled(client.options):
                 sentry_span = sentry_sdk.traces.start_span(
                     name=sentry_span_name,
+                    attributes={"sentry.op": "function", "sentry.origin": self.origin},
                 )
-                sentry_span.set_attribute("sentry.op", "function")
-                sentry_span.set_attribute("sentry.origin", self.origin)
-                sentry_span.start()
             else:
                 sentry_span = sentry_sdk.start_span(
                     op="function",

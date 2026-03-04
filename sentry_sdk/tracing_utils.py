@@ -1122,9 +1122,9 @@ def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None
             if span.containing_transaction is not None:
                 span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
         elif isinstance(span, StreamedSpan):
-            span.set_status(SpanStatus.ERROR)
-            if span.segment is not None:
-                span.segment.set_status(SpanStatus.ERROR)
+            span.status = SpanStatus.ERROR
+            if span._segment is not None:
+                span._segment.status = SpanStatus.ERROR
 
 
 def _generate_sample_rand(
@@ -1480,6 +1480,15 @@ def make_sampling_decision(
     attributes: "Optional[Attributes]",
     scope: "sentry_sdk.Scope",
 ) -> "tuple[bool, Optional[float], Optional[float], Optional[str]]":
+    """
+    Decide whether a span should be sampled.
+
+    Returns a tuple with:
+    - the sampling decision
+    - the effective sample rate
+    - the sample rand
+    - the reason for not sampling the span, if unsampled
+    """
     client = sentry_sdk.get_client()
 
     if not has_tracing_enabled(client.options):
@@ -1513,7 +1522,7 @@ def make_sampling_decision(
             sample_rate = client.options["traces_sample_rate"]
 
     # Validate whether the sample_rate we got is actually valid. Since
-    # traces_sampler is user provided, it could return anything.
+    # traces_sampler is user-provided, it could return anything.
     if not is_valid_sample_rate(sample_rate, source="Tracing"):
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
         return False, None, None, None
@@ -1522,6 +1531,8 @@ def make_sampling_decision(
 
     if client.monitor:
         sample_rate /= 2**client.monitor.downsample_factor
+
+    outcome: "Optional[str]" = None
 
     if not sample_rate:
         if traces_sampler_defined:
@@ -1552,6 +1563,7 @@ def make_sampling_decision(
 
 
 def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
+    """Determine if a span fits one of the rules in ignore_spans."""
     client = sentry_sdk.get_client()
     ignore_spans = (client.options.get("_experiments") or {}).get("ignore_spans")
 

@@ -49,7 +49,7 @@ def test_start_span(sentry_init, capture_envelopes):
         assert segment.is_segment() is True
         with sentry_sdk.traces.start_span(name="child") as child:
             assert child.is_segment() is False
-            assert child.segment == segment
+            assert child._segment == segment
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -87,7 +87,7 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
 
     segment = sentry_sdk.traces.start_span(name="segment")
     child = sentry_sdk.traces.start_span(name="child")
-    assert child.segment == segment
+    assert child._segment == segment
     child.end()
     segment.end()
 
@@ -415,7 +415,7 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
                 ...
 
     assert traces_sampler_called == 1
-    assert span_name_in_traces_sampler == segment.get_name()
+    assert span_name_in_traces_sampler == segment.name
 
 
 def test_start_inactive_span(sentry_init, capture_envelopes):
@@ -588,7 +588,7 @@ def test_continue_trace_sampled(sentry_init, capture_envelopes):
 
     assert span.sampled is True
     assert span.trace_id == trace_id
-    assert span.parent_span_id == parent_span_id
+    assert span._parent_span_id == parent_span_id
     assert span._sample_rand == float(sample_rand)
 
     sentry_sdk.get_client().flush()
@@ -627,7 +627,7 @@ def test_continue_trace_unsampled(sentry_init, capture_envelopes):
         ...
 
     assert span.sampled is False
-    assert span.get_name() == ""
+    assert span.name == ""
     assert span.trace_id == "00000000000000000000000000000000"
     assert span.span_id == "0000000000000000"
 
@@ -662,7 +662,7 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_envelopes):
 
     assert span.sampled is True
     assert span.trace_id == trace_id
-    assert span.parent_span_id == parent_span_id
+    assert span._parent_span_id == parent_span_id
     assert isinstance(span._sample_rand, float)
 
     sentry_sdk.get_client().flush()
@@ -867,10 +867,10 @@ def test_set_span_status(sentry_init, capture_envelopes):
     events = capture_envelopes()
 
     with sentry_sdk.traces.start_span(name="span") as span:
-        span.set_status(SpanStatus.ERROR)
+        span.status = SpanStatus.ERROR
 
     with sentry_sdk.traces.start_span(name="span") as span:
-        span.set_status("error")
+        span.status = "error"
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -1156,7 +1156,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent(
 
                 with sentry_sdk.traces.start_span(name="child") as span:
                     assert span.sampled is True
-                    assert span.parent_span_id == segment.span_id
+                    assert span._parent_span_id == segment.span_id
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -1190,7 +1190,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     segment = sentry_sdk.traces.start_span(name="segment")
     assert not isinstance(segment, NoOpStreamedSpan)
     assert segment.sampled is True
-    assert segment.parent_span_id is None
+    assert segment._parent_span_id is None
 
     ignored_span1 = sentry_sdk.traces.start_span(name="ignored", parent_span=segment)
     assert isinstance(ignored_span1, NoOpStreamedSpan)
@@ -1205,7 +1205,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     span = sentry_sdk.traces.start_span(name="child", parent_span=ignored_span2)
     assert not isinstance(span, NoOpStreamedSpan)
     assert span.sampled is True
-    assert span.parent_span_id == segment.span_id
+    assert span._parent_span_id == segment.span_id
     span.end()
 
     ignored_span2.end()
@@ -1239,21 +1239,21 @@ def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
 
     with sentry_sdk.traces.start_span(name="segment") as span1:
         assert span1.sampled is True
-        assert span1.parent_span_id is None
+        assert span1._parent_span_id is None
 
         with sentry_sdk.traces.start_span(name="ignored") as span2:
             assert span2.sampled is False
 
             with sentry_sdk.traces.start_span(name="child 1") as span3:
                 assert span3.sampled is True
-                assert span3.parent_span_id == span1.span_id
+                assert span3._parent_span_id == span1.span_id
 
                 with sentry_sdk.traces.start_span(name="ignored") as span4:
                     assert span4.sampled is False
 
                     with sentry_sdk.traces.start_span(name="child 2") as span5:
                         assert span5.sampled is True
-                        assert span5.parent_span_id == span3.span_id
+                        assert span5._parent_span_id == span3.span_id
 
     sentry_sdk.get_client().flush()
     spans = envelopes_to_spans(events)
@@ -1306,6 +1306,7 @@ def test_transport_format(sentry_init, capture_envelopes):
                     "sentry.span.source": {"value": "custom", "type": "string"},
                     "thread.id": {"value": mock.ANY, "type": "string"},
                     "thread.name": {"value": "MainThread", "type": "string"},
+                    "sentry.segment.id": {"value": mock.ANY, "type": "string"},
                     "sentry.segment.name": {"value": "test", "type": "string"},
                     "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
                     "sentry.sdk.version": {"value": mock.ANY, "type": "string"},

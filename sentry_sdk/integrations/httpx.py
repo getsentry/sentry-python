@@ -62,9 +62,20 @@ def _install_httpx_client() -> None:
 
         span_ctx: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
+            attributes = {
+                "sentry.op": OP.HTTP_CLIENT,
+                "sentry.origin": HttpxIntegration.origin,
+                SPANDATA.HTTP_METHOD: request.method,
+            }
+            if parsed_url is not None:
+                attributes["url"] = parsed_url.url
+                attributes[SPANDATA.HTTP_QUERY] = parsed_url.query
+                attributes[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
             span_ctx = sentry_sdk.traces.start_span(
-                name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}"
+                name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
+                attributes=attributes,
             )
+
         else:
             span_ctx = start_span(
                 op=OP.HTTP_CLIENT,
@@ -77,16 +88,7 @@ def _install_httpx_client() -> None:
             )
 
         with span_ctx as span:
-            if isinstance(span, StreamedSpan):
-                span.set_attribute("sentry.op", OP.HTTP_CLIENT)
-                span.set_attribute("sentry.origin", HttpxIntegration.origin)
-
-                span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
-                if parsed_url is not None:
-                    span.set_attribute("url", parsed_url.url)
-                    span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
-                    span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
-            else:
+            if not isinstance(span, StreamedSpan):
                 span.set_data(SPANDATA.HTTP_METHOD, request.method)
                 if parsed_url is not None:
                     span.set_data("url", parsed_url.url)
@@ -111,10 +113,11 @@ def _install_httpx_client() -> None:
 
             rv = real_send(self, request, **kwargs)
 
-            span.set_http_status(rv.status_code)
             if isinstance(span, StreamedSpan):
+                span.status = "error" if rv.status_code >= 400 else "ok"
                 span.set_attribute("reason", rv.reason_phrase)
             else:
+                span.set_http_status(rv.status_code)
                 span.set_data("reason", rv.reason_phrase)
 
         with capture_internal_exceptions():
@@ -143,8 +146,19 @@ def _install_httpx_async_client() -> None:
 
         span_ctx: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
+            attributes = {
+                "sentry.op": OP.HTTP_CLIENT,
+                "sentry.origin": HttpxIntegration.origin,
+                SPANDATA.HTTP_METHOD: request.method,
+            }
+            if parsed_url is not None:
+                attributes["url"] = parsed_url.url
+                attributes[SPANDATA.HTTP_QUERY] = parsed_url.query
+                attributes[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
             span_ctx = sentry_sdk.traces.start_span(
-                name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}"
+                name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
+                attributes=attributes,
             )
         else:
             span_ctx = start_span(
@@ -158,15 +172,7 @@ def _install_httpx_async_client() -> None:
             )
 
         with span_ctx as span:
-            if isinstance(span, StreamedSpan):
-                span.set_attribute("sentry.op", OP.HTTP_CLIENT)
-                span.set_attribute("sentry.origin", HttpxIntegration.origin)
-                span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
-                if parsed_url is not None:
-                    span.set_attribute("url", parsed_url.url)
-                    span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
-                    span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
-            else:
+            if not isinstance(span, StreamedSpan):
                 span.set_data(SPANDATA.HTTP_METHOD, request.method)
                 if parsed_url is not None:
                     span.set_data("url", parsed_url.url)
@@ -190,10 +196,11 @@ def _install_httpx_async_client() -> None:
 
             rv = await real_send(self, request, **kwargs)
 
-            span.set_http_status(rv.status_code)
             if isinstance(span, StreamedSpan):
+                span.status = "error" if rv.status_code >= 400 else "ok"
                 span.set_attribute("reason", rv.reason_phrase)
             else:
+                span.set_http_status(rv.status_code)
                 span.set_data("reason", rv.reason_phrase)
 
         with capture_internal_exceptions():
