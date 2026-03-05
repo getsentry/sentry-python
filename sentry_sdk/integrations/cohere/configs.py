@@ -7,8 +7,57 @@ from sentry_sdk.consts import SPANDATA
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from sentry_sdk.ai.span_config import OperationConfig
+    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+    from typing_extensions import TypedDict
+
+    # Source paths: list of attribute chains to try in order.
+    # e.g. [("meta", "billed_units", "input_tokens"), ("meta", "tokens", "input_tokens")]
+    SourcePaths = Sequence[Tuple[str, ...]]
+
+    # Maps a SPANDATA key to source paths on the response object.
+    # e.g. {SPANDATA.GEN_AI_RESPONSE_ID: [("id",)]}
+    SourceMapping = Dict[str, SourcePaths]
+
+    class UsageConfig(TypedDict, total=False):
+        """Declarative token usage extraction paths (from response object)."""
+
+        input_tokens: SourcePaths
+        output_tokens: SourcePaths
+        total_tokens: SourcePaths
+
+    class ResponseConfig(TypedDict, total=False):
+        """Declarative response span data config."""
+
+        # Attributes always extracted from the response object.
+        sources: SourceMapping
+        # Attributes extracted only when PII sending is enabled.
+        pii_sources: SourceMapping
+        # Custom extractor for response text (PII only).
+        # Returns list of text strings, or None.
+        extract_text: Callable[[Any], Optional[List[str]]]
+        # Declarative token usage paths.
+        usage: UsageConfig
+
+    class OperationConfig(TypedDict, total=False):
+        """Full declarative config for an AI operation (chat, embeddings, etc.)."""
+
+        # Key/value pairs set on every span unconditionally.
+        static: Dict[str, Any]
+        # Maps kwarg names to SPANDATA keys (always set if present in kwargs).
+        params: Dict[str, str]
+        # Maps kwarg names to SPANDATA keys (only set when PII is enabled).
+        pii_params: Dict[str, str]
+        # Extracts messages from kwargs for the span.
+        extract_messages: Callable[[Dict[str, Any]], Optional[List[Dict[str, Any]]]]
+        # SPANDATA key for messages (default: GEN_AI_REQUEST_MESSAGES).
+        message_target: str
+        # Non-streaming response config.
+        response: ResponseConfig
+        # Streaming response config (different attribute paths).
+        stream_response: ResponseConfig
+        # Source paths to extract a full response object from a stream-end event
+        # (V1 pattern: reuse "response" config after extracting).
+        stream_response_object: SourcePaths
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
