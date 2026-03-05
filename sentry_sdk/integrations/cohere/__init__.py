@@ -1,9 +1,8 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.ai.span_config import set_request_span_data
+from sentry_sdk.ai.span_config import set_request_span_data, set_response_span_data
 
 from typing import TYPE_CHECKING
 
@@ -42,6 +41,12 @@ COHERE_EMBED_CONFIG = {
     ),
     "message_target": SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
     "truncation_fn": None,
+    "response": {
+        "usage": {
+            "input_tokens": [("meta", "billed_units", "input_tokens")],
+            "total_tokens": [("meta", "billed_units", "input_tokens")],
+        },
+    },
 }
 
 
@@ -102,16 +107,9 @@ def _wrap_embed(f):
                     _capture_exception(e)
                 reraise(*exc_info)
 
-            if (
-                hasattr(res, "meta")
-                and hasattr(res.meta, "billed_units")
-                and hasattr(res.meta.billed_units, "input_tokens")
-            ):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.billed_units.input_tokens,
-                    total_tokens=res.meta.billed_units.input_tokens,
-                )
+            set_response_span_data(
+                span, res, False, COHERE_EMBED_CONFIG["response"]
+            )
             return res
 
     return new_embed

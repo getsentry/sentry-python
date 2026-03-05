@@ -105,4 +105,7 @@ def set_response_span_data(
             output_tokens=get_first_from_sources(
                 response, usage_config.get("output_tokens", [])
             ),
+            total_tokens=get_first_from_sources(
+                response, usage_config.get("total_tokens", [])
+            ),
         )
