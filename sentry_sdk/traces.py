@@ -148,6 +148,10 @@ class StreamedSpan:
         self._name = name
 
     @property
+    def active(self) -> bool:
+        return self._active
+
+    @property
     def span_id(self) -> str:
         if not self._span_id:
             self._span_id = uuid.uuid4().hex[16:]
