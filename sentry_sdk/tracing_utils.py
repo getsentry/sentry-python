@@ -1369,13 +1369,11 @@ from sentry_sdk.tracing import (
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
-
-
 from sentry_sdk.traces import (
     LOW_QUALITY_SEGMENT_SOURCES,
     start_span as start_streaming_span,
     StreamedSpan,
 )
+
+if TYPE_CHECKING:
+    from sentry_sdk.tracing import Span
