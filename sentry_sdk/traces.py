@@ -10,7 +10,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.utils import format_attribute
+from sentry_sdk.utils import format_attribute, logger
 
 if TYPE_CHECKING:
     from typing import Optional, Union
