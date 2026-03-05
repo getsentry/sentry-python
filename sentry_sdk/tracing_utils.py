@@ -1483,6 +1483,8 @@ def make_sampling_decision(
     """
     Decide whether a span should be sampled.
 
+    Use traces_sampler if defined, otherwise traces_sample_rate.
+
     Returns a tuple with:
     - the sampling decision
     - the effective sample rate
@@ -1496,9 +1498,10 @@ def make_sampling_decision(
 
     propagation_context = scope.get_active_propagation_context()
 
+    sample_rand = None
     if propagation_context.baggage is not None:
         sample_rand = propagation_context.baggage._sample_rand()
-    else:
+    if sample_rand is None:
         sample_rand = _generate_sample_rand(propagation_context.trace_id)
 
     sampling_context = {
@@ -1529,6 +1532,7 @@ def make_sampling_decision(
 
     sample_rate = float(sample_rate)
 
+    # Adjust sample rate if we're under backpressure
     if client.monitor:
         sample_rate /= 2**client.monitor.downsample_factor
 
