@@ -231,6 +231,14 @@ class StreamedSpan:
             f"active={self._active})>"
         )
 
+    def __enter__(self) -> "StreamedSpan":
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        pass
+
     def get_attributes(self) -> "Attributes":
         return self._attributes
 
@@ -301,6 +309,14 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(sampled={self.sampled})>"
+
+    def __enter__(self) -> "StreamedSpan":
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        pass
 
     def get_attributes(self) -> "Attributes":
         return {}
