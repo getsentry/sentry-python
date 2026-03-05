@@ -1,9 +1,12 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.span_config import set_input_span_data
-from sentry_sdk.ai.utils import set_data_normalized, transform_message_content
+from sentry_sdk.ai.span_config import set_request_span_data, set_response_span_data
+from sentry_sdk.ai.utils import (
+    get_first_from_sources,
+    transitive_getattr,
+    transform_message_content,
+)
 from sentry_sdk.consts import OP, SPANDATA
 
 from typing import TYPE_CHECKING
@@ -16,11 +19,6 @@ import sentry_sdk
 from sentry_sdk.integrations.cohere import (
     CohereIntegration,
     _capture_exception,
-)
-from sentry_sdk.integrations.cohere.utils import (
-    get_first_from_sources,
-    set_span_data_from_sources,
-    transitive_getattr,
 )
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, reraise
@@ -46,6 +44,30 @@ try:
 except ImportError:
     _has_v2 = False
 
+STREAM_DELTA_TEXT_SOURCES = [("delta", "message", "content", "text")]
+
+_V2_USAGE = {
+    "input_tokens": [
+        ("usage", "billed_units", "input_tokens"),
+        ("usage", "tokens", "input_tokens"),
+    ],
+    "output_tokens": [
+        ("usage", "billed_units", "output_tokens"),
+        ("usage", "tokens", "output_tokens"),
+    ],
+}
+
+
+def _extract_v2_response_text(response):
+    # type: (Any) -> list[str] | None
+    content = get_first_from_sources(response, [("message", "content")], True)
+    if content:
+        texts = [item.text for item in content if hasattr(item, "text")]
+        if texts:
+            return texts
+    return None
+
+
 COHERE_V2_CHAT_CONFIG = {
     "static": {
         SPANDATA.GEN_AI_SYSTEM: "cohere",
@@ -55,26 +77,33 @@ COHERE_V2_CHAT_CONFIG = {
         "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
     },
     "extract_messages": lambda kw: _extract_messages_v2(kw.get("messages", [])),
-}
-
-CHAT_RESPONSE_SOURCES = {
-    SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
-    SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("finish_reason",)],
-}
-PII_CHAT_RESPONSE_SOURCES = {
-    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: [("message", "tool_calls")],
-}
-CHAT_USAGE_SOURCES = [("usage",)]
-STREAM_DELTA_TEXT_SOURCES = [("delta", "message", "content", "text")]
-STREAM_CHAT_RESPONSE_SOURCES: "dict[str, list[tuple[str, ...]]]" = {
-    SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
-    SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("delta", "finish_reason")],
-}
-STREAM_CHAT_USAGE_SOURCES = [("delta", "usage")]
-USAGE_UNIT_SOURCES = [("billed_units",), ("tokens",)]
-USAGE_TOKEN_SOURCES = {
-    SPANDATA.GEN_AI_USAGE_INPUT_TOKENS: [("input_tokens",)],
-    SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS: [("output_tokens",)],
+    "response": {
+        "sources": {
+            SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("finish_reason",)],
+        },
+        "pii_sources": {
+            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: [("message", "tool_calls")],
+        },
+        "extract_text": _extract_v2_response_text,
+        "usage": _V2_USAGE,
+    },
+    "stream_response": {
+        "sources": {
+            SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
+            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("delta", "finish_reason")],
+        },
+        "usage": {
+            "input_tokens": [
+                ("delta", "usage", "billed_units", "input_tokens"),
+                ("delta", "usage", "tokens", "input_tokens"),
+            ],
+            "output_tokens": [
+                ("delta", "usage", "billed_units", "output_tokens"),
+                ("delta", "usage", "tokens", "output_tokens"),
+            ],
+        },
+    },
 }
 
 
@@ -120,12 +149,14 @@ def _wrap_chat_v2(f, streaming):
                     SPANDATA.GEN_AI_REQUEST_MODEL: model if model else None,
                     SPANDATA.GEN_AI_RESPONSE_MODEL: model if model else None,
                 }
-                set_input_span_data(
+                set_request_span_data(
                     span, kwargs, integration, COHERE_V2_CHAT_CONFIG, span_data
                 )
                 if streaming:
                     return _iter_v2_stream_events(res, span, include_pii)
-                _collect_v2_response_fields(span, res, include_pii)
+                set_response_span_data(
+                    span, res, include_pii, COHERE_V2_CHAT_CONFIG["response"]
+                )
                 return res
 
     return new_chat
@@ -150,7 +181,13 @@ def _iter_v2_stream_events(old_iterator, span, include_pii):
         for x in old_iterator:
             _append_stream_delta_text(collected_text, x)
             if isinstance(x, MessageEndV2ChatStreamResponse):
-                _collect_v2_stream_end_fields(span, x, include_pii, collected_text)
+                set_response_span_data(
+                    span,
+                    x,
+                    include_pii,
+                    COHERE_V2_CHAT_CONFIG["stream_response"],
+                    collected_text,
+                )
             yield x
 
 
@@ -161,52 +198,3 @@ def _append_stream_delta_text(collected_text, event):
     content_text = get_first_from_sources(event, STREAM_DELTA_TEXT_SOURCES)
     if content_text is not None:
         collected_text.append(content_text)
-
-
-def _collect_v2_stream_end_fields(span, event, include_pii, collected_text):
-    # type: (Span, Any, bool, list[str]) -> None
-    if include_pii and collected_text:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, ["".join(collected_text)]
-        )
-    set_span_data_from_sources(
-        span, event, STREAM_CHAT_RESPONSE_SOURCES, require_truthy=False
-    )
-    stream_usage = get_first_from_sources(event, STREAM_CHAT_USAGE_SOURCES)
-    if stream_usage is not None:
-        _record_token_usage_v2(span, stream_usage)
-
-
-def _collect_v2_response_fields(span, response, include_pii):
-    # type: (Span, V2ChatResponse, bool) -> None
-    if include_pii:
-        content = get_first_from_sources(response, [("message", "content")], True)
-        if content:
-            texts = [item.text for item in content if hasattr(item, "text")]
-            if texts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, texts)
-        set_span_data_from_sources(
-            span, response, PII_CHAT_RESPONSE_SOURCES, require_truthy=True
-        )
-    set_span_data_from_sources(
-        span, response, CHAT_RESPONSE_SOURCES, require_truthy=False
-    )
-    usage = get_first_from_sources(response, CHAT_USAGE_SOURCES)
-    if usage is not None:
-        _record_token_usage_v2(span, usage)
-
-
-def _record_token_usage_v2(span, usage):
-    # type: (Span, Any) -> None
-    usage_obj = get_first_from_sources(usage, USAGE_UNIT_SOURCES)
-    if usage_obj is None:
-        return
-    record_token_usage(
-        span,
-        input_tokens=get_first_from_sources(
-            usage_obj, USAGE_TOKEN_SOURCES[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS]
-        ),
-        output_tokens=get_first_from_sources(
-            usage_obj, USAGE_TOKEN_SOURCES[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS]
-        ),
-    )

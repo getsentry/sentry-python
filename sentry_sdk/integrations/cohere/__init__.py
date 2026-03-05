@@ -3,7 +3,7 @@ from functools import wraps
 
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.ai.span_config import set_input_span_data
+from sentry_sdk.ai.span_config import set_request_span_data
 
 from typing import TYPE_CHECKING
 
@@ -92,7 +92,7 @@ def _wrap_embed(f):
             name=f"embeddings {model}".strip(),
             origin=CohereIntegration.origin,
         ) as span:
-            set_input_span_data(span, kwargs, integration, COHERE_EMBED_CONFIG)
+            set_request_span_data(span, kwargs, integration, COHERE_EMBED_CONFIG)
 
             try:
                 res = f(*args, **kwargs)
