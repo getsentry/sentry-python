@@ -70,6 +70,7 @@ class StreamedSpan:
     __slots__ = (
         "_name",
         "_attributes",
+        "_active",
         "_span_id",
         "_trace_id",
         "_status",
@@ -80,9 +81,11 @@ class StreamedSpan:
         *,
         name: str,
         attributes: "Optional[Attributes]" = None,
+        active: bool = True,
         trace_id: "Optional[str]" = None,
     ):
         self._name: str = name
+        self._active: bool = active
         self._attributes: "Attributes" = {}
         if attributes:
             for attribute, value in attributes.items():
@@ -99,7 +102,8 @@ class StreamedSpan:
             f"<{self.__class__.__name__}("
             f"name={self._name}, "
             f"trace_id={self.trace_id}, "
-            f"span_id={self.span_id})>"
+            f"span_id={self.span_id}, "
+            f"active={self._active})>"
         )
 
     def get_attributes(self) -> "Attributes":
@@ -142,6 +146,10 @@ class StreamedSpan:
     @name.setter
     def name(self, name: str) -> None:
         self._name = name
+
+    @property
+    def active(self) -> bool:
+        return self._active
 
     @property
     def span_id(self) -> str:
