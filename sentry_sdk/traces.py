@@ -9,8 +9,7 @@ import uuid
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.utils import format_attribute
+from sentry_sdk.utils import format_attribute, logger
 
 if TYPE_CHECKING:
     from typing import Optional, Union
@@ -71,6 +70,7 @@ class StreamedSpan:
     __slots__ = (
         "_name",
         "_attributes",
+        "_active",
         "_span_id",
         "_trace_id",
         "_status",
@@ -81,9 +81,11 @@ class StreamedSpan:
         *,
         name: str,
         attributes: "Optional[Attributes]" = None,
+        active: bool = True,
         trace_id: "Optional[str]" = None,
     ):
         self._name: str = name
+        self._active: bool = active
         self._attributes: "Attributes" = {}
         if attributes:
             for attribute, value in attributes.items():
@@ -92,8 +94,17 @@ class StreamedSpan:
         self._span_id: "Optional[str]" = None
         self._trace_id: "Optional[str]" = trace_id
 
-        self.set_status(SpanStatus.OK)
-        self.set_source(SegmentSource.CUSTOM)
+        self._status = SpanStatus.OK.value
+        self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"name={self._name}, "
+            f"trace_id={self.trace_id}, "
+            f"span_id={self.span_id}, "
+            f"active={self._active})>"
+        )
 
     def get_attributes(self) -> "Attributes":
         return self._attributes
@@ -111,43 +122,34 @@ class StreamedSpan:
         except KeyError:
             pass
 
-    def get_status(self) -> "Union[SpanStatus, str]":
-        if self._status in {s.value for s in SpanStatus}:
-            return SpanStatus(self._status)
-
+    @property
+    def status(self) -> "str":
         return self._status
 
-    def set_status(self, status: "Union[SpanStatus, str]") -> None:
+    @status.setter
+    def status(self, status: "Union[SpanStatus, str]") -> None:
         if isinstance(status, Enum):
             status = status.value
 
+        if status not in {e.value for e in SpanStatus}:
+            logger.debug(
+                f'Unsupported span status {status}. Expected one of: "ok", "error"'
+            )
+            return
+
         self._status = status
 
-    def set_http_status(self, http_status: int) -> None:
-        self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
-
-        if http_status >= 400:
-            self.set_status(SpanStatus.ERROR)
-        else:
-            self.set_status(SpanStatus.OK)
-
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return self._name
 
-    def set_name(self, name: str) -> None:
+    @name.setter
+    def name(self, name: str) -> None:
         self._name = name
 
-    def set_op(self, op: str) -> None:
-        self.set_attribute("sentry.op", op)
-
-    def set_origin(self, origin: str) -> None:
-        self.set_attribute("sentry.origin", origin)
-
-    def set_source(self, source: "Union[str, SegmentSource]") -> None:
-        if isinstance(source, Enum):
-            source = source.value
-
-        self.set_attribute("sentry.span.source", source)
+    @property
+    def active(self) -> bool:
+        return self._active
 
     @property
     def span_id(self) -> str:
