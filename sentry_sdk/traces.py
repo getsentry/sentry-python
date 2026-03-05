@@ -589,6 +589,10 @@ class NoOpStreamedSpan(StreamedSpan):
     def trace_id(self) -> str:
         return "00000000000000000000000000000000"
 
+    @property
+    def sampled(self) -> "Optional[bool]":
+        return False
+
     def _start(self) -> None:
         if self._scope is None:
             return self
@@ -645,10 +649,6 @@ class NoOpStreamedSpan(StreamedSpan):
         )
 
         return f"{propagation_context.trace_id}-{propagation_context.span_id}-0"
-
-    @property
-    def sampled(self) -> "Optional[bool]":
-        return False
 
 
 def trace(
