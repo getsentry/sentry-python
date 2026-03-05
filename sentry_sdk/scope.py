@@ -30,10 +30,11 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
     has_span_streaming_enabled,
-    normalize_incoming_data,
+    is_ignored_span,
+    make_sampling_decision,
     PropagationContext,
 )
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, NoOpStreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -582,7 +583,7 @@ class Scope:
 
         # If we have an active span, return traceparent from there
         if has_tracing_enabled(client.options) and self.span is not None:
-            return self.span.to_traceparent()
+            return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
         return self.get_active_propagation_context().to_traceparent()
@@ -596,7 +597,7 @@ class Scope:
 
         # If we have an active span, return baggage from there
         if has_tracing_enabled(client.options) and self.span is not None:
-            return self.span.to_baggage()
+            return self.span._to_baggage()
 
         # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
@@ -606,7 +607,7 @@ class Scope:
         Returns the Sentry "trace" context from the Propagation Context.
         """
         if has_tracing_enabled(self.get_client().options) and self._span is not None:
-            return self._span.get_trace_context()
+            return self._span._get_trace_context()
 
         # if we are tracing externally (otel), those values take precedence
         external_propagation_context = get_external_propagation_context()
@@ -671,7 +672,7 @@ class Scope:
         span = span or self.span
 
         if has_tracing_enabled(client.options) and span is not None:
-            for header in span.iter_headers():
+            for header in span._iter_headers():
                 yield header
         elif has_external_propagation_context():
             # when we have an external_propagation_context (otlp)
@@ -695,6 +696,13 @@ class Scope:
             isolation_scope._propagation_context = PropagationContext()
         return isolation_scope._propagation_context
 
+    def set_custom_sampling_context(
+        self, custom_sampling_context: "dict[str, Any]"
+    ) -> None:
+        self.get_active_propagation_context()._set_custom_sampling_context(
+            custom_sampling_context
+        )
+
     def clear(self) -> None:
         """Clears the entire scope."""
         self._level: "Optional[LogLevelStr]" = None
@@ -711,7 +719,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture: bool = True
 
-        self._span: "Optional[Span]" = None
+        self._span: "Optional[Union[Span, StreamedSpan]]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
 
@@ -765,6 +773,14 @@ class Scope:
         if self._span is None:
             return None
 
+        if isinstance(self._span, StreamedSpan):
+            warnings.warn(
+                "Scope.transaction is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return None
+
         # there is an orphan span on the scope
         if self._span.containing_transaction is None:
             return None
@@ -794,17 +810,36 @@ class Scope:
             "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
         )
         self._transaction = value
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = value
+        if self._span:
+            if isinstance(self._span, StreamedSpan):
+                warnings.warn(
+                    "Scope.transaction is not available in streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return None
+
+            if self._span.containing_transaction:
+                self._span.containing_transaction.name = value
 
     def set_transaction_name(self, name: str, source: "Optional[str]" = None) -> None:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
+        if self._span:
+            if isinstance(self._span, NoOpStreamedSpan):
+                return
 
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = name
-            if source:
-                self._span.containing_transaction.source = source
+            elif isinstance(self._span, StreamedSpan):
+                self._span._segment.name = name
+                if source:
+                    self._span._segment.set_attribute(
+                        "sentry.span.source", getattr(source, "value", source)
+                    )
+
+            elif self._span.containing_transaction:
+                self._span.containing_transaction.name = name
+                if source:
+                    self._span.containing_transaction.source = source
 
         if source:
             self._transaction_info["source"] = source
@@ -827,12 +862,12 @@ class Scope:
             session.update(user=value)
 
     @property
-    def span(self) -> "Optional[Span]":
+    def span(self) -> "Optional[Union[Span, StreamedSpan]]":
         """Get/set current tracing span or transaction."""
         return self._span
 
     @span.setter
-    def span(self, span: "Optional[Span]") -> None:
+    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -1141,6 +1176,15 @@ class Scope:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        client = sentry_sdk.get_client()
+        if has_span_streaming_enabled(client.options):
+            warnings.warn(
+                "Scope.start_span is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return NoOpSpan()
+
         if kwargs.get("description") is not None:
             warnings.warn(
                 "The `description` parameter is deprecated. Please use `name` instead.",
@@ -1160,6 +1204,9 @@ class Scope:
 
             # get current span or transaction
             span = self.span or self.get_isolation_scope().span
+            if isinstance(span, StreamedSpan):
+                # make mypy happy
+                return NoOpSpan()
 
             if span is None:
                 # New spans get the `trace_id` from the scope
@@ -1173,6 +1220,94 @@ class Scope:
                 span = span.start_child(**kwargs)
 
             return span
+
+    def start_streamed_span(
+        self,
+        name: str,
+        attributes: "Optional[Attributes]" = None,
+        parent_span: "Optional[StreamedSpan]" = None,
+        active: bool = True,
+    ) -> "StreamedSpan":
+        # TODO: rename to start_span once we drop the old API
+        if isinstance(parent_span, NoOpStreamedSpan):
+            # parent_span is only set if the user explicitly set it
+            logger.debug(
+                "Ignored parent span provided. Span will be parented to the "
+                "currently active span instead."
+            )
+
+        if parent_span is None or isinstance(parent_span, NoOpStreamedSpan):
+            parent_span = self.span or self.get_current_scope().span  # type: ignore
+
+        # If no eligible parent_span was provided and there is no currently
+        # active span, this is a segment
+        if parent_span is None:
+            propagation_context = self.get_active_propagation_context()
+
+            if is_ignored_span(name, attributes):
+                return NoOpStreamedSpan(
+                    scope=self,
+                    unsampled_reason="ignored",
+                )
+
+            sampled, sample_rate, sample_rand, outcome = make_sampling_decision(
+                name,
+                attributes,
+                self,
+            )
+            if sampled is False:
+                return NoOpStreamedSpan(
+                    scope=self,
+                    unsampled_reason=outcome,
+                )
+
+            if sample_rate is not None:
+                self._update_sample_rate(sample_rate)
+
+            return StreamedSpan(
+                name=name,
+                attributes=attributes,
+                active=active,
+                scope=self,
+                segment=None,
+                trace_id=propagation_context.trace_id,
+                parent_span_id=propagation_context.parent_span_id,
+                parent_sampled=propagation_context.parent_sampled,
+                baggage=propagation_context.baggage,
+                sample_rand=sample_rand,
+                sample_rate=sample_rate,
+            )
+
+        # This is a child span; take propagation context from the parent span
+        with new_scope():
+            if is_ignored_span(name, attributes):
+                return NoOpStreamedSpan(
+                    unsampled_reason="ignored",
+                )
+            if isinstance(parent_span, NoOpStreamedSpan):
+                return NoOpStreamedSpan(
+                    unsampled_reason=parent_span._unsampled_reason,
+                )
+
+            return StreamedSpan(
+                name=name,
+                attributes=attributes,
+                active=active,
+                scope=self,
+                segment=parent_span._segment,
+                trace_id=parent_span.trace_id,
+                parent_span_id=parent_span.span_id,
+                parent_sampled=parent_span.sampled,
+            )
+
+    def _update_sample_rate(self, sample_rate: float) -> None:
+        # If we had to adjust the sample rate when setting the sampling decision
+        # for a span, it needs to be updated in the propagation context too
+        propagation_context = self.get_active_propagation_context()
+        baggage = propagation_context.baggage
+
+        if baggage is not None:
+            baggage.sentry_items["sample_rate"] = str(sample_rate)
 
     def continue_trace(
         self,
@@ -1206,6 +1341,9 @@ class Scope:
             same_process_as_parent=False,
             **optional_kwargs,
         )
+
+    def set_propagation_context(self, environ_or_headers: "dict[str, Any]") -> None:
+        self.generate_propagation_context(environ_or_headers)
 
     def capture_event(
         self,

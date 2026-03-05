@@ -7,12 +7,13 @@ from sentry_sdk.integrations.redis.consts import (
     _SINGLE_KEY_COMMANDS,
 )
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Sequence
+    from typing import Any, Optional, Sequence, Union
     from sentry_sdk.tracing import Span
 
 
@@ -105,14 +106,18 @@ def _parse_rediscluster_command(command: "Any") -> "Sequence[Any]":
 
 
 def _set_pipeline_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     is_cluster: bool,
     get_command_args_fn: "Any",
     is_transaction: bool,
     commands_seq: "Sequence[Any]",
 ) -> None:
-    span.set_tag("redis.is_cluster", is_cluster)
-    span.set_tag("redis.transaction", is_transaction)
+    if isinstance(span, StreamedSpan):
+        span.set_attribute("redis.is_cluster", is_cluster)
+        span.set_attribute("redis.transaction", is_transaction)
+    else:
+        span.set_tag("redis.is_cluster", is_cluster)
+        span.set_tag("redis.transaction", is_transaction)
 
     commands = []
     for i, arg in enumerate(commands_seq):
@@ -122,24 +127,45 @@ def _set_pipeline_data(
         command = get_command_args_fn(arg)
         commands.append(_get_safe_command(command[0], command[1:]))
 
-    span.set_data(
-        "redis.commands",
-        {
-            "count": len(commands_seq),
-            "first_ten": commands,
-        },
-    )
+    if isinstance(span, StreamedSpan):
+        span.set_attribute(
+            "redis.commands.count",
+            len(commands_seq),
+        )
+        span.set_attribute(
+            "redis.commands.first_ten",
+            commands,
+        )
+    else:
+        span.set_data(
+            "redis.commands",
+            {
+                "count": len(commands_seq),
+                "first_ten": commands,
+            },
+        )
 
 
-def _set_client_data(span: "Span", is_cluster: bool, name: str, *args: "Any") -> None:
-    span.set_tag("redis.is_cluster", is_cluster)
-    if name:
-        span.set_tag("redis.command", name)
-        span.set_tag(SPANDATA.DB_OPERATION, name)
+def _set_client_data(
+    span: "Union[Span, StreamedSpan]", is_cluster: bool, name: str, *args: "Any"
+) -> None:
+    if isinstance(span, StreamedSpan):
+        span.set_attribute("redis.is_cluster", is_cluster)
+        if name:
+            span.set_attribute("redis.command", name)
+            span.set_attribute(SPANDATA.DB_OPERATION, name)
+    else:
+        span.set_tag("redis.is_cluster", is_cluster)
+        if name:
+            span.set_tag("redis.command", name)
+            span.set_tag(SPANDATA.DB_OPERATION, name)
 
     if name and args:
         name_low = name.lower()
         if (name_low in _SINGLE_KEY_COMMANDS) or (
             name_low in _MULTI_KEY_COMMANDS and len(args) == 1
         ):
-            span.set_tag("redis.key", args[0])
+            if isinstance(span, StreamedSpan):
+                span.set_attribute("redis.key", args[0])
+            else:
+                span.set_tag("redis.key", args[0])

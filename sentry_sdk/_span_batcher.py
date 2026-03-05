@@ -4,21 +4,24 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.utils import format_timestamp, serialize_attribute, safe_repr
+from sentry_sdk.utils import format_timestamp, serialize_attribute
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
     from sentry_sdk.traces import StreamedSpan
-    from sentry_sdk._types import SerializedAttributeValue
 
 
 class SpanBatcher(Batcher["StreamedSpan"]):
-    # TODO[span-first]: size-based flushes
-    # TODO[span-first]: adjust flush/drop defaults
+    # MAX_BEFORE_FLUSH should be lower than MAX_BEFORE_DROP, so that there is
+    # a bit of a buffer for spans that appear between setting the flush event
+    # and actually flushing the buffer.
+    #
+    # The max limits are all per trace.
+    MAX_ENVELOPE_SIZE = 1000  # spans
     MAX_BEFORE_FLUSH = 1000
-    MAX_BEFORE_DROP = 5000
+    MAX_BEFORE_DROP = 2000
+    MAX_BYTES_BEFORE_FLUSH = 5 * 1024 * 1024  # 5 MB
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "span"
@@ -35,6 +38,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # envelope.
         # trace_id -> span buffer
         self._span_buffer: dict[str, list["StreamedSpan"]] = defaultdict(list)
+        self._running_size: dict[str, int] = defaultdict(lambda: 0)
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
@@ -45,16 +49,12 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
 
-    def get_size(self) -> int:
-        # caller is responsible for locking before checking this
-        return sum(len(buffer) for buffer in self._span_buffer.values())
-
     def add(self, span: "StreamedSpan") -> None:
         if not self._ensure_thread() or self._flusher is None:
             return None
 
         with self._lock:
-            size = self.get_size()
+            size = len(self._span_buffer[span.trace_id])
             if size >= self.MAX_BEFORE_DROP:
                 self._record_lost_func(
                     reason="queue_overflow",
@@ -64,17 +64,37 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return None
 
             self._span_buffer[span.trace_id].append(span)
+
             if size + 1 >= self.MAX_BEFORE_FLUSH:
                 self._flush_event.set()
+                return
+
+            self._running_size[span.trace_id] += self._estimate_size(span)
+            if self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH:
+                self._flush_event.set()
+                return
+
+    @staticmethod
+    def _estimate_size(item: "StreamedSpan") -> int:
+        # Rough estimate of serialized span size that's quick to compute
+        return 210 + 70 * len(item._attributes)
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
-        # TODO[span-first]
         res: "dict[str, Any]" = {
+            "trace_id": item.trace_id,
             "span_id": item.span_id,
             "name": item._name,
             "status": item._status,
+            "is_segment": item.is_segment(),
+            "start_timestamp": item._start_timestamp.timestamp(),
         }
+
+        if item._timestamp:
+            res["end_timestamp"] = item._timestamp.timestamp()
+
+        if item._parent_span_id:
+            res["parent_span_id"] = item._parent_span_id
 
         if item._attributes:
             res["attributes"] = {
@@ -86,43 +106,47 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _flush(self) -> None:
         with self._lock:
             if len(self._span_buffer) == 0:
-                return None
+                return
 
             envelopes = []
-            for trace_id, spans in self._span_buffer.items():
+            for spans in self._span_buffer.values():
                 if spans:
-                    # TODO[span-first]
-                    # dsc = spans[0].dynamic_sampling_context()
-                    dsc = None
+                    dsc = spans[0]._dynamic_sampling_context()
 
-                    envelope = Envelope(
-                        headers={
-                            "sent_at": format_timestamp(datetime.now(timezone.utc)),
-                            "trace": dsc,
-                        }
-                    )
+                    # Max per envelope is 1000, so if we happen to have more than
+                    # 1000 spans in one bucket, we'll need to separate them.
+                    for start in range(0, len(spans), self.MAX_ENVELOPE_SIZE):
+                        end = min(start + self.MAX_ENVELOPE_SIZE, len(spans))
 
-                    envelope.add_item(
-                        Item(
-                            type="span",
-                            content_type="application/vnd.sentry.items.span.v2+json",
+                        envelope = Envelope(
                             headers={
-                                "item_count": len(spans),
-                            },
-                            payload=PayloadRef(
-                                json={
-                                    "items": [
-                                        self._to_transport_format(span)
-                                        for span in spans
-                                    ]
-                                }
-                            ),
+                                "sent_at": format_timestamp(datetime.now(timezone.utc)),
+                                "trace": dsc,
+                            }
                         )
-                    )
 
-                    envelopes.append(envelope)
+                        envelope.add_item(
+                            Item(
+                                type=self.TYPE,
+                                content_type=self.CONTENT_TYPE,
+                                headers={
+                                    "item_count": end - start,
+                                },
+                                payload=PayloadRef(
+                                    json={
+                                        "items": [
+                                            self._to_transport_format(spans[j])
+                                            for j in range(start, end)
+                                        ]
+                                    }
+                                ),
+                            )
+                        )
+
+                        envelopes.append(envelope)
 
             self._span_buffer.clear()
+            self._running_size.clear()
 
         for envelope in envelopes:
             self._capture_func(envelope)

@@ -253,6 +253,8 @@ class Item:
             return "session"
         elif ty == "attachment":
             return "attachment"
+        elif ty == "span":
+            return "span"
         elif ty == "transaction":
             return "transaction"
         elif ty == "event":
