@@ -1225,7 +1225,6 @@ class Scope:
                 parent_sampled=parent_span.sampled,
             )
 
-
     def continue_trace(
         self,
         environ_or_headers: "Dict[str, Any]",
