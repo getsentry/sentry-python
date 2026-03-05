@@ -473,6 +473,9 @@ class SPANDATA:
 
     GEN_AI_CHOICE = "gen_ai.choice"
     """
+    .. deprecated::
+        This attribute is deprecated. Use the gen_ai.output.messages attribute instead.
+
     The model's response message.
     Example: "The weather in Paris is rainy and overcast, with temperatures around 57°F"
     """
@@ -677,6 +680,9 @@ class SPANDATA:
 
     GEN_AI_USER_MESSAGE = "gen_ai.user.message"
     """
+    .. deprecated::
+        This attribute is deprecated. Use the gen_ai.input.messages attribute instead.
+
     The user message passed to the model.
     Example: "What's the weather in Paris?"
     """
