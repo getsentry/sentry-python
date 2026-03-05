@@ -91,10 +91,9 @@ def _wrap_chat(f, streaming):
 
                 if streaming:
                     return _iter_stream_events(response, span, include_pii)
-                else:
-                    set_response_span_data(
-                        span, response, include_pii, COHERE_V1_CHAT_CONFIG["response"]
-                    )
+                set_response_span_data(
+                    span, response, include_pii, COHERE_V1_CHAT_CONFIG["response"]
+                )
                 return response
 
     return new_chat
