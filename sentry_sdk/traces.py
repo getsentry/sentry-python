@@ -9,15 +9,11 @@ import uuid
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.utils import format_attribute
+from sentry_sdk.utils import format_attribute, logger
 
 if TYPE_CHECKING:
     from typing import Optional, Union
     from sentry_sdk._types import Attributes, AttributeValue
-
-
-FLAGS_CAPACITY = 10
 
 
 class SpanStatus(str, Enum):
@@ -65,19 +61,19 @@ class StreamedSpan:
     """
     A span holds timing information of a block of code.
 
-    Spans can have multiple child spans thus forming a span tree.
+    Spans can have multiple child spans, thus forming a span tree.
 
-    This is the Span First span implementation. The original transaction-based
-    span implementation lives in tracing.Span.
+    This is the Span First span implementation that streams spans. The original
+    transaction-based span implementation lives in tracing.Span.
     """
 
     __slots__ = (
         "_name",
         "_attributes",
+        "_active",
         "_span_id",
         "_trace_id",
         "_status",
-        "_flags",
     )
 
     def __init__(
@@ -85,9 +81,11 @@ class StreamedSpan:
         *,
         name: str,
         attributes: "Optional[Attributes]" = None,
+        active: bool = True,
         trace_id: "Optional[str]" = None,
     ):
         self._name: str = name
+        self._active: bool = active
         self._attributes: "Attributes" = {}
         if attributes:
             for attribute, value in attributes.items():
@@ -96,10 +94,17 @@ class StreamedSpan:
         self._span_id: "Optional[str]" = None
         self._trace_id: "Optional[str]" = trace_id
 
-        self.set_status(SpanStatus.OK)
-        self.set_source(SegmentSource.CUSTOM)
+        self._status = SpanStatus.OK.value
+        self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
-        self._flags: dict[str, bool] = {}
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}("
+            f"name={self._name}, "
+            f"trace_id={self.trace_id}, "
+            f"span_id={self.span_id}, "
+            f"active={self._active})>"
+        )
 
     def get_attributes(self) -> "Attributes":
         return self._attributes
@@ -117,47 +122,34 @@ class StreamedSpan:
         except KeyError:
             pass
 
-    def get_status(self) -> "Union[SpanStatus, str]":
-        if self._status in {s.value for s in SpanStatus}:
-            return SpanStatus(self._status)
-
+    @property
+    def status(self) -> "str":
         return self._status
 
-    def set_status(self, status: "Union[SpanStatus, str]") -> None:
+    @status.setter
+    def status(self, status: "Union[SpanStatus, str]") -> None:
         if isinstance(status, Enum):
             status = status.value
 
+        if status not in {e.value for e in SpanStatus}:
+            logger.debug(
+                f'Unsupported span status {status}. Expected one of: "ok", "error"'
+            )
+            return
+
         self._status = status
 
-    def set_http_status(self, http_status: int) -> None:
-        self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
-
-        if http_status >= 400:
-            self.set_status(SpanStatus.ERROR)
-        else:
-            self.set_status(SpanStatus.OK)
-
-    def get_name(self) -> str:
+    @property
+    def name(self) -> str:
         return self._name
 
-    def set_name(self, name: str) -> None:
+    @name.setter
+    def name(self, name: str) -> None:
         self._name = name
 
-    def set_flag(self, flag: str, result: bool) -> None:
-        if len(self._flags) < FLAGS_CAPACITY:
-            self._flags[flag] = result
-
-    def set_op(self, op: str) -> None:
-        self.set_attribute("sentry.op", op)
-
-    def set_origin(self, origin: str) -> None:
-        self.set_attribute("sentry.origin", origin)
-
-    def set_source(self, source: "Union[str, SegmentSource]") -> None:
-        if isinstance(source, Enum):
-            source = source.value
-
-        self.set_attribute("sentry.span.source", source)
+    @property
+    def active(self) -> bool:
+        return self._active
 
     @property
     def span_id(self) -> str:
@@ -172,3 +164,45 @@ class StreamedSpan:
             self._trace_id = uuid.uuid4().hex
 
         return self._trace_id
+
+
+class NoOpStreamedSpan(StreamedSpan):
+    def get_attributes(self) -> "Attributes":
+        return {}
+
+    def set_attribute(self, key: str, value: "AttributeValue") -> None:
+        pass
+
+    def set_attributes(self, attributes: "Attributes") -> None:
+        pass
+
+    def remove_attribute(self, key: str) -> None:
+        pass
+
+    @property
+    def status(self) -> "str":
+        return SpanStatus.OK.value
+
+    @status.setter
+    def status(self, status: "Union[SpanStatus, str]") -> None:
+        pass
+
+    @property
+    def name(self) -> str:
+        return ""
+
+    @name.setter
+    def name(self, value: str) -> None:
+        pass
+
+    @property
+    def active(self) -> bool:
+        return True
+
+    @property
+    def span_id(self) -> str:
+        return "0000000000000000"
+
+    @property
+    def trace_id(self) -> str:
+        return "00000000000000000000000000000000"
