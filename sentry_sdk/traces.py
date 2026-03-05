@@ -396,7 +396,7 @@ class StreamedSpan:
         if isinstance(status, Enum):
             status = status.value
 
-        if status not in ("ok", "error"):
+        if status not in {e.value for e in SpanStatus}:
             logger.debug(
                 f'Unsupported span status {status}. Expected one of: "ok", "error"'
             )
@@ -467,6 +467,18 @@ class StreamedSpan:
             return self._segment._get_baggage()
         return None
 
+    def _get_baggage(self) -> "Baggage":
+        """
+        Return the :py:class:`~sentry_sdk.tracing_utils.Baggage` associated with
+        the segment.
+
+        The first time a new baggage with Sentry items is made, it will be frozen.
+        """
+        if not self._baggage or self._baggage.mutable:
+            self._baggage = Baggage.populate_from_segment(self)
+
+        return self._baggage
+
     def _iter_headers(self) -> "Iterator[tuple[str, str]]":
         if not self._segment:
             return
@@ -493,18 +505,6 @@ class StreamedSpan:
     def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
         if profiler_id is not None:
             self.set_attribute("sentry.profiler_id", profiler_id)
-
-    def _get_baggage(self) -> "Baggage":
-        """
-        Return the :py:class:`~sentry_sdk.tracing_utils.Baggage` associated with
-        the segment.
-
-        The first time a new baggage with Sentry items is made, it will be frozen.
-        """
-        if not self._baggage or self._baggage.mutable:
-            self._baggage = Baggage.populate_from_segment(self)
-
-        return self._baggage
 
     def _get_trace_context(self) -> "dict[str, Any]":
         # Even if spans themselves are not event-based anymore, we need this
