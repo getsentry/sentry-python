@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
     from cohere import StreamedChatResponse
+    from sentry_sdk.ai.span_config import OperationConfig
 
 import sentry_sdk
 from sentry_sdk.integrations.cohere import (
@@ -37,13 +38,26 @@ except ImportError:
     _has_chat_types = False
 
 
+def setup_v1(wrap_embed_fn):
+    # type: (Callable[..., Any]) -> None
+    try:
+        from cohere.base_client import BaseCohere
+        from cohere.client import Client
+    except ImportError:
+        return
+
+    BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
+    BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
+    Client.embed = wrap_embed_fn(Client.embed)
+
+
 def _extract_response_text(response):
     # type: (Any) -> list[str] | None
     text = getattr(response, "text", None)
     return [text] if text is not None else None
 
 
-COHERE_V1_CHAT_CONFIG = {
+COHERE_V1_CHAT_CONFIG: "OperationConfig" = {
     "static": {
         SPANDATA.GEN_AI_SYSTEM: "cohere",
         SPANDATA.GEN_AI_OPERATION_NAME: "chat",
@@ -74,19 +88,6 @@ COHERE_V1_CHAT_CONFIG = {
 }
 
 
-def setup_v1(wrap_embed_fn):
-    # type: (Callable[..., Any]) -> None
-    try:
-        from cohere.base_client import BaseCohere
-        from cohere.client import Client
-    except ImportError:
-        return
-
-    BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
-    BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
-    Client.embed = wrap_embed_fn(Client.embed)
-
-
 def _wrap_chat(f, streaming):
     # type: (Callable[..., Any], bool) -> Callable[..., Any]
     if not _has_chat_types:
@@ -112,7 +113,7 @@ def _wrap_chat(f, streaming):
             origin=CohereIntegration.origin,
         ) as span:
             try:
-                res = f(*args, **kwargs)
+                response = f(*args, **kwargs)
             except Exception as e:
                 exc_info = sys.exc_info()
                 with capture_internal_exceptions():
@@ -129,12 +130,12 @@ def _wrap_chat(f, streaming):
                 )
 
                 if streaming:
-                    return _iter_stream_events(res, span, include_pii)
+                    return _iter_stream_events(response, span, include_pii)
                 else:
                     set_response_span_data(
-                        span, res, include_pii, COHERE_V1_CHAT_CONFIG["response"]
+                        span, response, include_pii, COHERE_V1_CHAT_CONFIG["response"]
                     )
-                return res
+                return response
 
     return new_chat
 

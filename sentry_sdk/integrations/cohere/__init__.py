@@ -10,6 +10,7 @@ from sentry_sdk.tracing_utils import set_span_errored
 
 if TYPE_CHECKING:
     from typing import Any, Callable
+    from sentry_sdk.ai.span_config import OperationConfig
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -30,7 +31,7 @@ def _normalize_embedding_input(texts):
     return [texts]
 
 
-COHERE_EMBED_CONFIG = {
+COHERE_EMBED_CONFIG: "OperationConfig" = {
     "static": {
         SPANDATA.GEN_AI_SYSTEM: "cohere",
         SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",

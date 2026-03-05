@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
     from sentry_sdk.tracing import Span
+    from sentry_sdk.ai.span_config import OperationConfig
 
 import sentry_sdk
 from sentry_sdk.integrations.cohere import (
@@ -44,18 +45,19 @@ try:
 except ImportError:
     _has_v2 = False
 
-STREAM_DELTA_TEXT_SOURCES = [("delta", "message", "content", "text")]
 
-_V2_USAGE = {
-    "input_tokens": [
-        ("usage", "billed_units", "input_tokens"),
-        ("usage", "tokens", "input_tokens"),
-    ],
-    "output_tokens": [
-        ("usage", "billed_units", "output_tokens"),
-        ("usage", "tokens", "output_tokens"),
-    ],
-}
+def setup_v2(wrap_embed_fn):
+    # type: (Callable[..., Any]) -> None
+    if not _has_v2:
+        return
+    CohereV2Client.chat = _wrap_chat_v2(CohereV2Client.chat, streaming=False)
+    CohereV2Client.chat_stream = _wrap_chat_v2(
+        CohereV2Client.chat_stream, streaming=True
+    )
+    CohereV2Client.embed = wrap_embed_fn(CohereV2Client.embed)
+
+
+STREAM_DELTA_TEXT_SOURCES = [("delta", "message", "content", "text")]
 
 
 def _extract_v2_response_text(response):
@@ -68,7 +70,7 @@ def _extract_v2_response_text(response):
     return None
 
 
-COHERE_V2_CHAT_CONFIG = {
+COHERE_V2_CHAT_CONFIG: "OperationConfig" = {
     "static": {
         SPANDATA.GEN_AI_SYSTEM: "cohere",
         SPANDATA.GEN_AI_OPERATION_NAME: "chat",
@@ -87,7 +89,16 @@ COHERE_V2_CHAT_CONFIG = {
             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: [("message", "tool_calls")],
         },
         "extract_text": _extract_v2_response_text,
-        "usage": _V2_USAGE,
+        "usage": {
+            "input_tokens": [
+                ("usage", "billed_units", "input_tokens"),
+                ("usage", "tokens", "input_tokens"),
+            ],
+            "output_tokens": [
+                ("usage", "billed_units", "output_tokens"),
+                ("usage", "tokens", "output_tokens"),
+            ],
+        },
     },
     "stream_response": {
         "sources": {
@@ -108,17 +119,6 @@ COHERE_V2_CHAT_CONFIG = {
 }
 
 
-def setup_v2(wrap_embed_fn):
-    # type: (Callable[..., Any]) -> None
-    if not _has_v2:
-        return
-    CohereV2Client.chat = _wrap_chat_v2(CohereV2Client.chat, streaming=False)
-    CohereV2Client.chat_stream = _wrap_chat_v2(
-        CohereV2Client.chat_stream, streaming=True
-    )
-    CohereV2Client.embed = wrap_embed_fn(CohereV2Client.embed)
-
-
 def _wrap_chat_v2(f, streaming):
     # type: (Callable[..., Any], bool) -> Callable[..., Any]
     @wraps(f)
@@ -137,7 +137,7 @@ def _wrap_chat_v2(f, streaming):
             origin=CohereIntegration.origin,
         ) as span:
             try:
-                res = f(*args, **kwargs)
+                response = f(*args, **kwargs)
             except Exception as e:
                 exc_info = sys.exc_info()
                 with capture_internal_exceptions():
@@ -153,11 +153,11 @@ def _wrap_chat_v2(f, streaming):
                     span, kwargs, integration, COHERE_V2_CHAT_CONFIG, span_data
                 )
                 if streaming:
-                    return _iter_v2_stream_events(res, span, include_pii)
+                    return _iter_v2_stream_events(response, span, include_pii)
                 set_response_span_data(
-                    span, res, include_pii, COHERE_V2_CHAT_CONFIG["response"]
+                    span, response, include_pii, COHERE_V2_CHAT_CONFIG["response"]
                 )
-                return res
+                return response
 
     return new_chat
 
