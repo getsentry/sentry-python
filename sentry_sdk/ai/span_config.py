@@ -33,27 +33,31 @@ def set_request_span_data(span, kwargs, integration, config, span_data=None):
             set_data_normalized(span, span_attr, value)
 
     if should_send_default_pii() and integration.include_prompts:
-        extract = config.get("extract_messages")
-        if extract is not None:
-            messages = extract(kwargs)
-            if messages:
-                messages = normalize_message_roles(messages)
-                scope = sentry_sdk.get_current_scope()
-                messages = truncate_and_annotate_messages(messages, span, scope)
-                if messages is not None:
-                    target = config.get(
-                        "message_target", SPANDATA.GEN_AI_REQUEST_MESSAGES
-                    )
-                    set_data_normalized(span, target, messages, unpack=False)
-
         for kwarg_key, span_attr in config.get("pii_params", {}).items():
             if kwarg_key in kwargs:
                 value = kwargs[kwarg_key]
                 set_data_normalized(span, span_attr, value)
 
 
+def set_request_messages(span, messages, target=None):
+    # type: (Span, Any, Optional[str]) -> None
+    """Normalize, truncate, and set request messages on the span.
+
+    Caller is responsible for PII gating.
+    """
+    if not messages:
+        return
+    messages = normalize_message_roles(messages)
+    scope = sentry_sdk.get_current_scope()
+    messages = truncate_and_annotate_messages(messages, span, scope)
+    if messages is not None:
+        set_data_normalized(
+            span, target or SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+        )
+
+
 def set_response_span_data(
-    span, response, include_pii, response_config, collected_text=None
+    span, response, include_pii, response_config, response_text=None
 ):
     # type: (Span, Any, bool, Dict[str, Any], Optional[List[str]]) -> None
     """Set response span data from a declarative config."""
@@ -65,16 +69,8 @@ def set_response_span_data(
         pii_sources = response_config.get("pii_sources")
         if pii_sources:
             set_span_data_from_sources(span, response, pii_sources, require_truthy=True)
-        if collected_text:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, ["".join(collected_text)]
-            )
-        else:
-            extract_text = response_config.get("extract_text")
-            if extract_text:
-                texts = extract_text(response)
-                if texts:
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, texts)
+        if response_text:
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
 
     usage_config = response_config.get("usage")
     if usage_config:

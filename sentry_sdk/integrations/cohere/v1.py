@@ -1,8 +1,12 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.ai.span_config import set_request_span_data, set_response_span_data
-from sentry_sdk.ai.utils import get_first_from_sources
+from sentry_sdk.ai.span_config import (
+    set_request_span_data,
+    set_request_messages,
+    set_response_span_data,
+)
+from sentry_sdk.ai.utils import get_first_from_sources, transform_message_content
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.cohere.configs import COHERE_V1_CHAT_CONFIG
 
@@ -88,11 +92,20 @@ def _wrap_chat(f, streaming):
                 set_request_span_data(
                     span, kwargs, integration, COHERE_V1_CHAT_CONFIG, span_data
                 )
+                if include_pii:
+                    set_request_messages(span, _extract_v1_messages(kwargs))
 
                 if streaming:
                     return _iter_stream_events(response, span, include_pii)
+                response_text = (
+                    _extract_v1_response_text(response) if include_pii else None
+                )
                 set_response_span_data(
-                    span, response, include_pii, COHERE_V1_CHAT_CONFIG["response"]
+                    span,
+                    response,
+                    include_pii,
+                    COHERE_V1_CHAT_CONFIG["response"],
+                    response_text,
                 )
                 return response
 
@@ -110,7 +123,36 @@ def _iter_stream_events(old_iterator, span, include_pii):
                     x, COHERE_V1_CHAT_CONFIG["stream_response_object"]
                 )
                 if response is not None:
+                    response_text = (
+                        _extract_v1_response_text(response) if include_pii else None
+                    )
                     set_response_span_data(
-                        span, response, include_pii, COHERE_V1_CHAT_CONFIG["response"]
+                        span,
+                        response,
+                        include_pii,
+                        COHERE_V1_CHAT_CONFIG["response"],
+                        response_text,
                     )
         yield x
+
+
+def _extract_v1_messages(kwargs):
+    # type: (Any) -> list[dict[str, str]]
+    messages = []
+    for x in kwargs.get("chat_history", []):
+        messages.append(
+            {
+                "role": getattr(x, "role", ""),
+                "content": transform_message_content(getattr(x, "message", "")),
+            }
+        )
+    message = kwargs.get("message")
+    if message:
+        messages.append({"role": "user", "content": transform_message_content(message)})
+    return messages
+
+
+def _extract_v1_response_text(response):
+    # type: (Any) -> list[str] | None
+    text = getattr(response, "text", None)
+    return [text] if text is not None else None

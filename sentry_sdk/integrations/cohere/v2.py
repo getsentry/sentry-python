@@ -1,8 +1,16 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.ai.span_config import set_request_span_data, set_response_span_data
-from sentry_sdk.ai.utils import get_first_from_sources, transitive_getattr
+from sentry_sdk.ai.span_config import (
+    set_request_span_data,
+    set_request_messages,
+    set_response_span_data,
+)
+from sentry_sdk.ai.utils import (
+    get_first_from_sources,
+    transform_message_content,
+    transitive_getattr,
+)
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.cohere.configs import (
     COHERE_V2_CHAT_CONFIG,
@@ -89,10 +97,22 @@ def _wrap_chat_v2(f, streaming):
                 set_request_span_data(
                     span, kwargs, integration, COHERE_V2_CHAT_CONFIG, span_data
                 )
+                if include_pii:
+                    set_request_messages(
+                        span, _extract_v2_messages(kwargs.get("messages", []))
+                    )
+
                 if streaming:
                     return _iter_v2_stream_events(response, span, include_pii)
+                response_text = (
+                    _extract_v2_response_text(response) if include_pii else None
+                )
                 set_response_span_data(
-                    span, response, include_pii, COHERE_V2_CHAT_CONFIG["response"]
+                    span,
+                    response,
+                    include_pii,
+                    COHERE_V2_CHAT_CONFIG["response"],
+                    response_text,
                 )
                 return response
 
@@ -106,12 +126,17 @@ def _iter_v2_stream_events(old_iterator, span, include_pii):
         with capture_internal_exceptions():
             _append_stream_delta_text(collected_text, x)
             if isinstance(x, MessageEndV2ChatStreamResponse):
+                response_text = (
+                    ["".join(collected_text)]
+                    if include_pii and collected_text
+                    else None
+                )
                 set_response_span_data(
                     span,
                     x,
                     include_pii,
                     COHERE_V2_CHAT_CONFIG["stream_response"],
-                    collected_text,
+                    response_text,
                 )
         yield x
 
@@ -123,3 +148,25 @@ def _append_stream_delta_text(collected_text, event):
     content_text = get_first_from_sources(event, STREAM_DELTA_TEXT_SOURCES)
     if content_text is not None:
         collected_text.append(content_text)
+
+
+def _extract_v2_messages(messages):
+    # type: (Any) -> list[dict[str, Any]]
+    result = []
+    for msg in messages:
+        role = msg["role"] if isinstance(msg, dict) else getattr(msg, "role", "unknown")
+        content = (
+            msg["content"] if isinstance(msg, dict) else getattr(msg, "content", "")
+        )
+        result.append({"role": role, "content": transform_message_content(content)})
+    return result
+
+
+def _extract_v2_response_text(response):
+    # type: (Any) -> list[str] | None
+    content = get_first_from_sources(response, [("message", "content")], True)
+    if content:
+        texts = [item.text for item in content if hasattr(item, "text")]
+        if texts:
+            return texts
+    return None

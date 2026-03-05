@@ -1,13 +1,9 @@
-from sentry_sdk.ai.utils import (
-    get_first_from_sources,
-    transform_message_content,
-)
 from sentry_sdk.consts import SPANDATA
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+    from typing import Any, Dict, Sequence, Tuple
     from typing_extensions import TypedDict
 
     # Source paths: list of attribute chains to try in order.
@@ -32,9 +28,6 @@ if TYPE_CHECKING:
         sources: SourceMapping
         # Attributes extracted only when PII sending is enabled.
         pii_sources: SourceMapping
-        # Custom extractor for response text (PII only).
-        # Returns list of text strings, or None.
-        extract_text: Callable[[Any], Optional[List[str]]]
         # Declarative token usage paths.
         usage: UsageConfig
 
@@ -47,10 +40,6 @@ if TYPE_CHECKING:
         params: Dict[str, str]
         # Maps kwarg names to SPANDATA keys (only set when PII is enabled).
         pii_params: Dict[str, str]
-        # Extracts messages from kwargs for the span.
-        extract_messages: Callable[[Dict[str, Any]], Optional[List[Dict[str, Any]]]]
-        # SPANDATA key for messages (default: GEN_AI_REQUEST_MESSAGES).
-        message_target: str
         # Non-streaming response config.
         response: ResponseConfig
         # Streaming response config (different attribute paths).
@@ -58,62 +47,6 @@ if TYPE_CHECKING:
         # Source paths to extract a full response object from a stream-end event
         # (V1 pattern: reuse "response" config after extracting).
         stream_response_object: SourcePaths
-
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
-
-def _normalize_embedding_input(texts):
-    # type: (Any) -> Any
-    if isinstance(texts, list):
-        return texts
-    if isinstance(texts, tuple):
-        return list(texts)
-    return [texts]
-
-
-def _extract_v1_messages(kwargs):
-    # type: (dict[str, Any]) -> list[dict[str, str]]
-    messages = []
-    for x in kwargs.get("chat_history", []):
-        messages.append(
-            {
-                "role": getattr(x, "role", ""),
-                "content": transform_message_content(getattr(x, "message", "")),
-            }
-        )
-    message = kwargs.get("message")
-    if message:
-        messages.append({"role": "user", "content": transform_message_content(message)})
-    return messages
-
-
-def _extract_v1_response_text(response):
-    # type: (Any) -> list[str] | None
-    text = getattr(response, "text", None)
-    return [text] if text is not None else None
-
-
-def _extract_v2_messages(messages):
-    # type: (Any) -> list[dict[str, Any]]
-    result = []
-    for msg in messages:
-        role = msg["role"] if isinstance(msg, dict) else getattr(msg, "role", "unknown")
-        content = (
-            msg["content"] if isinstance(msg, dict) else getattr(msg, "content", "")
-        )
-        result.append({"role": role, "content": transform_message_content(content)})
-    return result
-
-
-def _extract_v2_response_text(response):
-    # type: (Any) -> list[str] | None
-    content = get_first_from_sources(response, [("message", "content")], True)
-    if content:
-        texts = [item.text for item in content if hasattr(item, "text")]
-        if texts:
-            return texts
-    return None
 
 
 # ── Configs ──────────────────────────────────────────────────────────────────
@@ -125,10 +58,6 @@ COHERE_EMBED_CONFIG: "OperationConfig" = {
         SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
     },
     "params": {"model": SPANDATA.GEN_AI_REQUEST_MODEL},
-    "extract_messages": lambda kw: (
-        _normalize_embedding_input(kw["texts"]) if "texts" in kw else None
-    ),
-    "message_target": SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
     "response": {
         "usage": {
             "input_tokens": [("meta", "billed_units", "input_tokens")],
@@ -143,7 +72,6 @@ COHERE_V1_CHAT_CONFIG: "OperationConfig" = {
         SPANDATA.GEN_AI_SYSTEM: "cohere",
         SPANDATA.GEN_AI_OPERATION_NAME: "chat",
     },
-    "extract_messages": lambda kw: _extract_v1_messages(kw),
     "response": {
         "sources": {
             SPANDATA.GEN_AI_RESPONSE_MODEL: [("model",)],
@@ -153,7 +81,6 @@ COHERE_V1_CHAT_CONFIG: "OperationConfig" = {
         "pii_sources": {
             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: [("tool_calls",)],
         },
-        "extract_text": _extract_v1_response_text,
         "usage": {
             "input_tokens": [
                 ("meta", "billed_units", "input_tokens"),
@@ -180,7 +107,6 @@ COHERE_V2_CHAT_CONFIG: "OperationConfig" = {
     "pii_params": {
         "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
     },
-    "extract_messages": lambda kw: _extract_v2_messages(kw.get("messages", [])),
     "response": {
         "sources": {
             SPANDATA.GEN_AI_RESPONSE_MODEL: [("model",)],
@@ -190,7 +116,6 @@ COHERE_V2_CHAT_CONFIG: "OperationConfig" = {
         "pii_sources": {
             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: [("message", "tool_calls")],
         },
-        "extract_text": _extract_v2_response_text,
         "usage": {
             "input_tokens": [
                 ("usage", "billed_units", "input_tokens"),

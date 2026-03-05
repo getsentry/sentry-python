@@ -1,12 +1,17 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.consts import OP
-from sentry_sdk.ai.span_config import set_request_span_data, set_response_span_data
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.ai.span_config import (
+    set_request_span_data,
+    set_request_messages,
+    set_response_span_data,
+)
 from sentry_sdk.integrations.cohere.configs import COHERE_EMBED_CONFIG
 
 from typing import TYPE_CHECKING
 
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import set_span_errored
 
 if TYPE_CHECKING:
@@ -64,15 +69,23 @@ def _wrap_embed(f):
 
         model = kwargs.get("model", "")
 
+        include_pii = should_send_default_pii() and integration.include_prompts
+
         with sentry_sdk.start_span(
             op=OP.GEN_AI_EMBEDDINGS,
             name=f"embeddings {model}".strip(),
             origin=CohereIntegration.origin,
         ) as span:
             set_request_span_data(span, kwargs, integration, COHERE_EMBED_CONFIG)
+            if include_pii and "texts" in kwargs:
+                set_request_messages(
+                    span,
+                    _normalize_embedding_input(kwargs["texts"]),
+                    target=SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                )
 
             try:
-                res = f(*args, **kwargs)
+                response = f(*args, **kwargs)
             except Exception as e:
                 exc_info = sys.exc_info()
                 with capture_internal_exceptions():
@@ -80,8 +93,17 @@ def _wrap_embed(f):
                 reraise(*exc_info)
 
             set_response_span_data(
-                span, res, False, COHERE_EMBED_CONFIG["response"]
+                span, response, False, COHERE_EMBED_CONFIG["response"]
             )
-            return res
+            return response
 
     return new_embed
+
+
+def _normalize_embedding_input(texts):
+    # type: (Any) -> Any
+    if isinstance(texts, list):
+        return texts
+    if isinstance(texts, tuple):
+        return list(texts)
+    return [texts]
