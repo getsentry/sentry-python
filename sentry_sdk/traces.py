@@ -552,9 +552,10 @@ class NoOpStreamedSpan(StreamedSpan):
         scope: "Optional[sentry_sdk.Scope]" = None,
         **kwargs: "Any",
     ) -> None:
-        self._segment = None  # type: ignore[assignment]
         self._scope = scope  # type: ignore[assignment]
         self._unsampled_reason = unsampled_reason
+
+        self._segment = None  # type: ignore[assignment]
 
         self._start()
 
@@ -576,6 +577,9 @@ class NoOpStreamedSpan(StreamedSpan):
     @name.setter
     def name(self, value: str) -> None:
         pass
+
+    # XXX[span-first]: These default span_id and trace_id values will be used
+    # in outgoing requests if a noop span is active. Is that how it should be?
 
     @property
     def span_id(self) -> str:

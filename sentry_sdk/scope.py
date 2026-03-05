@@ -1246,9 +1246,8 @@ class Scope:
 
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
-                    trace_id=propagation_context.trace_id,
-                    unsampled_reason="ignored",
                     scope=self,
+                    unsampled_reason="ignored",
                 )
 
             sampled, sample_rate, sample_rand, outcome = make_sampling_decision(
@@ -1258,9 +1257,8 @@ class Scope:
             )
             if sampled is False:
                 return NoOpStreamedSpan(
-                    trace_id=propagation_context.trace_id,
-                    unsampled_reason=outcome,
                     scope=self,
+                    unsampled_reason=outcome,
                 )
 
             if sample_rate is not None:
@@ -1282,11 +1280,13 @@ class Scope:
 
         # This is a child span; take propagation context from the parent span
         with new_scope():
-            if is_ignored_span(name, attributes) or isinstance(
-                parent_span, NoOpStreamedSpan
-            ):
+            if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
-                    trace_id=parent_span.trace_id, unsampled_reason="ignored"
+                    unsampled_reason="ignored",
+                )
+            if isinstance(parent_span, NoOpStreamedSpan):
+                return NoOpStreamedSpan(
+                    unsampled_reason=parent_span._unsampled_reason,
                 )
 
             return StreamedSpan(
@@ -1302,7 +1302,7 @@ class Scope:
 
     def _update_sample_rate(self, sample_rate: float) -> None:
         # If we had to adjust the sample rate when setting the sampling decision
-        # for the spans, it needs to be updated in the propagation context too
+        # for a span, it needs to be updated in the propagation context too
         propagation_context = self.get_active_propagation_context()
         baggage = propagation_context.baggage
 

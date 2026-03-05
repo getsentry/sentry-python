@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 
 class SpanBatcher(Batcher["StreamedSpan"]):
-    # TODO[span-first]: adjust flush/drop defaults
     # MAX_BEFORE_FLUSH should be lower than MAX_BEFORE_DROP, so that there is
     # a bit of a buffer for spans that appear between setting the flush event
     # and actually flushing the buffer.
