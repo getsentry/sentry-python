@@ -14,8 +14,11 @@ from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import format_attribute, logger
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Callable, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue
+
+    P = ParamSpec("P")
+    R = TypeVar("R")
 
 
 class SpanStatus(str, Enum):
@@ -342,3 +345,74 @@ class NoOpStreamedSpan(StreamedSpan):
     @property
     def sampled(self) -> "Optional[bool]":
         return False
+
+
+def trace(
+    func: "Optional[Callable[P, R]]" = None,
+    *,
+    name: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Any]]" = None,
+    active: bool = True,
+) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
+    """
+    Decorator to start a span around a function call.
+
+    This decorator automatically creates a new span when the decorated function
+    is called, and finishes the span when the function returns or raises an exception.
+
+    :param func: The function to trace. When used as a decorator without parentheses,
+        this is the function being decorated. When used with parameters (e.g.,
+        ``@trace(op="custom")``, this should be None.
+    :type func: Callable or None
+
+    :param name: The human-readable name/description for the span. If not provided,
+        defaults to the function name. This provides more specific details about
+        what the span represents (e.g., "GET /api/users", "process_user_data").
+    :type name: str or None
+
+    :param attributes: A dictionary of key-value pairs to add as attributes to the span.
+        Attribute values must be strings, integers, floats, or booleans. These
+        attributes provide additional context about the span's execution.
+    :type attributes: dict[str, Any] or None
+
+    :param active: Controls whether spans started while this span is running
+        will automatically become its children. That's the default behavior. If
+        you want to create a span that shouldn't have any children (unless
+        provided explicitly via the `parent_span` argument), set this to False.
+    :type active: bool
+
+    :returns: When used as ``@trace``, returns the decorated function. When used as
+        ``@trace(...)`` with parameters, returns a decorator function.
+    :rtype: Callable or decorator function
+
+    Example::
+
+        import sentry_sdk
+
+        # Simple usage with default values
+        @sentry_sdk.trace
+        def process_data():
+            # Function implementation
+            pass
+
+        # With custom parameters
+        @sentry_sdk.trace(
+            name="Get user data",
+            attributes={"postgres": True}
+        )
+        def make_db_query(sql):
+            # Function implementation
+            pass
+    """
+    from sentry_sdk.tracing_utils import create_streaming_span_decorator
+
+    decorator = create_streaming_span_decorator(
+        name=name,
+        attributes=attributes,
+        active=active,
+    )
+
+    if func:
+        return decorator(func)
+    else:
+        return decorator

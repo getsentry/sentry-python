@@ -942,6 +942,58 @@ def create_span_decorator(
     return span_decorator
 
 
+def create_streaming_span_decorator(
+    name: "Optional[str]" = None,
+    attributes: "Optional[dict[str, Any]]" = None,
+    active: bool = True,
+) -> "Any":
+    """
+    Create a span creating decorator that can wrap both sync and async functions.
+    """
+    from sentry_sdk.scope import should_send_default_pii
+
+    def span_decorator(f: "Any") -> "Any":
+        """
+        Decorator to create a span for the given function.
+        """
+
+        @functools.wraps(f)
+        async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+            span_name = name or qualname_from_function(f) or ""
+
+            with start_streaming_span(
+                name=span_name, attributes=attributes, active=active
+            ):
+                result = await f(*args, **kwargs)
+                return result
+
+        try:
+            async_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+        @functools.wraps(f)
+        def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+            span_name = name or qualname_from_function(f) or ""
+
+            with start_streaming_span(
+                name=span_name, attributes=attributes, active=active
+            ):
+                return f(*args, **kwargs)
+
+        try:
+            sync_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+        if inspect.iscoroutinefunction(f):
+            return async_wrapper
+        else:
+            return sync_wrapper
+
+    return span_decorator
+
+
 def get_current_span(scope: "Optional[sentry_sdk.Scope]" = None) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
@@ -1320,3 +1372,10 @@ from sentry_sdk.tracing import (
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
+
+
+from sentry_sdk.traces import (
+    LOW_QUALITY_SEGMENT_SOURCES,
+    start_span as start_streaming_span,
+    StreamedSpan,
+)
