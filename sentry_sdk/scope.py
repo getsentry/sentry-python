@@ -583,7 +583,7 @@ class Scope:
 
         # If we have an active span, return traceparent from there
         if has_tracing_enabled(client.options) and self.span is not None:
-            return self.span.to_traceparent()
+            return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
         return self.get_active_propagation_context().to_traceparent()
@@ -597,7 +597,7 @@ class Scope:
 
         # If we have an active span, return baggage from there
         if has_tracing_enabled(client.options) and self.span is not None:
-            return self.span.to_baggage()
+            return self.span._to_baggage()
 
         # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
@@ -607,7 +607,7 @@ class Scope:
         Returns the Sentry "trace" context from the Propagation Context.
         """
         if has_tracing_enabled(self.get_client().options) and self._span is not None:
-            return self._span.get_trace_context()
+            return self._span._get_trace_context()
 
         # if we are tracing externally (otel), those values take precedence
         external_propagation_context = get_external_propagation_context()

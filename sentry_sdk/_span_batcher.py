@@ -112,7 +112,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             envelopes = []
             for spans in self._span_buffer.values():
                 if spans:
-                    dsc = spans[0].dynamic_sampling_context()
+                    dsc = spans[0]._dynamic_sampling_context()
 
                     # Max per envelope is 1000, so if we happen to have more than
                     # 1000 spans in one bucket, we'll need to separate them.
