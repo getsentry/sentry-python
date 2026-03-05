@@ -310,7 +310,7 @@ class NoOpStreamedSpan(StreamedSpan):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(sampled={self.sampled})>"
 
-    def __enter__(self) -> "StreamedSpan":
+    def __enter__(self) -> "NoOpStreamedSpan":
         return self
 
     def __exit__(
