@@ -12,12 +12,13 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import execute_tool_span
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, UserPromptPart
 from pydantic_ai.usage import RequestUsage
-from pydantic_ai.models.test import TestModel
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
+from pydantic_ai._tool_manager import ToolDefinition
 
 
 @pytest.fixture
@@ -2794,3 +2795,142 @@ async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
     (span_data,) = event["spans"]
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+@pytest.mark.asyncio
+async def test_tool_description_in_execute_tool_span(sentry_init, capture_events):
+    """
+    Test that tool description from the tool's docstring is included in execute_tool spans.
+    """
+    agent = Agent(
+        "test",
+        name="test_agent",
+        system_prompt="You are a helpful test assistant.",
+    )
+
+    @agent.tool_plain
+    def multiply_numbers(a: int, b: int) -> int:
+        """Multiply two numbers and return the product."""
+        return a * b
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    result = await agent.run("What is 5 times 3?")
+    assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
+    assert len(tool_spans) >= 1
+
+    tool_span = tool_spans[0]
+    assert tool_span["data"]["gen_ai.tool.name"] == "multiply_numbers"
+    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION in tool_span["data"]
+    assert "Multiply two numbers" in tool_span["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
+
+
+@pytest.mark.asyncio
+async def test_tool_without_description_omits_tool_description(
+    sentry_init, capture_events
+):
+    """
+    Test that execute_tool spans omit tool description when the tool has no docstring.
+    """
+    agent = Agent(
+        "test",
+        name="test_agent",
+        system_prompt="You are a helpful test assistant.",
+    )
+
+    @agent.tool_plain
+    def no_docs_tool(a: int, b: int) -> int:
+        return a + b
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    result = await agent.run("What is 5 + 3?")
+    assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
+    assert len(tool_spans) >= 1
+
+    tool_span = tool_spans[0]
+    assert tool_span["data"]["gen_ai.tool.name"] == "no_docs_tool"
+    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION not in tool_span["data"]
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_span_with_tool_definition(sentry_init, capture_events):
+    """
+    Test execute_tool_span helper correctly sets tool description from a ToolDefinition.
+    """
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    tool_def = ToolDefinition(
+        name="my_tool",
+        description="A tool that does something useful.",
+        parameters_json_schema={"type": "object", "properties": {}},
+    )
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        with execute_tool_span(
+            "my_tool", {"arg": "value"}, None, "function", tool_definition=tool_def
+        ) as span:
+            assert span is not None
+
+    (event,) = events
+    tool_spans = [s for s in event["spans"] if s["op"] == "gen_ai.execute_tool"]
+    assert len(tool_spans) == 1
+    assert (
+        tool_spans[0]["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
+        == "A tool that does something useful."
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_span_without_tool_definition(sentry_init, capture_events):
+    """
+    Test execute_tool_span helper omits tool description when tool_definition is None.
+    """
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        with execute_tool_span(
+            "my_tool", {"arg": "value"}, None, "function", tool_definition=None
+        ) as span:
+            assert span is not None
+
+    (event,) = events
+    tool_spans = [s for s in event["spans"] if s["op"] == "gen_ai.execute_tool"]
+    assert len(tool_spans) == 1
+    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION not in tool_spans[0]["data"]
