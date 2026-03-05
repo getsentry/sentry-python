@@ -119,7 +119,7 @@ def start_span(
     ```
 
     To continue a trace from another service, call
-    `sentry_sdk.traces.continue_trace()` prior to creating the top-level span.
+    `sentry_sdk.traces.continue_trace()` prior to creating a top-level span.
 
     :param name: The name to identify this span by.
     :type name: str
