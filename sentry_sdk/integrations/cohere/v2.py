@@ -79,6 +79,7 @@ COHERE_V2_CHAT_CONFIG = {
     "extract_messages": lambda kw: _extract_messages_v2(kw.get("messages", [])),
     "response": {
         "sources": {
+            SPANDATA.GEN_AI_RESPONSE_MODEL: [("model",)],
             SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
             SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("finish_reason",)],
         },
@@ -147,7 +148,6 @@ def _wrap_chat_v2(f, streaming):
                 span_data = {
                     SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming,
                     SPANDATA.GEN_AI_REQUEST_MODEL: model if model else None,
-                    SPANDATA.GEN_AI_RESPONSE_MODEL: model if model else None,
                 }
                 set_request_span_data(
                     span, kwargs, integration, COHERE_V2_CHAT_CONFIG, span_data

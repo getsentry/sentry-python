@@ -280,6 +280,7 @@ def test_v2_nonstreaming_chat(
             200,
             json={
                 "id": "resp-123",
+                "model": "some-model",
                 "finish_reason": "COMPLETE",
                 "message": {
                     "role": "assistant",

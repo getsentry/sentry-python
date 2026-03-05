@@ -36,6 +36,7 @@ try:
 except ImportError:
     _has_chat_types = False
 
+
 def _extract_response_text(response):
     # type: (Any) -> list[str] | None
     text = getattr(response, "text", None)
@@ -50,6 +51,7 @@ COHERE_V1_CHAT_CONFIG = {
     "extract_messages": lambda kw: _extract_messages(kw),
     "response": {
         "sources": {
+            SPANDATA.GEN_AI_RESPONSE_MODEL: [("model",)],
             SPANDATA.GEN_AI_RESPONSE_ID: [("generation_id",)],
             SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("finish_reason",)],
         },

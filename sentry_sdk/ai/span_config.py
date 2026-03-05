@@ -62,7 +62,9 @@ def set_request_span_data(span, kwargs, integration, config, span_data=None):
                 set_data_normalized(span, span_attr, value)
 
 
-def set_response_span_data(span, response, include_pii, response_config, collected_text=None):
+def set_response_span_data(
+    span, response, include_pii, response_config, collected_text=None
+):
     # type: (Span, Any, bool, Dict[str, Any], Optional[List[str]]) -> None
     """
     Set response span data from a declarative config.
@@ -81,9 +83,7 @@ def set_response_span_data(span, response, include_pii, response_config, collect
     if include_pii:
         pii_sources = response_config.get("pii_sources")
         if pii_sources:
-            set_span_data_from_sources(
-                span, response, pii_sources, require_truthy=True
-            )
+            set_span_data_from_sources(span, response, pii_sources, require_truthy=True)
         if collected_text:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TEXT, ["".join(collected_text)]
