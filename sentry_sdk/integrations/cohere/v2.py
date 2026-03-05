@@ -137,7 +137,9 @@ def _extract_messages_v2(messages):
     result = []
     for msg in messages:
         role = msg["role"] if isinstance(msg, dict) else getattr(msg, "role", "unknown")
-        content = msg["content"] if isinstance(msg, dict) else getattr(msg, "content", "")
+        content = (
+            msg["content"] if isinstance(msg, dict) else getattr(msg, "content", "")
+        )
         result.append({"role": role, "content": transform_message_content(content)})
     return result
 
@@ -165,7 +167,9 @@ def _append_stream_delta_text(collected_text, event):
 def _collect_v2_stream_end_fields(span, event, include_pii, collected_text):
     # type: (Span, Any, bool, list[str]) -> None
     if include_pii and collected_text:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, ["".join(collected_text)])
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_RESPONSE_TEXT, ["".join(collected_text)]
+        )
     set_span_data_from_sources(
         span, event, STREAM_CHAT_RESPONSE_SOURCES, require_truthy=False
     )
