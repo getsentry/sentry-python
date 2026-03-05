@@ -3,7 +3,7 @@ from sentry_sdk.ai.utils import set_data_normalized
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Mapping, Sequence
 
 
 def transitive_getattr(obj, *attrs):
@@ -17,7 +17,7 @@ def transitive_getattr(obj, *attrs):
 
 
 def get_first_from_sources(obj, source_paths, require_truthy=False):
-    # type: (Any, list[tuple[str, ...]], bool) -> Any
+    # type: (Any, Sequence[tuple[str, ...]], bool) -> Any
     for source_path in source_paths:
         value = transitive_getattr(obj, *source_path)
         if not value:
@@ -28,7 +28,7 @@ def get_first_from_sources(obj, source_paths, require_truthy=False):
 
 
 def set_span_data_from_sources(span, obj, target_sources, require_truthy):
-    # type: (Any, Any, dict[str, list[tuple[str, ...]]], bool) -> None
+    # type: (Any, Any, Mapping[str, Sequence[tuple[str, ...]]], bool) -> None
     for spandata_key, source_paths in target_sources.items():
         value = get_first_from_sources(obj, source_paths, require_truthy=require_truthy)
         if value is not None:

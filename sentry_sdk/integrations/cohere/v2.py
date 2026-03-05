@@ -46,6 +46,17 @@ try:
 except ImportError:
     _has_v2 = False
 
+COHERE_V2_CHAT_CONFIG = {
+    "static": {
+        SPANDATA.GEN_AI_SYSTEM: "cohere",
+        SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+    },
+    "pii_params": {
+        "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+    },
+    "extract_messages": lambda kw: _extract_messages_v2(kw.get("messages", [])),
+}
+
 CHAT_RESPONSE_SOURCES = {
     SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
     SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("finish_reason",)],
@@ -55,7 +66,7 @@ PII_CHAT_RESPONSE_SOURCES = {
 }
 CHAT_USAGE_SOURCES = [("usage",)]
 STREAM_DELTA_TEXT_SOURCES = [("delta", "message", "content", "text")]
-STREAM_CHAT_RESPONSE_SOURCES = {
+STREAM_CHAT_RESPONSE_SOURCES: "dict[str, list[tuple[str, ...]]]" = {
     SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
     SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("delta", "finish_reason")],
 }
@@ -104,29 +115,17 @@ def _wrap_chat_v2(f, streaming):
                 reraise(*exc_info)
 
             with capture_internal_exceptions():
-                extra = {SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming}
-                if model:
-                    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-                    extra[SPANDATA.GEN_AI_RESPONSE_MODEL] = model
+                span_data = {
+                    SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming,
+                    SPANDATA.GEN_AI_REQUEST_MODEL: model if model else None,
+                    SPANDATA.GEN_AI_RESPONSE_MODEL: model if model else None,
+                }
                 set_input_span_data(
-                    span,
-                    kwargs,
-                    integration,
-                    {
-                        "system": "cohere",
-                        "operation": "chat",
-                        "pii_params": {
-                            "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                        },
-                        "extract_messages": lambda kw: _extract_messages_v2(
-                            kw.get("messages", [])
-                        ),
-                        "extra_static": extra,
-                    },
+                    span, kwargs, integration, COHERE_V2_CHAT_CONFIG, span_data
                 )
                 if streaming:
                     return _iter_v2_stream_events(res, span, include_pii)
-                _collect_v2_response_fields(span, res, include_pii=include_pii)
+                _collect_v2_response_fields(span, res, include_pii)
                 return res
 
     return new_chat
@@ -146,7 +145,7 @@ def _extract_messages_v2(messages):
 
 def _iter_v2_stream_events(old_iterator, span, include_pii):
     # type: (Any, Span, bool) -> Iterator[V2ChatStreamResponse]
-    collected_text = []
+    collected_text = []  # type: list[str]
     with capture_internal_exceptions():
         for x in old_iterator:
             _append_stream_delta_text(collected_text, x)

@@ -32,8 +32,10 @@ def _normalize_embedding_input(texts):
 
 
 COHERE_EMBED_CONFIG = {
-    "system": "cohere",
-    "operation": "embeddings",
+    "static": {
+        SPANDATA.GEN_AI_SYSTEM: "cohere",
+        SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+    },
     "params": {"model": SPANDATA.GEN_AI_REQUEST_MODEL},
     "extract_messages": lambda kw: (
         _normalize_embedding_input(kw["texts"]) if "texts" in kw else None

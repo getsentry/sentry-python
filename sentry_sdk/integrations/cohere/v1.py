@@ -38,6 +38,14 @@ try:
 except ImportError:
     _has_chat_types = False
 
+COHERE_V1_CHAT_CONFIG = {
+    "static": {
+        SPANDATA.GEN_AI_SYSTEM: "cohere",
+        SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+    },
+    "extract_messages": lambda kw: _extract_messages(kw),
+}
+
 CHAT_RESPONSE_SOURCES = {
     SPANDATA.GEN_AI_RESPONSE_ID: [("generation_id",)],
     SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("finish_reason",)],
@@ -105,24 +113,17 @@ def _wrap_chat(f, streaming):
                 reraise(*exc_info)
 
             with capture_internal_exceptions():
+                span_data = {SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming}
                 if model:
-                    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+                    span_data[SPANDATA.GEN_AI_REQUEST_MODEL] = model
                 set_input_span_data(
-                    span,
-                    kwargs,
-                    integration,
-                    {
-                        "system": "cohere",
-                        "operation": "chat",
-                        "extract_messages": _extract_messages_v1,
-                        "extra_static": {SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming},
-                    },
+                    span, kwargs, integration, COHERE_V1_CHAT_CONFIG, span_data
                 )
 
                 if streaming:
-                    return _iter_v1_stream_events(res, span, include_pii)
+                    return _iter_stream_events(res, span, include_pii)
                 if isinstance(res, NonStreamedChatResponse):
-                    _collect_v1_response_fields(span, res, include_pii=include_pii)
+                    _collect_response_fields(span, res, include_pii=include_pii)
                 else:
                     set_data_normalized(span, "unknown_response", True)
                 return res
@@ -130,13 +131,13 @@ def _wrap_chat(f, streaming):
     return new_chat
 
 
-def _extract_messages_v1(kwargs):
+def _extract_messages(kwargs):
     # type: (dict[str, Any]) -> list[dict[str, str]]
     messages = []
     for x in kwargs.get("chat_history", []):
         messages.append(
             {
-                "role": getattr(x, "role", "").lower(),
+                "role": getattr(x, "role", ""),
                 "content": transform_message_content(getattr(x, "message", "")),
             }
         )
@@ -146,7 +147,7 @@ def _extract_messages_v1(kwargs):
     return messages
 
 
-def _iter_v1_stream_events(old_iterator, span, include_pii):
+def _iter_stream_events(old_iterator, span, include_pii):
     # type: (Any, Any, bool) -> Iterator[StreamedChatResponse]
     with capture_internal_exceptions():
         for x in old_iterator:
@@ -161,10 +162,10 @@ def _collect_v1_stream_end_fields(span, event, include_pii):
     # type: (Any, Any, bool) -> None
     response = get_first_from_sources(event, STREAM_RESPONSE_SOURCES)
     if response is not None:
-        _collect_v1_response_fields(span, response, include_pii)
+        _collect_response_fields(span, response, include_pii)
 
 
-def _collect_v1_response_fields(span, response, include_pii):
+def _collect_response_fields(span, response, include_pii):
     # type: (Any, Any, bool) -> None
     if include_pii:
         text = get_first_from_sources(response, CHAT_RESPONSE_TEXT_SOURCES)
