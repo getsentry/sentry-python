@@ -102,8 +102,8 @@ def _wrap_chat_v2(f, streaming):
 def _iter_v2_stream_events(old_iterator, span, include_pii):
     # type: (Any, Span, bool) -> Iterator[V2ChatStreamResponse]
     collected_text = []  # type: list[str]
-    with capture_internal_exceptions():
-        for x in old_iterator:
+    for x in old_iterator:
+        with capture_internal_exceptions():
             _append_stream_delta_text(collected_text, x)
             if isinstance(x, MessageEndV2ChatStreamResponse):
                 set_response_span_data(
@@ -113,7 +113,7 @@ def _iter_v2_stream_events(old_iterator, span, include_pii):
                     COHERE_V2_CHAT_CONFIG["stream_response"],
                     collected_text,
                 )
-            yield x
+        yield x
 
 
 def _append_stream_delta_text(collected_text, event):

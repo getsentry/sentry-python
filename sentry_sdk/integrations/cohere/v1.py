@@ -101,8 +101,8 @@ def _wrap_chat(f, streaming):
 
 def _iter_stream_events(old_iterator, span, include_pii):
     # type: (Any, Any, bool) -> Iterator[StreamedChatResponse]
-    with capture_internal_exceptions():
-        for x in old_iterator:
+    for x in old_iterator:
+        with capture_internal_exceptions():
             if isinstance(x, ChatStreamEndEvent) or isinstance(
                 x, StreamEndStreamedChatResponse
             ):
@@ -113,4 +113,4 @@ def _iter_stream_events(old_iterator, span, include_pii):
                     set_response_span_data(
                         span, response, include_pii, COHERE_V1_CHAT_CONFIG["response"]
                     )
-            yield x
+        yield x

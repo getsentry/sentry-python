@@ -182,6 +182,24 @@ def test_v1_bad_chat(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
+def test_v1_streaming_error_propagates(sentry_init, capture_events):
+    """Stream errors must not be silently swallowed by capture_internal_exceptions."""
+    sentry_init(integrations=[CohereIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    from sentry_sdk.integrations.cohere.v1 import _iter_stream_events
+
+    def failing_iterator():
+        yield "event1"
+        raise ConnectionError("stream interrupted")
+
+    with start_transaction(name="cohere tx") as tx:
+        span = tx.start_child(op="gen_ai.chat")
+        with pytest.raises(ConnectionError, match="stream interrupted"):
+            list(_iter_stream_events(failing_iterator(), span, False))
+        span.finish()
+
+
 def test_v1_span_status_error(sentry_init, capture_events):
     sentry_init(integrations=[CohereIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -408,6 +426,25 @@ def test_v2_streaming_chat(
 
 
 # --- V2 Error ---
+
+
+@pytest.mark.skipif(not has_v2, reason="Cohere V2 client not available")
+def test_v2_streaming_error_propagates(sentry_init, capture_events):
+    """Stream errors must not be silently swallowed by capture_internal_exceptions."""
+    sentry_init(integrations=[CohereIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    from sentry_sdk.integrations.cohere.v2 import _iter_v2_stream_events
+
+    def failing_iterator():
+        yield "event1"
+        raise ConnectionError("stream interrupted")
+
+    with start_transaction(name="cohere tx") as tx:
+        span = tx.start_child(op="gen_ai.chat")
+        with pytest.raises(ConnectionError, match="stream interrupted"):
+            list(_iter_v2_stream_events(failing_iterator(), span, False))
+        span.finish()
 
 
 @pytest.mark.skipif(not has_v2, reason="Cohere V2 client not available")
