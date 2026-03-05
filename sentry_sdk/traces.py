@@ -255,6 +255,9 @@ class NoOpStreamedSpan(StreamedSpan):
     def __init__(self) -> None:
         pass
 
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}(sampled={self.sampled})>"
+
     def get_attributes(self) -> "Attributes":
         return {}
 
