@@ -164,3 +164,56 @@ class StreamedSpan:
             self._trace_id = uuid.uuid4().hex
 
         return self._trace_id
+
+
+class NoOpStreamedSpan(StreamedSpan):
+    __slots__ = (
+    )
+
+    def __init__(
+        self,
+    ) -> None:
+        pass
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}(sampled={self.sampled})>"
+
+    def get_attributes(self) -> "Attributes":
+        return {}
+
+    def set_attribute(self, key: str, value: "AttributeValue") -> None:
+        pass
+
+    def set_attributes(self, attributes: "Attributes") -> None:
+        pass
+
+    def remove_attribute(self, key: str) -> None:
+        pass
+
+    @property
+    def status(self) -> "str":
+        return SpanStatus.OK.value
+
+    @status.setter
+    def status(self, status: "Union[SpanStatus, str]") -> None:
+        pass
+
+    @property
+    def name(self) -> str:
+        return ""
+
+    @name.setter
+    def name(self, value: str) -> None:
+        pass
+
+    @property
+    def active(self) -> bool:
+        return True
+
+    @property
+    def span_id(self) -> str:
+        return "0000000000000000"
+
+    @property
+    def trace_id(self) -> str:
+        return "00000000000000000000000000000000"
