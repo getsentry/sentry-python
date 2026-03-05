@@ -9,7 +9,6 @@ import uuid
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.utils import format_attribute, logger
 
 if TYPE_CHECKING:
@@ -100,7 +99,7 @@ class StreamedSpan:
             f"<{self.__class__.__name__}("
             f"name={self._name}, "
             f"trace_id={self.trace_id}, "
-            f"span_id={self.span_id}>"
+            f"span_id={self.span_id})>"
         )
 
     def get_attributes(self) -> "Attributes":
