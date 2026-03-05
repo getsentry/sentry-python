@@ -434,6 +434,14 @@ class StreamedSpan:
     def sampled(self) -> "Optional[bool]":
         return True
 
+    @property
+    def start_timestamp(self) -> "Optional[datetime]":
+        return self._start_timestamp
+
+    @property
+    def timestamp(self) -> "Optional[datetime]":
+        return self._timestamp
+
     def is_segment(self) -> bool:
         return self._segment == self
 
@@ -501,7 +509,7 @@ class StreamedSpan:
     def _get_trace_context(self) -> "dict[str, Any]":
         # Even if spans themselves are not event-based anymore, we need this
         # to populate trace context on events
-        context = {
+        context: "dict[str, Any]" = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self._parent_span_id,

@@ -672,7 +672,7 @@ class Scope:
         span = span or self.span
 
         if has_tracing_enabled(client.options) and span is not None:
-            for header in span.iter_headers():
+            for header in span._iter_headers():
                 yield header
         elif has_external_propagation_context():
             # when we have an external_propagation_context (otlp)
