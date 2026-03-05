@@ -2,19 +2,18 @@ import sys
 from functools import wraps
 
 from sentry_sdk.ai.span_config import set_request_span_data, set_response_span_data
-from sentry_sdk.ai.utils import (
-    get_first_from_sources,
-    transitive_getattr,
-    transform_message_content,
-)
+from sentry_sdk.ai.utils import get_first_from_sources, transitive_getattr
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.cohere.configs import (
+    COHERE_V2_CHAT_CONFIG,
+    STREAM_DELTA_TEXT_SOURCES,
+)
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
     from sentry_sdk.tracing import Span
-    from sentry_sdk.ai.span_config import OperationConfig
 
 import sentry_sdk
 from sentry_sdk.integrations.cohere import (
@@ -55,68 +54,6 @@ def setup_v2(wrap_embed_fn):
         CohereV2Client.chat_stream, streaming=True
     )
     CohereV2Client.embed = wrap_embed_fn(CohereV2Client.embed)
-
-
-STREAM_DELTA_TEXT_SOURCES = [("delta", "message", "content", "text")]
-
-
-def _extract_v2_response_text(response):
-    # type: (Any) -> list[str] | None
-    content = get_first_from_sources(response, [("message", "content")], True)
-    if content:
-        texts = [item.text for item in content if hasattr(item, "text")]
-        if texts:
-            return texts
-    return None
-
-
-COHERE_V2_CHAT_CONFIG: "OperationConfig" = {
-    "static": {
-        SPANDATA.GEN_AI_SYSTEM: "cohere",
-        SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-    },
-    "pii_params": {
-        "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-    },
-    "extract_messages": lambda kw: _extract_messages_v2(kw.get("messages", [])),
-    "response": {
-        "sources": {
-            SPANDATA.GEN_AI_RESPONSE_MODEL: [("model",)],
-            SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
-            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("finish_reason",)],
-        },
-        "pii_sources": {
-            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: [("message", "tool_calls")],
-        },
-        "extract_text": _extract_v2_response_text,
-        "usage": {
-            "input_tokens": [
-                ("usage", "billed_units", "input_tokens"),
-                ("usage", "tokens", "input_tokens"),
-            ],
-            "output_tokens": [
-                ("usage", "billed_units", "output_tokens"),
-                ("usage", "tokens", "output_tokens"),
-            ],
-        },
-    },
-    "stream_response": {
-        "sources": {
-            SPANDATA.GEN_AI_RESPONSE_ID: [("id",)],
-            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("delta", "finish_reason")],
-        },
-        "usage": {
-            "input_tokens": [
-                ("delta", "usage", "billed_units", "input_tokens"),
-                ("delta", "usage", "tokens", "input_tokens"),
-            ],
-            "output_tokens": [
-                ("delta", "usage", "billed_units", "output_tokens"),
-                ("delta", "usage", "tokens", "output_tokens"),
-            ],
-        },
-    },
-}
 
 
 def _wrap_chat_v2(f, streaming):
@@ -160,18 +97,6 @@ def _wrap_chat_v2(f, streaming):
                 return response
 
     return new_chat
-
-
-def _extract_messages_v2(messages):
-    # type: (Any) -> list[dict[str, Any]]
-    result = []
-    for msg in messages:
-        role = msg["role"] if isinstance(msg, dict) else getattr(msg, "role", "unknown")
-        content = (
-            msg["content"] if isinstance(msg, dict) else getattr(msg, "content", "")
-        )
-        result.append({"role": role, "content": transform_message_content(content)})
-    return result
 
 
 def _iter_v2_stream_events(old_iterator, span, include_pii):

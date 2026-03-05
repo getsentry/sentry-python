@@ -1,8 +1,9 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.ai.span_config import set_request_span_data, set_response_span_data
+from sentry_sdk.integrations.cohere.configs import COHERE_EMBED_CONFIG
 
 from typing import TYPE_CHECKING
 
@@ -10,7 +11,6 @@ from sentry_sdk.tracing_utils import set_span_errored
 
 if TYPE_CHECKING:
     from typing import Any, Callable
-    from sentry_sdk.ai.span_config import OperationConfig
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -20,35 +20,6 @@ try:
     from cohere import __version__ as cohere_version  # noqa: F401
 except ImportError:
     raise DidNotEnable("Cohere not installed")
-
-
-def _normalize_embedding_input(texts):
-    # type: (Any) -> Any
-    if isinstance(texts, list):
-        return texts
-    if isinstance(texts, tuple):
-        return list(texts)
-    return [texts]
-
-
-COHERE_EMBED_CONFIG: "OperationConfig" = {
-    "static": {
-        SPANDATA.GEN_AI_SYSTEM: "cohere",
-        SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-    },
-    "params": {"model": SPANDATA.GEN_AI_REQUEST_MODEL},
-    "extract_messages": lambda kw: (
-        _normalize_embedding_input(kw["texts"]) if "texts" in kw else None
-    ),
-    "message_target": SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
-    "truncation_fn": None,
-    "response": {
-        "usage": {
-            "input_tokens": [("meta", "billed_units", "input_tokens")],
-            "total_tokens": [("meta", "billed_units", "input_tokens")],
-        },
-    },
-}
 
 
 class CohereIntegration(Integration):

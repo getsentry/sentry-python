@@ -2,18 +2,15 @@ import sys
 from functools import wraps
 
 from sentry_sdk.ai.span_config import set_request_span_data, set_response_span_data
-from sentry_sdk.ai.utils import (
-    get_first_from_sources,
-    transform_message_content,
-)
+from sentry_sdk.ai.utils import get_first_from_sources
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.cohere.configs import COHERE_V1_CHAT_CONFIG
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
     from cohere import StreamedChatResponse
-    from sentry_sdk.ai.span_config import OperationConfig
 
 import sentry_sdk
 from sentry_sdk.integrations.cohere import (
@@ -49,43 +46,6 @@ def setup_v1(wrap_embed_fn):
     BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
     BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
     Client.embed = wrap_embed_fn(Client.embed)
-
-
-def _extract_response_text(response):
-    # type: (Any) -> list[str] | None
-    text = getattr(response, "text", None)
-    return [text] if text is not None else None
-
-
-COHERE_V1_CHAT_CONFIG: "OperationConfig" = {
-    "static": {
-        SPANDATA.GEN_AI_SYSTEM: "cohere",
-        SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-    },
-    "extract_messages": lambda kw: _extract_messages(kw),
-    "response": {
-        "sources": {
-            SPANDATA.GEN_AI_RESPONSE_MODEL: [("model",)],
-            SPANDATA.GEN_AI_RESPONSE_ID: [("generation_id",)],
-            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS: [("finish_reason",)],
-        },
-        "pii_sources": {
-            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: [("tool_calls",)],
-        },
-        "extract_text": _extract_response_text,
-        "usage": {
-            "input_tokens": [
-                ("meta", "billed_units", "input_tokens"),
-                ("meta", "tokens", "input_tokens"),
-            ],
-            "output_tokens": [
-                ("meta", "billed_units", "output_tokens"),
-                ("meta", "tokens", "output_tokens"),
-            ],
-        },
-    },
-    "stream_response_object": [("response",)],
-}
 
 
 def _wrap_chat(f, streaming):
@@ -138,22 +98,6 @@ def _wrap_chat(f, streaming):
                 return response
 
     return new_chat
-
-
-def _extract_messages(kwargs):
-    # type: (dict[str, Any]) -> list[dict[str, str]]
-    messages = []
-    for x in kwargs.get("chat_history", []):
-        messages.append(
-            {
-                "role": getattr(x, "role", ""),
-                "content": transform_message_content(getattr(x, "message", "")),
-            }
-        )
-    message = kwargs.get("message")
-    if message:
-        messages.append({"role": "user", "content": transform_message_content(message)})
-    return messages
 
 
 def _iter_stream_events(old_iterator, span, include_pii):
