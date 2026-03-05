@@ -64,12 +64,12 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return None
 
             self._span_buffer[span.trace_id].append(span)
+            self._running_size[span.trace_id] += self._estimate_size(span)
 
             if size + 1 >= self.MAX_BEFORE_FLUSH:
                 self._flush_event.set()
                 return
 
-            self._running_size[span.trace_id] += self._estimate_size(span)
             if self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH:
                 self._flush_event.set()
                 return
