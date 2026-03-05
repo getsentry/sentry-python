@@ -87,10 +87,14 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _to_transport_format(item: "StreamedSpan") -> "Any":
         # TODO[span-first]
         res: "dict[str, Any]" = {
+            "trace_id": item.trace_id,
             "span_id": item.span_id,
             "name": item._name,
             "status": item._status,
         }
+
+        if item._parent_span_id:
+            res["parent_span_id"] = item._parent_span_id
 
         if item._attributes:
             res["attributes"] = {
@@ -102,7 +106,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _flush(self) -> None:
         with self._lock:
             if len(self._span_buffer) == 0:
-                return None
+                return
 
             envelopes = []
             for trace_id, spans in self._span_buffer.items():
