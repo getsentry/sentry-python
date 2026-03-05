@@ -11,7 +11,7 @@ def transitive_getattr(obj, *attrs):
     current = obj
     for attr in attrs:
         current = getattr(current, attr, None)
-        if not current:
+        if current is None:
             return None
     return current
 
@@ -20,7 +20,9 @@ def get_first_from_sources(obj, source_paths, require_truthy=False):
     # type: (Any, list[tuple[str, ...]], bool) -> Any
     for source_path in source_paths:
         value = transitive_getattr(obj, *source_path)
-        if value if require_truthy else value is not None:
+        if not value:
+            continue
+        if not require_truthy or value:
             return value
     return None
 
