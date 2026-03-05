@@ -5,15 +5,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
 
-_MISSING = object()
-
 
 def transitive_getattr(obj, *attrs):
     # type: (Any, str) -> Any
     current = obj
     for attr in attrs:
-        current = getattr(current, attr, _MISSING)
-        if current is _MISSING:
+        current = getattr(current, attr, None)
+        if not current:
             return None
     return current
 
