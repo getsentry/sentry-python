@@ -503,8 +503,7 @@ def normalize_message_role(role: str) -> str:
     Normalize a message role to one of the 4 allowed gen_ai role values.
     Maps "ai" -> "assistant" and keeps other standard roles unchanged.
     """
-    role_lower = role.lower()
-    return GEN_AI_MESSAGE_ROLE_MAPPING.get(role_lower, role_lower)
+    return GEN_AI_MESSAGE_ROLE_MAPPING.get(role, role)
 
 
 def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str, Any]]":
