@@ -17,9 +17,6 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Attributes, AttributeValue
 
 
-FLAGS_CAPACITY = 10
-
-
 class SpanStatus(str, Enum):
     OK = "ok"
     ERROR = "error"
@@ -65,10 +62,10 @@ class StreamedSpan:
     """
     A span holds timing information of a block of code.
 
-    Spans can have multiple child spans thus forming a span tree.
+    Spans can have multiple child spans, thus forming a span tree.
 
-    This is the Span First span implementation. The original transaction-based
-    span implementation lives in tracing.Span.
+    This is the Span First span implementation that streams spans. The original
+    transaction-based span implementation lives in tracing.Span.
     """
 
     __slots__ = (
@@ -77,7 +74,6 @@ class StreamedSpan:
         "_span_id",
         "_trace_id",
         "_status",
-        "_flags",
     )
 
     def __init__(
@@ -98,8 +94,6 @@ class StreamedSpan:
 
         self.set_status(SpanStatus.OK)
         self.set_source(SegmentSource.CUSTOM)
-
-        self._flags: dict[str, bool] = {}
 
     def get_attributes(self) -> "Attributes":
         return self._attributes
@@ -142,10 +136,6 @@ class StreamedSpan:
 
     def set_name(self, name: str) -> None:
         self._name = name
-
-    def set_flag(self, flag: str, result: bool) -> None:
-        if len(self._flags) < FLAGS_CAPACITY:
-            self._flags[flag] = result
 
     def set_op(self, op: str) -> None:
         self.set_attribute("sentry.op", op)
