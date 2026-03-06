@@ -319,10 +319,6 @@ class StreamedSpan:
                 del self._previous_span_on_scope
                 self._scope.span = old_span
 
-        client = sentry_sdk.get_client()
-        if not client.is_active():
-            return
-
         # Set attributes from the segment
         self.set_attribute("sentry.segment.id", self._segment.span_id)
         self.set_attribute("sentry.segment.name", self._segment.name)
@@ -338,6 +334,10 @@ class StreamedSpan:
                 self._timestamp = datetime.now(timezone.utc)
 
         self._finished = True
+
+        client = sentry_sdk.get_client()
+        if not client.is_active():
+            return
 
         # Finally, queue the span for sending to Sentry
         self._scope._capture_span(self)
