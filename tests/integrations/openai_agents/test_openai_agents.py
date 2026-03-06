@@ -2087,7 +2087,7 @@ async def test_multiple_agents_asyncio(
     Test that multiple agents can be run at the same time in asyncio tasks
     without interfering with each other.
     """
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
@@ -2995,7 +2995,7 @@ async def test_conversation_id_on_all_spans(
     Test that gen_ai.conversation.id is set on all AI-related spans when passed to Runner.run().
     """
 
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
@@ -3154,7 +3154,7 @@ async def test_no_conversation_id_when_not_provided(
     Test that gen_ai.conversation.id is not set when not passed to Runner.run().
     """
 
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
