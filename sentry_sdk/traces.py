@@ -323,12 +323,10 @@ class StreamedSpan:
                         "Failed to set end_timestamp. Using current time instead."
                     )
 
-                if isinstance(end_timestamp, datetime):
-                    self._timestamp = end_timestamp
-                else:
-                    logger.debug(
-                        "Failed to set end_timestamp. Using current time instead."
-                    )
+            if isinstance(end_timestamp, datetime):
+                self._timestamp = end_timestamp
+            else:
+                logger.debug("Failed to set end_timestamp. Using current time instead.")
 
         if self._timestamp is None:
             try:
