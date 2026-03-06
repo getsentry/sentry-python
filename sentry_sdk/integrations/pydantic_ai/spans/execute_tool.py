@@ -39,7 +39,10 @@ def execute_tool_span(
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
 
     if tool_definition:
-        span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_definition.description)
+        span.set_data(
+            SPANDATA.GEN_AI_TOOL_DESCRIPTION,
+            getattr(tool_definition, "description", None),
+        )
 
     _set_agent_data(span, agent)
 
