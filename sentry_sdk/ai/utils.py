@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple
+    from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
     from sentry_sdk.tracing import Span
 
@@ -30,7 +30,7 @@ class GEN_AI_ALLOWED_MESSAGE_ROLES:
 GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING = {
     GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM: ["system"],
     GEN_AI_ALLOWED_MESSAGE_ROLES.USER: ["user", "human"],
-    GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT: ["assistant", "ai"],
+    GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT: ["assistant", "ai", "chatbot"],
     GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL: ["tool", "tool_call"],
 }
 
@@ -725,3 +725,32 @@ def set_conversation_id(conversation_id: str) -> None:
     """
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id(conversation_id)
+
+
+def transitive_getattr(obj, *attrs):
+    # type: (Any, str) -> Any
+    current = obj
+    for attr in attrs:
+        current = getattr(current, attr, None)
+        if current is None:
+            return None
+    return current
+
+
+def get_first_from_sources(obj, source_paths, require_truthy=False):
+    # type: (Any, Sequence[tuple[str, ...]], bool) -> Any
+    for source_path in source_paths:
+        value = transitive_getattr(obj, *source_path)
+        if value is None:
+            continue
+        if not require_truthy or value:
+            return value
+    return None
+
+
+def set_span_data_from_sources(span, obj, target_sources, require_truthy):
+    # type: (Any, Any, Mapping[str, Sequence[tuple[str, ...]]], bool) -> None
+    for spandata_key, source_paths in target_sources.items():
+        value = get_first_from_sources(obj, source_paths, require_truthy=require_truthy)
+        if value is not None:
+            set_data_normalized(span, spandata_key, value)

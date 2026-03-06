@@ -1,9 +1,21 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized, normalize_message_roles
+from sentry_sdk.ai.span_config import (
+    set_request_span_data,
+    set_request_messages,
+    set_response_span_data,
+)
+from sentry_sdk.ai.utils import (
+    get_first_from_sources,
+    transform_message_content,
+    transitive_getattr,
+)
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.cohere.configs import (
+    COHERE_V2_CHAT_CONFIG,
+    STREAM_DELTA_TEXT_SOURCES,
+)
 
 from typing import TYPE_CHECKING
 
@@ -52,42 +64,6 @@ def setup_v2(wrap_embed_fn):
     CohereV2Client.embed = wrap_embed_fn(CohereV2Client.embed)
 
 
-def _collect_v2_response_fields(span, response, include_pii):
-    # type: (Span, Any, bool) -> None
-    model = getattr(response, "model", None)
-    if model:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, model)
-
-    response_id = getattr(response, "id", None)
-    if response_id:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_ID, response_id)
-
-    finish_reason = getattr(response, "finish_reason", None)
-    if finish_reason:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason)
-
-    if include_pii:
-        response_text = _extract_v2_response_text(response)
-        if response_text:
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
-
-        tool_calls = getattr(getattr(response, "message", None), "tool_calls", None)
-        if tool_calls:
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, tool_calls)
-
-    usage = getattr(response, "usage", None)
-    if usage:
-        billed = getattr(usage, "billed_units", None)
-        tokens = getattr(usage, "tokens", None)
-        src = billed or tokens
-        if src:
-            record_token_usage(
-                span,
-                input_tokens=getattr(src, "input_tokens", None),
-                output_tokens=getattr(src, "output_tokens", None),
-            )
-
-
 def _wrap_chat_v2(f, streaming):
     # type: (Callable[..., Any], bool) -> Callable[..., Any]
     @wraps(f)
@@ -100,51 +76,45 @@ def _wrap_chat_v2(f, streaming):
         model = kwargs.get("model", "")
         include_pii = should_send_default_pii() and integration.include_prompts
 
-        span = sentry_sdk.start_span(
+        with sentry_sdk.start_span(
             op=OP.GEN_AI_CHAT,
             name=f"chat {model}".strip(),
             origin=CohereIntegration.origin,
-        )
-        span.__enter__()
-        try:
-            response = f(*args, **kwargs)
-        except Exception as e:
-            exc_info = sys.exc_info()
+        ) as span:
+            try:
+                response = f(*args, **kwargs)
+            except Exception as e:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(e)
+                reraise(*exc_info)
+
             with capture_internal_exceptions():
-                _capture_exception(e)
-                span.__exit__(None, None, None)
-            reraise(*exc_info)
-
-        with capture_internal_exceptions():
-            set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-            set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
-
-            if model:
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-
-            if include_pii:
-                messages = _extract_v2_messages(kwargs.get("messages", []))
-                messages = normalize_message_roles(messages)
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages,
-                    unpack=False,
+                span_data = {
+                    SPANDATA.GEN_AI_RESPONSE_STREAMING: streaming,
+                    SPANDATA.GEN_AI_REQUEST_MODEL: model if model else None,
+                }
+                set_request_span_data(
+                    span, kwargs, integration, COHERE_V2_CHAT_CONFIG, span_data
                 )
-
-                tools = kwargs.get("tools")
-                if tools:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools
+                if include_pii:
+                    set_request_messages(
+                        span, _extract_v2_messages(kwargs.get("messages", []))
                     )
 
-            if streaming:
-                return _iter_v2_stream_events(response, span, include_pii)
-
-            _collect_v2_response_fields(span, response, include_pii)
-            span.__exit__(None, None, None)
-            return response
+                if streaming:
+                    return _iter_v2_stream_events(response, span, include_pii)
+                response_text = (
+                    _extract_v2_response_text(response) if include_pii else None
+                )
+                set_response_span_data(
+                    span,
+                    response,
+                    include_pii,
+                    COHERE_V2_CHAT_CONFIG["response"],
+                    response_text,
+                )
+                return response
 
     return new_chat
 
@@ -156,60 +126,28 @@ def _iter_v2_stream_events(old_iterator, span, include_pii):
         with capture_internal_exceptions():
             _append_stream_delta_text(collected_text, x)
             if isinstance(x, MessageEndV2ChatStreamResponse):
-                _collect_v2_stream_end_fields(span, x, collected_text, include_pii)
+                response_text = (
+                    ["".join(collected_text)]
+                    if include_pii and collected_text
+                    else None
+                )
+                set_response_span_data(
+                    span,
+                    x,
+                    include_pii,
+                    COHERE_V2_CHAT_CONFIG["stream_response"],
+                    response_text,
+                )
         yield x
-
-    span.__exit__(None, None, None)
-
-
-def _collect_v2_stream_end_fields(span, event, collected_text, include_pii):
-    # type: (Span, Any, list[str], bool) -> None
-    delta = getattr(event, "delta", None)
-    if not delta:
-        return
-
-    response_id = getattr(event, "id", None)
-    if response_id:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_ID, response_id)
-
-    finish_reason = getattr(delta, "finish_reason", None)
-    if finish_reason:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason)
-
-    if include_pii and collected_text:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, ["".join(collected_text)]
-        )
-
-    usage = getattr(delta, "usage", None)
-    if usage:
-        billed = getattr(usage, "billed_units", None)
-        tokens = getattr(usage, "tokens", None)
-        src = billed or tokens
-        if src:
-            record_token_usage(
-                span,
-                input_tokens=getattr(src, "input_tokens", None),
-                output_tokens=getattr(src, "output_tokens", None),
-            )
 
 
 def _append_stream_delta_text(collected_text, event):
     # type: (list[str], Any) -> None
-    if getattr(event, "type", None) != "content-delta":
+    if transitive_getattr(event, "type") != "content-delta":
         return
-    delta = getattr(event, "delta", None)
-    if not delta:
-        return
-    message = getattr(delta, "message", None)
-    if not message:
-        return
-    content = getattr(message, "content", None)
-    if not content:
-        return
-    text = getattr(content, "text", None)
-    if text is not None:
-        collected_text.append(text)
+    content_text = get_first_from_sources(event, STREAM_DELTA_TEXT_SOURCES)
+    if content_text is not None:
+        collected_text.append(content_text)
 
 
 def _extract_v2_messages(messages):
@@ -220,17 +158,15 @@ def _extract_v2_messages(messages):
         content = (
             msg["content"] if isinstance(msg, dict) else getattr(msg, "content", "")
         )
-        result.append({"role": role, "content": content})
+        result.append({"role": role, "content": transform_message_content(content)})
     return result
 
 
 def _extract_v2_response_text(response):
     # type: (Any) -> list[str] | None
-    message = getattr(response, "message", None)
-    if not message:
-        return None
-    content = getattr(message, "content", None)
-    if not content:
-        return None
-    texts = [item.text for item in content if hasattr(item, "text")]
-    return texts if texts else None
+    content = get_first_from_sources(response, [("message", "content")], True)
+    if content:
+        texts = [item.text for item in content if hasattr(item, "text")]
+        if texts:
+            return texts
+    return None

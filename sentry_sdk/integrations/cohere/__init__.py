@@ -1,9 +1,13 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.ai.span_config import (
+    set_request_span_data,
+    set_request_messages,
+    set_response_span_data,
+)
+from sentry_sdk.integrations.cohere.configs import COHERE_EMBED_CONFIG
 
 from typing import TYPE_CHECKING
 
@@ -64,48 +68,41 @@ def _wrap_embed(f):
 
         model = kwargs.get("model", "")
 
+        include_pii = should_send_default_pii() and integration.include_prompts
+
         with sentry_sdk.start_span(
             op=OP.GEN_AI_EMBEDDINGS,
             name=f"embeddings {model}".strip(),
             origin=CohereIntegration.origin,
         ) as span:
-            set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-            set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-
-            if "model" in kwargs:
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"])
-
-            if "texts" in kwargs and (
-                should_send_default_pii() and integration.include_prompts
-            ):
-                texts = kwargs["texts"]
-                if isinstance(texts, str):
-                    texts = [texts]
-                elif isinstance(texts, tuple):
-                    texts = list(texts)
-                if isinstance(texts, list) and len(texts) > 0:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, texts, unpack=False
-                    )
+            set_request_span_data(span, kwargs, integration, COHERE_EMBED_CONFIG)
+            if include_pii and "texts" in kwargs:
+                set_request_messages(
+                    span,
+                    _normalize_embedding_input(kwargs["texts"]),
+                    target=SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                )
 
             try:
-                res = f(*args, **kwargs)
+                response = f(*args, **kwargs)
             except Exception as e:
                 exc_info = sys.exc_info()
                 with capture_internal_exceptions():
                     _capture_exception(e)
                 reraise(*exc_info)
 
-            if (
-                hasattr(res, "meta")
-                and hasattr(res.meta, "billed_units")
-                and hasattr(res.meta.billed_units, "input_tokens")
-            ):
-                record_token_usage(
-                    span,
-                    input_tokens=res.meta.billed_units.input_tokens,
-                    total_tokens=res.meta.billed_units.input_tokens,
-                )
-            return res
+            set_response_span_data(
+                span, response, False, COHERE_EMBED_CONFIG["response"]
+            )
+            return response
 
     return new_embed
+
+
+def _normalize_embedding_input(texts):
+    # type: (Any) -> Any
+    if isinstance(texts, list):
+        return texts
+    if isinstance(texts, tuple):
+        return list(texts)
+    return [texts]
