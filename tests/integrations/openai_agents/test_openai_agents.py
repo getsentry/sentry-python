@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import os
 import json
 import logging
+import httpx
 
 import sentry_sdk
 from sentry_sdk import start_span
@@ -14,7 +15,7 @@ from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.utils import parse_version, package_version
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, InternalServerError
 from agents.models.openai_responses import OpenAIResponsesModel
 
 from unittest import mock
@@ -1631,35 +1632,46 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
     Test that input data is captured even when the API call raises an exception.
     This verifies that _set_input_data is called before the API call.
     """
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.side_effect = Exception("API Error")
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-            sentry_init(
-                integrations=[
-                    OpenAIAgentsIntegration(),
-                    LoggingIntegration(event_level=logging.CRITICAL),
-                ],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+    model_request = httpx.Request(
+        "POST",
+        "/responses",
+    )
 
-            events = capture_events()
+    response = httpx.Response(
+        500,
+        request=model_request,
+    )
 
-            with pytest.raises(Exception, match="API Error"):
-                await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
-                )
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[
+                OpenAIAgentsIntegration(),
+                LoggingIntegration(event_level=logging.CRITICAL),
+            ],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
+
+        events = capture_events()
+
+        with pytest.raises(InternalServerError, match="Error code: 500"):
+            await agents.Runner.run(agent, "Test input", run_config=test_run_config)
 
     (
         error_event,
         transaction,
     ) = events
 
-    assert error_event["exception"]["values"][0]["type"] == "Exception"
-    assert error_event["exception"]["values"][0]["value"] == "API Error"
+    assert error_event["exception"]["values"][0]["type"] == "InternalServerError"
+    assert error_event["exception"]["values"][0]["value"] == "Error code: 500"
 
     spans = transaction["spans"]
     ai_client_span = [s for s in spans if s["op"] == "gen_ai.chat"][0]
