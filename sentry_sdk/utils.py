@@ -2005,7 +2005,11 @@ def safe_serialize(data: "Any") -> str:
 
     try:
         serialized = serialize_item(data)
-        return json.dumps(serialized, default=str)
+        return (
+            json.dumps(serialized, default=str)
+            if not isinstance(serialized, str)
+            else serialized
+        )
     except Exception:
         return str(data)
 
