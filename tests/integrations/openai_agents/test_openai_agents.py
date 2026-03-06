@@ -12,7 +12,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import parse_version, package_version
 
 from openai import AsyncOpenAI
 from agents.models.openai_responses import OpenAIResponsesModel
@@ -36,6 +36,8 @@ from agents.items import (
 from agents.tool import HostedMCPTool
 from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
+
+OPENAI_VERSION = package_version("openai")
 
 from openai.types.responses import (
     ResponseCreatedEvent,
@@ -1256,18 +1258,22 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-    assert ai_client_span1["data"]["gen_ai.response.tool_calls"] == safe_serialize(
-        [
-            {
-                "arguments": '{"message": "hello"}',
-                "call_id": "call_123",
-                "name": "simple_test_tool",
-                "type": "function_call",
-                "id": "call_123",
-                "status": None,
-            }
-        ]
-    )
+
+    tool_call = {
+        "arguments": '{"message": "hello"}',
+        "call_id": "call_123",
+        "name": "simple_test_tool",
+        "type": "function_call",
+        "id": "call_123",
+        "status": None,
+    }
+
+    if OPENAI_VERSION >= (2, 25, 0):
+        tool_call["namespace"] = None
+
+    assert json.loads(ai_client_span1["data"]["gen_ai.response.tool_calls"]) == [
+        tool_call
+    ]
 
     assert tool_span["description"] == "execute_tool simple_test_tool"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
