@@ -451,7 +451,7 @@ class NoOpStreamedSpan(StreamedSpan):
         self._scope.span = self
         self._previous_span_on_scope = old_span
 
-    def _end(self) -> None:
+    def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         if self._scope is None:
             return
 
