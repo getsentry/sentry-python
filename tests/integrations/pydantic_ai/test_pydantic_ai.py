@@ -18,7 +18,6 @@ from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, UserPromptPart
 from pydantic_ai.usage import RequestUsage
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
-from pydantic_ai._tool_manager import ToolDefinition
 
 
 @pytest.fixture
@@ -2832,11 +2831,11 @@ async def test_tool_description_in_execute_tool_span(sentry_init, capture_events
 
 
 @pytest.mark.asyncio
-async def test_tool_without_description_omits_tool_description(
+async def test_tool_without_description_sets_tool_description_to_none(
     sentry_init, capture_events
 ):
     """
-    Test that execute_tool spans omit tool description when the tool has no docstring.
+    Test that execute_tool spans set tool description to None when the tool has no docstring.
     """
     agent = Agent(
         "test",
