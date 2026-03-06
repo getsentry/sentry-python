@@ -1492,7 +1492,9 @@ async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_age
 
 
 @pytest.mark.asyncio
-async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
+async def test_hosted_mcp_tool_propagation_headers(
+    sentry_init, test_agent, get_model_response
+):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
     """
@@ -1508,9 +1510,7 @@ async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
         },
     )
 
-    client = AsyncOpenAI(api_key="z")
-    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
-
+    client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
 
     agent_with_tool = test_agent.clone(
@@ -1524,11 +1524,13 @@ async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
+    response = get_model_response(EXAMPLE_RESPONSE)
+
     with patch.object(
-        model._client.responses,
-        "create",
-        wraps=model._client.responses.create,
-    ) as create, mock.patch(
+        agent_with_tool.model._client._client,
+        "send",
+        return_value=response,
+    ) as send, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
         with sentry_sdk.start_transaction(
@@ -1542,13 +1544,17 @@ async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
                 run_config=test_run_config,
             )
 
-            ai_client_span = transaction._span_recorder.spans[-1]
+            ai_client_span = next(
+                span
+                for span in transaction._span_recorder.spans
+                if span.op == OP.GEN_AI_CHAT
+            )
 
-        args, kwargs = create.call_args
+        args, kwargs = send.call_args
 
-        assert "tools" in kwargs
-        assert len(kwargs["tools"]) == 1
-        hosted_mcp_tool = kwargs["tools"][0]
+        request = args[0]
+        body = json.loads(request.content.decode("utf-8"))
+        hosted_mcp_tool = body["tools"][0]
 
         assert hosted_mcp_tool["headers"][
             "sentry-trace"
