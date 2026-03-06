@@ -937,121 +937,85 @@ def test_agent_invocation_span_sync(
 
 
 @pytest.mark.asyncio
-async def test_handoff_span(sentry_init, capture_events, get_model_response):
+async def test_handoff_span(sentry_init, capture_events, mock_usage):
     """
     Test that handoff spans are created when agents hand off to other agents.
     """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4-mini", openai_client=client)
-
     # Create two simple agents with a handoff relationship
     secondary_agent = agents.Agent(
         name="secondary_agent",
         instructions="You are a secondary agent.",
-        model=model,
+        model="gpt-4o-mini",
     )
 
     primary_agent = agents.Agent(
         name="primary_agent",
         instructions="You are a primary agent that hands off to secondary agent.",
-        model=model,
+        model="gpt-4o-mini",
         handoffs=[secondary_agent],
     )
 
-    handoff_response = get_model_response(
-        Response(
-            id="resp_tool_123",
-            output=[
-                ResponseFunctionToolCall(
-                    id="call_handoff_123",
-                    call_id="call_handoff_123",
-                    name="transfer_to_secondary_agent",
-                    type="function_call",
-                    arguments="{}",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=20,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=5,
-                ),
-                total_tokens=30,
-            ),
-        )
-    )
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Mock two responses:
+            # 1. Primary agent calls handoff tool
+            # 2. Secondary agent provides final response
+            handoff_response = ModelResponse(
+                output=[
+                    ResponseFunctionToolCall(
+                        id="call_handoff_123",
+                        call_id="call_handoff_123",
+                        name="transfer_to_secondary_agent",
+                        type="function_call",
+                        arguments="{}",
+                    )
+                ],
+                usage=mock_usage,
+                response_id="resp_handoff_123",
+            )
 
-    final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="I'm the specialist and I can help with that!",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=20,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=5,
-                ),
-                total_tokens=30,
-            ),
-        )
-    )
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="I'm the specialist and I can help with that!",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=mock_usage,
+                response_id="resp_final_123",
+            )
 
-    with patch.object(
-        primary_agent.model._client._client,
-        "send",
-        side_effect=[handoff_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
+            mock_get_response.side_effect = [handoff_response, final_response]
 
-        events = capture_events()
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
 
-        result = await agents.Runner.run(
-            primary_agent,
-            "Please hand off to secondary agent",
-            run_config=test_run_config,
-        )
+            events = capture_events()
 
-        assert result is not None
+            result = await agents.Runner.run(
+                primary_agent,
+                "Please hand off to secondary agent",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-
-    handoff_span = next(span for span in spans if span.get("op") == OP.GEN_AI_HANDOFF)
+    handoff_span = spans[2]
 
     # Verify handoff span was created
     assert handoff_span is not None
@@ -1062,123 +1026,85 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
 
 
 @pytest.mark.asyncio
-async def test_max_turns_before_handoff_span(
-    sentry_init, capture_events, get_model_response
-):
+async def test_max_turns_before_handoff_span(sentry_init, capture_events, mock_usage):
     """
     Example raising agents.exceptions.AgentsException after the agent invocation span is complete.
     """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4-mini", openai_client=client)
-
     # Create two simple agents with a handoff relationship
     secondary_agent = agents.Agent(
         name="secondary_agent",
         instructions="You are a secondary agent.",
-        model=model,
+        model="gpt-4o-mini",
     )
 
     primary_agent = agents.Agent(
         name="primary_agent",
         instructions="You are a primary agent that hands off to secondary agent.",
-        model=model,
+        model="gpt-4o-mini",
         handoffs=[secondary_agent],
     )
 
-    handoff_response = get_model_response(
-        Response(
-            id="resp_tool_123",
-            output=[
-                ResponseFunctionToolCall(
-                    id="call_handoff_123",
-                    call_id="call_handoff_123",
-                    name="transfer_to_secondary_agent",
-                    type="function_call",
-                    arguments="{}",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=20,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=5,
-                ),
-                total_tokens=30,
-            ),
-        )
-    )
-
-    final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="I'm the specialist and I can help with that!",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=20,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=5,
-                ),
-                total_tokens=30,
-            ),
-        )
-    )
-
-    with patch.object(
-        primary_agent.model._client._client,
-        "send",
-        side_effect=[handoff_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        events = capture_events()
-
-        with pytest.raises(MaxTurnsExceeded):
-            await agents.Runner.run(
-                primary_agent,
-                "Please hand off to secondary agent",
-                run_config=test_run_config,
-                max_turns=1,
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Mock two responses:
+            # 1. Primary agent calls handoff tool
+            # 2. Secondary agent provides final response
+            handoff_response = ModelResponse(
+                output=[
+                    ResponseFunctionToolCall(
+                        id="call_handoff_123",
+                        call_id="call_handoff_123",
+                        name="transfer_to_secondary_agent",
+                        type="function_call",
+                        arguments="{}",
+                    )
+                ],
+                usage=mock_usage,
+                response_id="resp_handoff_123",
             )
+
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="I'm the specialist and I can help with that!",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=mock_usage,
+                response_id="resp_final_123",
+            )
+
+            mock_get_response.side_effect = [handoff_response, final_response]
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            with pytest.raises(MaxTurnsExceeded):
+                await agents.Runner.run(
+                    primary_agent,
+                    "Please hand off to secondary agent",
+                    run_config=test_run_config,
+                    max_turns=1,
+                )
 
     (error, transaction) = events
     spans = transaction["spans"]
-
-    handoff_span = next(span for span in spans if span.get("op") == OP.GEN_AI_HANDOFF)
+    handoff_span = spans[2]
 
     # Verify handoff span was created
     assert handoff_span is not None
@@ -1832,106 +1758,79 @@ async def test_span_status_error(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_mcp_tool_execution_spans(
-    sentry_init, capture_events, test_agent, get_model_response
-):
+async def test_mcp_tool_execution_spans(sentry_init, capture_events, test_agent):
     """
     Test that MCP (Model Context Protocol) tool calls create execute_tool spans.
     """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
 
-    mcp_response = get_model_response(
-        Response(
-            id="resp_mcp_123",
-            output=[
-                McpCall(
-                    id="mcp_call_123",
-                    name="test_mcp_tool",
-                    arguments='{"query": "search term"}',
-                    output="MCP tool executed successfully",
-                    error=None,
-                    type="mcp_call",
-                    server_label="test_server",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a McpCall object
+            mcp_call = McpCall(
+                id="mcp_call_123",
+                name="test_mcp_tool",
+                arguments='{"query": "search term"}',
+                output="MCP tool executed successfully",
+                error=None,
+                type="mcp_call",
+                server_label="test_server",
+            )
+
+            # Create a ModelResponse with an McpCall in the output
+            mcp_response = ModelResponse(
+                output=[mcp_call],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=10,
+                    output_tokens=5,
+                    total_tokens=15,
                 ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                response_id="resp_mcp_123",
+            )
+
+            # Final response after MCP tool execution
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="Task completed using MCP tool",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=15,
+                    output_tokens=10,
+                    total_tokens=25,
                 ),
-                total_tokens=15,
-            ),
-        )
-    )
+                response_id="resp_final_123",
+            )
 
-    final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Task completed using MCP tool",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=25,
-            ),
-        )
-    )
+            mock_get_response.side_effect = [mcp_response, final_response]
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        side_effect=[mcp_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
 
-        events = capture_events()
+            events = capture_events()
 
-        await agents.Runner.run(
-            agent,
-            "Please use MCP tool",
-            run_config=test_run_config,
-        )
+            await agents.Runner.run(
+                test_agent,
+                "Please use MCP tool",
+                run_config=test_run_config,
+            )
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -1962,106 +1861,79 @@ async def test_mcp_tool_execution_spans(
 
 
 @pytest.mark.asyncio
-async def test_mcp_tool_execution_with_error(
-    sentry_init, capture_events, test_agent, get_model_response
-):
+async def test_mcp_tool_execution_with_error(sentry_init, capture_events, test_agent):
     """
     Test that MCP tool calls with errors are tracked with error status.
     """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
 
-    mcp_response = get_model_response(
-        Response(
-            id="resp_mcp_123",
-            output=[
-                McpCall(
-                    id="mcp_call_error_123",
-                    name="failing_mcp_tool",
-                    arguments='{"query": "test"}',
-                    output=None,
-                    error="MCP tool execution failed",
-                    type="mcp_call",
-                    server_label="test_server",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a McpCall object with an error
+            mcp_call_with_error = McpCall(
+                id="mcp_call_error_123",
+                name="failing_mcp_tool",
+                arguments='{"query": "test"}',
+                output=None,
+                error="MCP tool execution failed",
+                type="mcp_call",
+                server_label="test_server",
+            )
+
+            # Create a ModelResponse with a failing McpCall
+            mcp_response = ModelResponse(
+                output=[mcp_call_with_error],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=10,
+                    output_tokens=5,
+                    total_tokens=15,
                 ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                response_id="resp_mcp_error_123",
+            )
+
+            # Final response after error
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="The MCP tool encountered an error",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=15,
+                    output_tokens=10,
+                    total_tokens=25,
                 ),
-                total_tokens=15,
-            ),
-        )
-    )
+                response_id="resp_final_error_123",
+            )
 
-    final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Task completed using MCP tool",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=25,
-            ),
-        )
-    )
+            mock_get_response.side_effect = [mcp_response, final_response]
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        side_effect=[mcp_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
 
-        events = capture_events()
+            events = capture_events()
 
-        await agents.Runner.run(
-            agent,
-            "Please use failing MCP tool",
-            run_config=test_run_config,
-        )
+            await agents.Runner.run(
+                test_agent,
+                "Please use failing MCP tool",
+                run_config=test_run_config,
+            )
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -2090,106 +1962,79 @@ async def test_mcp_tool_execution_with_error(
 
 
 @pytest.mark.asyncio
-async def test_mcp_tool_execution_without_pii(
-    sentry_init, capture_events, test_agent, get_model_response
-):
+async def test_mcp_tool_execution_without_pii(sentry_init, capture_events, test_agent):
     """
     Test that MCP tool input/output are not included when send_default_pii is False.
     """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
 
-    mcp_response = get_model_response(
-        Response(
-            id="resp_mcp_123",
-            output=[
-                McpCall(
-                    id="mcp_call_pii_123",
-                    name="test_mcp_tool",
-                    arguments='{"query": "sensitive data"}',
-                    output="Result with sensitive info",
-                    error=None,
-                    type="mcp_call",
-                    server_label="test_server",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            # Create a McpCall object
+            mcp_call = McpCall(
+                id="mcp_call_pii_123",
+                name="test_mcp_tool",
+                arguments='{"query": "sensitive data"}',
+                output="Result with sensitive info",
+                error=None,
+                type="mcp_call",
+                server_label="test_server",
+            )
+
+            # Create a ModelResponse with an McpCall
+            mcp_response = ModelResponse(
+                output=[mcp_call],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=10,
+                    output_tokens=5,
+                    total_tokens=15,
                 ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                response_id="resp_mcp_123",
+            )
+
+            # Final response
+            final_response = ModelResponse(
+                output=[
+                    ResponseOutputMessage(
+                        id="msg_final",
+                        type="message",
+                        status="completed",
+                        content=[
+                            ResponseOutputText(
+                                text="Task completed",
+                                type="output_text",
+                                annotations=[],
+                            )
+                        ],
+                        role="assistant",
+                    )
+                ],
+                usage=Usage(
+                    requests=1,
+                    input_tokens=15,
+                    output_tokens=10,
+                    total_tokens=25,
                 ),
-                total_tokens=15,
-            ),
-        )
-    )
+                response_id="resp_final_123",
+            )
 
-    final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Task completed",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=5,
-                ),
-                total_tokens=25,
-            ),
-        )
-    )
+            mock_get_response.side_effect = [mcp_response, final_response]
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        side_effect=[mcp_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=False,  # PII disabled
-        )
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,  # PII disabled
+            )
 
-        events = capture_events()
+            events = capture_events()
 
-        await agents.Runner.run(
-            agent,
-            "Please use MCP tool",
-            run_config=test_run_config,
-        )
+            await agents.Runner.run(
+                test_agent,
+                "Please use MCP tool",
+                run_config=test_run_config,
+            )
 
     (transaction,) = events
     spans = transaction["spans"]
