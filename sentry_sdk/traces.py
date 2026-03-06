@@ -199,7 +199,6 @@ class StreamedSpan:
         "_parent_sampled",
         "_start_timestamp",
         "_start_timestamp_monotonic_ns",
-        "_finished",
         "_timestamp",
         "_status",
         "_scope",
@@ -238,7 +237,6 @@ class StreamedSpan:
 
         self._start_timestamp = datetime.now(timezone.utc)
         self._timestamp: "Optional[datetime]" = None
-        self._finished: bool = False
 
         try:
             # profiling depends on this value and requires that
@@ -282,15 +280,7 @@ class StreamedSpan:
         :param end_timestamp: End timestamp to use instead of current time.
         :type end_timestamp: "Optional[Union[float, datetime]]"
         """
-        try:
-            if end_timestamp and self._timestamp is None:
-                if isinstance(end_timestamp, float):
-                    end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
-                self._timestamp = end_timestamp
-        except AttributeError:
-            logger.debug(f"Failed to set end_timestamp: {end_timestamp}")
-
-        self._end()
+        self._end(end_timestamp)
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         warnings.warn(
@@ -307,8 +297,8 @@ class StreamedSpan:
             self._scope.span = self
             self._previous_span_on_scope = old_span
 
-    def _end(self) -> None:
-        if self._finished is True:
+    def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        if self._timestamp is not None:
             # This span is already finished, ignore.
             return
 
@@ -323,7 +313,15 @@ class StreamedSpan:
         self.set_attribute("sentry.segment.id", self._segment.span_id)
         self.set_attribute("sentry.segment.name", self._segment.name)
 
-        # Set the end timestamp if not set yet (e.g. via span.end(<timestamp>))
+        # Set the end timestamp
+        if end_timestamp is not None:
+            try:
+                if isinstance(end_timestamp, float):
+                    end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
+                self._timestamp = end_timestamp
+            except Exception:
+                logger.debug(f"Failed to set end_timestamp: {end_timestamp}")
+
         if self._timestamp is None:
             try:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
@@ -332,8 +330,6 @@ class StreamedSpan:
                 )
             except AttributeError:
                 self._timestamp = datetime.now(timezone.utc)
-
-        self._finished = True
 
         client = sentry_sdk.get_client()
         if not client.is_active():
