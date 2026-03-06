@@ -505,6 +505,14 @@ class NoOpStreamedSpan(StreamedSpan):
     def sampled(self) -> "Optional[bool]":
         return False
 
+    @property
+    def start_timestamp(self) -> "Optional[datetime]":
+        return None
+
+    @property
+    def timestamp(self) -> "Optional[datetime]":
+        return None
+
 
 def trace(
     func: "Optional[Callable[P, R]]" = None,
