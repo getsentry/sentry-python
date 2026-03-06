@@ -67,7 +67,7 @@ _DEFAULT_PARENT_SPAN = object()
 def start_span(
     name: str,
     attributes: "Optional[Attributes]" = None,
-    parent_span: "Optional[StreamedSpan]" = _DEFAULT_PARENT_SPAN,
+    parent_span: "Optional[StreamedSpan]" = _DEFAULT_PARENT_SPAN,  # type: ignore[assignment]
     active: bool = True,
 ) -> "StreamedSpan":
     """
