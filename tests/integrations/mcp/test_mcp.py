@@ -241,15 +241,12 @@ async def test_tool_handler_streamable_http(
     assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
     assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
     assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
-    assert span["data"]["mcp.request.argument.data"] == '"test"'
+    assert span["data"]["mcp.request.argument.data"] == "test"
 
     # Check PII-sensitive data
     if send_default_pii and include_prompts:
-        # TODO: Investigate why tool result is double-serialized.
         assert span["data"][SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
-            json.dumps(
-                {"status": "completed"},
-            )
+            {"status": "completed"}
         )
     else:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
@@ -366,8 +363,8 @@ async def test_prompt_handler_stdio(
     assert span["data"][SPANDATA.MCP_METHOD_NAME] == "prompts/get"
     assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
     assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-prompt"
-    assert span["data"]["mcp.request.argument.name"] == '"code_help"'
-    assert span["data"]["mcp.request.argument.language"] == '"python"'
+    assert span["data"]["mcp.request.argument.name"] == "code_help"
+    assert span["data"]["mcp.request.argument.language"] == "python"
 
     # Message count is always captured
     assert span["data"][SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT] == 1
@@ -752,7 +749,7 @@ async def test_tool_result_extraction_unstructured(
     # Should extract and join text from content blocks only with PII
     if send_default_pii and include_prompts:
         assert (
-            span["data"][SPANDATA.MCP_TOOL_RESULT_CONTENT] == '"First part Second part"'
+            span["data"][SPANDATA.MCP_TOOL_RESULT_CONTENT] == "First part Second part"
         )
     else:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
@@ -959,7 +956,7 @@ async def test_tool_with_complex_arguments(sentry_init, capture_events, stdio):
     assert span["data"]["mcp.request.argument.nested"] == json.dumps(
         {"key": "value", "list": [1, 2, 3]}
     )
-    assert span["data"]["mcp.request.argument.string"] == '"test"'
+    assert span["data"]["mcp.request.argument.string"] == "test"
     assert span["data"]["mcp.request.argument.number"] == "42"
 
 
