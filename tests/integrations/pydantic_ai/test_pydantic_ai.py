@@ -2361,7 +2361,6 @@ async def test_execute_tool_span_creation(sentry_init, capture_events):
     """
     import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
-        execute_tool_span,
         update_execute_tool_span,
     )
 
@@ -2387,7 +2386,6 @@ async def test_execute_tool_span_with_mcp_type(sentry_init, capture_events):
     Test execute_tool span with MCP tool type.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import execute_tool_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2412,7 +2410,6 @@ async def test_execute_tool_span_without_prompts(sentry_init, capture_events):
     """
     import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
-        execute_tool_span,
         update_execute_tool_span,
     )
 
@@ -2438,7 +2435,6 @@ async def test_execute_tool_span_with_none_args(sentry_init, capture_events):
     Test execute_tool span with None args.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import execute_tool_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2483,7 +2479,6 @@ async def test_update_execute_tool_span_with_none_result(sentry_init, capture_ev
     """
     import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
-        execute_tool_span,
         update_execute_tool_span,
     )
 
@@ -2874,64 +2869,3 @@ async def test_tool_without_description_omits_tool_description(
     assert tool_span["data"]["gen_ai.tool.name"] == "no_docs_tool"
     assert SPANDATA.GEN_AI_TOOL_DESCRIPTION in tool_span["data"]
     assert tool_span["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION] is None
-
-
-@pytest.mark.asyncio
-async def test_execute_tool_span_with_tool_definition(sentry_init, capture_events):
-    """
-    Test execute_tool_span helper correctly sets tool description from a ToolDefinition.
-    """
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-
-    tool_def = ToolDefinition(
-        name="my_tool",
-        description="A tool that does something useful.",
-        parameters_json_schema={"type": "object", "properties": {}},
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        with execute_tool_span(
-            "my_tool", {"arg": "value"}, None, "function", tool_definition=tool_def
-        ) as span:
-            assert span is not None
-
-    (event,) = events
-    tool_spans = [s for s in event["spans"] if s["op"] == "gen_ai.execute_tool"]
-    assert len(tool_spans) == 1
-    assert (
-        tool_spans[0]["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
-        == "A tool that does something useful."
-    )
-
-
-@pytest.mark.asyncio
-async def test_execute_tool_span_without_tool_definition(sentry_init, capture_events):
-    """
-    Test execute_tool_span helper omits tool description when tool_definition is None.
-    """
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        with execute_tool_span(
-            "my_tool", {"arg": "value"}, None, "function", tool_definition=None
-        ) as span:
-            assert span is not None
-
-    (event,) = events
-    tool_spans = [s for s in event["spans"] if s["op"] == "gen_ai.execute_tool"]
-    assert len(tool_spans) == 1
-    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION not in tool_spans[0]["data"]
