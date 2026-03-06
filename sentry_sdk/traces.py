@@ -315,12 +315,20 @@ class StreamedSpan:
 
         # Set the end timestamp
         if end_timestamp is not None:
-            try:
-                if isinstance(end_timestamp, float):
+            if isinstance(end_timestamp, (float, int)):
+                try:
                     end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
-                self._timestamp = end_timestamp
-            except Exception:
-                logger.debug(f"Failed to set end_timestamp: {end_timestamp}")
+                except Exception:
+                    logger.debug(
+                        "Failed to set end_timestamp. Using current time instead."
+                    )
+
+                if isinstance(end_timestamp, datetime):
+                    self._timestamp = end_timestamp
+                else:
+                    logger.debug(
+                        "Failed to set end_timestamp. Using current time instead."
+                    )
 
         if self._timestamp is None:
             try:
