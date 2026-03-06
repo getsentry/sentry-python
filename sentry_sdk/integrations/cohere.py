@@ -163,10 +163,12 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                     role = getattr(x, "role", "").lower()
                     if role == "chatbot":
                         role = "assistant"
-                    messages.append({
-                        "role": role,
-                        "content": getattr(x, "message", ""),
-                    })
+                    messages.append(
+                        {
+                            "role": role,
+                            "content": getattr(x, "message", ""),
+                        }
+                    )
                 messages.append({"role": "user", "content": message})
                 messages = normalize_message_roles(messages)
                 set_data_normalized(
@@ -254,7 +256,9 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     )
 
             if "model" in kwargs:
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"])
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"]
+                )
             try:
                 res = f(*args, **kwargs)
             except Exception as e:
