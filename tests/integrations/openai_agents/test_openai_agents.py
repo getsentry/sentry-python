@@ -958,7 +958,7 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
         handoffs=[secondary_agent],
     )
 
-    first_response = get_model_response(
+    handoff_response = get_model_response(
         Response(
             id="resp_tool_123",
             output=[
@@ -990,7 +990,7 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_final_123",
             output=[
@@ -1031,7 +1031,7 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
     with patch.object(
         primary_agent.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[handoff_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -1085,7 +1085,7 @@ async def test_max_turns_before_handoff_span(
         handoffs=[secondary_agent],
     )
 
-    first_response = get_model_response(
+    handoff_response = get_model_response(
         Response(
             id="resp_tool_123",
             output=[
@@ -1117,7 +1117,7 @@ async def test_max_turns_before_handoff_span(
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_final_123",
             output=[
@@ -1158,7 +1158,7 @@ async def test_max_turns_before_handoff_span(
     with patch.object(
         primary_agent.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[handoff_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -1206,7 +1206,7 @@ async def test_tool_execution_span(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
 
-    first_response = get_model_response(
+    tool_call_response = get_model_response(
         Response(
             id="resp_tool_123",
             output=[
@@ -1238,7 +1238,7 @@ async def test_tool_execution_span(
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_final_123",
             output=[
@@ -1279,7 +1279,7 @@ async def test_tool_execution_span(
     with patch.object(
         agent_with_tool.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[tool_call_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -1842,7 +1842,7 @@ async def test_mcp_tool_execution_spans(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    first_response = get_model_response(
+    mcp_response = get_model_response(
         Response(
             id="resp_mcp_123",
             output=[
@@ -1876,7 +1876,7 @@ async def test_mcp_tool_execution_spans(
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_final_123",
             output=[
@@ -1917,7 +1917,7 @@ async def test_mcp_tool_execution_spans(
     with patch.object(
         agent.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[mcp_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -1972,7 +1972,7 @@ async def test_mcp_tool_execution_with_error(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    first_response = get_model_response(
+    mcp_call_with_error_response = get_model_response(
         Response(
             id="resp_mcp_123",
             output=[
@@ -2006,7 +2006,7 @@ async def test_mcp_tool_execution_with_error(
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_final_123",
             output=[
@@ -2047,7 +2047,7 @@ async def test_mcp_tool_execution_with_error(
     with patch.object(
         agent.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[mcp_call_with_error_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -2100,7 +2100,7 @@ async def test_mcp_tool_execution_without_pii(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    first_response = get_model_response(
+    mcp_response = get_model_response(
         Response(
             id="resp_mcp_123",
             output=[
@@ -2134,7 +2134,7 @@ async def test_mcp_tool_execution_without_pii(
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_final_123",
             output=[
@@ -2175,7 +2175,7 @@ async def test_mcp_tool_execution_without_pii(
     with patch.object(
         agent.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[mcp_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -2324,7 +2324,7 @@ async def test_tool_execution_error_tracing(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[failing_tool], model=model)
 
-    first_response = get_model_response(
+    tool_response = get_model_response(
         Response(
             id="resp_1",
             output=[
@@ -2356,7 +2356,7 @@ async def test_tool_execution_error_tracing(
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_2",
             output=[
@@ -2397,7 +2397,7 @@ async def test_tool_execution_error_tracing(
     with patch.object(
         agent_with_tool.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[tool_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -2665,7 +2665,7 @@ async def test_multiple_llm_calls_aggregate_usage(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[calculator], model=model)
 
-    first_response = get_model_response(
+    tool_call_response = get_model_response(
         Response(
             id="resp_1",
             output=[
@@ -2697,7 +2697,7 @@ async def test_multiple_llm_calls_aggregate_usage(
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_2",
             output=[
@@ -2738,7 +2738,7 @@ async def test_multiple_llm_calls_aggregate_usage(
     with patch.object(
         agent_with_tool.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[tool_call_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -3260,7 +3260,7 @@ async def test_conversation_id_on_tool_span(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[simple_tool], model=model)
 
-    first_response = get_model_response(
+    tool_response = get_model_response(
         Response(
             id="call_123",
             output=[
@@ -3292,7 +3292,7 @@ async def test_conversation_id_on_tool_span(
         )
     )
 
-    second_response = get_model_response(
+    final_response = get_model_response(
         Response(
             id="resp_final_789",
             output=[
@@ -3333,7 +3333,7 @@ async def test_conversation_id_on_tool_span(
     with patch.object(
         agent_with_tool.model._client._client,
         "send",
-        side_effect=[first_response, second_response],
+        side_effect=[tool_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
