@@ -59,10 +59,15 @@ SOURCE_FOR_STYLE = {
 }
 
 
+# Sentinel value for an unset parent_span to be able to distinguish it from
+# a None set by the user
+_DEFAULT_PARENT_SPAN = object()
+
+
 def start_span(
     name: str,
     attributes: "Optional[Attributes]" = None,
-    parent_span: "Optional[StreamedSpan]" = None,
+    parent_span: "Optional[StreamedSpan]" = _DEFAULT_PARENT_SPAN,
     active: bool = True,
 ) -> "StreamedSpan":
     """
@@ -70,7 +75,8 @@ def start_span(
 
     The span's parent, unless provided explicitly via the `parent_span` argument,
     will be the current active span, if any. If there is none, this span will
-    become the root of a new span tree.
+    become the root of a new span tree. If you explicitly want this span to be
+    top-level without a parent, set `parent_span=None`.
 
     `start_span()` can either be used as context manager or you can use the span
     object it returns and explicitly end it via `span.end()`. The following is
@@ -102,7 +108,8 @@ def start_span(
 
     :param parent_span: A span instance that the new span should consider its
         parent. If not provided, the parent will be set to the currently active
-        span, if any.
+        span, if any. If set to `None`, this span will become a new root-level
+        span.
     :type parent_span: "Optional[StreamedSpan]"
 
     :param active: Controls whether spans started while this span is running
