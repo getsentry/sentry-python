@@ -1206,7 +1206,7 @@ async def test_tool_execution_span(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
 
-    tool_call_response = get_model_response(
+    tool_response = get_model_response(
         Response(
             id="resp_tool_123",
             output=[
@@ -1279,7 +1279,7 @@ async def test_tool_execution_span(
     with patch.object(
         agent_with_tool.model._client._client,
         "send",
-        side_effect=[tool_call_response, final_response],
+        side_effect=[tool_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
@@ -1972,7 +1972,7 @@ async def test_mcp_tool_execution_with_error(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    mcp_call_with_error_response = get_model_response(
+    mcp_response = get_model_response(
         Response(
             id="resp_mcp_123",
             output=[
@@ -2047,7 +2047,7 @@ async def test_mcp_tool_execution_with_error(
     with patch.object(
         agent.model._client._client,
         "send",
-        side_effect=[mcp_call_with_error_response, final_response],
+        side_effect=[mcp_response, final_response],
     ) as _:
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
