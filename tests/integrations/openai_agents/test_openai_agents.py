@@ -9,7 +9,7 @@ import httpx
 
 import sentry_sdk
 from sentry_sdk import start_span
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
@@ -1338,7 +1338,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
             ai_client_span = next(
                 span
                 for span in transaction._span_recorder.spans
-                if span.op == "gen_ai.chat"
+                if span.op == OP.GEN_AI_CHAT
             )
 
         args, kwargs = create.call_args
