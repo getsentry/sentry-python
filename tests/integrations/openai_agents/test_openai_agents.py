@@ -1062,7 +1062,7 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
 
 @pytest.mark.asyncio
 async def test_max_turns_before_handoff_span(
-    sentry_init, capture_events, mock_usage, get_model_response
+    sentry_init, capture_events, get_model_response
 ):
     """
     Example raising agents.exceptions.AgentsException after the agent invocation span is complete.
