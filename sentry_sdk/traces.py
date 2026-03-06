@@ -418,6 +418,7 @@ class NoOpStreamedSpan(StreamedSpan):
         scope: "Optional[sentry_sdk.Scope]" = None,
     ) -> None:
         self._scope = scope  # type: ignore[assignment]
+
         self._start()
 
     def __repr__(self) -> str:
@@ -433,7 +434,7 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def _start(self) -> None:
         if self._scope is None:
-            return self
+            return
 
         old_span = self._scope.span
         self._scope.span = self
