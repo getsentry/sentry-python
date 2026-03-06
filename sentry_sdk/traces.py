@@ -319,9 +319,7 @@ class StreamedSpan:
                 try:
                     end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
                 except Exception:
-                    logger.debug(
-                        "Failed to set end_timestamp. Using current time instead."
-                    )
+                    pass
 
             if isinstance(end_timestamp, datetime):
                 self._timestamp = end_timestamp
