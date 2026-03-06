@@ -15,7 +15,7 @@ from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.utils import parse_version
 
-from openai import AsyncOpenAI, AsyncStream
+from openai import AsyncOpenAI
 from agents.models.openai_responses import OpenAIResponsesModel
 
 from unittest import mock
@@ -44,15 +44,11 @@ from openai.types.responses import (
     ResponseCompletedEvent,
     Response,
     ResponseUsage,
-    ResponseStreamEvent,
 )
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
 )
-
-from openai._response import AsyncAPIResponse
-from openai._models import FinalRequestOptions
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
 
