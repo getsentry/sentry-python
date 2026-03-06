@@ -17,7 +17,7 @@ def execute_tool_span(
     tool_args: "Any",
     agent: "Any",
     tool_type: str = "function",
-    tool_definition: Optional["ToolDefinition"] = None,
+    tool_definition: "Optional[ToolDefinition]" = None,
 ) -> "sentry_sdk.tracing.Span":
     """Create a span for tool execution.
 
