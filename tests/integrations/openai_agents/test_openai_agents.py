@@ -1203,7 +1203,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
 
 
-def sse_chunks(events):
+def server_side_event_chunks(events):
     for event in events:
         payload = event.model_dump()
         chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
@@ -1253,7 +1253,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         200,
         request=request,
         content=async_iterator(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     ResponseCreatedEvent(
                         response=Response(
@@ -2837,7 +2837,7 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent, async_iterat
         200,
         request=request,
         content=async_iterator(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     ResponseCreatedEvent(
                         response=Response(
