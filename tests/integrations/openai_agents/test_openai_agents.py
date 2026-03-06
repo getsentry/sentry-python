@@ -981,11 +981,11 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
                 ),
-                output_tokens=5,
+                output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                    reasoning_tokens=5,
                 ),
-                total_tokens=15,
+                total_tokens=30,
             ),
         )
     )
@@ -1015,15 +1015,15 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
             model="gpt-4",
             object="response",
             usage=ResponseUsage(
-                input_tokens=15,
+                input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
                 ),
-                output_tokens=10,
+                output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                    reasoning_tokens=5,
                 ),
-                total_tokens=25,
+                total_tokens=30,
             ),
         )
     )
@@ -1108,11 +1108,11 @@ async def test_max_turns_before_handoff_span(
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
                 ),
-                output_tokens=5,
+                output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                    reasoning_tokens=5,
                 ),
-                total_tokens=15,
+                total_tokens=30,
             ),
         )
     )
@@ -1142,15 +1142,15 @@ async def test_max_turns_before_handoff_span(
             model="gpt-4",
             object="response",
             usage=ResponseUsage(
-                input_tokens=15,
+                input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
                 ),
-                output_tokens=10,
+                output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                    reasoning_tokens=5,
                 ),
-                total_tokens=25,
+                total_tokens=30,
             ),
         )
     )
@@ -1901,15 +1901,15 @@ async def test_mcp_tool_execution_spans(
             model="gpt-4.1-2025-04-14",
             object="response",
             usage=ResponseUsage(
-                input_tokens=10,
+                input_tokens=15,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
                 ),
-                output_tokens=20,
+                output_tokens=10,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=5,
+                    reasoning_tokens=0,
                 ),
-                total_tokens=30,
+                total_tokens=25,
             ),
         )
     )
@@ -2031,15 +2031,15 @@ async def test_mcp_tool_execution_with_error(
             model="gpt-4.1-2025-04-14",
             object="response",
             usage=ResponseUsage(
-                input_tokens=10,
+                input_tokens=15,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
                 ),
-                output_tokens=20,
+                output_tokens=10,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=5,
+                    reasoning_tokens=0,
                 ),
-                total_tokens=30,
+                total_tokens=25,
             ),
         )
     )
@@ -2159,15 +2159,15 @@ async def test_mcp_tool_execution_without_pii(
             model="gpt-4.1-2025-04-14",
             object="response",
             usage=ResponseUsage(
-                input_tokens=10,
+                input_tokens=15,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
                 ),
-                output_tokens=20,
+                output_tokens=10,
                 output_tokens_details=OutputTokensDetails(
                     reasoning_tokens=5,
                 ),
-                total_tokens=30,
+                total_tokens=25,
             ),
         )
     )
@@ -2345,11 +2345,11 @@ async def test_tool_execution_error_tracing(
             usage=ResponseUsage(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
-                    cached_tokens=5,
+                    cached_tokens=0,
                 ),
                 output_tokens=5,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=3,
+                    reasoning_tokens=0,
                 ),
                 total_tokens=15,
             ),
@@ -2381,15 +2381,15 @@ async def test_tool_execution_error_tracing(
             model="gpt-4-0613",
             object="response",
             usage=ResponseUsage(
-                input_tokens=20,
+                input_tokens=15,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
                 ),
-                output_tokens=15,
+                output_tokens=10,
                 output_tokens_details=OutputTokensDetails(
                     reasoning_tokens=0,
                 ),
-                total_tokens=35,
+                total_tokens=25,
             ),
         )
     )
@@ -2686,11 +2686,11 @@ async def test_multiple_llm_calls_aggregate_usage(
             usage=ResponseUsage(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
-                    cached_tokens=5,
+                    cached_tokens=0,
                 ),
                 output_tokens=5,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=3,
+                    reasoning_tokens=0,
                 ),
                 total_tokens=15,
             ),
@@ -2724,11 +2724,11 @@ async def test_multiple_llm_calls_aggregate_usage(
             usage=ResponseUsage(
                 input_tokens=20,
                 input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
+                    cached_tokens=5,
                 ),
                 output_tokens=15,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                    reasoning_tokens=3,
                 ),
                 total_tokens=35,
             ),
@@ -3279,15 +3279,15 @@ async def test_conversation_id_on_tool_span(
             model="gpt-4",
             object="response",
             usage=ResponseUsage(
-                input_tokens=20,
+                input_tokens=10,
                 input_tokens_details=InputTokensDetails(
-                    cached_tokens=5,
+                    cached_tokens=0,
                 ),
-                output_tokens=10,
+                output_tokens=5,
                 output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=8,
+                    reasoning_tokens=0,
                 ),
-                total_tokens=30,
+                total_tokens=15,
             ),
         )
     )
