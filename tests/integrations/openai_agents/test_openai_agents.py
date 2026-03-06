@@ -2069,34 +2069,38 @@ async def test_mcp_tool_execution_without_pii(sentry_init, capture_events, test_
 
 @pytest.mark.asyncio
 async def test_multiple_agents_asyncio(
-    sentry_init, capture_events, test_agent, mock_model_response
+    sentry_init, capture_events, test_agent, mock_model_response, get_model_response
 ):
     """
     Test that multiple agents can be run at the same time in asyncio tasks
     without interfering with each other.
     """
+    client = AsyncOpenAI(api_key="z")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    response = get_model_response(mock_model_response)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
+
+        events = capture_events()
+
+        async def run():
+            await agents.Runner.run(
+                starting_agent=agent,
+                input="Test input",
+                run_config=test_run_config,
             )
 
-            events = capture_events()
-
-            async def run():
-                await agents.Runner.run(
-                    starting_agent=test_agent,
-                    input="Test input",
-                    run_config=test_run_config,
-                )
-
-            await asyncio.gather(*[run() for _ in range(3)])
+        await asyncio.gather(*[run() for _ in range(3)])
 
     assert len(events) == 3
     txn1, txn2, txn3 = events
@@ -2973,37 +2977,45 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
 )
 @pytest.mark.asyncio
 async def test_conversation_id_on_all_spans(
-    sentry_init, capture_events, test_agent, mock_model_response
+    sentry_init, capture_events, test_agent, mock_model_response, get_model_response
 ):
     """
     Test that gen_ai.conversation.id is set on all AI-related spans when passed to Runner.run().
     """
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    client = AsyncOpenAI(api_key="z")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-            )
+    response = get_model_response(mock_model_response)
 
-            events = capture_events()
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
 
-            result = await agents.Runner.run(
-                test_agent,
-                "Test input",
-                run_config=test_run_config,
-                conversation_id="conv_test_123",
-            )
+        events = capture_events()
 
-            assert result is not None
+        result = await agents.Runner.run(
+            agent,
+            "Test input",
+            run_config=test_run_config,
+            conversation_id="conv_test_123",
+        )
+
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-    invoke_agent_span, ai_client_span = spans
+    invoke_agent_span = next(
+        span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    )
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     # Verify workflow span (transaction) has conversation_id
     assert (
@@ -3120,35 +3132,47 @@ async def test_conversation_id_on_tool_span(sentry_init, capture_events, test_ag
 )
 @pytest.mark.asyncio
 async def test_no_conversation_id_when_not_provided(
-    sentry_init, capture_events, test_agent, mock_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    mock_model_response,
+    get_model_response,
 ):
     """
     Test that gen_ai.conversation.id is not set when not passed to Runner.run().
     """
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    client = AsyncOpenAI(api_key="z")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-            )
+    response = get_model_response(mock_model_response)
 
-            events = capture_events()
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
 
-            # Don't pass conversation_id
-            result = await agents.Runner.run(
-                test_agent, "Test input", run_config=test_run_config
-            )
+        events = capture_events()
 
-            assert result is not None
+        # Don't pass conversation_id
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
+
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-    invoke_agent_span, ai_client_span = spans
+    invoke_agent_span = next(
+        span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    )
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     # Verify conversation_id is NOT set on any spans
     assert "gen_ai.conversation.id" not in transaction["contexts"]["trace"].get(
