@@ -448,6 +448,18 @@ class NoOpStreamedSpan(StreamedSpan):
             del self._previous_span_on_scope
             self._scope.span = old_span
 
+    def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        self._end()
+
+    def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        warnings.warn(
+            "span.finish() is deprecated. Use span.end() instead.",
+            stacklevel=2,
+            category=DeprecationWarning,
+        )
+
+        self._end()
+
     def get_attributes(self) -> "Attributes":
         return {}
 
