@@ -15,7 +15,7 @@ from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.utils import parse_version
 
-from openai import AsyncOpenAI, AsyncStream
+from openai import AsyncOpenAI
 from agents.models.openai_responses import OpenAIResponsesModel
 
 from unittest import mock
