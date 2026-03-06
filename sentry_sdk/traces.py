@@ -6,12 +6,20 @@ sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
 import uuid
+import warnings
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.tracing_utils import Baggage
-from sentry_sdk.utils import format_attribute, logger
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    format_attribute,
+    logger,
+    nanosecond_time,
+    should_be_treated_as_error,
+)
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional, ParamSpec, TypeVar, Union
@@ -189,8 +197,12 @@ class StreamedSpan:
         "_parent_span_id",
         "_segment",
         "_parent_sampled",
+        "_start_timestamp",
+        "_start_timestamp_monotonic_ns",
+        "_timestamp",
         "_status",
         "_scope",
+        "_previous_span_on_scope",
         "_baggage",
     )
 
@@ -223,10 +235,22 @@ class StreamedSpan:
         self._parent_sampled = parent_sampled
         self._baggage = baggage
 
+        self._start_timestamp = datetime.now(timezone.utc)
+        self._timestamp: "Optional[datetime]" = None
+
+        try:
+            # profiling depends on this value and requires that
+            # it is measured in nanoseconds
+            self._start_timestamp_monotonic_ns = nanosecond_time()
+        except AttributeError:
+            pass
+
         self._span_id: "Optional[str]" = None
 
         self._status = SpanStatus.OK.value
         self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
+
+        self._start()
 
     def __repr__(self) -> str:
         return (
@@ -244,7 +268,79 @@ class StreamedSpan:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        pass
+        if value is not None and should_be_treated_as_error(ty, value):
+            self.status = SpanStatus.ERROR
+
+        self._end()
+
+    def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        """
+        Finish this span and queue it for sending.
+
+        :param end_timestamp: End timestamp to use instead of current time.
+        :type end_timestamp: "Optional[Union[float, datetime]]"
+        """
+        self._end(end_timestamp)
+
+    def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        warnings.warn(
+            "span.finish() is deprecated. Use span.end() instead.",
+            stacklevel=2,
+            category=DeprecationWarning,
+        )
+
+        self.end(end_timestamp)
+
+    def _start(self) -> None:
+        if self._active:
+            old_span = self._scope.span
+            self._scope.span = self
+            self._previous_span_on_scope = old_span
+
+    def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        if self._timestamp is not None:
+            # This span is already finished, ignore.
+            return
+
+        # Detach from scope
+        if self._active:
+            with capture_internal_exceptions():
+                old_span = self._previous_span_on_scope
+                del self._previous_span_on_scope
+                self._scope.span = old_span
+
+        # Set attributes from the segment
+        self.set_attribute("sentry.segment.id", self._segment.span_id)
+        self.set_attribute("sentry.segment.name", self._segment.name)
+
+        # Set the end timestamp
+        if end_timestamp is not None:
+            if isinstance(end_timestamp, (float, int)):
+                try:
+                    end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
+                except Exception:
+                    pass
+
+            if isinstance(end_timestamp, datetime):
+                self._timestamp = end_timestamp
+            else:
+                logger.debug("Failed to set end_timestamp. Using current time instead.")
+
+        if self._timestamp is None:
+            try:
+                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+                self._timestamp = self._start_timestamp + timedelta(
+                    microseconds=elapsed / 1000
+                )
+            except AttributeError:
+                self._timestamp = datetime.now(timezone.utc)
+
+        client = sentry_sdk.get_client()
+        if not client.is_active():
+            return
+
+        # Finally, queue the span for sending to Sentry
+        self._scope._capture_span(self)
 
     def get_attributes(self) -> "Attributes":
         return self._attributes
@@ -309,10 +405,28 @@ class StreamedSpan:
     def sampled(self) -> "Optional[bool]":
         return True
 
+    @property
+    def start_timestamp(self) -> "Optional[datetime]":
+        return self._start_timestamp
+
+    @property
+    def timestamp(self) -> "Optional[datetime]":
+        return self._timestamp
+
 
 class NoOpStreamedSpan(StreamedSpan):
-    def __init__(self) -> None:
-        pass
+    __slots__ = (
+        "_scope",
+        "_previous_span_on_scope",
+    )
+
+    def __init__(
+        self,
+        scope: "Optional[sentry_sdk.Scope]" = None,
+    ) -> None:
+        self._scope = scope  # type: ignore[assignment]
+
+        self._start()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(sampled={self.sampled})>"
@@ -323,7 +437,36 @@ class NoOpStreamedSpan(StreamedSpan):
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        pass
+        self._end()
+
+    def _start(self) -> None:
+        if self._scope is None:
+            return
+
+        old_span = self._scope.span
+        self._scope.span = self
+        self._previous_span_on_scope = old_span
+
+    def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        if self._scope is None:
+            return
+
+        with capture_internal_exceptions():
+            old_span = self._previous_span_on_scope
+            del self._previous_span_on_scope
+            self._scope.span = old_span
+
+    def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        self._end()
+
+    def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
+        warnings.warn(
+            "span.finish() is deprecated. Use span.end() instead.",
+            stacklevel=2,
+            category=DeprecationWarning,
+        )
+
+        self._end()
 
     def get_attributes(self) -> "Attributes":
         return {}
@@ -368,6 +511,14 @@ class NoOpStreamedSpan(StreamedSpan):
     @property
     def sampled(self) -> "Optional[bool]":
         return False
+
+    @property
+    def start_timestamp(self) -> "Optional[datetime]":
+        return None
+
+    @property
+    def timestamp(self) -> "Optional[datetime]":
+        return None
 
 
 def trace(
