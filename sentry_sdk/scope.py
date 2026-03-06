@@ -33,7 +33,7 @@ from sentry_sdk.tracing_utils import (
     normalize_incoming_data,
     PropagationContext,
 )
-from sentry_sdk.traces import StreamedSpan, NoOpStreamedSpan
+from sentry_sdk.traces import _DEFAULT_PARENT_SPAN, StreamedSpan, NoOpStreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -1177,9 +1177,9 @@ class Scope:
     def start_streamed_span(
         self,
         name: str,
-        attributes: "Optional[Attributes]" = None,
-        parent_span: "Optional[StreamedSpan]" = None,
-        active: bool = True,
+        attributes: "Optional[Attributes]",
+        parent_span: "Optional[StreamedSpan]",
+        active: bool,
     ) -> "StreamedSpan":
         # TODO: rename to start_span once we drop the old API
         if isinstance(parent_span, NoOpStreamedSpan):
@@ -1189,7 +1189,9 @@ class Scope:
                 "currently active span instead."
             )
 
-        if parent_span is None or isinstance(parent_span, NoOpStreamedSpan):
+        if parent_span is _DEFAULT_PARENT_SPAN or isinstance(
+            parent_span, NoOpStreamedSpan
+        ):
             parent_span = self.span  # type: ignore
 
         # If no eligible parent_span was provided and there is no currently
