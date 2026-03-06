@@ -847,6 +847,35 @@ def test_send_task_wrapped(
     assert span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
 
 
+def test_user_custom_headers_accessible_in_task(init_celery):
+    """
+    Regression test for https://github.com/getsentry/sentry-python/issues/5566
+
+    User-provided custom headers passed to apply_async() must be accessible
+    via task.request.headers on the worker side.
+    """
+    celery = init_celery(traces_sample_rate=1.0)
+
+    @celery.task(name="custom_headers_task", bind=True)
+    def custom_headers_task(self):
+        return dict(self.request.headers or {})
+
+    custom_headers = {
+        "my_custom_key": "my_value",
+        "correlation_id": "abc-123",
+        "tenant_id": "tenant-42",
+    }
+
+    with start_transaction(name="test"):
+        result = custom_headers_task.apply_async(headers=custom_headers)
+
+    received_headers = result.get()
+    for key, value in custom_headers.items():
+        assert received_headers.get(key) == value, (
+            f"Custom header {key!r} not found in task.request.headers"
+        )
+
+
 @pytest.mark.skip(reason="placeholder so that forked test does not come last")
 def test_placeholder():
     """Forked tests must not come last in the module.
