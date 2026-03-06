@@ -1824,7 +1824,7 @@ async def test_mcp_tool_execution_spans(
         events = capture_events()
 
         await agents.Runner.run(
-            test_agent,
+            agent,
             "Please use MCP tool",
             run_config=test_run_config,
         )
@@ -1954,7 +1954,7 @@ async def test_mcp_tool_execution_with_error(
         events = capture_events()
 
         await agents.Runner.run(
-            test_agent,
+            agent,
             "Please use failing MCP tool",
             run_config=test_run_config,
         )
@@ -2082,7 +2082,7 @@ async def test_mcp_tool_execution_without_pii(
         events = capture_events()
 
         await agents.Runner.run(
-            test_agent,
+            agent,
             "Please use MCP tool",
             run_config=test_run_config,
         )
