@@ -12,7 +12,6 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
-from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import execute_tool_span
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, UserPromptPart
@@ -2360,6 +2359,7 @@ async def test_execute_tool_span_creation(sentry_init, capture_events):
     """
     import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+        execute_tool_span,
         update_execute_tool_span,
     )
 
@@ -2385,6 +2385,9 @@ async def test_execute_tool_span_with_mcp_type(sentry_init, capture_events):
     Test execute_tool span with MCP tool type.
     """
     import sentry_sdk
+    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+        execute_tool_span,
+    )
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2409,6 +2412,7 @@ async def test_execute_tool_span_without_prompts(sentry_init, capture_events):
     """
     import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+        execute_tool_span,
         update_execute_tool_span,
     )
 
@@ -2434,6 +2438,7 @@ async def test_execute_tool_span_with_none_args(sentry_init, capture_events):
     Test execute_tool span with None args.
     """
     import sentry_sdk
+    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import execute_tool_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2478,6 +2483,7 @@ async def test_update_execute_tool_span_with_none_result(sentry_init, capture_ev
     """
     import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+        execute_tool_span,
         update_execute_tool_span,
     )
 
