@@ -314,6 +314,24 @@ def test_agent_with_instructions():
 
 
 @pytest.fixture
+def test_agent_custom_model():
+    """Create a real Agent instance for testing."""
+    return Agent(
+        name="test_agent_custom_model",
+        instructions="You are a helpful test assistant.",
+        # the model could be agents.OpenAIChatCompletionsModel()
+        model="my-custom-model",
+        model_settings=ModelSettings(
+            max_tokens=100,
+            temperature=0.7,
+            top_p=1.0,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+        ),
+    )
+
+
+@pytest.fixture
 def get_model_response():
     def inner(response_content):
         model_request = httpx.Request(
@@ -638,6 +656,7 @@ async def test_agent_invocation_span(
 async def test_client_span_custom_model(
     sentry_init,
     capture_events,
+    test_agent_custom_model,
     mock_model_response,
     get_model_response,
 ):
@@ -647,20 +666,7 @@ async def test_client_span_custom_model(
 
     client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="my-custom-model", openai_client=client)
-
-    agent = Agent(
-        name="test_agent_custom_model",
-        instructions="You are a helpful test assistant.",
-        # the model could be agents.OpenAIChatCompletionsModel()
-        model=model,
-        model_settings=ModelSettings(
-            max_tokens=100,
-            temperature=0.7,
-            top_p=1.0,
-            presence_penalty=0.0,
-            frequency_penalty=0.0,
-        ),
-    )
+    agent = test_agent_custom_model.clone(model=model)
 
     response = get_model_response(mock_model_response)
 
