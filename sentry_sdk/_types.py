@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, TypeVar, Union
 
-
 # Re-exported for compat, since code out there in the wild might use this variable.
 MYPY = TYPE_CHECKING
 
@@ -93,19 +92,13 @@ Annotated = Union[AnnotatedValue, T]
 
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence
-
     from datetime import datetime
-
     from types import TracebackType
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Mapping
-    from typing import NotRequired
-    from typing import Optional
-    from typing import Tuple
-    from typing import Type
+    from typing import Any, Callable, Dict, Mapping, NotRequired, Optional, Type
+
     from typing_extensions import Literal, TypedDict
+
+    from sentry_sdk.tracing import TransactionSource
 
     class SDKInfo(TypedDict):
         name: str
@@ -285,8 +278,69 @@ if TYPE_CHECKING:
     # TODO: Make a proper type definition for this (PRs welcome!)
     BreadcrumbHint = Dict[str, Any]
 
-    # TODO: Make a proper type definition for this (PRs welcome!)
-    SamplingContext = Dict[str, Any]
+    _ASGIInfo = TypedDict(
+        "_ASGIInfo", {"version": str, "spec_version": NotRequired[str]}
+    )
+    _ASGIScope = TypedDict(
+        "_ASGIScope",
+        {
+            "type": str,
+            "asgi": _ASGIInfo,
+            "path": str,
+            "query_string": bytes,
+            "headers": list[tuple[bytes, bytes]],
+            # Not mandatory in Websocket
+            "http_version": NotRequired[str],
+            "method": NotRequired[str],
+            # Optional fields per ASGI spec
+            "scheme": NotRequired[str],
+            "raw_path": NotRequired[bytes],
+            "root_path": NotRequired[str],
+            "client": NotRequired[tuple[str, int]],
+            "server": NotRequired[tuple[str, int]],
+            "state": NotRequired[dict[str, Any]],
+        },
+    )
+    _TransactionContext = TypedDict(
+        "_TransactionContext",
+        {
+            "trace_id": str,
+            "span_id": str,
+            "parent_span_id": Optional[str],
+            "same_process_as_parent": bool,
+            "op": Optional[str],
+            "description": Optional[str],
+            "start_timestamp": datetime | int,
+            "timestamp": Optional[datetime],
+            "origin": str,
+            "tags": NotRequired[dict[str, str]],
+            "data": NotRequired[dict[str, Any]],
+            "name": str,
+            "source": TransactionSource,
+            "sampled": Optional[bool],
+        },
+    )
+    _SamplingContextTyped = TypedDict(
+        "_SamplingContextTyped",
+        {
+            "transaction_context": _TransactionContext,
+            "parent_sampled": Optional[bool],
+            "asgi_scope": NotRequired[_ASGIScope],
+            # `wsgi_environ` is only present for WSGI server (like Django), and it contains mainly env vars, and some wsgi specifics.
+            "wsgi_environ": NotRequired[dict[str, Any]],
+            # `aiohttp_request` is only present for AIOHTTP server, and contains <class 'aiohttp.web_request.Request'>
+            "aiohttp_request": NotRequired[Any],
+            # NOT tested these below, but documented for completeness sake to pass mypy.
+            "tornado_request": NotRequired[Any],
+            "celery_job": NotRequired[dict[str, Any]],
+            "rq_job": NotRequired[Any],
+            "aws_event": NotRequired[Any],
+            "aws_context": NotRequired[Any],
+            "gcp_env": NotRequired[dict[str, Any]],
+            "gcp_event": NotRequired[Any],
+        },
+    )
+    SamplingContext = Union[_SamplingContextTyped, dict[str, Any]]
 
     EventProcessor = Callable[[Event, Hint], Optional[Event]]
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]

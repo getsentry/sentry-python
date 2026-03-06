@@ -1076,7 +1076,7 @@ class Scope:
 
         # use traces_sample_rate, traces_sampler, and/or inheritance to make a
         # sampling decision
-        sampling_context = {
+        sampling_context: "Dict[str, Any]" = {
             "transaction_context": transaction.to_json(),
             "parent_sampled": transaction.parent_sampled,
         }
