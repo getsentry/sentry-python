@@ -18,7 +18,6 @@ from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, UserPromptPart
 from pydantic_ai.usage import RequestUsage
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
-from pydantic_ai._tool_manager import ToolDefinition
 
 
 @pytest.fixture
@@ -2867,5 +2866,4 @@ async def test_tool_without_description_omits_tool_description(
 
     tool_span = tool_spans[0]
     assert tool_span["data"]["gen_ai.tool.name"] == "no_docs_tool"
-    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION in tool_span["data"]
-    assert tool_span["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION] is None
+    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION not in tool_span["data"]
