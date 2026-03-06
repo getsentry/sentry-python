@@ -1382,18 +1382,22 @@ async def test_tool_execution_span(
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-    assert ai_client_span1["data"]["gen_ai.response.tool_calls"] == safe_serialize(
-        [
-            {
-                "arguments": '{"message": "hello"}',
-                "call_id": "call_123",
-                "name": "simple_test_tool",
-                "type": "function_call",
-                "id": "call_123",
-                "status": None,
-            }
-        ]
-    )
+
+    tool_call = {
+        "arguments": '{"message": "hello"}',
+        "call_id": "call_123",
+        "name": "simple_test_tool",
+        "type": "function_call",
+        "id": "call_123",
+        "status": None,
+    }
+
+    if OPENAI_VERSION >= (2, 25, 0):
+        tool_call["namespace"] = None
+
+    assert json.loads(ai_client_span1["data"]["gen_ai.response.tool_calls"]) == [
+        tool_call
+    ]
 
     assert tool_span["description"] == "execute_tool simple_test_tool"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
