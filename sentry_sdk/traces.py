@@ -595,7 +595,7 @@ def trace(
     )
 
     client = sentry_sdk.get_client()
-    if not has_span_streaming_enabled(client):
+    if not has_span_streaming_enabled(client.options):
         warnings.warn(
             "Using span streaming API in non-span-streaming mode. Use "
             "@sentry_sdk.trace instead.",
