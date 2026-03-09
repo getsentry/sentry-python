@@ -30,7 +30,7 @@ class GEN_AI_ALLOWED_MESSAGE_ROLES:
 GEN_AI_MESSAGE_ROLE_REVERSE_MAPPING = {
     GEN_AI_ALLOWED_MESSAGE_ROLES.SYSTEM: ["system"],
     GEN_AI_ALLOWED_MESSAGE_ROLES.USER: ["user", "human"],
-    GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT: ["assistant", "ai"],
+    GEN_AI_ALLOWED_MESSAGE_ROLES.ASSISTANT: ["assistant", "ai", "chatbot"],
     GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL: ["tool", "tool_call"],
 }
 
@@ -503,7 +503,7 @@ def normalize_message_role(role: str) -> str:
     Normalize a message role to one of the 4 allowed gen_ai role values.
     Maps "ai" -> "assistant" and keeps other standard roles unchanged.
     """
-    return GEN_AI_MESSAGE_ROLE_MAPPING.get(role, role)
+    return GEN_AI_MESSAGE_ROLE_MAPPING.get(role.lower(), role)
 
 
 def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str, Any]]":
