@@ -8,7 +8,6 @@ from .patches import (
     _get_all_tools,
     _run_single_turn,
     _run_single_turn_streamed,
-    _execute_handoffs,
     _create_run_wrapper,
     _create_run_streamed_wrapper,
     _execute_final_output,
@@ -67,7 +66,6 @@ class OpenAIAgentsIntegration(Integration):
     - `AgentRunner._get_model()` -> `agents.run_internal.turn_preparation.get_model()`
     - `AgentRunner._get_all_tools()` -> `agents.run_internal.turn_preparation.get_all_tools()`
     - `AgentRunner._run_single_turn()` -> `agents.run_internal.run_loop.run_single_turn()`
-    - `RunImpl.execute_handoffs()` -> `agents.run_internal.turn_resolution.execute_handoffs()`
     - `RunImpl.execute_final_output()` -> `agents.run_internal.turn_resolution.execute_final_output()`
 
     Typical interaction with the library:
@@ -84,8 +82,7 @@ class OpenAIAgentsIntegration(Integration):
     Local tools are run based on the return value from the Responses API as a post-API call step in the above loop.
     Hosted MCP Tools are run as part of the Responses API call, and involve OpenAI reaching out to an external MCP server.
     An agent can handoff to another agent, also directed by the return value of the Responses API and run post-API call in the loop.
-    Handoffs are a way to switch agent-wide configuration.
-    - Handoffs are executed by calling `RunImpl.execute_handoffs()`. The method is patched with `patches._execute_handoffs()`
+    Handoffs are a way to switch agent-wide configuration and/or start with a fresh context.
     """
 
     identifier = "openai_agents"
@@ -137,20 +134,6 @@ class OpenAIAgentsIntegration(Integration):
                 )
 
             agents.run.run_single_turn_streamed = new_wrapped_run_single_turn_streamed
-
-            original_execute_handoffs = turn_resolution.execute_handoffs
-
-            @wraps(original_execute_handoffs)
-            async def new_wrapped_execute_handoffs(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _execute_handoffs(
-                    original_execute_handoffs, *args, **kwargs
-                )
-
-            agents.run_internal.turn_resolution.execute_handoffs = (
-                new_wrapped_execute_handoffs
-            )
 
             original_execute_final_output = turn_resolution.execute_final_output
 
@@ -214,18 +197,6 @@ class OpenAIAgentsIntegration(Integration):
 
         agents.run.AgentRunner._run_single_turn_streamed = classmethod(
             old_wrapped_run_single_turn_streamed
-        )
-
-        original_execute_handoffs = agents._run_impl.RunImpl.execute_handoffs
-
-        @wraps(agents._run_impl.RunImpl.execute_handoffs.__func__)
-        async def old_wrapped_execute_handoffs(
-            cls: "agents.Runner", *args: "Any", **kwargs: "Any"
-        ) -> "SingleStepResult":
-            return await _execute_handoffs(original_execute_handoffs, *args, **kwargs)
-
-        agents._run_impl.RunImpl.execute_handoffs = classmethod(
-            old_wrapped_execute_handoffs
         )
 
         original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
