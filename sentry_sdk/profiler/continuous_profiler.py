@@ -439,7 +439,6 @@ class ContinuousScheduler:
         buffer = self.buffer
         if buffer is not None:
             buffer.flush()
-            buffer = None
 
 
 class ThreadContinuousScheduler(ContinuousScheduler):
