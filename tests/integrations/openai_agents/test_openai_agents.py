@@ -1425,6 +1425,15 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         "/responses",
     )
 
+    # openai-agents calls with_streaming_response() if available starting with
+    # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
+    # When using with_streaming_response() the header set below changes the response type:
+    # https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_response.py#L67.
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
+        agent_with_tool.model._client.responses, "with_streaming_response"
+    ):
+        request.headers["X-Stainless-Raw-Response"] = "stream"
+
     response = httpx.Response(
         200,
         request=request,
@@ -3177,6 +3186,15 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent, async_iterat
         "POST",
         "/responses",
     )
+
+    # openai-agents calls with_streaming_response() if available starting with
+    # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
+    # When using with_streaming_response() the header set below changes the response type:
+    # https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_response.py#L67.
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
+        agent_with_tool.model._client.responses, "with_streaming_response"
+    ):
+        request.headers["X-Stainless-Raw-Response"] = "stream"
 
     response = httpx.Response(
         200,
