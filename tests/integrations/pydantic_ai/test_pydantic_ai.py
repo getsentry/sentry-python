@@ -2837,11 +2837,11 @@ async def test_tool_description_in_execute_tool_span(sentry_init, capture_events
 
 
 @pytest.mark.asyncio
-async def test_tool_without_description_sets_tool_description_to_none(
+async def test_tool_without_description_omits_tool_description(
     sentry_init, capture_events
 ):
     """
-    Test that execute_tool spans set tool description to None when the tool has no docstring.
+    Test that execute_tool spans omit tool description when the tool has no docstring.
     """
     agent = Agent(
         "test",
@@ -2872,5 +2872,4 @@ async def test_tool_without_description_sets_tool_description_to_none(
 
     tool_span = tool_spans[0]
     assert tool_span["data"]["gen_ai.tool.name"] == "no_docs_tool"
-    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION in tool_span["data"]
-    assert tool_span["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION] is None
+    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION not in tool_span["data"]
