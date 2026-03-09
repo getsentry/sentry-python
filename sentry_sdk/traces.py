@@ -591,16 +591,7 @@ def trace(
     """
     from sentry_sdk.tracing_utils import (
         create_streaming_span_decorator,
-        has_span_streaming_enabled,
     )
-
-    client = sentry_sdk.get_client()
-    if not has_span_streaming_enabled(client.options):
-        warnings.warn(
-            "Using span streaming API in non-span-streaming mode. Use "
-            "@sentry_sdk.trace instead.",
-            stacklevel=2,
-        )
 
     decorator = create_streaming_span_decorator(
         name=name,
