@@ -440,7 +440,7 @@ class StreamedSpan:
         return self._timestamp
 
     def _is_segment(self) -> bool:
-        return self._segment == self
+        return self._segment is self
 
 
 class NoOpStreamedSpan(StreamedSpan):
