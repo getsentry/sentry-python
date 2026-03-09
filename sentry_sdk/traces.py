@@ -438,13 +438,16 @@ class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
         "_scope",
         "_previous_span_on_scope",
+        "_unsampled_reason",
     )
 
     def __init__(
         self,
+        unsampled_reason: "Optional[str]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
     ) -> None:
         self._scope = scope  # type: ignore[assignment]
+        self._unsampled_reason = unsampled_reason
 
         self._start()
 
@@ -468,10 +471,16 @@ class NoOpStreamedSpan(StreamedSpan):
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        if self._scope is None:
-            return
+        client = sentry_sdk.get_client()
+        if client.is_active() and client.transport:
+            logger.debug("Discarding span because sampled = False")
+            client.transport.record_lost_event(
+                reason=self._unsampled_reason or "sample_rate",
+                data_category="span",
+                quantity=1,
+            )
 
-        if not hasattr(self, "_previous_span_on_scope"):
+        if self._scope is None or not hasattr(self, "_previous_span_on_scope"):
             return
 
         with capture_internal_exceptions():

@@ -23,6 +23,7 @@ from sentry_sdk.utils import (
     to_string,
     try_convert,
     is_sentry_url,
+    is_valid_sample_rate,
     _is_external_source,
     _is_in_project_root,
     _module_in_list,
@@ -40,6 +41,8 @@ if TYPE_CHECKING:
     from typing import Tuple
 
     from types import FrameType
+
+    from sentry_sdk._types import Attributes
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -1377,6 +1380,93 @@ def add_sentry_baggage_to_headers(
     headers[BAGGAGE_HEADER_NAME] = (
         stripped_existing_baggage + separator + sentry_baggage
     )
+
+
+def make_sampling_decision(
+    name: str,
+    attributes: "Optional[Attributes]",
+    scope: "sentry_sdk.Scope",
+) -> "tuple[bool, Optional[float], Optional[float], Optional[str]]":
+    """
+    Decide whether a span should be sampled.
+
+    Returns a tuple with:
+    1. the sampling decision
+    2. the effective sample rate
+    3. the sample rand
+    4. the reason for not sampling the span, if unsampled
+    """
+    client = sentry_sdk.get_client()
+
+    if not has_tracing_enabled(client.options):
+        return False, None, None, None
+
+    propagation_context = scope.get_active_propagation_context()
+
+    sample_rand = None
+    if propagation_context.baggage is not None:
+        sample_rand = propagation_context.baggage._sample_rand()
+    if sample_rand is None:
+        sample_rand = _generate_sample_rand(propagation_context.trace_id)
+
+    sampling_context = {
+        "name": name,
+        "trace_id": propagation_context.trace_id,
+        "parent_span_id": propagation_context.parent_span_id,
+        "parent_sampled": propagation_context.parent_sampled,
+        "attributes": attributes or {},
+    }
+
+    # If there's a traces_sampler, use that; otherwise use traces_sample_rate
+    traces_sampler_defined = callable(client.options.get("traces_sampler"))
+    if traces_sampler_defined:
+        sample_rate = client.options["traces_sampler"](sampling_context)
+    else:
+        if sampling_context["parent_sampled"] is not None:
+            sample_rate = sampling_context["parent_sampled"]
+        else:
+            sample_rate = client.options["traces_sample_rate"]
+
+    # Validate whether the sample_rate we got is actually valid. Since
+    # traces_sampler is user-provided, it could return anything.
+    if not is_valid_sample_rate(sample_rate, source="Tracing"):
+        logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
+        return False, None, None, None
+
+    sample_rate = float(sample_rate)
+
+    # Adjust sample rate if we're under backpressure
+    if client.monitor:
+        sample_rate /= 2**client.monitor.downsample_factor
+
+    outcome: "Optional[str]" = None
+
+    if not sample_rate:
+        if traces_sampler_defined:
+            reason = "traces_sampler returned 0 or False"
+        else:
+            reason = "traces_sample_rate is set to 0"
+
+        logger.debug(f"[Tracing] Discarding {name} because {reason}")
+        if client.monitor and client.monitor.downsample_factor > 0:
+            outcome = "backpressure"
+        else:
+            outcome = "sample_rate"
+
+        return False, 0.0, None, outcome
+
+    sampled = sample_rand < sample_rate
+
+    if sampled:
+        logger.debug(f"[Tracing] Starting {name}")
+        outcome = None
+    else:
+        logger.debug(
+            f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
+        )
+        outcome = "sample_rate"
+
+    return sampled, sample_rate, sample_rand, outcome
 
 
 # Circular imports
