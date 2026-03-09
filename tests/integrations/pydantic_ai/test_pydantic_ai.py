@@ -2794,3 +2794,113 @@ async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
     (span_data,) = event["spans"]
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+@pytest.mark.asyncio
+async def test_agent_iter(sentry_init, capture_events, test_agent):
+    """
+    Test that agent.iter() creates an invoke_agent span with chat children.
+    """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    async with test_agent.iter("Test input") as agent_run:
+        async for _node in agent_run:
+            pass
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # Verify transaction
+    assert transaction["transaction"] == "invoke_agent test_agent"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.pydantic_ai"
+
+    # Find chat spans
+    chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+    assert len(chat_spans) >= 1
+
+    # iter() is not streaming (node-by-node iteration, not token streaming)
+    for chat_span in chat_spans:
+        assert chat_span["data"]["gen_ai.response.streaming"] is False
+        assert "gen_ai.request.messages" in chat_span["data"]
+        assert "gen_ai.usage.input_tokens" in chat_span["data"]
+
+
+@pytest.mark.asyncio
+async def test_agent_iter_with_tools(sentry_init, capture_events, test_agent):
+    """
+    Test that tool execution creates execute_tool spans when using iter().
+    """
+
+    @test_agent.tool_plain
+    def get_data(query: str) -> str:
+        """Return data for a query."""
+        return f"Result for {query}"
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    async with test_agent.iter("Use get_data tool") as agent_run:
+        async for _node in agent_run:
+            pass
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # Find span types
+    chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
+    tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
+
+    # Should have tool spans
+    assert len(tool_spans) >= 1
+
+    # Check tool span
+    tool_span = tool_spans[0]
+    assert tool_span["data"]["gen_ai.tool.name"] == "get_data"
+    assert tool_span["data"]["gen_ai.tool.type"] == "function"
+    assert "gen_ai.tool.input" in tool_span["data"]
+    assert "gen_ai.tool.output" in tool_span["data"]
+
+    # iter() is not streaming
+    for chat_span in chat_spans:
+        assert chat_span["data"]["gen_ai.response.streaming"] is False
+
+
+@pytest.mark.asyncio
+async def test_agent_run_no_duplicate_spans(sentry_init, capture_events, test_agent):
+    """
+    Test that agent.run() does not produce duplicate invoke_agent spans.
+
+    Since run() internally calls iter(), the passthrough logic must prevent
+    iter()'s wrapper from creating a second invoke_agent span.
+    """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    result = await test_agent.run("Test input")
+    assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # The transaction itself is the invoke_agent span
+    assert transaction["contexts"]["trace"]["op"] == "gen_ai.invoke_agent"
+
+    # There should be NO child invoke_agent spans (passthrough prevents duplicates)
+    invoke_agent_child_spans = [s for s in spans if s["op"] == "gen_ai.invoke_agent"]
+    assert len(invoke_agent_child_spans) == 0

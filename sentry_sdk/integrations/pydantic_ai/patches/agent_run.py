@@ -6,12 +6,13 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import invoke_agent_span, update_invoke_agent_span
-from ..utils import _capture_exception, pop_agent, push_agent
+from ..utils import _capture_exception, get_current_agent, pop_agent, push_agent
 
 from typing import TYPE_CHECKING
 
 try:
     from pydantic_ai.agent import Agent  # type: ignore
+    from pydantic_ai.run import AgentRun  # type: ignore
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
@@ -40,8 +41,17 @@ class _StreamingContextManagerWrapper:
         self._isolation_scope: "Any" = None
         self._span: "Optional[sentry_sdk.tracing.Span]" = None
         self._result: "Any" = None
+        self._is_passthrough: bool = False
 
     async def __aenter__(self) -> "Any":
+        # Skip instrumentation if there's already an active agent context.
+        # This happens when run()/run_stream() internally call iter().
+        if get_current_agent() is not None:
+            self._is_passthrough = True
+            result = await self.original_ctx_manager.__aenter__()
+            self._result = result
+            return result
+
         # Set up isolation scope and invoke_agent span
         self._isolation_scope = sentry_sdk.isolation_scope()
         self._isolation_scope.__enter__()
@@ -56,8 +66,7 @@ class _StreamingContextManagerWrapper:
         )
         self._span.__enter__()
 
-        # Push agent to contextvar stack after span is successfully created and entered
-        # This ensures proper pairing with pop_agent() in __aexit__ even if exceptions occur
+        # Push agent to contextvar stack after span is successfully created
         push_agent(self.agent, self.is_streaming)
 
         # Enter the original context manager
@@ -66,13 +75,24 @@ class _StreamingContextManagerWrapper:
         return result
 
     async def __aexit__(self, exc_type: "Any", exc_val: "Any", exc_tb: "Any") -> None:
+        if self._is_passthrough:
+            await self.original_ctx_manager.__aexit__(exc_type, exc_val, exc_tb)
+            return
+
         try:
             # Exit the original context manager first
             await self.original_ctx_manager.__aexit__(exc_type, exc_val, exc_tb)
 
             # Update span with result if successful
             if exc_type is None and self._result and self._span is not None:
-                update_invoke_agent_span(self._span, self._result)
+                # AgentRun (from iter()) wraps the final result in .result;
+                # StreamedRunResult (from run_stream()) is used directly.
+                if isinstance(self._result, AgentRun):
+                    result = self._result.result
+                else:
+                    result = self._result
+                if result is not None:
+                    update_invoke_agent_span(self._span, result)
         finally:
             # Pop agent from contextvar stack
             pop_agent()
@@ -136,9 +156,10 @@ def _create_run_wrapper(
 
 def _create_streaming_wrapper(
     original_func: "Callable[..., Any]",
+    is_streaming: bool = True,
 ) -> "Callable[..., Any]":
     """
-    Wraps run_stream method that returns an async context manager.
+    Wraps streaming methods (run_stream, iter) that return async context managers.
     """
 
     @wraps(original_func)
@@ -158,7 +179,7 @@ def _create_streaming_wrapper(
             user_prompt=user_prompt,
             model=model,
             model_settings=model_settings,
-            is_streaming=True,
+            is_streaming=is_streaming,
         )
 
     return wrapper
@@ -210,3 +231,7 @@ def _patch_agent_run() -> None:
     Agent.run_stream_events = _create_streaming_events_wrapper(
         original_run_stream_events
     )
+
+    # Patch iter() - same async context manager pattern as run_stream()
+    original_iter = Agent.iter
+    Agent.iter = _create_streaming_wrapper(original_iter, is_streaming=False)
