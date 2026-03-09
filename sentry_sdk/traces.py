@@ -14,7 +14,7 @@ from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import format_attribute, logger
 
 if TYPE_CHECKING:
-    from typing import Optional, Union
+    from typing import Any, Optional, Union
     from sentry_sdk._types import Attributes, AttributeValue
 
 
@@ -99,6 +99,9 @@ def start_span(
     span.end()
     ```
 
+    To continue a trace from another service, call
+    `sentry_sdk.traces.continue_trace()` prior to creating a top-level span.
+
     :param name: The name to identify this span by.
     :type name: str
 
@@ -124,6 +127,44 @@ def start_span(
     return sentry_sdk.get_current_scope().start_streamed_span(
         name, attributes, parent_span, active
     )
+
+
+def continue_trace(incoming: "dict[str, Any]") -> None:
+    """
+    Continue a trace from headers or environment variables.
+
+    This function sets the propagation context on the scope. Any span started
+    in the updated scope will belong under the trace extracted from the
+    provided propagation headers or environment variables.
+
+    continue_trace() doesn't start any spans on its own. Use the start_span()
+    API for that.
+    """
+    # This is set both on the isolation and the current scope for compatibility
+    # reasons. Conceptually, it belongs on the isolation scope, and it also
+    # used to be set there in non-span-first mode. But in span first mode, we
+    # start spans on the current scope, regardless of type, like JS does, so we
+    # need to set the propagation context there.
+    sentry_sdk.get_isolation_scope().generate_propagation_context(
+        incoming,
+    )
+    sentry_sdk.get_current_scope().generate_propagation_context(
+        incoming,
+    )
+
+
+def new_trace() -> None:
+    """
+    Resets the propagation context, forcing a new trace.
+
+    This function sets the propagation context on the scope. Any span started
+    in the updated scope will start its own trace.
+
+    new_trace() doesn't start any spans on its own. Use the start_span() API
+    for that.
+    """
+    sentry_sdk.get_isolation_scope().set_new_propagation_context()
+    sentry_sdk.get_current_scope().set_new_propagation_context()
 
 
 class StreamedSpan:
