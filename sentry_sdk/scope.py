@@ -30,7 +30,7 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
     has_span_streaming_enabled,
-    make_sampling_decision,
+    _make_sampling_decision,
     normalize_incoming_data,
     PropagationContext,
 )
@@ -1200,7 +1200,7 @@ class Scope:
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
-            sampled, sample_rate, sample_rand, outcome = make_sampling_decision(
+            sampled, sample_rate, sample_rand, outcome = _make_sampling_decision(
                 name,
                 attributes,
                 self,

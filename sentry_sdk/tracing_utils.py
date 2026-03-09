@@ -1382,7 +1382,7 @@ def add_sentry_baggage_to_headers(
     )
 
 
-def make_sampling_decision(
+def _make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
     scope: "sentry_sdk.Scope",
