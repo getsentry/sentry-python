@@ -124,11 +124,6 @@ else:
     )
 
 
-async def async_iterator(values):
-    for value in values:
-        yield value
-
-
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -500,6 +495,7 @@ def test_streaming_chat_completion_no_prompts(
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "hello"},
             ],
+            stream=True,
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -509,6 +505,8 @@ def test_streaming_chat_completion_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -624,6 +622,7 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
         response_stream = client.chat.completions.create(
             model="some-model",
             messages=messages,
+            stream=True,
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -654,6 +653,8 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
             },
         ]
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
     assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -683,7 +684,7 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
     ],
 )
 async def test_streaming_chat_completion_async_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
 ):
     sentry_init(
         integrations=[
@@ -747,6 +748,7 @@ async def test_streaming_chat_completion_async_no_prompts(
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "hello"},
             ],
+            stream=True,
         )
 
         response_string = ""
@@ -758,6 +760,8 @@ async def test_streaming_chat_completion_async_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -820,7 +824,7 @@ async def test_streaming_chat_completion_async_no_prompts(
     ],
 )
 async def test_streaming_chat_completion_async(
-    sentry_init, capture_events, messages, request
+    sentry_init, capture_events, messages, request, async_iterator
 ):
     sentry_init(
         integrations=[
@@ -881,6 +885,7 @@ async def test_streaming_chat_completion_async(
         response_stream = await client.chat.completions.create(
             model="some-model",
             messages=messages,
+            stream=True,
         )
 
         response_string = ""
@@ -892,6 +897,8 @@ async def test_streaming_chat_completion_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -942,7 +949,8 @@ def test_bad_chat_completion(sentry_init, capture_events):
     )
     with pytest.raises(OpenAIError):
         client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+            model="some-model",
+            messages=[{"role": "system", "content": "hello"}],
         )
 
     (event,) = events
@@ -1450,7 +1458,9 @@ def test_span_origin_streaming_chat(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_span_origin_streaming_chat_async(sentry_init, capture_events):
+async def test_span_origin_streaming_chat_async(
+    sentry_init, capture_events, async_iterator
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -2407,7 +2417,7 @@ async def test_ai_client_span_responses_async_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_ai_client_span_streaming_responses_async_api(
-    sentry_init, capture_events, instructions, input, request
+    sentry_init, capture_events, instructions, input, request, async_iterator
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -2417,15 +2427,19 @@ async def test_ai_client_span_streaming_responses_async_api(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
+    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
+    client.responses._post = mock.AsyncMock(return_value=returned_stream)
 
     with start_transaction(name="openai tx"):
-        await client.responses.create(
+        result = await client.responses.create(
             model="gpt-4o",
             instructions=instructions,
             input=input,
             stream=True,
         )
+        async for _ in result:
+            pass
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -2436,16 +2450,17 @@ async def test_ai_client_span_streaming_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
-        "gen_ai.response.model": "response-model-id",
+        "gen_ai.response.time_to_first_token": mock.ANY,
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.request.model": "gpt-4o",
-        "gen_ai.response.text": "the model response",
+        "gen_ai.response.text": "hello world",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -2760,6 +2775,8 @@ def test_streaming_responses_api(
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
@@ -2779,7 +2796,7 @@ def test_streaming_responses_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
 ):
     sentry_init(
         integrations=[
@@ -2814,6 +2831,8 @@ async def test_streaming_responses_api_async(
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
@@ -2994,7 +3013,9 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
 
     with start_transaction(name="openai tx"):
         response_stream = client.chat.completions.create(
-            model="some-model", messages=[{"role": "user", "content": "Say hello"}]
+            model="some-model",
+            messages=[{"role": "user", "content": "Say hello"}],
+            stream=True,
         )
         # Consume the stream
         for _ in response_stream:
@@ -3013,7 +3034,9 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
 
 # noinspection PyTypeChecker
 @pytest.mark.asyncio
-async def test_streaming_chat_completion_ttft_async(sentry_init, capture_events):
+async def test_streaming_chat_completion_ttft_async(
+    sentry_init, capture_events, async_iterator
+):
     """
     Test that async streaming chat completions capture time-to-first-token (TTFT).
     """
@@ -3058,7 +3081,9 @@ async def test_streaming_chat_completion_ttft_async(sentry_init, capture_events)
 
     with start_transaction(name="openai tx"):
         response_stream = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "user", "content": "Say hello"}]
+            model="some-model",
+            messages=[{"role": "user", "content": "Say hello"}],
+            stream=True,
         )
         # Consume the stream
         async for _ in response_stream:
@@ -3116,7 +3141,9 @@ def test_streaming_responses_api_ttft(sentry_init, capture_events):
 # noinspection PyTypeChecker
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-async def test_streaming_responses_api_ttft_async(sentry_init, capture_events):
+async def test_streaming_responses_api_ttft_async(
+    sentry_init, capture_events, async_iterator
+):
     """
     Test that async streaming responses API captures time-to-first-token (TTFT).
     """

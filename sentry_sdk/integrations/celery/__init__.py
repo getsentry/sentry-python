@@ -231,6 +231,12 @@ def _update_celery_task_headers(
                 if key.startswith("sentry-"):
                     updated_headers["headers"][key] = value
 
+            # Preserve user-provided custom headers in the inner "headers" dict
+            # so they survive to task.request.headers on the worker (celery#4875).
+            for key, value in original_headers.items():
+                if key != "headers" and key not in updated_headers["headers"]:
+                    updated_headers["headers"][key] = value
+
     return updated_headers
 
 
