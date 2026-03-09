@@ -262,7 +262,17 @@ def mock_model_response():
         created_at=10000000,
         model="gpt-4",
         object="response",
-        usage=None,
+        usage=ResponseUsage(
+            input_tokens=10,
+            input_tokens_details=InputTokensDetails(
+                cached_tokens=0,
+            ),
+            output_tokens=20,
+            output_tokens_details=OutputTokensDetails(
+                reasoning_tokens=5,
+            ),
+            total_tokens=30,
+        ),
     )
 
 
