@@ -46,11 +46,15 @@ from openai.types.responses import (
     ResponseCompletedEvent,
     Response,
     ResponseUsage,
+    ResponseStreamEvent,
 )
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
 )
+
+from openai._response import AsyncAPIResponse
+from openai._models import FinalRequestOptions
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
 
@@ -89,140 +93,6 @@ EXAMPLE_RESPONSE = Response(
         total_tokens=30,
     ),
 )
-
-
-async def EXAMPLE_STREAMED_RESPONSE(*args, **kwargs):
-    yield ResponseCreatedEvent(
-        response=Response(
-            id="chat-id",
-            output=[],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-        ),
-        type="response.created",
-        sequence_number=0,
-    )
-
-    yield ResponseCompletedEvent(
-        response=Response(
-            id="chat-id",
-            output=[
-                ResponseOutputMessage(
-                    id="message-id",
-                    content=[
-                        ResponseOutputText(
-                            annotations=[],
-                            text="the model response",
-                            type="output_text",
-                        ),
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                ),
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=20,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=5,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=8,
-                ),
-                total_tokens=30,
-            ),
-        ),
-        type="response.completed",
-        sequence_number=1,
-    )
-
-
-async def EXAMPLE_STREAMED_RESPONSE_WITH_DELTA(*args, **kwargs):
-    yield ResponseCreatedEvent(
-        response=Response(
-            id="chat-id",
-            output=[],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-        ),
-        type="response.created",
-        sequence_number=0,
-    )
-
-    yield ResponseTextDeltaEvent(
-        type="response.output_text.delta",
-        item_id="message-id",
-        output_index=0,
-        content_index=0,
-        delta="Hello",
-        logprobs=[],
-        sequence_number=1,
-    )
-
-    yield ResponseTextDeltaEvent(
-        type="response.output_text.delta",
-        item_id="message-id",
-        output_index=0,
-        content_index=0,
-        delta=" world!",
-        logprobs=[],
-        sequence_number=2,
-    )
-
-    yield ResponseCompletedEvent(
-        response=Response(
-            id="chat-id",
-            output=[
-                ResponseOutputMessage(
-                    id="message-id",
-                    content=[
-                        ResponseOutputText(
-                            annotations=[],
-                            text="Hello world!",
-                            type="output_text",
-                        ),
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                ),
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=20,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=5,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=8,
-                ),
-                total_tokens=30,
-            ),
-        ),
-        type="response.completed",
-        sequence_number=3,
-    )
 
 
 @pytest.fixture
@@ -1509,8 +1379,17 @@ async def test_tool_execution_span(
     assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
 
 
+def server_side_event_chunks(events):
+    for event in events:
+        payload = event.model_dump()
+        chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+        yield chunk.encode("utf-8")
+
+
 @pytest.mark.asyncio
-async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_agent):
+async def test_hosted_mcp_tool_propagation_header_streamed(
+    sentry_init, test_agent, async_iterator
+):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
     """
@@ -1527,7 +1406,6 @@ async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_age
     )
 
     client = AsyncOpenAI(api_key="z")
-    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
 
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
 
@@ -1542,10 +1420,80 @@ async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_age
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
+    request = httpx.Request(
+        "POST",
+        "/responses",
+    )
+
+    response = httpx.Response(
+        200,
+        request=request,
+        content=async_iterator(
+            server_side_event_chunks(
+                [
+                    ResponseCreatedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="response-model-id",
+                            object="response",
+                        ),
+                        type="response.created",
+                        sequence_number=0,
+                    ),
+                    ResponseCompletedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[
+                                ResponseOutputMessage(
+                                    id="message-id",
+                                    content=[
+                                        ResponseOutputText(
+                                            annotations=[],
+                                            text="the model response",
+                                            type="output_text",
+                                        ),
+                                    ],
+                                    role="assistant",
+                                    status="completed",
+                                    type="message",
+                                ),
+                            ],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="response-model-id",
+                            object="response",
+                            usage=ResponseUsage(
+                                input_tokens=20,
+                                input_tokens_details=InputTokensDetails(
+                                    cached_tokens=5,
+                                ),
+                                output_tokens=10,
+                                output_tokens_details=OutputTokensDetails(
+                                    reasoning_tokens=8,
+                                ),
+                                total_tokens=30,
+                            ),
+                        ),
+                        type="response.completed",
+                        sequence_number=1,
+                    ),
+                ]
+            )
+        ),
+    )
+
+    # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
     with patch.object(
-        model._client.responses,
-        "create",
-        side_effect=EXAMPLE_STREAMED_RESPONSE,
+        agent_with_tool.model._client._client,
+        "send",
+        return_value=response,
     ) as create, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
@@ -1563,13 +1511,17 @@ async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_age
             async for event in result.stream_events():
                 pass
 
-            ai_client_span = transaction._span_recorder.spans[-1]
+            ai_client_span = next(
+                span
+                for span in transaction._span_recorder.spans
+                if span.op == OP.GEN_AI_CHAT
+            )
 
         args, kwargs = create.call_args
 
-        assert "tools" in kwargs
-        assert len(kwargs["tools"]) == 1
-        hosted_mcp_tool = kwargs["tools"][0]
+        request = args[0]
+        body = json.loads(request.content.decode("utf-8"))
+        hosted_mcp_tool = body["tools"][0]
 
         assert hosted_mcp_tool["headers"][
             "sentry-trace"
@@ -3194,7 +3146,7 @@ async def test_streaming_span_update_captures_response_data(
 
 
 @pytest.mark.asyncio
-async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
+async def test_streaming_ttft_on_chat_span(sentry_init, test_agent, async_iterator):
     """
     Test that time-to-first-token (TTFT) is recorded on chat spans during streaming.
 
@@ -3209,7 +3161,6 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
     should NOT trigger TTFT.
     """
     client = AsyncOpenAI(api_key="z")
-    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
 
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
 
@@ -3222,10 +3173,98 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
         traces_sample_rate=1.0,
     )
 
+    request = httpx.Request(
+        "POST",
+        "/responses",
+    )
+
+    response = httpx.Response(
+        200,
+        request=request,
+        content=async_iterator(
+            server_side_event_chunks(
+                [
+                    ResponseCreatedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="response-model-id",
+                            object="response",
+                        ),
+                        type="response.created",
+                        sequence_number=0,
+                    ),
+                    ResponseTextDeltaEvent(
+                        type="response.output_text.delta",
+                        item_id="message-id",
+                        output_index=0,
+                        content_index=0,
+                        delta="Hello",
+                        logprobs=[],
+                        sequence_number=1,
+                    ),
+                    ResponseTextDeltaEvent(
+                        type="response.output_text.delta",
+                        item_id="message-id",
+                        output_index=0,
+                        content_index=0,
+                        delta=" world!",
+                        logprobs=[],
+                        sequence_number=2,
+                    ),
+                    ResponseCompletedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[
+                                ResponseOutputMessage(
+                                    id="message-id",
+                                    content=[
+                                        ResponseOutputText(
+                                            annotations=[],
+                                            text="Hello world!",
+                                            type="output_text",
+                                        ),
+                                    ],
+                                    role="assistant",
+                                    status="completed",
+                                    type="message",
+                                ),
+                            ],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="response-model-id",
+                            object="response",
+                            usage=ResponseUsage(
+                                input_tokens=20,
+                                input_tokens_details=InputTokensDetails(
+                                    cached_tokens=5,
+                                ),
+                                output_tokens=10,
+                                output_tokens_details=OutputTokensDetails(
+                                    reasoning_tokens=8,
+                                ),
+                                total_tokens=30,
+                            ),
+                        ),
+                        type="response.completed",
+                        sequence_number=3,
+                    ),
+                ]
+            )
+        ),
+    )
+
+    # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
     with patch.object(
-        model._client.responses,
-        "create",
-        side_effect=EXAMPLE_STREAMED_RESPONSE_WITH_DELTA,
+        agent_with_tool.model._client._client,
+        "send",
+        return_value=response,
     ) as _:
         with sentry_sdk.start_transaction(
             name="test_ttft", sampled=True
