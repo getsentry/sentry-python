@@ -67,11 +67,6 @@ EXAMPLE_MESSAGE = Message(
 )
 
 
-async def async_iterator(values):
-    for value in values:
-        yield value
-
-
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -324,7 +319,7 @@ def test_streaming_create_message(
     ],
 )
 async def test_streaming_create_message_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
 ):
     client = AsyncAnthropic(api_key="z")
     returned_stream = AsyncStream(cast_to=None, response=None, client=client)
@@ -567,7 +562,7 @@ def test_streaming_create_message_with_input_json_delta(
     ],
 )
 async def test_streaming_create_message_with_input_json_delta_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
 ):
     client = AsyncAnthropic(api_key="z")
     returned_stream = AsyncStream(cast_to=None, response=None, client=client)
@@ -1361,7 +1356,7 @@ def test_streaming_create_message_with_system_prompt(
     ],
 )
 async def test_streaming_create_message_with_system_prompt_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
