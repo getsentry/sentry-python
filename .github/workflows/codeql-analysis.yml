@@ -15,7 +15,6 @@ on:
   push:
     branches:
       - master
-      - potel-base
   pull_request:
   schedule:
     - cron: '18 18 * * 3'

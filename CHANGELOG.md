@@ -6,6 +6,25 @@
 
 - Add `set_attribute`, `remove_attribute` to global API by @sentrivana in [#5555](https://github.com/getsentry/sentry-python/pull/5555)
 
+  You can now set and unset attributes on logs and metrics via top-level API. Think of it as `sentry_sdk.set_tag()` for attribute-based telemetry. Other event types (transactions, spans, errors) will be unaffected.
+
+  ```python
+  import sentry_sdk
+  
+  sentry_sdk.init(...)
+  
+  sentry_sdk.set_attribute("my.attribute", "my value")
+  
+  # This metric will have "my.attribute" set
+  sentry_sdk.metrics.count("counter", 1)
+  
+  # Remove the attribute
+  sentry_sdk.remove_attribute("my.attribute")
+  
+  # This log will not have "my.attribute" set
+  sentry_sdk.logger.info("An info log")
+  ```
+
 ### Bug Fixes 🐛
 
 #### Openai
