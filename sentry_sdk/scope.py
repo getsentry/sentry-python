@@ -1237,7 +1237,7 @@ class Scope:
             )
 
         if parent_span is None or isinstance(parent_span, NoOpStreamedSpan):
-            parent_span = self.span or self.get_current_scope().span  # type: ignore
+            parent_span = self.span  # type: ignore
 
         # If no eligible parent_span was provided and there is no currently
         # active span, this is a segment

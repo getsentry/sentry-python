@@ -206,14 +206,14 @@ class StreamedSpan:
         "_sampled",
         "_parent_sampled",
         "_start_timestamp",
-        "_timestamp",
-        "_status",
         "_start_timestamp_monotonic_ns",
+        "_timestamp",
+        "_finished",
+        "_status",
         "_scope",
         "_context_manager_state",
         "_continuous_profile",
         "_baggage",
-        "_finished",
         "_sample_rand",
         "_sample_rate",
     )
@@ -252,6 +252,8 @@ class StreamedSpan:
         self._sample_rate = sample_rate
 
         self._start_timestamp = datetime.now(timezone.utc)
+        self._timestamp: "Optional[datetime]" = None
+        self._finished: bool = False
 
         try:
             # profiling depends on this value and requires that
@@ -260,8 +262,6 @@ class StreamedSpan:
         except AttributeError:
             pass
 
-        self._timestamp: "Optional[datetime]" = None
-        self._finished: bool = False
         self._span_id: "Optional[str]" = None
 
         self._status = SpanStatus.OK.value
