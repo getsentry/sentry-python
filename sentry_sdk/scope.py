@@ -1224,6 +1224,8 @@ class Scope:
                 parent_span_id=propagation_context.parent_span_id,
                 parent_sampled=propagation_context.parent_sampled,
                 baggage=propagation_context.baggage,
+                sample_rand=sample_rand,
+                sample_rate=sample_rate,
             )
 
         # This is a child span; take propagation context from the parent span

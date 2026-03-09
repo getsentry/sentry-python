@@ -224,6 +224,8 @@ class StreamedSpan:
         "_scope",
         "_previous_span_on_scope",
         "_baggage",
+        "_sample_rand",
+        "_sample_rate",
     )
 
     def __init__(
@@ -238,6 +240,8 @@ class StreamedSpan:
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
         baggage: "Optional[Baggage]" = None,
+        sample_rate: "Optional[float]" = None,
+        sample_rand: "Optional[float]" = None,
     ):
         self._name: str = name
         self._active: bool = active
@@ -254,6 +258,8 @@ class StreamedSpan:
         self._parent_span_id = parent_span_id
         self._parent_sampled = parent_sampled
         self._baggage = baggage
+        self._sample_rand = sample_rand
+        self._sample_rate = sample_rate
 
         self._start_timestamp = datetime.now(timezone.utc)
         self._timestamp: "Optional[datetime]" = None
