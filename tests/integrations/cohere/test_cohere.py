@@ -72,6 +72,7 @@ def test_nonstreaming_chat(
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
@@ -151,6 +152,7 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.total_tokens"] == 30

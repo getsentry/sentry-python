@@ -178,7 +178,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             for k, v in COLLECTED_CHAT_PARAMS.items():
                 if k in kwargs:
                     set_data_normalized(span, v, kwargs[k])
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
 
             if streaming:
                 old_iterator = res
