@@ -441,11 +441,7 @@ class StreamedSpan:
 
 
 class NoOpStreamedSpan(StreamedSpan):
-    __slots__ = (
-        "_scope",
-        "_previous_span_on_scope",
-        "_unsampled_reason",
-    )
+    __slots__ = ("_unsampled_reason",)
 
     def __init__(
         self,
