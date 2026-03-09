@@ -711,7 +711,9 @@ async def test_message_history(sentry_init, capture_events):
     from pydantic_ai import messages
 
     history = [
-        messages.UserPromptPart(content="Hello, I'm Alice"),
+        messages.ModelRequest(
+            parts=[messages.UserPromptPart(content="Hello, I'm Alice")]
+        ),
         messages.ModelResponse(
             parts=[messages.TextPart(content="Hello Alice! How can I help you?")],
             model_name="test",
@@ -1493,7 +1495,7 @@ async def test_message_formatting_with_different_parts(sentry_init, capture_even
 
     # Create message history with different part types
     history = [
-        messages.UserPromptPart(content="Hello"),
+        messages.ModelRequest(parts=[messages.UserPromptPart(content="Hello")]),
         messages.ModelResponse(
             parts=[
                 messages.TextPart(content="Hi there!"),

@@ -155,7 +155,8 @@ def get_default_release() -> "Optional[str]":
         return release
 
     for var in (
-        "HEROKU_SLUG_COMMIT",
+        "HEROKU_BUILD_COMMIT",
+        "HEROKU_SLUG_COMMIT",  # deprecated by Heroku, kept for backward compatibility
         "SOURCE_VERSION",
         "CODEBUILD_RESOLVED_SOURCE_VERSION",
         "CIRCLE_SHA1",
@@ -2004,7 +2005,11 @@ def safe_serialize(data: "Any") -> str:
 
     try:
         serialized = serialize_item(data)
-        return json.dumps(serialized, default=str)
+        return (
+            json.dumps(serialized, default=str)
+            if not isinstance(serialized, str)
+            else serialized
+        )
     except Exception:
         return str(data)
 

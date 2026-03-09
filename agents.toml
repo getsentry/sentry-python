@@ -16,3 +16,7 @@ source = "getsentry/skills"
 [[skills]]
 name = "skill-scanner"
 source = "getsentry/skills"
+
+[[skills]]
+name = "security-review"
+source = "getsentry/skills"
