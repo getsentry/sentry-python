@@ -4,10 +4,7 @@ from functools import wraps
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.ai.utils import (
-    set_data_normalized,
-    normalize_message_roles,
-)
+from sentry_sdk.ai.utils import set_data_normalized, normalize_message_roles
 
 from typing import TYPE_CHECKING
 
@@ -154,18 +151,15 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             reraise(*exc_info)
 
         with capture_internal_exceptions():
-            set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-            set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            span.set_data(SPANDATA.GEN_AI_SYSTEM, "cohere")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
                 for x in kwargs.get("chat_history", []):
-                    role = getattr(x, "role", "").lower()
-                    if role == "chatbot":
-                        role = "assistant"
                     messages.append(
                         {
-                            "role": role,
+                            "role": getattr(x, "role", ""),
                             "content": getattr(x, "message", ""),
                         }
                     )
