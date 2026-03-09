@@ -4,7 +4,7 @@ from functools import wraps
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.ai.utils import set_data_normalized, normalize_message_roles
+from sentry_sdk.ai.utils import set_data_normalized
 
 from typing import TYPE_CHECKING
 
@@ -37,6 +37,14 @@ try:
     from cohere import StreamEndStreamedChatResponse
 except ImportError:
     from cohere import StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse
+
+
+COHERE_ROLE_MAPPING = {
+    "SYSTEM": "system",
+    "USER": "user",
+    "CHATBOT": "assistant",
+    "TOOL": "tool",
+}
 
 
 COLLECTED_CHAT_PARAMS = {
@@ -157,14 +165,14 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
                 for x in kwargs.get("chat_history", []):
+                    role = getattr(x, "role", "")
                     messages.append(
                         {
-                            "role": getattr(x, "role", ""),
+                            "role": COHERE_ROLE_MAPPING.get(role, role),
                             "content": getattr(x, "message", ""),
                         }
                     )
                 messages.append({"role": "user", "content": message})
-                messages = normalize_message_roles(messages)
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
