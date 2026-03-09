@@ -38,10 +38,7 @@ def execute_tool_span(
     span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, tool_type)
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
 
-    if (
-        tool_definition is not None
-        and getattr(tool_definition, "description", None) is not None
-    ):
+    if tool_definition is not None and hasattr(tool_definition, "description"):
         span.set_data(
             SPANDATA.GEN_AI_TOOL_DESCRIPTION,
             tool_definition.description,
