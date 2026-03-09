@@ -46,11 +46,15 @@ from openai.types.responses import (
     ResponseCompletedEvent,
     Response,
     ResponseUsage,
+    ResponseStreamEvent,
 )
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
 )
+
+from openai._response import AsyncAPIResponse
+from openai._models import FinalRequestOptions
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
 
@@ -89,140 +93,6 @@ EXAMPLE_RESPONSE = Response(
         total_tokens=30,
     ),
 )
-
-
-async def EXAMPLE_STREAMED_RESPONSE(*args, **kwargs):
-    yield ResponseCreatedEvent(
-        response=Response(
-            id="chat-id",
-            output=[],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-        ),
-        type="response.created",
-        sequence_number=0,
-    )
-
-    yield ResponseCompletedEvent(
-        response=Response(
-            id="chat-id",
-            output=[
-                ResponseOutputMessage(
-                    id="message-id",
-                    content=[
-                        ResponseOutputText(
-                            annotations=[],
-                            text="the model response",
-                            type="output_text",
-                        ),
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                ),
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=20,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=5,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=8,
-                ),
-                total_tokens=30,
-            ),
-        ),
-        type="response.completed",
-        sequence_number=1,
-    )
-
-
-async def EXAMPLE_STREAMED_RESPONSE_WITH_DELTA(*args, **kwargs):
-    yield ResponseCreatedEvent(
-        response=Response(
-            id="chat-id",
-            output=[],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-        ),
-        type="response.created",
-        sequence_number=0,
-    )
-
-    yield ResponseTextDeltaEvent(
-        type="response.output_text.delta",
-        item_id="message-id",
-        output_index=0,
-        content_index=0,
-        delta="Hello",
-        logprobs=[],
-        sequence_number=1,
-    )
-
-    yield ResponseTextDeltaEvent(
-        type="response.output_text.delta",
-        item_id="message-id",
-        output_index=0,
-        content_index=0,
-        delta=" world!",
-        logprobs=[],
-        sequence_number=2,
-    )
-
-    yield ResponseCompletedEvent(
-        response=Response(
-            id="chat-id",
-            output=[
-                ResponseOutputMessage(
-                    id="message-id",
-                    content=[
-                        ResponseOutputText(
-                            annotations=[],
-                            text="Hello world!",
-                            type="output_text",
-                        ),
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                ),
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=20,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=5,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=8,
-                ),
-                total_tokens=30,
-            ),
-        ),
-        type="response.completed",
-        sequence_number=3,
-    )
 
 
 @pytest.fixture
@@ -1236,7 +1106,9 @@ async def test_max_turns_before_handoff_span(
 
 
 @pytest.mark.asyncio
-async def test_tool_execution_span(sentry_init, capture_events, test_agent):
+async def test_tool_execution_span(
+    sentry_init, capture_events, test_agent, get_model_response
+):
     """
     Test tool execution span creation.
     """
@@ -1247,78 +1119,106 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         return f"Tool executed with: {message}"
 
     # Create agent with the tool
-    agent_with_tool = test_agent.clone(tools=[simple_test_tool])
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            # Create a mock response that includes tool calls
-            tool_call = ResponseFunctionToolCall(
-                id="call_123",
-                call_id="call_123",
-                name="simple_test_tool",
-                type="function_call",
-                arguments='{"message": "hello"}',
-            )
-
-            # First response with tool call
-            tool_response = ModelResponse(
-                output=[tool_call],
-                usage=Usage(
-                    requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+    tool_response = get_model_response(
+        Response(
+            id="resp_tool_123",
+            output=[
+                ResponseFunctionToolCall(
+                    id="call_123",
+                    call_id="call_123",
+                    name="simple_test_tool",
+                    type="function_call",
+                    arguments='{"message": "hello"}',
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
                 ),
-                response_id="resp_tool_123",
-            )
-
-            # Second response with final answer
-            final_response = ModelResponse(
-                output=[
-                    ResponseOutputMessage(
-                        id="msg_final",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                text="Task completed using the tool",
-                                type="output_text",
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                ],
-                usage=Usage(
-                    requests=1, input_tokens=15, output_tokens=10, total_tokens=25
+                output_tokens=5,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=0,
                 ),
-                response_id="resp_final_123",
-            )
+                total_tokens=15,
+            ),
+        )
+    )
 
-            # Return different responses on successive calls
-            mock_get_response.side_effect = [tool_response, final_response]
+    final_response = get_model_response(
+        Response(
+            id="resp_final_123",
+            output=[
+                ResponseOutputMessage(
+                    id="msg_final",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="Task completed using the tool",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=15,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                ),
+                output_tokens=10,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=0,
+                ),
+                total_tokens=25,
+            ),
+        )
+    )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+    with patch.object(
+        agent_with_tool.model._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            events = capture_events()
+        events = capture_events()
 
-            await agents.Runner.run(
-                agent_with_tool,
-                "Please use the simple test tool",
-                run_config=test_run_config,
-            )
+        await agents.Runner.run(
+            agent_with_tool,
+            "Please use the simple test tool",
+            run_config=test_run_config,
+        )
 
     (transaction,) = events
     spans = transaction["spans"]
-    (
-        agent_span,
-        ai_client_span1,
-        tool_span,
-        ai_client_span2,
-    ) = spans
+    agent_span = next(span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT)
+    ai_client_span1, ai_client_span2 = (
+        span for span in spans if span["op"] == OP.GEN_AI_CHAT
+    )
+    tool_span = next(span for span in spans if span["op"] == OP.GEN_AI_EXECUTE_TOOL)
 
     available_tools = [
         {
@@ -1479,8 +1379,17 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
 
 
+def server_side_event_chunks(events):
+    for event in events:
+        payload = event.model_dump()
+        chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+        yield chunk.encode("utf-8")
+
+
 @pytest.mark.asyncio
-async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_agent):
+async def test_hosted_mcp_tool_propagation_header_streamed(
+    sentry_init, test_agent, async_iterator
+):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
     """
@@ -1497,7 +1406,6 @@ async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_age
     )
 
     client = AsyncOpenAI(api_key="z")
-    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
 
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
 
@@ -1512,10 +1420,89 @@ async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_age
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
+    request = httpx.Request(
+        "POST",
+        "/responses",
+    )
+
+    # openai-agents calls with_streaming_response() if available starting with
+    # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
+    # When using with_streaming_response() the header set below changes the response type:
+    # https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_response.py#L67.
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
+        agent_with_tool.model._client.responses, "with_streaming_response"
+    ):
+        request.headers["X-Stainless-Raw-Response"] = "stream"
+
+    response = httpx.Response(
+        200,
+        request=request,
+        content=async_iterator(
+            server_side_event_chunks(
+                [
+                    ResponseCreatedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="response-model-id",
+                            object="response",
+                        ),
+                        type="response.created",
+                        sequence_number=0,
+                    ),
+                    ResponseCompletedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[
+                                ResponseOutputMessage(
+                                    id="message-id",
+                                    content=[
+                                        ResponseOutputText(
+                                            annotations=[],
+                                            text="the model response",
+                                            type="output_text",
+                                        ),
+                                    ],
+                                    role="assistant",
+                                    status="completed",
+                                    type="message",
+                                ),
+                            ],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="response-model-id",
+                            object="response",
+                            usage=ResponseUsage(
+                                input_tokens=20,
+                                input_tokens_details=InputTokensDetails(
+                                    cached_tokens=5,
+                                ),
+                                output_tokens=10,
+                                output_tokens_details=OutputTokensDetails(
+                                    reasoning_tokens=8,
+                                ),
+                                total_tokens=30,
+                            ),
+                        ),
+                        type="response.completed",
+                        sequence_number=1,
+                    ),
+                ]
+            )
+        ),
+    )
+
+    # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
     with patch.object(
-        model._client.responses,
-        "create",
-        side_effect=EXAMPLE_STREAMED_RESPONSE,
+        agent_with_tool.model._client._client,
+        "send",
+        return_value=response,
     ) as create, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
@@ -1533,13 +1520,17 @@ async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_age
             async for event in result.stream_events():
                 pass
 
-            ai_client_span = transaction._span_recorder.spans[-1]
+            ai_client_span = next(
+                span
+                for span in transaction._span_recorder.spans
+                if span.op == OP.GEN_AI_CHAT
+            )
 
         args, kwargs = create.call_args
 
-        assert "tools" in kwargs
-        assert len(kwargs["tools"]) == 1
-        hosted_mcp_tool = kwargs["tools"][0]
+        request = args[0]
+        body = json.loads(request.content.decode("utf-8"))
+        hosted_mcp_tool = body["tools"][0]
 
         assert hosted_mcp_tool["headers"][
             "sentry-trace"
@@ -2338,7 +2329,9 @@ def test_openai_agents_message_role_mapping(
 
 
 @pytest.mark.asyncio
-async def test_tool_execution_error_tracing(sentry_init, capture_events, test_agent):
+async def test_tool_execution_error_tracing(
+    sentry_init, capture_events, test_agent, get_model_response
+):
     """
     Test that tool execution errors are properly tracked via error tracing patch.
 
@@ -2356,70 +2349,100 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
         raise ValueError("Tool execution failed")
 
     # Create agent with the failing tool
-    agent_with_tool = test_agent.clone(tools=[failing_tool])
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent_with_tool = test_agent.clone(tools=[failing_tool], model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            # Create a mock response that includes tool call
-            tool_call = ResponseFunctionToolCall(
-                id="call_123",
-                call_id="call_123",
-                name="failing_tool",
-                type="function_call",
-                arguments='{"message": "test"}',
-            )
-
-            # First response with tool call
-            tool_response = ModelResponse(
-                output=[tool_call],
-                usage=Usage(
-                    requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+    tool_response = get_model_response(
+        Response(
+            id="resp_1",
+            output=[
+                ResponseFunctionToolCall(
+                    id="call_123",
+                    call_id="call_123",
+                    name="failing_tool",
+                    type="function_call",
+                    arguments='{"message": "test"}',
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4.1-2025-04-14",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
                 ),
-                response_id="resp_tool_123",
-            )
-
-            # Second response after tool error (agents library handles the error and continues)
-            final_response = ModelResponse(
-                output=[
-                    ResponseOutputMessage(
-                        id="msg_final",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                text="An error occurred while running the tool",
-                                type="output_text",
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                ],
-                usage=Usage(
-                    requests=1, input_tokens=15, output_tokens=10, total_tokens=25
+                output_tokens=5,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=0,
                 ),
-                response_id="resp_final_123",
-            )
+                total_tokens=15,
+            ),
+        )
+    )
 
-            mock_get_response.side_effect = [tool_response, final_response]
+    final_response = get_model_response(
+        Response(
+            id="resp_2",
+            output=[
+                ResponseOutputMessage(
+                    id="msg_final",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="An error occurred while running the tool",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4-0613",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=15,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                ),
+                output_tokens=10,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=0,
+                ),
+                total_tokens=25,
+            ),
+        )
+    )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+    with patch.object(
+        agent_with_tool.model._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            events = capture_events()
+        events = capture_events()
 
-            # Note: The agents library catches tool exceptions internally,
-            # so we don't expect this to raise
-            await agents.Runner.run(
-                agent_with_tool,
-                "Please use the failing tool",
-                run_config=test_run_config,
-            )
+        # Note: The agents library catches tool exceptions internally,
+        # so we don't expect this to raise
+        await agents.Runner.run(
+            agent_with_tool,
+            "Please use the failing tool",
+            run_config=test_run_config,
+        )
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -2702,7 +2725,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
 
 @pytest.mark.asyncio
 async def test_multiple_llm_calls_aggregate_usage(
-    sentry_init, capture_events, test_agent
+    sentry_init, capture_events, test_agent, get_model_response
 ):
     """
     Test that invoke_agent spans show aggregated usage across multiple LLM calls
@@ -2714,79 +2737,100 @@ async def test_multiple_llm_calls_aggregate_usage(
         """Add two numbers"""
         return a + b
 
-    agent_with_tool = test_agent.clone(tools=[calculator])
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent_with_tool = test_agent.clone(tools=[calculator], model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            # First call: agent decides to use tool (10 input, 5 output tokens)
-            tool_call_response = ModelResponse(
-                output=[
-                    ResponseFunctionToolCall(
-                        id="call_123",
-                        call_id="call_123",
-                        name="calculator",
-                        type="function_call",
-                        arguments='{"a": 5, "b": 3}',
-                    )
-                ],
-                usage=Usage(
-                    requests=1,
-                    input_tokens=10,
-                    output_tokens=5,
-                    total_tokens=15,
-                    input_tokens_details=InputTokensDetails(cached_tokens=0),
-                    output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
+    tool_call_response = get_model_response(
+        Response(
+            id="resp_1",
+            output=[
+                ResponseFunctionToolCall(
+                    id="call_123",
+                    call_id="call_123",
+                    name="calculator",
+                    type="function_call",
+                    arguments='{"a": 5, "b": 3}',
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4.1-2025-04-14",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
                 ),
-                response_id="resp_tool_call",
-            )
-
-            # Second call: agent uses tool result to respond (20 input, 15 output tokens)
-            final_response = ModelResponse(
-                output=[
-                    ResponseOutputMessage(
-                        id="msg_final",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                text="The result is 8",
-                                type="output_text",
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                ],
-                usage=Usage(
-                    requests=1,
-                    input_tokens=20,
-                    output_tokens=15,
-                    total_tokens=35,
-                    input_tokens_details=InputTokensDetails(cached_tokens=5),
-                    output_tokens_details=OutputTokensDetails(reasoning_tokens=3),
+                output_tokens=5,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=0,
                 ),
-                response_id="resp_final",
-            )
+                total_tokens=15,
+            ),
+        )
+    )
 
-            mock_get_response.side_effect = [tool_call_response, final_response]
+    final_response = get_model_response(
+        Response(
+            id="resp_2",
+            output=[
+                ResponseOutputMessage(
+                    id="msg_final",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="The result is 8",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4-0613",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=20,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=5,
+                ),
+                output_tokens=15,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=3,
+                ),
+                total_tokens=35,
+            ),
+        )
+    )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+    with patch.object(
+        agent_with_tool.model._client._client,
+        "send",
+        side_effect=[tool_call_response, final_response],
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            events = capture_events()
+        events = capture_events()
 
-            result = await agents.Runner.run(
-                agent_with_tool,
-                "What is 5 + 3?",
-                run_config=test_run_config,
-            )
+        result = await agents.Runner.run(
+            agent_with_tool,
+            "What is 5 + 3?",
+            run_config=test_run_config,
+        )
 
-            assert result is not None
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -2893,7 +2937,10 @@ async def test_invoke_agent_span_includes_response_model(
 
 @pytest.mark.asyncio
 async def test_invoke_agent_span_uses_last_response_model(
-    sentry_init, capture_events, test_agent
+    sentry_init,
+    capture_events,
+    test_agent,
+    get_model_response,
 ):
     """
     Test that when an agent makes multiple LLM calls (e.g., with tools),
@@ -2905,17 +2952,14 @@ async def test_invoke_agent_span_uses_last_response_model(
         """Add two numbers"""
         return a + b
 
-    agent_with_tool = test_agent.clone(tools=[calculator])
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent_with_tool = test_agent.clone(tools=[calculator], model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
-        ) as mock_fetch_response:
-            # First call: gpt-4 model returns tool call
-            first_response = MagicMock()
-            first_response.model = "gpt-4-0613"
-            first_response.id = "resp_1"
-            first_response.output = [
+    first_response = get_model_response(
+        Response(
+            id="resp_1",
+            output=[
                 ResponseFunctionToolCall(
                     id="call_123",
                     call_id="call_123",
@@ -2923,65 +2967,85 @@ async def test_invoke_agent_span_uses_last_response_model(
                     type="function_call",
                     arguments='{"a": 5, "b": 3}',
                 )
-            ]
-            first_response.usage = MagicMock()
-            first_response.usage.input_tokens = 10
-            first_response.usage.output_tokens = 5
-            first_response.usage.total_tokens = 15
-            first_response.usage.input_tokens_details = InputTokensDetails(
-                cached_tokens=0
-            )
-            first_response.usage.output_tokens_details = OutputTokensDetails(
-                reasoning_tokens=0
-            )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4-0613",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                ),
+                output_tokens=5,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=0,
+                ),
+                total_tokens=15,
+            ),
+        )
+    )
 
-            # Second call: different model version returns final message
-            second_response = MagicMock()
-            second_response.model = "gpt-4.1-2025-04-14"
-            second_response.id = "resp_2"
-            second_response.output = [
+    second_response = get_model_response(
+        Response(
+            id="resp_2",
+            output=[
                 ResponseOutputMessage(
                     id="msg_final",
                     type="message",
                     status="completed",
                     content=[
                         ResponseOutputText(
-                            text="The result is 8",
+                            text="I'm the specialist and I can help with that!",
                             type="output_text",
                             annotations=[],
                         )
                     ],
                     role="assistant",
                 )
-            ]
-            second_response.usage = MagicMock()
-            second_response.usage.input_tokens = 20
-            second_response.usage.output_tokens = 15
-            second_response.usage.total_tokens = 35
-            second_response.usage.input_tokens_details = InputTokensDetails(
-                cached_tokens=5
-            )
-            second_response.usage.output_tokens_details = OutputTokensDetails(
-                reasoning_tokens=3
-            )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4.1-2025-04-14",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=20,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                ),
+                output_tokens=15,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=35,
+            ),
+        )
+    )
 
-            mock_fetch_response.side_effect = [first_response, second_response]
+    with patch.object(
+        agent_with_tool.model._client._client,
+        "send",
+        side_effect=[first_response, second_response],
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+        events = capture_events()
 
-            events = capture_events()
+        result = await agents.Runner.run(
+            agent_with_tool,
+            "What is 5 + 3?",
+            run_config=test_run_config,
+        )
 
-            result = await agents.Runner.run(
-                agent_with_tool,
-                "What is 5 + 3?",
-                run_config=test_run_config,
-            )
-
-            assert result is not None
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -3091,7 +3155,7 @@ async def test_streaming_span_update_captures_response_data(
 
 
 @pytest.mark.asyncio
-async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
+async def test_streaming_ttft_on_chat_span(sentry_init, test_agent, async_iterator):
     """
     Test that time-to-first-token (TTFT) is recorded on chat spans during streaming.
 
@@ -3106,7 +3170,6 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
     should NOT trigger TTFT.
     """
     client = AsyncOpenAI(api_key="z")
-    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
 
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
 
@@ -3119,10 +3182,107 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
         traces_sample_rate=1.0,
     )
 
+    request = httpx.Request(
+        "POST",
+        "/responses",
+    )
+
+    # openai-agents calls with_streaming_response() if available starting with
+    # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
+    # When using with_streaming_response() the header set below changes the response type:
+    # https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_response.py#L67.
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
+        agent_with_tool.model._client.responses, "with_streaming_response"
+    ):
+        request.headers["X-Stainless-Raw-Response"] = "stream"
+
+    response = httpx.Response(
+        200,
+        request=request,
+        content=async_iterator(
+            server_side_event_chunks(
+                [
+                    ResponseCreatedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="response-model-id",
+                            object="response",
+                        ),
+                        type="response.created",
+                        sequence_number=0,
+                    ),
+                    ResponseTextDeltaEvent(
+                        type="response.output_text.delta",
+                        item_id="message-id",
+                        output_index=0,
+                        content_index=0,
+                        delta="Hello",
+                        logprobs=[],
+                        sequence_number=1,
+                    ),
+                    ResponseTextDeltaEvent(
+                        type="response.output_text.delta",
+                        item_id="message-id",
+                        output_index=0,
+                        content_index=0,
+                        delta=" world!",
+                        logprobs=[],
+                        sequence_number=2,
+                    ),
+                    ResponseCompletedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[
+                                ResponseOutputMessage(
+                                    id="message-id",
+                                    content=[
+                                        ResponseOutputText(
+                                            annotations=[],
+                                            text="Hello world!",
+                                            type="output_text",
+                                        ),
+                                    ],
+                                    role="assistant",
+                                    status="completed",
+                                    type="message",
+                                ),
+                            ],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="response-model-id",
+                            object="response",
+                            usage=ResponseUsage(
+                                input_tokens=20,
+                                input_tokens_details=InputTokensDetails(
+                                    cached_tokens=5,
+                                ),
+                                output_tokens=10,
+                                output_tokens_details=OutputTokensDetails(
+                                    reasoning_tokens=8,
+                                ),
+                                total_tokens=30,
+                            ),
+                        ),
+                        type="response.completed",
+                        sequence_number=3,
+                    ),
+                ]
+            )
+        ),
+    )
+
+    # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
     with patch.object(
-        model._client.responses,
-        "create",
-        side_effect=EXAMPLE_STREAMED_RESPONSE_WITH_DELTA,
+        agent_with_tool.model._client._client,
+        "send",
+        return_value=response,
     ) as _:
         with sentry_sdk.start_transaction(
             name="test_ttft", sampled=True
@@ -3211,7 +3371,9 @@ async def test_conversation_id_on_all_spans(
     reason="conversation_id support requires openai-agents >= 0.4.0",
 )
 @pytest.mark.asyncio
-async def test_conversation_id_on_tool_span(sentry_init, capture_events, test_agent):
+async def test_conversation_id_on_tool_span(
+    sentry_init, capture_events, test_agent, get_model_response
+):
     """
     Test that gen_ai.conversation.id is set on tool execution spans when passed to Runner.run().
     """
@@ -3221,65 +3383,98 @@ async def test_conversation_id_on_tool_span(sentry_init, capture_events, test_ag
         """A simple tool"""
         return f"Result: {message}"
 
-    agent_with_tool = test_agent.clone(tools=[simple_tool])
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent_with_tool = test_agent.clone(tools=[simple_tool], model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            tool_call = ResponseFunctionToolCall(
-                id="call_123",
-                call_id="call_123",
-                name="simple_tool",
-                type="function_call",
-                arguments='{"message": "hello"}',
-            )
-
-            tool_response = ModelResponse(
-                output=[tool_call],
-                usage=Usage(
-                    requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+    tool_response = get_model_response(
+        Response(
+            id="call_123",
+            output=[
+                ResponseFunctionToolCall(
+                    id="call_123",
+                    call_id="call_123",
+                    name="simple_tool",
+                    type="function_call",
+                    arguments='{"message": "hello"}',
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
                 ),
-                response_id="resp_tool_456",
-            )
-
-            final_response = ModelResponse(
-                output=[
-                    ResponseOutputMessage(
-                        id="msg_final",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                text="Done",
-                                type="output_text",
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                ],
-                usage=Usage(
-                    requests=1, input_tokens=15, output_tokens=10, total_tokens=25
+                output_tokens=5,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=0,
                 ),
-                response_id="resp_final_789",
-            )
+                total_tokens=15,
+            ),
+        )
+    )
 
-            mock_get_response.side_effect = [tool_response, final_response]
+    final_response = get_model_response(
+        Response(
+            id="resp_final_789",
+            output=[
+                ResponseOutputMessage(
+                    id="msg_final",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="Done",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=20,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=5,
+                ),
+                output_tokens=10,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=8,
+                ),
+                total_tokens=30,
+            ),
+        )
+    )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-            )
+    with patch.object(
+        agent_with_tool.model._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
 
-            events = capture_events()
+        events = capture_events()
 
-            await agents.Runner.run(
-                agent_with_tool,
-                "Use the tool",
-                run_config=test_run_config,
-                conversation_id="conv_tool_test_456",
-            )
+        await agents.Runner.run(
+            agent_with_tool,
+            "Use the tool",
+            run_config=test_run_config,
+            conversation_id="conv_tool_test_456",
+        )
 
     (transaction,) = events
     spans = transaction["spans"]
