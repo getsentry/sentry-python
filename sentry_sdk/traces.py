@@ -173,7 +173,7 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
     sentry_sdk.get_isolation_scope().generate_propagation_context(
         incoming,
     )
-    return sentry_sdk.get_current_scope().generate_propagation_context(
+    sentry_sdk.get_current_scope().generate_propagation_context(
         incoming,
     )
 
