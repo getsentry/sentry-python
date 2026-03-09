@@ -140,6 +140,17 @@ def start_span(
     :return: The span that has been started.
     :rtype: StreamedSpan
     """
+    from sentry_sdk.tracing_utils import has_span_streaming_enabled
+
+    if not has_span_streaming_enabled(sentry_sdk.get_client().options):
+        warnings.warn(
+            "Using span streaming API in non-span-streaming mode. Use "
+            "sentry_sdk.start_transaction() and sentry_sdk.start_span() "
+            "instead.",
+            stacklevel=2,
+        )
+        return NoOpStreamedSpan()
+
     return sentry_sdk.get_current_scope().start_streamed_span(
         name, attributes, parent_span, active
     )

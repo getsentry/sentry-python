@@ -1182,15 +1182,6 @@ class Scope:
         active: bool,
     ) -> "StreamedSpan":
         # TODO: rename to start_span once we drop the old API
-        if not has_span_streaming_enabled(sentry_sdk.get_client().options):
-            warnings.warn(
-                "Using span streaming API in non-span-streaming mode. Use "
-                "sentry_sdk.start_transaction() and sentry_sdk.start_span() "
-                "instead.",
-                stacklevel=2,
-            )
-            return NoOpStreamedSpan()
-
         if isinstance(parent_span, NoOpStreamedSpan):
             # parent_span is only set if the user explicitly set it
             logger.debug(
