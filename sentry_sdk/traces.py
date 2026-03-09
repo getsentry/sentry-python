@@ -518,7 +518,7 @@ class NoOpStreamedSpan(StreamedSpan):
         pass
 
     def _is_segment(self) -> bool:
-        return True if self._scope is not None else False
+        return self._scope is not None
 
     @property
     def status(self) -> "str":
