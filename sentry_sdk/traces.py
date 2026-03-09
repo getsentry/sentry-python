@@ -1,4 +1,6 @@
 """
+EXPERIMENTAL. Do not use in production.
+
 The API in this file is only meant to be used in span streaming mode.
 
 You can enable span streaming mode via
@@ -84,6 +86,9 @@ def start_span(
     """
     Start a span.
 
+    EXPERIMENTAL. Use sentry_sdk.start_transaction() and sentry_sdk.start_span()
+    instead.
+
     The span's parent, unless provided explicitly via the `parent_span` argument,
     will be the current active span, if any. If there is none, this span will
     become the root of a new span tree. If you explicitly want this span to be
@@ -144,6 +149,8 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
     """
     Continue a trace from headers or environment variables.
 
+    EXPERIMENTAL. Use sentry_sdk.continue_trace() instead.
+
     This function sets the propagation context on the scope. Any span started
     in the updated scope will belong under the trace extracted from the
     provided propagation headers or environment variables.
@@ -167,6 +174,8 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
 def new_trace() -> None:
     """
     Resets the propagation context, forcing a new trace.
+
+    EXPERIMENTAL.
 
     This function sets the propagation context on the scope. Any span started
     in the updated scope will start its own trace.
@@ -531,6 +540,8 @@ def trace(
     """
     Decorator to start a span around a function call.
 
+    EXPERIMENTAL. Use @sentry_sdk.trace instead.
+
     This decorator automatically creates a new span when the decorated function
     is called, and finishes the span when the function returns or raises an exception.
 
@@ -578,7 +589,18 @@ def trace(
             # Function implementation
             pass
     """
-    from sentry_sdk.tracing_utils import create_streaming_span_decorator
+    from sentry_sdk.tracing_utils import (
+        create_streaming_span_decorator,
+        has_span_streaming_enabled,
+    )
+
+    client = sentry_sdk.get_client()
+    if not has_span_streaming_enabled(client):
+        warnings.warn(
+            "Using span streaming API in non-span-streaming mode. Use "
+            "@sentry_sdk.trace instead.",
+            stacklevel=2,
+        )
 
     decorator = create_streaming_span_decorator(
         name=name,
