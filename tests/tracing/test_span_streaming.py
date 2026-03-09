@@ -1,5 +1,4 @@
 import asyncio
-import re
 import sys
 from typing import Any
 from unittest import mock
@@ -7,7 +6,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk.traces import SegmentSource, SpanStatus, StreamedSpan, NoOpStreamedSpan
+from sentry_sdk.traces import SpanStatus
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
