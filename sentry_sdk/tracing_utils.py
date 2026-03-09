@@ -1052,7 +1052,6 @@ def create_streaming_span_decorator(
     """
     Create a span creating decorator that can wrap both sync and async functions.
     """
-    from sentry_sdk.scope import should_send_default_pii
 
     def span_decorator(f: "Any") -> "Any":
         """
@@ -1619,9 +1618,11 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
     Span,
 )
+from sentry_sdk.traces import (
+    start_span as start_streaming_span,
+)
 
 from sentry_sdk.traces import (
     LOW_QUALITY_SEGMENT_SOURCES,
-    start_span as start_streaming_span,
     StreamedSpan,
 )

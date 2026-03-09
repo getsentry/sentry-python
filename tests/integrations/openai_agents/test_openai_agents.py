@@ -5,16 +5,17 @@ from unittest.mock import MagicMock, patch
 import os
 import json
 import logging
+import httpx
 
 import sentry_sdk
 from sentry_sdk import start_span
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
 from sentry_sdk.utils import parse_version, package_version
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, InternalServerError
 from agents.models.openai_responses import OpenAIResponsesModel
 
 from unittest import mock
@@ -237,8 +238,9 @@ def mock_usage():
 
 
 @pytest.fixture
-def mock_model_response(mock_usage):
-    return ModelResponse(
+def mock_model_response():
+    return Response(
+        id="resp_123",
         output=[
             ResponseOutputMessage(
                 id="msg_123",
@@ -254,8 +256,23 @@ def mock_model_response(mock_usage):
                 role="assistant",
             )
         ],
-        usage=mock_usage,
-        response_id="resp_123",
+        parallel_tool_calls=False,
+        tool_choice="none",
+        tools=[],
+        created_at=10000000,
+        model="gpt-4",
+        object="response",
+        usage=ResponseUsage(
+            input_tokens=10,
+            input_tokens_details=InputTokensDetails(
+                cached_tokens=0,
+            ),
+            output_tokens=20,
+            output_tokens_details=OutputTokensDetails(
+                reasoning_tokens=5,
+            ),
+            total_tokens=30,
+        ),
     )
 
 
@@ -314,34 +331,61 @@ def test_agent_custom_model():
     )
 
 
+@pytest.fixture
+def get_model_response():
+    def inner(response_content):
+        model_request = httpx.Request(
+            "POST",
+            "/responses",
+        )
+
+        response = httpx.Response(
+            200,
+            request=model_request,
+            content=json.dumps(response_content.model_dump()).encode("utf-8"),
+        )
+
+        return response
+
+    return inner
+
+
 @pytest.mark.asyncio
 async def test_agent_invocation_span_no_pii(
-    sentry_init, capture_events, test_agent, mock_model_response
+    sentry_init, capture_events, test_agent, mock_model_response, get_model_response
 ):
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=False,
-            )
+    response = get_model_response(mock_model_response)
 
-            events = capture_events()
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=False,
+        )
 
-            result = await agents.Runner.run(
-                test_agent, "Test input", run_config=test_run_config
-            )
+        events = capture_events()
 
-            assert result is not None
-            assert result.final_output == "Hello, how can I help you?"
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
+
+        assert result is not None
+        assert result.final_output == "Hello, how can I help you?"
 
     (transaction,) = events
     spans = transaction["spans"]
-    invoke_agent_span, ai_client_span = spans
+    invoke_agent_span = next(
+        span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    )
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
@@ -454,33 +498,38 @@ async def test_agent_invocation_span(
     instructions,
     input,
     request,
+    get_model_response,
 ):
     """
     Test that the integration creates spans for agent invocations.
     """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent_with_instructions(instructions).clone(model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    response = get_model_response(mock_model_response)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            events = capture_events()
+        events = capture_events()
 
-            result = await agents.Runner.run(
-                test_agent_with_instructions(instructions),
-                input,
-                run_config=test_run_config,
-            )
+        result = await agents.Runner.run(
+            agent,
+            input,
+            run_config=test_run_config,
+        )
 
-            assert result is not None
-            assert result.final_output == "Hello, how can I help you?"
+        assert result is not None
+        assert result.final_output == "Hello, how can I help you?"
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -605,35 +654,44 @@ async def test_agent_invocation_span(
 
 @pytest.mark.asyncio
 async def test_client_span_custom_model(
-    sentry_init, capture_events, test_agent_custom_model, mock_model_response
+    sentry_init,
+    capture_events,
+    test_agent_custom_model,
+    mock_model_response,
+    get_model_response,
 ):
     """
     Test that the integration uses the correct model name if a custom model is used.
     """
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="my-custom-model", openai_client=client)
+    agent = test_agent_custom_model.clone(model=model)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-            )
+    response = get_model_response(mock_model_response)
 
-            events = capture_events()
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
 
-            result = await agents.Runner.run(
-                test_agent_custom_model, "Test input", run_config=test_run_config
-            )
+        events = capture_events()
 
-            assert result is not None
-            assert result.final_output == "Hello, how can I help you?"
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
+
+        assert result is not None
+        assert result.final_output == "Hello, how can I help you?"
 
     (transaction,) = events
     spans = transaction["spans"]
-    _, ai_client_span = spans
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     assert ai_client_span["description"] == "chat my-custom-model"
     assert ai_client_span["data"]["gen_ai.request.model"] == "my-custom-model"
@@ -644,35 +702,41 @@ def test_agent_invocation_span_sync_no_pii(
     capture_events,
     test_agent,
     mock_model_response,
+    get_model_response,
 ):
     """
     Test that the integration creates spans for agent invocations.
     """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    response = get_model_response(mock_model_response)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=False,
-            )
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=False,
+        )
 
-            events = capture_events()
+        events = capture_events()
 
-            result = agents.Runner.run_sync(
-                test_agent, "Test input", run_config=test_run_config
-            )
+        result = agents.Runner.run_sync(agent, "Test input", run_config=test_run_config)
 
-            assert result is not None
-            assert result.final_output == "Hello, how can I help you?"
+        assert result is not None
+        assert result.final_output == "Hello, how can I help you?"
 
     (transaction,) = events
     spans = transaction["spans"]
-    invoke_agent_span, ai_client_span = spans
+    invoke_agent_span = next(
+        span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    )
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
@@ -781,33 +845,38 @@ def test_agent_invocation_span_sync(
     instructions,
     input,
     request,
+    get_model_response,
 ):
     """
     Test that the integration creates spans for agent invocations.
     """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent_with_instructions(instructions).clone(model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    response = get_model_response(mock_model_response)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            events = capture_events()
+        events = capture_events()
 
-            result = agents.Runner.run_sync(
-                test_agent_with_instructions(instructions),
-                input,
-                run_config=test_run_config,
-            )
+        result = agents.Runner.run_sync(
+            agent,
+            input,
+            run_config=test_run_config,
+        )
 
-            assert result is not None
-            assert result.final_output == "Hello, how can I help you?"
+        assert result is not None
+        assert result.final_output == "Hello, how can I help you?"
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -1423,7 +1492,9 @@ async def test_hosted_mcp_tool_propagation_header_streamed(sentry_init, test_age
 
 
 @pytest.mark.asyncio
-async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
+async def test_hosted_mcp_tool_propagation_headers(
+    sentry_init, test_agent, get_model_response
+):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
     """
@@ -1439,9 +1510,7 @@ async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
         },
     )
 
-    client = AsyncOpenAI(api_key="z")
-    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
-
+    client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
 
     agent_with_tool = test_agent.clone(
@@ -1455,11 +1524,13 @@ async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
+    response = get_model_response(EXAMPLE_RESPONSE)
+
     with patch.object(
-        model._client.responses,
-        "create",
-        wraps=model._client.responses.create,
-    ) as create, mock.patch(
+        agent_with_tool.model._client._client,
+        "send",
+        return_value=response,
+    ) as send, mock.patch(
         "sentry_sdk.tracing_utils.Random.randrange", return_value=500000
     ):
         with sentry_sdk.start_transaction(
@@ -1473,13 +1544,17 @@ async def test_hosted_mcp_tool_propagation_headers(sentry_init, test_agent):
                 run_config=test_run_config,
             )
 
-            ai_client_span = transaction._span_recorder.spans[-1]
+            ai_client_span = next(
+                span
+                for span in transaction._span_recorder.spans
+                if span.op == OP.GEN_AI_CHAT
+            )
 
-        args, kwargs = create.call_args
+        args, kwargs = send.call_args
 
-        assert "tools" in kwargs
-        assert len(kwargs["tools"]) == 1
-        hosted_mcp_tool = kwargs["tools"][0]
+        request = args[0]
+        body = json.loads(request.content.decode("utf-8"))
+        hosted_mcp_tool = body["tools"][0]
 
         assert hosted_mcp_tool["headers"][
             "sentry-trace"
@@ -1631,35 +1706,46 @@ async def test_error_captures_input_data(sentry_init, capture_events, test_agent
     Test that input data is captured even when the API call raises an exception.
     This verifies that _set_input_data is called before the API call.
     """
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.side_effect = Exception("API Error")
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-            sentry_init(
-                integrations=[
-                    OpenAIAgentsIntegration(),
-                    LoggingIntegration(event_level=logging.CRITICAL),
-                ],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+    model_request = httpx.Request(
+        "POST",
+        "/responses",
+    )
 
-            events = capture_events()
+    response = httpx.Response(
+        500,
+        request=model_request,
+    )
 
-            with pytest.raises(Exception, match="API Error"):
-                await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
-                )
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[
+                OpenAIAgentsIntegration(),
+                LoggingIntegration(event_level=logging.CRITICAL),
+            ],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
+
+        events = capture_events()
+
+        with pytest.raises(InternalServerError, match="Error code: 500"):
+            await agents.Runner.run(agent, "Test input", run_config=test_run_config)
 
     (
         error_event,
         transaction,
     ) = events
 
-    assert error_event["exception"]["values"][0]["type"] == "Exception"
-    assert error_event["exception"]["values"][0]["value"] == "API Error"
+    assert error_event["exception"]["values"][0]["type"] == "InternalServerError"
+    assert error_event["exception"]["values"][0]["value"] == "Error code: 500"
 
     spans = transaction["spans"]
     ai_client_span = [s for s in spans if s["op"] == "gen_ai.chat"][0]
@@ -2012,34 +2098,38 @@ async def test_mcp_tool_execution_without_pii(sentry_init, capture_events, test_
 
 @pytest.mark.asyncio
 async def test_multiple_agents_asyncio(
-    sentry_init, capture_events, test_agent, mock_model_response
+    sentry_init, capture_events, test_agent, mock_model_response, get_model_response
 ):
     """
     Test that multiple agents can be run at the same time in asyncio tasks
     without interfering with each other.
     """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    response = get_model_response(mock_model_response)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
+
+        events = capture_events()
+
+        async def run():
+            await agents.Runner.run(
+                starting_agent=agent,
+                input="Test input",
+                run_config=test_run_config,
             )
 
-            events = capture_events()
-
-            async def run():
-                await agents.Runner.run(
-                    starting_agent=test_agent,
-                    input="Test input",
-                    run_config=test_run_config,
-                )
-
-            await asyncio.gather(*[run() for _ in range(3)])
+        await asyncio.gather(*[run() for _ in range(3)])
 
     assert len(events) == 3
     txn1, txn2, txn3 = events
@@ -2201,56 +2291,81 @@ async def test_tool_execution_error_tracing(sentry_init, capture_events, test_ag
 
 @pytest.mark.asyncio
 async def test_invoke_agent_span_includes_usage_data(
-    sentry_init, capture_events, test_agent, mock_usage
+    sentry_init,
+    capture_events,
+    test_agent,
+    get_model_response,
 ):
     """
     Test that invoke_agent spans include aggregated usage data from context_wrapper.
     This verifies the new functionality added to track token usage in invoke_agent spans.
     """
+    client = AsyncOpenAI(api_key="z")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            # Create a response with usage data
-            response = ModelResponse(
-                output=[
-                    ResponseOutputMessage(
-                        id="msg_123",
-                        type="message",
-                        status="completed",
-                        content=[
-                            ResponseOutputText(
-                                text="Response with usage",
-                                type="output_text",
-                                annotations=[],
-                            )
-                        ],
-                        role="assistant",
-                    )
-                ],
-                usage=mock_usage,
-                response_id="resp_123",
-            )
-            mock_get_response.return_value = response
+    response = get_model_response(
+        Response(
+            id="resp_123",
+            output=[
+                ResponseOutputMessage(
+                    id="msg_123",
+                    type="message",
+                    status="completed",
+                    content=[
+                        ResponseOutputText(
+                            text="Response with usage",
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4.1-2025-04-14",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        )
+    )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            events = capture_events()
+        events = capture_events()
 
-            result = await agents.Runner.run(
-                test_agent, "Test input", run_config=test_run_config
-            )
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
 
-            assert result is not None
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-    invoke_agent_span, ai_client_span = spans
+    invoke_agent_span = next(
+        span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    )
 
     # Verify invoke_agent span has usage data from context_wrapper
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
@@ -2258,7 +2373,6 @@ async def test_invoke_agent_span_includes_usage_data(
     assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
     assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
 
-    # The usage should match the mock_usage values (aggregated across all calls)
     assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 10
     assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
     assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 30
@@ -2268,23 +2382,23 @@ async def test_invoke_agent_span_includes_usage_data(
 
 @pytest.mark.asyncio
 async def test_ai_client_span_includes_response_model(
-    sentry_init, capture_events, test_agent
+    sentry_init,
+    capture_events,
+    test_agent,
+    get_model_response,
 ):
     """
     Test that ai_client spans (gen_ai.chat) include the response model from the actual API response.
     This verifies we capture the actual model used (which may differ from the requested model).
     """
+    client = AsyncOpenAI(api_key="z")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        # Mock the _fetch_response method to return a response with a model field
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
-        ) as mock_fetch_response:
-            # Create a mock OpenAI Response object with a specific model version
-            mock_response = MagicMock()
-            mock_response.model = "gpt-4.1-2025-04-14"  # The actual response model
-            mock_response.id = "resp_123"
-            mock_response.output = [
+    response = get_model_response(
+        Response(
+            id="resp_123",
+            output=[
                 ResponseOutputMessage(
                     id="msg_123",
                     type="message",
@@ -2298,37 +2412,49 @@ async def test_ai_client_span_includes_response_model(
                     ],
                     role="assistant",
                 )
-            ]
-            mock_response.usage = MagicMock()
-            mock_response.usage.input_tokens = 10
-            mock_response.usage.output_tokens = 20
-            mock_response.usage.total_tokens = 30
-            mock_response.usage.input_tokens_details = InputTokensDetails(
-                cached_tokens=0
-            )
-            mock_response.usage.output_tokens_details = OutputTokensDetails(
-                reasoning_tokens=5
-            )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4.1-2025-04-14",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        )
+    )
 
-            mock_fetch_response.return_value = mock_response
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+        events = capture_events()
 
-            events = capture_events()
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
 
-            result = await agents.Runner.run(
-                test_agent, "Test input", run_config=test_run_config
-            )
-
-            assert result is not None
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-    _, ai_client_span = spans
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     # Verify ai_client span has response model from API response
     assert ai_client_span["description"] == "chat gpt-4"
@@ -2338,29 +2464,28 @@ async def test_ai_client_span_includes_response_model(
 
 @pytest.mark.asyncio
 async def test_ai_client_span_response_model_with_chat_completions(
-    sentry_init, capture_events
+    sentry_init,
+    capture_events,
+    get_model_response,
 ):
     """
     Test that response model is captured when using ChatCompletions API (not Responses API).
     This ensures our implementation works with different OpenAI model types.
     """
     # Create agent that uses ChatCompletions model
+    client = AsyncOpenAI(api_key="z")
+    model = OpenAIResponsesModel(model="gpt-4o-mini", openai_client=client)
+
     agent = Agent(
         name="chat_completions_agent",
         instructions="Test agent using ChatCompletions",
-        model="gpt-4o-mini",
+        model=model,
     )
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        # Mock the _fetch_response method
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
-        ) as mock_fetch_response:
-            # Create a mock Response object
-            mock_response = MagicMock()
-            mock_response.model = "gpt-4o-mini-2024-07-18"
-            mock_response.id = "resp_123"
-            mock_response.output = [
+    response = get_model_response(
+        Response(
+            id="resp_123",
+            output=[
                 ResponseOutputMessage(
                     id="msg_123",
                     type="message",
@@ -2374,36 +2499,48 @@ async def test_ai_client_span_response_model_with_chat_completions(
                     ],
                     role="assistant",
                 )
-            ]
-            mock_response.usage = MagicMock()
-            mock_response.usage.input_tokens = 15
-            mock_response.usage.output_tokens = 25
-            mock_response.usage.total_tokens = 40
-            mock_response.usage.input_tokens_details = InputTokensDetails(
-                cached_tokens=0
-            )
-            mock_response.usage.output_tokens_details = OutputTokensDetails(
-                reasoning_tokens=0
-            )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4o-mini-2024-07-18",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=15,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                ),
+                output_tokens=25,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=40,
+            ),
+        )
+    )
 
-            mock_fetch_response.return_value = mock_response
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-            )
+        events = capture_events()
 
-            events = capture_events()
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
 
-            result = await agents.Runner.run(
-                agent, "Test input", run_config=test_run_config
-            )
-
-            assert result is not None
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-    _, ai_client_span = spans
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     # Verify response model from API response is captured
     assert "gen_ai.response.model" in ai_client_span["data"]
@@ -2515,21 +2652,22 @@ async def test_multiple_llm_calls_aggregate_usage(
 
 @pytest.mark.asyncio
 async def test_invoke_agent_span_includes_response_model(
-    sentry_init, capture_events, test_agent
+    sentry_init,
+    capture_events,
+    test_agent,
+    get_model_response,
 ):
     """
     Test that invoke_agent spans include the response model from the API response.
     """
+    client = AsyncOpenAI(api_key="z")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
-        ) as mock_fetch_response:
-            # Create a mock OpenAI Response object with a specific model version
-            mock_response = MagicMock()
-            mock_response.model = "gpt-4.1-2025-04-14"  # The actual response model
-            mock_response.id = "resp_123"
-            mock_response.output = [
+    response = get_model_response(
+        Response(
+            id="resp_123",
+            output=[
                 ResponseOutputMessage(
                     id="msg_123",
                     type="message",
@@ -2543,37 +2681,52 @@ async def test_invoke_agent_span_includes_response_model(
                     ],
                     role="assistant",
                 )
-            ]
-            mock_response.usage = MagicMock()
-            mock_response.usage.input_tokens = 10
-            mock_response.usage.output_tokens = 20
-            mock_response.usage.total_tokens = 30
-            mock_response.usage.input_tokens_details = InputTokensDetails(
-                cached_tokens=0
-            )
-            mock_response.usage.output_tokens_details = OutputTokensDetails(
-                reasoning_tokens=5
-            )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model="gpt-4.1-2025-04-14",
+            object="response",
+            usage=ResponseUsage(
+                input_tokens=10,
+                input_tokens_details=InputTokensDetails(
+                    cached_tokens=0,
+                ),
+                output_tokens=20,
+                output_tokens_details=OutputTokensDetails(
+                    reasoning_tokens=5,
+                ),
+                total_tokens=30,
+            ),
+        )
+    )
 
-            mock_fetch_response.return_value = mock_response
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
+        events = capture_events()
 
-            events = capture_events()
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
 
-            result = await agents.Runner.run(
-                test_agent, "Test input", run_config=test_run_config
-            )
-
-            assert result is not None
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-    invoke_agent_span, ai_client_span = spans
+    invoke_agent_span = next(
+        span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    )
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     # Verify invoke_agent span has response model from API
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
@@ -2847,37 +3000,45 @@ async def test_streaming_ttft_on_chat_span(sentry_init, test_agent):
 )
 @pytest.mark.asyncio
 async def test_conversation_id_on_all_spans(
-    sentry_init, capture_events, test_agent, mock_model_response
+    sentry_init, capture_events, test_agent, mock_model_response, get_model_response
 ):
     """
     Test that gen_ai.conversation.id is set on all AI-related spans when passed to Runner.run().
     """
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-            )
+    response = get_model_response(mock_model_response)
 
-            events = capture_events()
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
 
-            result = await agents.Runner.run(
-                test_agent,
-                "Test input",
-                run_config=test_run_config,
-                conversation_id="conv_test_123",
-            )
+        events = capture_events()
 
-            assert result is not None
+        result = await agents.Runner.run(
+            agent,
+            "Test input",
+            run_config=test_run_config,
+            conversation_id="conv_test_123",
+        )
+
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-    invoke_agent_span, ai_client_span = spans
+    invoke_agent_span = next(
+        span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    )
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     # Verify workflow span (transaction) has conversation_id
     assert (
@@ -2994,35 +3155,47 @@ async def test_conversation_id_on_tool_span(sentry_init, capture_events, test_ag
 )
 @pytest.mark.asyncio
 async def test_no_conversation_id_when_not_provided(
-    sentry_init, capture_events, test_agent, mock_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    mock_model_response,
+    get_model_response,
 ):
     """
     Test that gen_ai.conversation.id is not set when not passed to Runner.run().
     """
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            mock_get_response.return_value = mock_model_response
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
 
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-            )
+    response = get_model_response(mock_model_response)
 
-            events = capture_events()
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+        )
 
-            # Don't pass conversation_id
-            result = await agents.Runner.run(
-                test_agent, "Test input", run_config=test_run_config
-            )
+        events = capture_events()
 
-            assert result is not None
+        # Don't pass conversation_id
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
+
+        assert result is not None
 
     (transaction,) = events
     spans = transaction["spans"]
-    invoke_agent_span, ai_client_span = spans
+    invoke_agent_span = next(
+        span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    )
+    ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
     # Verify conversation_id is NOT set on any spans
     assert "gen_ai.conversation.id" not in transaction["contexts"]["trace"].get(
