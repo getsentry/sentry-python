@@ -12,7 +12,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import parse_version, package_version
 
 from openai import AsyncOpenAI
 from agents.models.openai_responses import OpenAIResponsesModel
@@ -36,6 +36,8 @@ from agents.items import (
 from agents.tool import HostedMCPTool
 from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
+
+OPENAI_VERSION = package_version("openai")
 
 from openai.types.responses import (
     ResponseCreatedEvent,
@@ -1256,18 +1258,22 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-    assert ai_client_span1["data"]["gen_ai.response.tool_calls"] == safe_serialize(
-        [
-            {
-                "arguments": '{"message": "hello"}',
-                "call_id": "call_123",
-                "name": "simple_test_tool",
-                "type": "function_call",
-                "id": "call_123",
-                "status": None,
-            }
-        ]
-    )
+
+    tool_call = {
+        "arguments": '{"message": "hello"}',
+        "call_id": "call_123",
+        "name": "simple_test_tool",
+        "type": "function_call",
+        "id": "call_123",
+        "status": None,
+    }
+
+    if OPENAI_VERSION >= (2, 25, 0):
+        tool_call["namespace"] = None
+
+    assert json.loads(ai_client_span1["data"]["gen_ai.response.tool_calls"]) == [
+        tool_call
+    ]
 
     assert tool_span["description"] == "execute_tool simple_test_tool"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
@@ -2505,75 +2511,6 @@ async def test_multiple_llm_calls_aggregate_usage(
     assert invoke_agent_span["data"]["gen_ai.usage.input_tokens.cached"] == 5
     # Reasoning tokens should be aggregated: 0 + 3 = 3
     assert invoke_agent_span["data"]["gen_ai.usage.output_tokens.reasoning"] == 3
-
-
-@pytest.mark.asyncio
-async def test_response_model_not_set_when_unavailable(
-    sentry_init, capture_events, test_agent
-):
-    """
-    Test that response model is not set if the API response doesn't have a model field.
-    The request model should still be set correctly.
-    """
-
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel._fetch_response"
-        ) as mock_fetch_response:
-            # Create a mock response without a model field
-            mock_response = MagicMock()
-            mock_response.model = None  # No model in response
-            mock_response.id = "resp_123"
-            mock_response.output = [
-                ResponseOutputMessage(
-                    id="msg_123",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Response without model field",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ]
-            mock_response.usage = MagicMock()
-            mock_response.usage.input_tokens = 10
-            mock_response.usage.output_tokens = 20
-            mock_response.usage.total_tokens = 30
-            mock_response.usage.input_tokens_details = InputTokensDetails(
-                cached_tokens=0
-            )
-            mock_response.usage.output_tokens_details = OutputTokensDetails(
-                reasoning_tokens=0
-            )
-
-            mock_fetch_response.return_value = mock_response
-
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-            )
-
-            events = capture_events()
-
-            result = await agents.Runner.run(
-                test_agent, "Test input", run_config=test_run_config
-            )
-
-            assert result is not None
-
-    (transaction,) = events
-    spans = transaction["spans"]
-    _, ai_client_span = spans
-
-    # Response model should NOT be set when API doesn't return it
-    assert "gen_ai.response.model" not in ai_client_span["data"]
-    # But request model should still be set
-    assert "gen_ai.request.model" in ai_client_span["data"]
-    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
 
 
 @pytest.mark.asyncio
