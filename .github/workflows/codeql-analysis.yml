@@ -30,6 +30,10 @@ permissions:
 
 jobs:
   analyze:
+    env:
+      CODEQL_ACTION_ANALYSIS_KEY: ".github/workflows/codeql.yml:analyze"  # Reduce number of GH API calls
+      CODEQL_ACTION_SKIP_WORKFLOW_VALIDATION: "true"  # Reduce number of GH API calls
+
     permissions:
       actions: read  # for github/codeql-action/init to get workflow details
       contents: read  # for actions/checkout to fetch code
@@ -54,6 +58,7 @@ jobs:
       uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
+        dependency-caching: false  # Reduce number of GH API calls
         # If you wish to specify custom queries, you can do so here or in a config file.
         # By default, queries listed here will override any specified in a config file.
         # Prefix the list here with "+" to use these queries and those in the config file.
