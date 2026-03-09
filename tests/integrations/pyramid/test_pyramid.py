@@ -19,7 +19,7 @@ from tests.conftest import unpack_werkzeug_response
 try:
     from importlib.metadata import version
 
-    PYRAMID_VERSION = Version(version("pyramid"))
+    PYRAMID_VERSION = Version(version("pyramid")).release
 
 except ImportError:
     # < py3.8
@@ -312,7 +312,7 @@ def test_errorhandler_ok(
 
 
 @pytest.mark.skipif(
-    PYRAMID_VERSION < Version("1.9"),
+    PYRAMID_VERSION < (1, 9),
     reason="We don't have the right hooks in older Pyramid versions",
 )
 def test_errorhandler_500(
