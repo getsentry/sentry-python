@@ -451,6 +451,9 @@ class NoOpStreamedSpan(StreamedSpan):
         if self._scope is None:
             return
 
+        if not hasattr(self._previous_span_on_scope):
+            return
+
         with capture_internal_exceptions():
             old_span = self._previous_span_on_scope
             del self._previous_span_on_scope
