@@ -124,11 +124,6 @@ else:
     )
 
 
-async def async_iterator(values):
-    for value in values:
-        yield value
-
-
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -689,7 +684,7 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
     ],
 )
 async def test_streaming_chat_completion_async_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
 ):
     sentry_init(
         integrations=[
@@ -829,7 +824,7 @@ async def test_streaming_chat_completion_async_no_prompts(
     ],
 )
 async def test_streaming_chat_completion_async(
-    sentry_init, capture_events, messages, request
+    sentry_init, capture_events, messages, request, async_iterator
 ):
     sentry_init(
         integrations=[
@@ -1463,7 +1458,9 @@ def test_span_origin_streaming_chat(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_span_origin_streaming_chat_async(sentry_init, capture_events):
+async def test_span_origin_streaming_chat_async(
+    sentry_init, capture_events, async_iterator
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -2420,7 +2417,7 @@ async def test_ai_client_span_responses_async_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_ai_client_span_streaming_responses_async_api(
-    sentry_init, capture_events, instructions, input, request
+    sentry_init, capture_events, instructions, input, request, async_iterator
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -2799,7 +2796,7 @@ def test_streaming_responses_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
 ):
     sentry_init(
         integrations=[
@@ -3037,7 +3034,9 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
 
 # noinspection PyTypeChecker
 @pytest.mark.asyncio
-async def test_streaming_chat_completion_ttft_async(sentry_init, capture_events):
+async def test_streaming_chat_completion_ttft_async(
+    sentry_init, capture_events, async_iterator
+):
     """
     Test that async streaming chat completions capture time-to-first-token (TTFT).
     """
@@ -3142,7 +3141,9 @@ def test_streaming_responses_api_ttft(sentry_init, capture_events):
 # noinspection PyTypeChecker
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-async def test_streaming_responses_api_ttft_async(sentry_init, capture_events):
+async def test_streaming_responses_api_ttft_async(
+    sentry_init, capture_events, async_iterator
+):
     """
     Test that async streaming responses API captures time-to-first-token (TTFT).
     """
