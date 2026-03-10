@@ -76,6 +76,10 @@ deps =
     linters: -r requirements-linting.txt
     linters: werkzeug<2.3.0
 
+    mypy: -r requirements-linting.txt
+    mypy: werkzeug<2.3.0
+    ruff: -r requirements-linting.txt
+
     # === Common ===
     py3.8-common: hypothesis
     common: pytest-asyncio
@@ -212,6 +216,8 @@ basepython =
     # Tools like ruff and mypy have options that pin the target Python
     # version (configured in pyproject.toml), ensuring consistent behavior.
     linters: python3.14
+    mypy: python3.14
+    ruff: python3.14
 
 commands =
     {py3.7,py3.8}-boto3: pip install urllib3<2.0.0
@@ -230,3 +236,12 @@ commands =
     ruff format --check tests sentry_sdk
     mypy sentry_sdk
     python scripts/find_raise_from_none.py
+
+[testenv:mypy]
+commands =
+    mypy sentry_sdk
+
+[testenv:ruff]
+commands =
+    ruff check tests sentry_sdk
+    ruff format --check tests sentry_sdk

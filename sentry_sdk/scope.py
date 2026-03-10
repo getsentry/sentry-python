@@ -33,7 +33,7 @@ from sentry_sdk.tracing_utils import (
     normalize_incoming_data,
     PropagationContext,
 )
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import _DEFAULT_PARENT_SPAN, StreamedSpan, NoOpStreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -1173,6 +1173,59 @@ class Scope:
                 span = span.start_child(**kwargs)
 
             return span
+
+    def start_streamed_span(
+        self,
+        name: str,
+        attributes: "Optional[Attributes]",
+        parent_span: "Optional[StreamedSpan]",
+        active: bool,
+    ) -> "StreamedSpan":
+        # TODO: rename to start_span once we drop the old API
+        if isinstance(parent_span, NoOpStreamedSpan):
+            # parent_span is only set if the user explicitly set it
+            logger.debug(
+                "Ignored parent span provided. Span will be parented to the "
+                "currently active span instead."
+            )
+
+        if parent_span is _DEFAULT_PARENT_SPAN or isinstance(
+            parent_span, NoOpStreamedSpan
+        ):
+            parent_span = self.span  # type: ignore
+
+        # If no eligible parent_span was provided and there is no currently
+        # active span, this is a segment
+        if parent_span is None:
+            propagation_context = self.get_active_propagation_context()
+
+            return StreamedSpan(
+                name=name,
+                attributes=attributes,
+                active=active,
+                scope=self,
+                segment=None,
+                trace_id=propagation_context.trace_id,
+                parent_span_id=propagation_context.parent_span_id,
+                parent_sampled=propagation_context.parent_sampled,
+                baggage=propagation_context.baggage,
+            )
+
+        # This is a child span; take propagation context from the parent span
+        with new_scope():
+            if isinstance(parent_span, NoOpStreamedSpan):
+                return NoOpStreamedSpan()
+
+            return StreamedSpan(
+                name=name,
+                attributes=attributes,
+                active=active,
+                scope=self,
+                segment=parent_span._segment,
+                trace_id=parent_span.trace_id,
+                parent_span_id=parent_span.span_id,
+                parent_sampled=parent_span.sampled,
+            )
 
     def continue_trace(
         self,
