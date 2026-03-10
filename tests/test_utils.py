@@ -35,6 +35,7 @@ from sentry_sdk.utils import (
     exc_info_from_error,
     get_lines_from_file,
     package_version,
+    safe_serialize,
 )
 
 
@@ -1060,6 +1061,37 @@ def test_get_lines_from_file_handle_linecache_errors():
     with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
         result = get_lines_from_file("filename", 10)
         assert result == expected_result
+
+
+def test_safe_serialize_plain_string():
+    assert safe_serialize("already a string") == "already a string"
+
+
+def test_safe_serialize_json_string():
+    assert safe_serialize('{"key": "value"}') == '{"key": "value"}'
+
+
+def test_safe_serialize_dict():
+    assert safe_serialize({"key": "value"}) == '{"key": "value"}'
+
+
+def test_safe_serialize_callable():
+    def my_func():
+        pass
+
+    result = safe_serialize(my_func)
+    assert result.startswith("<function")
+    assert '"' not in result[:1]  # no wrapping quotes from json.dumps
+
+
+def test_safe_serialize_object():
+    class MyClass:
+        def __init__(self):
+            self.x = 1
+
+    result = safe_serialize(MyClass())
+    assert result.startswith("<MyClass")
+    assert '"' not in result[:1]  # no wrapping quotes from json.dumps
 
 
 def test_package_version_is_none():
