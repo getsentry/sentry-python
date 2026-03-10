@@ -1386,16 +1386,9 @@ async def test_tool_execution_span(
     assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
 
 
-def server_side_event_chunks(events):
-    for event in events:
-        payload = event.model_dump()
-        chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
-        yield chunk.encode("utf-8")
-
-
 @pytest.mark.asyncio
 async def test_hosted_mcp_tool_propagation_header_streamed(
-    sentry_init, test_agent, async_iterator
+    sentry_init, test_agent, async_iterator, server_side_event_chunks
 ):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
@@ -3162,7 +3155,9 @@ async def test_streaming_span_update_captures_response_data(
 
 
 @pytest.mark.asyncio
-async def test_streaming_ttft_on_chat_span(sentry_init, test_agent, async_iterator):
+async def test_streaming_ttft_on_chat_span(
+    sentry_init, test_agent, async_iterator, server_side_event_chunks
+):
     """
     Test that time-to-first-token (TTFT) is recorded on chat spans during streaming.
 
