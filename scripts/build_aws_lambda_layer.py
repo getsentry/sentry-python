@@ -18,7 +18,7 @@ class LayerBuilder:
     def __init__(
         self,
         base_dir: str,
-        out_zip_filename: "Optional[str]"=None,
+        out_zip_filename: "Optional[str]" = None,
     ) -> None:
         self.base_dir = base_dir
         self.python_site_packages = os.path.join(self.base_dir, PYTHON_SITE_PACKAGES)

@@ -6,6 +6,7 @@ import pyramid.testing
 import pytest
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
+from packaging.version import Version
 from werkzeug.test import Client
 
 from sentry_sdk import capture_message, add_breadcrumb
@@ -18,7 +19,7 @@ from tests.conftest import unpack_werkzeug_response
 try:
     from importlib.metadata import version
 
-    PYRAMID_VERSION = tuple(map(int, version("pyramid").split(".")))
+    PYRAMID_VERSION = Version(version("pyramid")).release
 
 except ImportError:
     # < py3.8
