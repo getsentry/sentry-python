@@ -91,7 +91,11 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             "span_id": item.span_id,
             "name": item._name,
             "status": item._status,
+            "start_timestamp": item._start_timestamp.timestamp(),
         }
+
+        if item._timestamp:
+            res["end_timestamp"] = item._timestamp.timestamp()
 
         if item._parent_span_id:
             res["parent_span_id"] = item._parent_span_id
