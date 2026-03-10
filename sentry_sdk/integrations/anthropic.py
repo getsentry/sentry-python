@@ -92,6 +92,7 @@ def _wrap_stream_iter(
         if not hasattr(self, "_sentry_span"):
             for event in f(self):
                 yield event
+            return
 
         model = None
         usage = _RecordedUsage()
@@ -153,6 +154,7 @@ def _wrap_async_stream_aiter(
         if not hasattr(self, "_sentry_span"):
             async for event in f(self):
                 yield event
+            return
 
         model = None
         usage = _RecordedUsage()
