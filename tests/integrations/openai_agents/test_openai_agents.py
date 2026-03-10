@@ -1231,7 +1231,7 @@ async def test_tool_execution_span(
                 "type": "object",
                 "additionalProperties": False,
             },
-            "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
+            "on_invoke_tool": mock.ANY,
             "strict_json_schema": True,
             "is_enabled": True,
         }
@@ -1259,8 +1259,6 @@ async def test_tool_execution_span(
             }
         )
 
-    available_tools = safe_serialize(available_tools)
-
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
@@ -1268,7 +1266,10 @@ async def test_tool_execution_span(
     assert agent_span["origin"] == "auto.ai.openai_agents"
     assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
-    assert agent_span["data"]["gen_ai.request.available_tools"] == available_tools
+    assert (
+        json.loads(agent_span["data"]["gen_ai.request.available_tools"])
+        == available_tools
+    )
     assert agent_span["data"]["gen_ai.request.max_tokens"] == 100
     assert agent_span["data"]["gen_ai.request.model"] == "gpt-4"
     assert agent_span["data"]["gen_ai.request.temperature"] == 0.7
@@ -1279,7 +1280,10 @@ async def test_tool_execution_span(
     assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
     assert ai_client_span1["data"]["gen_ai.system"] == "openai"
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
-    assert ai_client_span1["data"]["gen_ai.request.available_tools"] == available_tools
+    assert (
+        json.loads(ai_client_span1["data"]["gen_ai.request.available_tools"])
+        == available_tools
+    )
     assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
     assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
         [
@@ -1320,11 +1324,7 @@ async def test_tool_execution_span(
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
     assert (
-        re.sub(
-            "<.*>(,)",
-            r"'NOT_CHECKED'\1",
-            agent_span["data"]["gen_ai.request.available_tools"],
-        )
+        json.loads(agent_span["data"]["gen_ai.request.available_tools"])
         == available_tools
     )
     assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
@@ -1342,11 +1342,7 @@ async def test_tool_execution_span(
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
     assert (
-        re.sub(
-            "<.*>(,)",
-            r"'NOT_CHECKED'\1",
-            agent_span["data"]["gen_ai.request.available_tools"],
-        )
+        json.loads(agent_span["data"]["gen_ai.request.available_tools"])
         == available_tools
     )
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
