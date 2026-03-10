@@ -2956,6 +2956,37 @@ def test_image_url_http_url_with_base64_data_in_query_param_is_not_redacted_no_m
     assert found_image, "Image content item should be found in messages data"
 
 
+def test_image_url_redacts_base64_data_url_with_complex_mime_type(
+    sentry_init, capture_events
+):
+    """Test that ImageUrl with a data URL using a complex MIME type (e.g. image/svg+xml) is redacted."""
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        image_url = ImageUrl(
+            url="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
+        )
+        user_part = UserPromptPart(content=["Look at this image:", image_url])
+        mock_msg = MagicMock()
+        mock_msg.parts = [user_part]
+        mock_msg.instructions = None
+
+        _set_input_messages(span, [mock_msg])
+        span.finish()
+
+    (event,) = events
+    span_data = event["spans"][0]["data"]
+    messages_data = _get_messages_from_span(span_data)
+    assert _find_image_content(messages_data, "image/svg+xml")
+
+
 @pytest.mark.asyncio
 async def test_invoke_agent_image_url_http_url_no_redaction(
     sentry_init, capture_events
