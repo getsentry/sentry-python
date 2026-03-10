@@ -1,6 +1,5 @@
 import sys
 import json
-import inspect
 from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING
