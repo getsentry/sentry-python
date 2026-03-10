@@ -68,18 +68,6 @@ EXAMPLE_MESSAGE = Message(
 )
 
 
-def sse_chunks(events):
-    for event in events:
-        payload = event.model_dump()
-        chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
-        yield chunk.encode("utf-8")
-
-
-async def async_iterator(values):
-    for value in values:
-        yield value
-
-
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -229,14 +217,18 @@ async def test_nonstreaming_create_message_async(
     ],
 )
 def test_streaming_create_message(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    server_side_event_chunks,
 ):
     client = Anthropic(api_key="z")
 
     response = httpx.Response(
         200,
         content=b"".join(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=EXAMPLE_MESSAGE,
@@ -272,6 +264,7 @@ def test_streaming_create_message(
             )
         ),
     )
+
     returned_stream = Stream(
         cast_to=MessageStreamEvent, response=response, client=client
     )
@@ -342,14 +335,19 @@ def test_streaming_create_message(
     ],
 )
 async def test_streaming_create_message_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    async_iterator,
+    server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
 
     response = httpx.Response(
         200,
-        content=b"".join(
-            sse_chunks(
+        content=async_iterator(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=EXAMPLE_MESSAGE,
@@ -458,14 +456,18 @@ async def test_streaming_create_message_async(
     ],
 )
 def test_streaming_create_message_with_input_json_delta(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    server_side_event_chunks,
 ):
     client = Anthropic(api_key="z")
 
     response = httpx.Response(
         200,
         content=b"".join(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=Message(
@@ -613,13 +615,18 @@ def test_streaming_create_message_with_input_json_delta(
     ],
 )
 async def test_streaming_create_message_with_input_json_delta_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    async_iterator,
+    server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
     response = httpx.Response(
         200,
         content=b"".join(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=Message(
@@ -1302,7 +1309,11 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     ],
 )
 def test_streaming_create_message_with_system_prompt(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
@@ -1310,7 +1321,7 @@ def test_streaming_create_message_with_system_prompt(
     response = httpx.Response(
         200,
         content=b"".join(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=EXAMPLE_MESSAGE,
@@ -1430,7 +1441,12 @@ def test_streaming_create_message_with_system_prompt(
     ],
 )
 async def test_streaming_create_message_with_system_prompt_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
@@ -1438,7 +1454,7 @@ async def test_streaming_create_message_with_system_prompt_async(
     response = httpx.Response(
         200,
         content=b"".join(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=EXAMPLE_MESSAGE,
@@ -2442,7 +2458,9 @@ def test_input_tokens_include_cache_read_nonstreaming(sentry_init, capture_event
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
 
 
-def test_input_tokens_include_cache_read_streaming(sentry_init, capture_events):
+def test_input_tokens_include_cache_read_streaming(
+    sentry_init, capture_events, server_side_event_chunks
+):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
 
@@ -2453,7 +2471,7 @@ def test_input_tokens_include_cache_read_streaming(sentry_init, capture_events):
     response = httpx.Response(
         200,
         content=b"".join(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         type="message_start",
@@ -2544,14 +2562,14 @@ def test_input_tokens_unchanged_without_caching(sentry_init, capture_events):
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
 
 
-def test_cache_tokens_streaming(sentry_init, capture_events):
+def test_cache_tokens_streaming(sentry_init, capture_events, server_side_event_chunks):
     """Test cache tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
 
     response = httpx.Response(
         200,
         content=b"".join(
-            sse_chunks(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         type="message_start",

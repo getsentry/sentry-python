@@ -1004,6 +1004,15 @@ def json_rpc_sse():
     return inner
 
 
+@pytest.fixture()
+def async_iterator():
+    async def inner(values):
+        for value in values:
+            yield value
+
+    return inner
+
+
 class MockServerRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         # Process an HTTP GET request and return a response.

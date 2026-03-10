@@ -16,7 +16,6 @@ from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, UserPromptPart
 from pydantic_ai.usage import RequestUsage
-from pydantic_ai.models.test import TestModel
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
 
 
@@ -2386,7 +2385,9 @@ async def test_execute_tool_span_with_mcp_type(sentry_init, capture_events):
     Test execute_tool span with MCP tool type.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import execute_tool_span
+    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+        execute_tool_span,
+    )
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2794,3 +2795,42 @@ async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
     (span_data,) = event["spans"]
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+@pytest.mark.asyncio
+async def test_tool_description_in_execute_tool_span(sentry_init, capture_events):
+    """
+    Test that tool description from the tool's docstring is included in execute_tool spans.
+    """
+    agent = Agent(
+        "test",
+        name="test_agent",
+        system_prompt="You are a helpful test assistant.",
+    )
+
+    @agent.tool_plain
+    def multiply_numbers(a: int, b: int) -> int:
+        """Multiply two numbers and return the product."""
+        return a * b
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    events = capture_events()
+
+    result = await agent.run("What is 5 times 3?")
+    assert result is not None
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
+    assert len(tool_spans) >= 1
+
+    tool_span = tool_spans[0]
+    assert tool_span["data"]["gen_ai.tool.name"] == "multiply_numbers"
+    assert SPANDATA.GEN_AI_TOOL_DESCRIPTION in tool_span["data"]
+    assert "Multiply two numbers" in tool_span["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]

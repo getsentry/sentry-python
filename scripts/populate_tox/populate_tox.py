@@ -4,6 +4,7 @@ This script populates tox.ini automatically using release data from PyPI.
 See scripts/populate_tox/README.md for more info.
 """
 
+import re
 import functools
 import hashlib
 import json
@@ -872,7 +873,10 @@ def get_last_updated() -> Optional[datetime]:
 
 
 def _normalize_name(package: str) -> str:
-    return package.lower().replace("-", "_")
+    # From https://peps.python.org/pep-0503/#normalized-names
+    # but normalizing to underscores instead of hyphens since tox-formatted packages
+    # use underscores.
+    return re.sub(r"[-_.]+", "_", package).lower()
 
 
 def _extract_wheel_info_to_cache(wheel: dict):
