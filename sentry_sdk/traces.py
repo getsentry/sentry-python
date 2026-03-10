@@ -271,6 +271,16 @@ class StreamedSpan:
         except AttributeError:
             pass
 
+        self._start_timestamp = datetime.now(timezone.utc)
+        self._timestamp: "Optional[datetime]" = None
+
+        try:
+            # profiling depends on this value and requires that
+            # it is measured in nanoseconds
+            self._start_timestamp_monotonic_ns = nanosecond_time()
+        except AttributeError:
+            pass
+
         self._span_id: "Optional[str]" = None
 
         self._status = SpanStatus.OK.value
@@ -294,8 +304,12 @@ class StreamedSpan:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
+        if self._timestamp is not None:
+            # This span is already finished, ignore
+            return
+
         if value is not None and should_be_treated_as_error(ty, value):
-            self.status = SpanStatus.ERROR
+            self.status = SpanStatus.ERROR.value
 
         self._end()
 
@@ -335,7 +349,9 @@ class StreamedSpan:
                 del self._previous_span_on_scope
                 self._scope.span = old_span
 
-        # Set attributes from the segment
+        # Set attributes from the segment. These are set on span end on purpose
+        # so that we have the best chance to capture the segment's final name
+        # (since it might change during its lifetime)
         self.set_attribute("sentry.segment.id", self._segment.span_id)
         self.set_attribute("sentry.segment.name", self._segment.name)
 
