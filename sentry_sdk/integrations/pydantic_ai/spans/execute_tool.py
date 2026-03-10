@@ -9,10 +9,15 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional
+    from pydantic_ai._tool_manager import ToolDefinition  # type: ignore
 
 
 def execute_tool_span(
-    tool_name: str, tool_args: "Any", agent: "Any", tool_type: str = "function"
+    tool_name: str,
+    tool_args: "Any",
+    agent: "Any",
+    tool_type: str = "function",
+    tool_definition: "Optional[ToolDefinition]" = None,
 ) -> "sentry_sdk.tracing.Span":
     """Create a span for tool execution.
 
@@ -21,6 +26,7 @@ def execute_tool_span(
         tool_args: The arguments passed to the tool
         agent: The agent executing the tool
         tool_type: The type of tool ("function" for regular tools, "mcp" for MCP services)
+        tool_definition: The definition of the tool, if available
     """
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_EXECUTE_TOOL,
@@ -31,6 +37,12 @@ def execute_tool_span(
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
     span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, tool_type)
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
+
+    if tool_definition is not None and hasattr(tool_definition, "description"):
+        span.set_data(
+            SPANDATA.GEN_AI_TOOL_DESCRIPTION,
+            tool_definition.description,
+        )
 
     _set_agent_data(span, agent)
 
