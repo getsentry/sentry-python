@@ -152,6 +152,11 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             origin=CohereIntegration.origin,
         )
         span.__enter__()
+
+        with capture_internal_exceptions():
+            span.set_data(SPANDATA.GEN_AI_SYSTEM, "cohere")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+
         try:
             res = f(*args, **kwargs)
         except Exception as e:
@@ -162,9 +167,6 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             reraise(*exc_info)
 
         with capture_internal_exceptions():
-            span.set_data(SPANDATA.GEN_AI_SYSTEM, "cohere")
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-
             if should_send_default_pii() and integration.include_prompts:
                 messages = []
                 for x in kwargs.get("chat_history", []):
@@ -241,8 +243,8 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
             name=f"embeddings {model}".strip(),
             origin=CohereIntegration.origin,
         ) as span:
-            set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "cohere")
-            set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+            span.set_data(SPANDATA.GEN_AI_SYSTEM, "cohere")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
 
             if "texts" in kwargs and (
                 should_send_default_pii() and integration.include_prompts
