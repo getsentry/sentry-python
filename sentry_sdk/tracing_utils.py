@@ -1431,7 +1431,7 @@ def _make_sampling_decision(
     # traces_sampler is user-provided, it could return anything.
     if not is_valid_sample_rate(sample_rate, source="Tracing"):
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
-        return False, None, None, None
+        return False, None, None, "sample_rate"
 
     sample_rate = float(sample_rate)
     if not sample_rate:
