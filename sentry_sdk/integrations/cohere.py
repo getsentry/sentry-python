@@ -113,7 +113,10 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         for attr, spandata_key in COLLECTED_CHAT_RESP_ATTRS.items():
             if hasattr(res, attr):
-                set_data_normalized(span, spandata_key, getattr(res, attr))
+                value = getattr(res, attr)
+                if spandata_key == SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS:
+                    value = [value]
+                set_data_normalized(span, spandata_key, value)
 
         if hasattr(res, "meta"):
             if hasattr(res.meta, "billed_units"):
