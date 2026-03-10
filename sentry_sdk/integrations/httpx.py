@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 try:
-    from httpx import AsyncClient, Client, Request, Response  # type: ignore
+    from httpx import AsyncClient, Client, Request, Response
 except ImportError:
     raise DidNotEnable("httpx is not installed")
 
@@ -125,7 +125,7 @@ def _install_httpx_client() -> None:
 
         return rv
 
-    Client.send = send
+    Client.send = send  # type: ignore
 
 
 def _install_httpx_async_client() -> None:
@@ -208,4 +208,4 @@ def _install_httpx_async_client() -> None:
 
         return rv
 
-    AsyncClient.send = send
+    AsyncClient.send = send  # type: ignore
