@@ -487,16 +487,19 @@ class NoOpStreamedSpan(StreamedSpan):
         if self._finished:
             return
 
-        client = sentry_sdk.get_client()
-        if client.is_active() and client.transport:
-            logger.debug("Discarding span because sampled = False")
-            client.transport.record_lost_event(
-                reason=self._unsampled_reason or "sample_rate",
-                data_category="span",
-                quantity=1,
-            )
+        if self._unsampled_reason is not None:
+            client = sentry_sdk.get_client()
+            if client.is_active() and client.transport:
+                logger.debug(
+                    f"Discarding span because sampled=False (reason: {self._unsampled_reason})"
+                )
+                client.transport.record_lost_event(
+                    reason=self._unsampled_reason,
+                    data_category="span",
+                    quantity=1,
+                )
 
-        if self._scope:
+        if self._scope and hasattr(self, "_previous_span_on_scope"):
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
