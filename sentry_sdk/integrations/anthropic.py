@@ -82,6 +82,11 @@ class AnthropicIntegration(Integration):
 def _wrap_stream_iter(
     f: "Callable[..., Iterator[RawMessageStreamEvent]]",
 ) -> "Callable[..., Iterator[RawMessageStreamEvent]]":
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Responsible for closing the AI Client Span.
+    """
+
     @wraps(f)
     def _patched_iter(self: "Stream") -> "Iterator[RawMessageStreamEvent]":
         if not hasattr(self, "_sentry_span"):
@@ -136,6 +141,11 @@ def _wrap_stream_iter(
 def _wrap_async_stream_aiter(
     f: "Callable[..., AsyncIterator[RawMessageStreamEvent]]",
 ) -> "Callable[..., AsyncIterator[RawMessageStreamEvent]]":
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Responsible for closing the AI Client Span.
+    """
+
     @wraps(f)
     async def _patched_aiter(
         self: "AsyncStream",
