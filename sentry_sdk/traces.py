@@ -460,6 +460,8 @@ class NoOpStreamedSpan(StreamedSpan):
         self._scope = scope  # type: ignore[assignment]
         self._unsampled_reason = unsampled_reason
 
+        self._finished = False
+
         self._start()
 
     def __repr__(self) -> str:
