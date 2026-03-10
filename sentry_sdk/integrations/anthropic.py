@@ -134,8 +134,6 @@ def _wrap_stream_iter(
             finish_span=True,
         )
 
-        return f(self)
-
     return _patched_iter
 
 
