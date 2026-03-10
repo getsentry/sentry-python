@@ -2864,9 +2864,14 @@ async def test_image_url_redacts_base64_data_url_via_agent_run(
     assert len(chat_spans) >= 1
 
     chat_span = chat_spans[0]
+    found_image = False
+
     if "gen_ai.request.messages" in chat_span["data"]:
         messages_data = _get_messages_from_span(chat_span["data"])
         assert _find_image_content(messages_data, "image/png")
+        found_image = True
+
+    assert found_image, "Image content item should be found in messages data"
 
 
 def test_image_url_http_url_no_redaction_needed(sentry_init, capture_events):

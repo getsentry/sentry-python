@@ -10,14 +10,8 @@ from ..consts import DATA_URL_BASE64_REGEX
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Union, Dict, Any, List, Optional
+    from typing import Union, Dict, Any
     from pydantic_ai.usage import RequestUsage, RunUsage  # type: ignore
-
-try:
-    from pydantic_ai.messages import BinaryContent, ImageUrl  # type: ignore
-except ImportError:
-    BinaryContent = None
-    ImageUrl = None
 
 
 def _serialize_image_url_item(item: "Any") -> "Dict[str, Any]":
