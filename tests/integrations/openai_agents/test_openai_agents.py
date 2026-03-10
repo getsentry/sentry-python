@@ -1352,7 +1352,7 @@ async def test_tool_execution_span(
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
 
     ai_client_span2_available_tools = json.loads(
-        tool_span["data"]["gen_ai.request.available_tools"]
+        ai_client_span2["data"]["gen_ai.request.available_tools"]
     )[0]
     assert all(
         ai_client_span2_available_tools.get(k) == v for k, v in available_tool.items()
