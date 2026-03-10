@@ -351,6 +351,7 @@ if TYPE_CHECKING:
             "max_runtime": int,
             "failure_issue_threshold": int,
             "recovery_threshold": int,
+            "owner": str,
         },
         total=False,
     )

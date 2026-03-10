@@ -262,6 +262,22 @@ def test_monitor_config(sentry_init, capture_envelopes):
     assert "monitor_config" not in check_in
 
 
+def test_monitor_config_with_owner(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    monitor_config = {
+        "schedule": {"type": "crontab", "value": "0 0 * * *"},
+        "owner": "team:6",
+    }
+
+    capture_checkin(monitor_slug="abc123", monitor_config=monitor_config)
+    check_in = envelopes[0].items[0].payload.json
+
+    assert check_in["monitor_slug"] == "abc123"
+    assert check_in["monitor_config"]["owner"] == "team:6"
+
+
 def test_decorator_monitor_config(sentry_init, capture_envelopes):
     sentry_init()
     envelopes = capture_envelopes()
