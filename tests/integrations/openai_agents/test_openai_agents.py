@@ -1266,12 +1266,10 @@ async def test_tool_execution_span(
     assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
 
-    agent_span_available_tools = json.loads(
+    agent_span_available_tool = json.loads(
         agent_span["data"]["gen_ai.request.available_tools"]
     )[0]
-    assert all(
-        agent_span_available_tools.get(k) == v for k, v in available_tool.items()
-    )
+    assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
 
     assert agent_span["data"]["gen_ai.request.max_tokens"] == 100
     assert agent_span["data"]["gen_ai.request.model"] == "gpt-4"
@@ -1284,11 +1282,11 @@ async def test_tool_execution_span(
     assert ai_client_span1["data"]["gen_ai.system"] == "openai"
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
 
-    ai_client_span1_available_tools = json.loads(
+    ai_client_span1_available_tool = json.loads(
         ai_client_span1["data"]["gen_ai.request.available_tools"]
     )[0]
     assert all(
-        ai_client_span1_available_tools.get(k) == v for k, v in available_tool.items()
+        ai_client_span1_available_tool[k] == v for k, v in available_tool.items()
     )
 
     assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
@@ -1331,10 +1329,10 @@ async def test_tool_execution_span(
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
 
-    tool_span_available_tools = json.loads(
+    tool_span_available_tool = json.loads(
         tool_span["data"]["gen_ai.request.available_tools"]
     )[0]
-    assert all(tool_span_available_tools.get(k) == v for k, v in available_tool.items())
+    assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
 
     assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
     assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"
@@ -1351,11 +1349,11 @@ async def test_tool_execution_span(
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
 
-    ai_client_span2_available_tools = json.loads(
+    ai_client_span2_available_tool = json.loads(
         ai_client_span2["data"]["gen_ai.request.available_tools"]
     )[0]
     assert all(
-        ai_client_span2_available_tools.get(k) == v for k, v in available_tool.items()
+        ai_client_span2_available_tool[k] == v for k, v in available_tool.items()
     )
 
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
