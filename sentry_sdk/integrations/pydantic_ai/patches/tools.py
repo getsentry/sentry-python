@@ -56,6 +56,9 @@ def _patch_execute_tool_call() -> None:
         if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
             tool_type = "mcp"
 
+        tool_def = getattr(tool, "tool_def", None)
+        tool_description = getattr(tool_def, "description", None)
+
         # Get agent from contextvar
         agent = get_current_agent()
 
@@ -73,6 +76,7 @@ def _patch_execute_tool_call() -> None:
                     args_dict,
                     agent,
                     tool_type=tool_type,
+                    tool_description=tool_description,
                 ) as span:
                     try:
                         result = await original_execute_tool_call(
@@ -133,6 +137,9 @@ def _patch_call_tool() -> None:
         if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
             tool_type = "mcp"
 
+        tool_def = getattr(tool, "tool_def", None)
+        tool_description = getattr(tool_def, "description", None)
+
         # Get agent from contextvar
         agent = get_current_agent()
 
@@ -150,6 +157,7 @@ def _patch_call_tool() -> None:
                     args_dict,
                     agent,
                     tool_type=tool_type,
+                    tool_description=tool_description,
                 ) as span:
                     try:
                         result = await original_call_tool(

@@ -12,7 +12,11 @@ if TYPE_CHECKING:
 
 
 def execute_tool_span(
-    tool_name: str, tool_args: "Any", agent: "Any", tool_type: str = "function"
+    tool_name: str,
+    tool_args: "Any",
+    agent: "Any",
+    tool_type: str = "function",
+    tool_description: "Optional[str]" = None,
 ) -> "sentry_sdk.tracing.Span":
     """Create a span for tool execution.
 
@@ -21,6 +25,7 @@ def execute_tool_span(
         tool_args: The arguments passed to the tool
         agent: The agent executing the tool
         tool_type: The type of tool ("function" for regular tools, "mcp" for MCP services)
+        tool_description: Optional description of the tool
     """
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_EXECUTE_TOOL,
@@ -31,6 +36,9 @@ def execute_tool_span(
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
     span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, tool_type)
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
+
+    if tool_description is not None:
+        span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
 
     _set_agent_data(span, agent)
 
