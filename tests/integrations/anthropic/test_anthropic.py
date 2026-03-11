@@ -732,7 +732,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == "{'location': 'San Francisco, CA'}"
+            == '{"location": "San Francisco, CA"}'
         )
 
     else:
