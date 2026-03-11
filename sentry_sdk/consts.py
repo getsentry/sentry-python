@@ -35,6 +35,7 @@ if TYPE_CHECKING:
         Any,
         Callable,
         Dict,
+        IgnoreSpansConfig,
         List,
         Optional,
         Sequence,
@@ -83,6 +84,7 @@ if TYPE_CHECKING:
             "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
+            "ignore_spans": Optional[IgnoreSpansConfig],
         },
         total=False,
     )

@@ -8,6 +8,7 @@ import warnings
 from collections.abc import Mapping, MutableMapping
 from datetime import timedelta
 from random import Random
+from typing import Pattern
 from urllib.parse import quote, unquote
 import uuid
 
@@ -1476,6 +1477,52 @@ def _make_sampling_decision(
         outcome = "sample_rate"
 
     return sampled, sample_rate, sample_rand, outcome
+
+
+def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
+    """Determine if a span fits one of the rules in ignore_spans."""
+    client = sentry_sdk.get_client()
+    ignore_spans = (client.options.get("_experiments") or {}).get("ignore_spans")
+
+    if not ignore_spans:
+        return False
+
+    def _matches(rule: "Any", value: "Any") -> bool:
+        if isinstance(rule, Pattern):
+            if isinstance(value, str):
+                return bool(rule.match(value))
+            else:
+                return False
+
+        return rule == value
+
+    for rule in ignore_spans:
+        if isinstance(rule, (str, Pattern)):
+            if _matches(rule, name):
+                return True
+
+        elif isinstance(rule, dict) and rule:
+            name_matches = True
+            attributes_match = True
+
+            if "name" in rule:
+                name_matches = _matches(rule["name"], name)
+
+            if "attributes" in rule:
+                if not attributes:
+                    attributes_match = False
+                else:
+                    for attribute, value in rule["attributes"].items():
+                        if attribute not in attributes or not _matches(
+                            value, attributes[attribute]
+                        ):
+                            attributes_match = False
+                            break
+
+            if name_matches and attributes_match:
+                return True
+
+    return False
 
 
 # Circular imports
