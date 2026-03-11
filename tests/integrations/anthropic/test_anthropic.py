@@ -295,7 +295,9 @@ def test_streaming_create_message(
     assert event["type"] == "transaction"
     assert event["transaction"] == "anthropic"
 
-    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+    matching_spans = [span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT]
+    assert len(matching_spans) == 1
+    (span,) = matching_spans
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
