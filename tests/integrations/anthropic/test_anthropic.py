@@ -67,6 +67,22 @@ EXAMPLE_MESSAGE = Message(
 )
 
 
+@pytest.fixture()
+def select_transactions_with_ai_client_spans():
+    def inner(events, operation_name):
+        return [
+            transaction
+            for transaction in events
+            if transaction["type"] == "transaction"
+            and any(
+                span["data"].get("gen_ai.operation.name") == operation_name
+                for span in transaction.get("spans", [])
+            )
+        ]
+
+    return inner
+
+
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
