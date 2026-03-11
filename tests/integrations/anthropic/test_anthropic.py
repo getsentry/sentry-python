@@ -539,14 +539,19 @@ async def test_streaming_create_message_async(
     ],
 )
 async def test_stream_message_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
 
-    response = httpx.Response(
-        200,
-        content=b"".join(
-            sse_chunks(
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=EXAMPLE_MESSAGE,
@@ -582,9 +587,6 @@ async def test_stream_message_async(
             )
         ),
     )
-    returned_stream = AsyncStream(
-        cast_to=MessageStreamEvent, response=response, client=client
-    )
 
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -592,7 +594,6 @@ async def test_stream_message_async(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = AsyncMock(return_value=returned_stream)
 
     messages = [
         {
@@ -601,14 +602,19 @@ async def test_stream_message_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        async with client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            async for event in stream:
-                pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                async for event in stream:
+                    pass
 
     assert len(events) == 1
     (event,) = events
@@ -1083,13 +1089,18 @@ async def test_streaming_create_message_with_input_json_delta_async(
     ],
 )
 async def test_stream_message_with_input_json_delta_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
-    response = httpx.Response(
-        200,
-        content=b"".join(
-            sse_chunks(
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=Message(
@@ -1157,10 +1168,7 @@ async def test_stream_message_with_input_json_delta_async(
                     ),
                 ]
             )
-        ),
-    )
-    returned_stream = AsyncStream(
-        cast_to=MessageStreamEvent, response=response, client=client
+        )
     )
 
     sentry_init(
@@ -1169,7 +1177,6 @@ async def test_stream_message_with_input_json_delta_async(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = AsyncMock(return_value=returned_stream)
 
     messages = [
         {
@@ -1178,14 +1185,19 @@ async def test_stream_message_with_input_json_delta_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        async with client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            async for event in stream:
-                pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                async for event in stream:
+                    pass
 
     assert len(events) == 1
     (event,) = events
@@ -2015,15 +2027,20 @@ def test_stream_messages_with_system_prompt(
     ],
 )
 async def test_stream_message_with_system_prompt_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
 
-    response = httpx.Response(
-        200,
-        content=b"".join(
-            sse_chunks(
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
                 [
                     MessageStartEvent(
                         message=EXAMPLE_MESSAGE,
@@ -2057,10 +2074,7 @@ async def test_stream_message_with_system_prompt_async(
                     ),
                 ]
             )
-        ),
-    )
-    returned_stream = AsyncStream(
-        cast_to=MessageStreamEvent, response=response, client=client
+        )
     )
 
     sentry_init(
@@ -2069,7 +2083,6 @@ async def test_stream_message_with_system_prompt_async(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = AsyncMock(return_value=returned_stream)
 
     messages = [
         {
@@ -2078,15 +2091,20 @@ async def test_stream_message_with_system_prompt_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        async with client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        ) as stream:
-            async for event in stream:
-                pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            ) as stream:
+                async for event in stream:
+                    pass
 
     assert len(events) == 1
     (event,) = events
