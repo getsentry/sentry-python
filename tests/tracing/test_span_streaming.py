@@ -46,9 +46,9 @@ def test_start_span(sentry_init, capture_envelopes):
     events = capture_envelopes()
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
-        assert segment.is_segment() is True
+        assert segment._is_segment() is True
         with sentry_sdk.traces.start_span(name="child") as child:
-            assert child.is_segment() is False
+            assert child._is_segment() is False
             assert child._segment == segment
 
     sentry_sdk.get_client().flush()

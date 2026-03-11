@@ -355,7 +355,7 @@ class StreamedSpan:
             return
 
         # Stop the profiler
-        if self.is_segment():
+        if self._is_segment():
             if self._continuous_profile is not None:
                 self._continuous_profile.stop()
 
@@ -474,8 +474,8 @@ class StreamedSpan:
     def timestamp(self) -> "Optional[datetime]":
         return self._timestamp
 
-    def is_segment(self) -> bool:
-        return self._segment == self
+    def _is_segment(self) -> bool:
+        return self._segment is self
 
     def _dynamic_sampling_context(self) -> "dict[str, str]":
         return self._segment._get_baggage().dynamic_sampling_context()
@@ -556,7 +556,7 @@ class StreamedSpan:
         return context
 
     def _start_profile(self) -> None:
-        if not self.is_segment():
+        if not self._is_segment():
             return
 
         try_autostart_continuous_profiler()
@@ -691,8 +691,8 @@ class NoOpStreamedSpan(StreamedSpan):
     def remove_attribute(self, key: str) -> None:
         pass
 
-    def is_segment(self) -> bool:
-        return False
+    def _is_segment(self) -> bool:
+        return self._scope is not None
 
     def _to_traceparent(self) -> str:
         propagation_context = (
