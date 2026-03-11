@@ -1490,7 +1490,7 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
     def _matches(rule: "Any", value: "Any") -> bool:
         if isinstance(rule, Pattern):
             if isinstance(value, str):
-                return bool(rule.match(value))
+                return bool(rule.fullmatch(value))
             else:
                 return False
 
