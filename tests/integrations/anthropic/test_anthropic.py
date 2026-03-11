@@ -1,7 +1,6 @@
 import pytest
 from unittest import mock
 import json
-import httpx
 
 try:
     from unittest.mock import AsyncMock
