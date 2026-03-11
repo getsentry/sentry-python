@@ -1422,7 +1422,7 @@ def _make_sampling_decision(
     traces_sampler_defined = callable(client.options.get("traces_sampler"))
     if traces_sampler_defined:
         sampling_context = {
-            "span": {
+            "span_context": {
                 "name": name,
                 "trace_id": propagation_context.trace_id,
                 "parent_span_id": propagation_context.parent_span_id,
@@ -1490,7 +1490,7 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
     def _matches(rule: "Any", value: "Any") -> bool:
         if isinstance(rule, Pattern):
             if isinstance(value, str):
-                return bool(rule.match(value))
+                return bool(rule.fullmatch(value))
             else:
                 return False
 
@@ -1501,7 +1501,7 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
             if _matches(rule, name):
                 return True
 
-        elif isinstance(rule, dict) and rule:
+        elif isinstance(rule, dict) and ("name" in rule or "attributes" in rule):
             name_matches = True
             attributes_match = True
 
