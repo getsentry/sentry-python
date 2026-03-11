@@ -703,6 +703,44 @@ def test_outgoing_traceparent_and_baggage(sentry_init, capture_envelopes):
         assert baggage_items["sentry-sampled"] == "true"
 
 
+def test_outgoing_traceparent_and_baggage_when_noop_span_is_active(
+    sentry_init, capture_envelopes
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "ignore_spans": ["ignored"],
+        },
+    )
+
+    sentry_sdk.traces.new_trace()
+
+    propagation_context = (
+        sentry_sdk.get_current_scope().get_active_propagation_context()
+    )
+    propagation_trace_id = propagation_context.trace_id
+    propagation_span_id = propagation_context.span_id
+
+    with sentry_sdk.traces.start_span(name="ignored") as span:
+        assert span.sampled is False
+
+        noop_trace_id = span.trace_id
+        noop_span_id = span.span_id
+
+        traceparent = sentry_sdk.get_traceparent()
+        assert traceparent != f"{noop_trace_id}-{noop_span_id}-0"
+        assert traceparent == f"{propagation_trace_id}-{propagation_span_id}-0"
+
+        baggage = sentry_sdk.get_baggage()
+        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert "sentry-trace_id" in baggage_items
+        assert baggage_items["sentry-trace_id"] != noop_trace_id
+        assert baggage_items["sentry-trace_id"] == propagation_trace_id
+        assert "sentry-sampled" in baggage_items
+        assert baggage_items["sentry-sampled"] == "false"
+
+
 def test_trace_decorator(sentry_init, capture_envelopes):
     sentry_init(
         traces_sample_rate=1.0,

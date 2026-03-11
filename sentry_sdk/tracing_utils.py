@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     from types import FrameType
 
     from sentry_sdk._types import Attributes
-    from sentry_sdk.traces import StreamedSpan
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -1608,6 +1607,7 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk.traces import (
     LOW_QUALITY_SEGMENT_SOURCES,
+    StreamedSpan,
     start_span as start_streaming_span,
 )
 
