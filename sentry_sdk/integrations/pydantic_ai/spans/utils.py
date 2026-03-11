@@ -1,13 +1,55 @@
 """Utility functions for PydanticAI span instrumentation."""
 
 import sentry_sdk
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.ai.utils import get_modality_from_mime_type
 from sentry_sdk.consts import SPANDATA
+
+from ..consts import DATA_URL_BASE64_REGEX
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Union, Dict, Any, List
+    from typing import Union, Dict, Any, List, Optional
     from pydantic_ai.usage import RequestUsage, RunUsage  # type: ignore
+
+try:
+    from pydantic_ai.messages import BinaryContent, ImageUrl  # type: ignore
+except ImportError:
+    BinaryContent = None
+    ImageUrl = None
+
+
+def _serialize_image_url_item(item: "Any") -> "Dict[str, Any]":
+    """Serialize an ImageUrl content item for span data.
+
+    For data URLs containing base64-encoded images, the content is redacted.
+    For regular HTTP URLs, the URL string is preserved.
+    """
+    data_url_matches = DATA_URL_BASE64_REGEX.match(item.url)
+
+    if data_url_matches:
+        mime_type = data_url_matches[1] or "image"
+        return {
+            "type": "image",
+            "mime_type": mime_type,
+            "content": BLOB_DATA_SUBSTITUTE,
+        }
+
+    return {
+        "type": "image",
+        "content": str(item.url),
+    }
+
+
+def _serialize_binary_content_item(item: "Any") -> "Dict[str, Any]":
+    """Serialize a BinaryContent item for span data, redacting the blob data."""
+    return {
+        "type": "blob",
+        "modality": get_modality_from_mime_type(item.media_type),
+        "mime_type": item.media_type,
+        "content": BLOB_DATA_SUBSTITUTE,
+    }
 
 
 def _set_usage_data(

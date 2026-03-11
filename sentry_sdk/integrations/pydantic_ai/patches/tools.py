@@ -50,7 +50,6 @@ def _patch_execute_tool_call() -> None:
         call = validated.call
         name = call.tool_name
         tool = self.tools.get(name) if self.tools else None
-        selected_tool_definition = getattr(tool, "tool_def", None)
 
         # Determine tool type by checking tool.toolset
         tool_type = "function"
@@ -74,7 +73,6 @@ def _patch_execute_tool_call() -> None:
                     args_dict,
                     agent,
                     tool_type=tool_type,
-                    tool_definition=selected_tool_definition,
                 ) as span:
                     try:
                         result = await original_execute_tool_call(
@@ -129,7 +127,6 @@ def _patch_call_tool() -> None:
         # Extract tool info before calling original
         name = call.tool_name
         tool = self.tools.get(name) if self.tools else None
-        selected_tool_definition = getattr(tool, "tool_def", None)
 
         # Determine tool type by checking tool.toolset
         tool_type = "function"  # default
@@ -153,7 +150,6 @@ def _patch_call_tool() -> None:
                     args_dict,
                     agent,
                     tool_type=tool_type,
-                    tool_definition=selected_tool_definition,
                 ) as span:
                     try:
                         result = await original_call_tool(
