@@ -1574,7 +1574,7 @@ async def test_hosted_mcp_tool_propagation_headers(
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
-    response = get_model_response(EXAMPLE_RESPONSE)
+    response = get_model_response(EXAMPLE_RESPONSE, serialize_pydantic=True)
 
     with patch.object(
         agent_with_tool.model._client._client,
