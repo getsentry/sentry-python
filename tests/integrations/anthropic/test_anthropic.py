@@ -642,15 +642,13 @@ async def test_streaming_create_message_with_input_json_delta_async(
                     ),
                     ContentBlockDeltaEvent(
                         delta=InputJSONDelta(
-                            partial_json="{'location':", type="input_json_delta"
+                            partial_json='{"location": "', type="input_json_delta"
                         ),
                         index=0,
                         type="content_block_delta",
                     ),
                     ContentBlockDeltaEvent(
-                        delta=InputJSONDelta(
-                            partial_json=" 'S", type="input_json_delta"
-                        ),
+                        delta=InputJSONDelta(partial_json="S", type="input_json_delta"),
                         index=0,
                         type="content_block_delta",
                     ),
@@ -670,7 +668,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
                     ),
                     ContentBlockDeltaEvent(
                         delta=InputJSONDelta(
-                            partial_json="A'}", type="input_json_delta"
+                            partial_json='A"}', type="input_json_delta"
                         ),
                         index=0,
                         type="content_block_delta",
