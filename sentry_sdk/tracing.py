@@ -771,6 +771,12 @@ class Span:
         thread_id, thread_name = get_current_thread_meta()
         self.set_thread(thread_id, thread_name)
 
+    # Private aliases matching StreamedSpan's private API
+    _to_traceparent = to_traceparent
+    _to_baggage = to_baggage
+    _iter_headers = iter_headers
+    _get_trace_context = get_trace_context
+
 
 class Transaction(Span):
     """The Transaction is the root element that holds all the spans
@@ -1243,6 +1249,8 @@ class Transaction(Span):
                 )
             )
 
+    _get_baggage = get_baggage
+
 
 class NoOpSpan(Span):
     def __repr__(self) -> str:
@@ -1323,6 +1331,13 @@ class NoOpSpan(Span):
         self, sampling_context: "SamplingContext"
     ) -> None:
         pass
+
+    # Private aliases matching StreamedSpan's private API
+    _to_traceparent = to_traceparent
+    _to_baggage = to_baggage
+    _get_baggage = get_baggage
+    _iter_headers = iter_headers
+    _get_trace_context = get_trace_context
 
 
 if TYPE_CHECKING:

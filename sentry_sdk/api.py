@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         LogLevelStr,
         SamplingContext,
     )
+    from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span, TransactionKwargs
 
     T = TypeVar("T")
@@ -409,7 +410,9 @@ def set_measurement(name: str, value: float, unit: "MeasurementUnit" = "") -> No
         transaction.set_measurement(name, value, unit)
 
 
-def get_current_span(scope: "Optional[Scope]" = None) -> "Optional[Span]":
+def get_current_span(
+    scope: "Optional[Scope]" = None,
+) -> "Optional[Union[Span, StreamedSpan]]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -523,6 +526,16 @@ def update_current_span(
     current_span = get_current_span()
 
     if current_span is None:
+        return
+
+    if isinstance(current_span, StreamedSpan):
+        warnings.warn(
+            "The `update_current_span` API isn't available in streaming mode. "
+            "Retrieve the current span with get_current_span() and use its API "
+            "directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return
 
     if op is not None:

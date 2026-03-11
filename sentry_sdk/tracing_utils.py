@@ -935,6 +935,14 @@ def create_span_decorator(
                 )
                 return await f(*args, **kwargs)
 
+            if isinstance(current_span, StreamedSpan):
+                warnings.warn(
+                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return await f(*args, **kwargs)
+
             span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
@@ -969,6 +977,14 @@ def create_span_decorator(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
                     qualname_from_function(f),
+                )
+                return f(*args, **kwargs)
+
+            if isinstance(current_span, StreamedSpan):
+                warnings.warn(
+                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
                 )
                 return f(*args, **kwargs)
 
@@ -1072,7 +1088,9 @@ def create_streaming_span_decorator(
     return span_decorator
 
 
-def get_current_span(scope: "Optional[sentry_sdk.Scope]" = None) -> "Optional[Span]":
+def get_current_span(
+    scope: "Optional[sentry_sdk.Scope]" = None,
+) -> "Optional[Union[Span, StreamedSpan]]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -1081,16 +1099,24 @@ def get_current_span(scope: "Optional[sentry_sdk.Scope]" = None) -> "Optional[Sp
     return current_span
 
 
-def set_span_errored(span: "Optional[Span]" = None) -> None:
+def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
     """
     Set the status of the current or given span to INTERNAL_ERROR.
     Also sets the status of the transaction (root span) to INTERNAL_ERROR.
     """
+    from sentry_sdk.traces import StreamedSpan, SpanStatus
+
     span = span or get_current_span()
+
     if span is not None:
-        span.set_status(SPANSTATUS.INTERNAL_ERROR)
-        if span.containing_transaction is not None:
-            span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+        if isinstance(span, Span):
+            span.set_status(SPANSTATUS.INTERNAL_ERROR)
+            if span.containing_transaction is not None:
+                span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+        elif isinstance(span, StreamedSpan):
+            span.status = SpanStatus.ERROR
+            if span._segment is not None:
+                span._segment.status = SpanStatus.ERROR
 
 
 def _generate_sample_rand(
