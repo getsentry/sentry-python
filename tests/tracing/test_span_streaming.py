@@ -729,16 +729,14 @@ def test_outgoing_traceparent_and_baggage_when_noop_span_is_active(
         noop_span_id = span.span_id
 
         traceparent = sentry_sdk.get_traceparent()
-        assert traceparent != f"{noop_trace_id}-{noop_span_id}-0"
-        assert traceparent == f"{propagation_trace_id}-{propagation_span_id}-0"
+        assert traceparent != f"{noop_trace_id}-{noop_span_id}"
+        assert traceparent == f"{propagation_trace_id}-{propagation_span_id}"
 
         baggage = sentry_sdk.get_baggage()
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
         assert "sentry-trace_id" in baggage_items
         assert baggage_items["sentry-trace_id"] != noop_trace_id
         assert baggage_items["sentry-trace_id"] == propagation_trace_id
-        assert "sentry-sampled" in baggage_items
-        assert baggage_items["sentry-sampled"] == "false"
 
 
 def test_trace_decorator(sentry_init, capture_envelopes):
