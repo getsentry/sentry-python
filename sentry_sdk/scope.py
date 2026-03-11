@@ -857,9 +857,6 @@ class Scope:
         if source:
             self._transaction_info["source"] = source
 
-        if source:
-            self._transaction_info["source"] = source
-
     @_attr_setter
     def user(self, value: "Optional[Dict[str, Any]]") -> None:
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""

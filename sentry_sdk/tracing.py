@@ -1249,7 +1249,9 @@ class Transaction(Span):
                 )
             )
 
+    # Private aliases matching StreamedSpan's private API
     _get_baggage = get_baggage
+    _get_trace_context = get_trace_context
 
 
 class NoOpSpan(Span):
