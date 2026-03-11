@@ -210,22 +210,16 @@ class RustTracingLayer:
             "origin": self.origin,
         }
 
-        scope = sentry_sdk.get_current_scope()
-        parent_sentry_span = scope.span
-        if parent_sentry_span:
-            sentry_span = parent_sentry_span.start_child(**kwargs)
-        else:
-            sentry_span = scope.start_span(**kwargs)
+        parent_sentry_span = sentry_sdk.get_current_span()
+        with sentry_sdk.start_span(**kwargs) as sentry_span:
+            fields = metadata.get("fields", [])
+            for field in fields:
+                if self._include_tracing_fields():
+                    sentry_span.set_data(field, attrs.get(field))
+                else:
+                    sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
 
-        fields = metadata.get("fields", [])
-        for field in fields:
-            if self._include_tracing_fields():
-                sentry_span.set_data(field, attrs.get(field))
-            else:
-                sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
-
-        scope.span = sentry_span
-        return (parent_sentry_span, sentry_span)
+            return (parent_sentry_span, sentry_span)
 
     def on_close(self, span_id: str, span_state: "TraceState") -> None:
         if span_state is None:
