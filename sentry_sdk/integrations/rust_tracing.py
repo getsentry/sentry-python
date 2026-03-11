@@ -182,7 +182,7 @@ class RustTracingLayer:
         elif event_type == EventTypeMapping.Event:
             process_event(deserialized_event)
 
-    def on_new_span(self, attrs: str, span_id: str) -> "SentrySpan":
+    def on_new_span(self, attrs: str, span_id: str) -> "Optional[SentrySpan]":
         attrs = json.loads(attrs)
         metadata = attrs.get("metadata", {})
 
