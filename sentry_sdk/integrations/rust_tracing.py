@@ -40,8 +40,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span as SentrySpan
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
-TraceState = Optional[Tuple[Optional[SentrySpan], SentrySpan]]
-
 
 class RustTracingLevel(Enum):
     Trace = "TRACE"
@@ -170,7 +168,7 @@ class RustTracingLayer:
             else self.include_tracing_fields
         )
 
-    def on_event(self, event: str, _span_state: "TraceState") -> None:
+    def on_event(self, event: str, sentry_span: "SentrySpan") -> None:
         deserialized_event = json.loads(event)
         metadata = deserialized_event.get("metadata", {})
 
@@ -184,7 +182,7 @@ class RustTracingLayer:
         elif event_type == EventTypeMapping.Event:
             process_event(deserialized_event)
 
-    def on_new_span(self, attrs: str, span_id: str) -> "TraceState":
+    def on_new_span(self, attrs: str, span_id: str) -> "SentrySpan":
         attrs = json.loads(attrs)
         metadata = attrs.get("metadata", {})
 
@@ -210,29 +208,26 @@ class RustTracingLayer:
             "origin": self.origin,
         }
 
-        parent_sentry_span = sentry_sdk.get_current_span()
-        with sentry_sdk.start_span(**kwargs) as sentry_span:
-            fields = metadata.get("fields", [])
-            for field in fields:
-                if self._include_tracing_fields():
-                    sentry_span.set_data(field, attrs.get(field))
-                else:
-                    sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
+        sentry_span = sentry_sdk.start_span(**kwargs)
+        fields = metadata.get("fields", [])
+        for field in fields:
+            if self._include_tracing_fields():
+                sentry_span.set_data(field, attrs.get(field))
+            else:
+                sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
 
-            return (parent_sentry_span, sentry_span)
+        sentry_span.__enter__()
+        return sentry_span
 
-    def on_close(self, span_id: str, span_state: "TraceState") -> None:
-        if span_state is None:
+    def on_close(self, span_id: str, sentry_span: "SentrySpan") -> None:
+        if sentry_span is None:
             return
 
-        parent_sentry_span, sentry_span = span_state
-        sentry_span.finish()
-        sentry_sdk.get_current_scope().span = parent_sentry_span
+        sentry_span.__exit__()
 
-    def on_record(self, span_id: str, values: str, span_state: "TraceState") -> None:
-        if span_state is None:
+    def on_record(self, span_id: str, values: str, sentry_span: "SentrySpan") -> None:
+        if sentry_span is None:
             return
-        _parent_sentry_span, sentry_span = span_state
 
         deserialized_values = json.loads(values)
         for key, value in deserialized_values.items():
