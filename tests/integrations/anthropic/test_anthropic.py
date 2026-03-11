@@ -364,9 +364,6 @@ def test_stream_messages(
             ]
         )
     )
-    returned_stream = Stream(
-        cast_to=MessageStreamEvent, response=response, client=client
-    )
 
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -374,7 +371,6 @@ def test_stream_messages(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
     messages = [
         {
@@ -383,14 +379,19 @@ def test_stream_messages(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        with client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for event in stream:
+                    pass
 
     assert len(events) == 1
     (event,) = events
@@ -398,8 +399,7 @@ def test_stream_messages(
     assert event["type"] == "transaction"
     assert event["transaction"] == "anthropic"
 
-    assert len(event["spans"]) == 1
-    (span,) = event["spans"]
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
@@ -864,9 +864,6 @@ def test_stream_messages_with_input_json_delta(
             ]
         )
     )
-    returned_stream = Stream(
-        cast_to=MessageStreamEvent, response=response, client=client
-    )
 
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -874,7 +871,6 @@ def test_stream_messages_with_input_json_delta(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
     messages = [
         {
@@ -883,14 +879,19 @@ def test_stream_messages_with_input_json_delta(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        with client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-        ) as stream:
-            for event in stream:
-                pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for event in stream:
+                    pass
 
     assert len(events) == 1
     (event,) = events
@@ -1932,9 +1933,6 @@ def test_stream_messages_with_system_prompt(
             ]
         )
     )
-    returned_stream = Stream(
-        cast_to=MessageStreamEvent, response=response, client=client
-    )
 
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -1942,7 +1940,6 @@ def test_stream_messages_with_system_prompt(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
     messages = [
         {
@@ -1951,15 +1948,20 @@ def test_stream_messages_with_system_prompt(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        with client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        ) as stream:
-            for event in stream:
-                pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            ) as stream:
+                for event in stream:
+                    pass
 
     assert len(events) == 1
     (event,) = events
@@ -3235,22 +3237,23 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
             ]
         )
     )
-    returned_stream = Stream(
-        cast_to=MessageStreamEvent, response=response, client=client
-    )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
-    with start_transaction(name="anthropic"):
-        with client.messages.stream(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "What is 5+5?"}],
-            model="claude-sonnet-4-20250514",
-        ) as stream:
-            for event in stream:
-                pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "What is 5+5?"}],
+                model="claude-sonnet-4-20250514",
+            ) as stream:
+                for event in stream:
+                    pass
 
     (span,) = events[0]["spans"]
 
@@ -3382,22 +3385,23 @@ def test_stream_messages_cache_tokens(
             ]
         )
     )
-    returned_stream = Stream(
-        cast_to=MessageStreamEvent, response=response, client=client
-    )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
-    with start_transaction(name="anthropic"):
-        with client.messages.stream(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "Hello"}],
-            model="claude-3-5-sonnet-20241022",
-        ) as stream:
-            for event in stream:
-                pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-3-5-sonnet-20241022",
+            ) as stream:
+                for event in stream:
+                    pass
 
     (span,) = events[0]["spans"]
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200

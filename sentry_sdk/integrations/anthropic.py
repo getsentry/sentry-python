@@ -278,7 +278,7 @@ def _transform_system_instructions(
     ]
 
 
-def _common_set_input_data(
+def _set_common_input_data(
     span: "Span",
     integration: "AnthropicIntegration",
     max_tokens: "int",
@@ -382,7 +382,7 @@ def _set_create_input_data(
     """
     span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False))
 
-    _common_set_input_data(
+    _set_common_input_data(
         span=span,
         integration=integration,
         max_tokens=kwargs.get("max_tokens"),  # type: ignore
@@ -408,7 +408,7 @@ def _set_stream_input_data(
     top_p: "Optional[float]",
     tools: "Optional[Iterable[ToolUnionParam]]",
 ) -> None:
-    _common_set_input_data(
+    _set_common_input_data(
         span=span,
         integration=integration,
         max_tokens=max_tokens,
