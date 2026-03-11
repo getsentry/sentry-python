@@ -1509,15 +1509,12 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
                 name_matches = _matches(rule["name"], name)
 
             if "attributes" in rule:
-                if not attributes:
-                    attributes_match = False
-                else:
-                    for attribute, value in rule["attributes"].items():
-                        if attribute not in attributes or not _matches(
-                            value, attributes[attribute]
-                        ):
-                            attributes_match = False
-                            break
+                for attribute, value in rule["attributes"].items():
+                    if attribute not in attributes or not _matches(
+                        value, attributes[attribute]
+                    ):
+                        attributes_match = False
+                        break
 
             if name_matches and attributes_match:
                 return True
