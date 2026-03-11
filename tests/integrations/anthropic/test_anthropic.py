@@ -220,8 +220,8 @@ def test_streaming_create_message(
     capture_events,
     send_default_pii,
     include_prompts,
-    server_side_event_chunks,
     get_model_response,
+    server_side_event_chunks,
 ):
     client = Anthropic(api_key="z")
 
@@ -335,8 +335,8 @@ async def test_streaming_create_message_async(
     send_default_pii,
     include_prompts,
     async_iterator,
-    server_side_event_chunks,
     get_model_response,
+    server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -455,8 +455,8 @@ def test_streaming_create_message_with_input_json_delta(
     capture_events,
     send_default_pii,
     include_prompts,
-    server_side_event_chunks,
     get_model_response,
+    server_side_event_chunks,
 ):
     client = Anthropic(api_key="z")
 
@@ -607,8 +607,8 @@ async def test_streaming_create_message_with_input_json_delta_async(
     send_default_pii,
     include_prompts,
     async_iterator,
-    server_side_event_chunks,
     get_model_response,
+    server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
     response = get_model_response(
@@ -1300,8 +1300,8 @@ def test_streaming_create_message_with_system_prompt(
     capture_events,
     send_default_pii,
     include_prompts,
-    server_side_event_chunks,
     get_model_response,
+    server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
@@ -1431,8 +1431,8 @@ async def test_streaming_create_message_with_system_prompt_async(
     send_default_pii,
     include_prompts,
     async_iterator,
-    server_side_event_chunks,
     get_model_response,
+    server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
@@ -2444,7 +2444,10 @@ def test_input_tokens_include_cache_read_nonstreaming(sentry_init, capture_event
 
 
 def test_input_tokens_include_cache_read_streaming(
-    sentry_init, capture_events, server_side_event_chunks, get_model_response
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
@@ -2546,7 +2549,10 @@ def test_input_tokens_unchanged_without_caching(sentry_init, capture_events):
 
 
 def test_cache_tokens_streaming(
-    sentry_init, capture_events, server_side_event_chunks, get_model_response
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
 ):
     """Test cache tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
