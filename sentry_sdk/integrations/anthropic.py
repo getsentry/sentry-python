@@ -869,17 +869,50 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
         if not hasattr(self, "_max_tokens"):
             return stream
 
-        _sentry_patched_stream_common(
-            stream=stream,
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+
+        if integration is None:
+            return stream
+
+        if self._messages is None:
+            return stream
+
+        try:
+            iter(self._messages)
+        except TypeError:
+            return stream
+
+        model = self._model
+        if model is None:
+            model = ""
+
+        span = get_start_span_function()(
+            op=OP.GEN_AI_CHAT,
+            name=f"chat {model}".strip(),
+            origin=AnthropicIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        _set_stream_input_data(
+            span,
+            integration,
             max_tokens=self._max_tokens,
             messages=self._messages,
-            model=self._model,
+            model=model,
             system=self._system,
             temperature=self._temperature,
             top_k=self._top_k,
             top_p=self._top_p,
             tools=self._tools,
         )
+
+        stream._iterator = _wrap_asynchronous_message_iterator(
+            iterator=stream._iterator,
+            span=span,
+            integration=integration,
+        )
+
         return stream
 
     return _sentry_patched_aenter
