@@ -31,7 +31,8 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     has_span_streaming_enabled,
     is_ignored_span,
-    make_sampling_decision,
+    _make_sampling_decision,
+    normalize_incoming_data,
     PropagationContext,
 )
 from sentry_sdk.traces import _DEFAULT_PARENT_SPAN, StreamedSpan, NoOpStreamedSpan
@@ -1252,7 +1253,7 @@ class Scope:
                     unsampled_reason="ignored",
                 )
 
-            sampled, sample_rate, sample_rand, outcome = make_sampling_decision(
+            sampled, sample_rate, sample_rand, outcome = _make_sampling_decision(
                 name,
                 attributes,
                 self,

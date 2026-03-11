@@ -1490,7 +1490,7 @@ def add_sentry_baggage_to_headers(
     )
 
 
-def make_sampling_decision(
+def _make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
     scope: "sentry_sdk.Scope",
@@ -1498,13 +1498,11 @@ def make_sampling_decision(
     """
     Decide whether a span should be sampled.
 
-    Use traces_sampler if defined, otherwise traces_sample_rate.
-
     Returns a tuple with:
-    - the sampling decision
-    - the effective sample rate
-    - the sample rand
-    - the reason for not sampling the span, if unsampled
+    1. the sampling decision
+    2. the effective sample rate
+    3. the sample rand
+    4. the reason for not sampling the span, if unsampled
     """
     client = sentry_sdk.get_client()
 
@@ -1519,23 +1517,24 @@ def make_sampling_decision(
     if sample_rand is None:
         sample_rand = _generate_sample_rand(propagation_context.trace_id)
 
-    sampling_context = {
-        "name": name,
-        "trace_id": propagation_context.trace_id,
-        "parent_span_id": propagation_context.parent_span_id,
-        "parent_sampled": propagation_context.parent_sampled,
-        "attributes": attributes or {},
-    }
-    if propagation_context.custom_sampling_context:
-        sampling_context.update(propagation_context.custom_sampling_context)
-
     # If there's a traces_sampler, use that; otherwise use traces_sample_rate
     traces_sampler_defined = callable(client.options.get("traces_sampler"))
     if traces_sampler_defined:
+        sampling_context = {
+            "name": name,
+            "trace_id": propagation_context.trace_id,
+            "parent_span_id": propagation_context.parent_span_id,
+            "parent_sampled": propagation_context.parent_sampled,
+            "attributes": dict(attributes) if attributes else {},
+        }
+
+        if propagation_context.custom_sampling_context:
+            sampling_context.update(propagation_context.custom_sampling_context)
+
         sample_rate = client.options["traces_sampler"](sampling_context)
     else:
-        if sampling_context["parent_sampled"] is not None:
-            sample_rate = sampling_context["parent_sampled"]
+        if propagation_context.parent_sampled is not None:
+            sample_rate = propagation_context.parent_sampled
         else:
             sample_rate = client.options["traces_sample_rate"]
 
@@ -1543,16 +1542,9 @@ def make_sampling_decision(
     # traces_sampler is user-provided, it could return anything.
     if not is_valid_sample_rate(sample_rate, source="Tracing"):
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
-        return False, None, None, None
+        return False, None, None, "sample_rate"
 
     sample_rate = float(sample_rate)
-
-    # Adjust sample rate if we're under backpressure
-    if client.monitor:
-        sample_rate /= 2**client.monitor.downsample_factor
-
-    outcome: "Optional[str]" = None
-
     if not sample_rate:
         if traces_sampler_defined:
             reason = "traces_sampler returned 0 or False"
@@ -1560,12 +1552,15 @@ def make_sampling_decision(
             reason = "traces_sample_rate is set to 0"
 
         logger.debug(f"[Tracing] Discarding {name} because {reason}")
-        if client.monitor and client.monitor.downsample_factor > 0:
-            outcome = "backpressure"
-        else:
-            outcome = "sample_rate"
+        return False, 0.0, None, "sample_rate"
 
-        return False, 0.0, None, outcome
+    # Adjust sample rate if we're under backpressure
+    if client.monitor:
+        sample_rate /= 2**client.monitor.downsample_factor
+
+        if not sample_rate:
+            logger.debug(f"[Tracing] Discarding {name} because backpressure")
+            return False, 0.0, None, "backpressure"
 
     sampled = sample_rand < sample_rate
 

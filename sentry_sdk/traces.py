@@ -287,16 +287,6 @@ class StreamedSpan:
         except AttributeError:
             pass
 
-        self._start_timestamp = datetime.now(timezone.utc)
-        self._timestamp: "Optional[datetime]" = None
-
-        try:
-            # profiling depends on this value and requires that
-            # it is measured in nanoseconds
-            self._start_timestamp_monotonic_ns = nanosecond_time()
-        except AttributeError:
-            pass
-
         self._span_id: "Optional[str]" = None
 
         self._status = SpanStatus.OK.value
@@ -393,7 +383,9 @@ class StreamedSpan:
             if isinstance(end_timestamp, datetime):
                 self._timestamp = end_timestamp
             else:
-                logger.debug("Failed to set end_timestamp. Using current time instead.")
+                logger.debug(
+                    "[Tracing] Failed to set end_timestamp. Using current time instead."
+                )
 
         if self._timestamp is None:
             try:
@@ -438,7 +430,7 @@ class StreamedSpan:
 
         if status not in {e.value for e in SpanStatus}:
             logger.debug(
-                f'Unsupported span status {status}. Expected one of: "ok", "error"'
+                f'[Tracing] Unsupported span status {status}. Expected one of: "ok", "error"'
             )
             return
 
@@ -579,7 +571,10 @@ class StreamedSpan:
 
 
 class NoOpStreamedSpan(StreamedSpan):
-    __slots__ = ("_unsampled_reason",)
+    __slots__ = (
+        "_finished",
+        "_unsampled_reason",
+    )
 
     def __init__(
         self,
@@ -590,6 +585,7 @@ class NoOpStreamedSpan(StreamedSpan):
         self._unsampled_reason = unsampled_reason
 
         self._segment = None  # type: ignore[assignment]
+        self._finished = False
 
         self._start()
 
@@ -621,25 +617,28 @@ class NoOpStreamedSpan(StreamedSpan):
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        client = sentry_sdk.get_client()
-        if client and client.transport:
-            logger.debug("Discarding span because sampled = False")
-            client.transport.record_lost_event(
-                reason=self._unsampled_reason or "sample_rate",
-                data_category="span",
-                quantity=1,
-            )
-
-        if self._scope is None:
+        if self._finished:
             return
 
-        if not hasattr(self, "_previous_span_on_scope"):
-            return
+        if self._unsampled_reason is not None:
+            client = sentry_sdk.get_client()
+            if client.is_active() and client.transport:
+                logger.debug(
+                    f"[Tracing] Discarding span because sampled=False (reason: {self._unsampled_reason})"
+                )
+                client.transport.record_lost_event(
+                    reason=self._unsampled_reason,
+                    data_category="span",
+                    quantity=1,
+                )
 
-        with capture_internal_exceptions():
-            old_span = self._previous_span_on_scope
-            del self._previous_span_on_scope
-            self._scope.span = old_span
+        if self._scope and hasattr(self, "_previous_span_on_scope"):
+            with capture_internal_exceptions():
+                old_span = self._previous_span_on_scope
+                del self._previous_span_on_scope
+                self._scope.span = old_span
+
+        self._finished = True
 
     def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         self._end()
