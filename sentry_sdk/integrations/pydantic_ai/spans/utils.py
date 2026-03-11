@@ -20,9 +20,10 @@ def _serialize_image_url_item(item: "Any") -> "Dict[str, Any]":
     For data URLs containing base64-encoded images, the content is redacted.
     For regular HTTP URLs, the URL string is preserved.
     """
-    data_url_matches = DATA_URL_BASE64_REGEX.match(item.url)
+    url = str(item.url)
+    data_url_match = DATA_URL_BASE64_REGEX.match(url)
 
-    if data_url_matches:
+    if data_url_match:
         return {
             "type": "image",
             "content": BLOB_DATA_SUBSTITUTE,
@@ -30,7 +31,7 @@ def _serialize_image_url_item(item: "Any") -> "Dict[str, Any]":
 
     return {
         "type": "image",
-        "content": str(item.url),
+        "content": url,
     }
 
 
