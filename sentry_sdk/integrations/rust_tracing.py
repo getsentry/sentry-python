@@ -223,7 +223,7 @@ class RustTracingLayer:
         if sentry_span is None:
             return
 
-        sentry_span.__exit__()
+        sentry_span.__exit__(None, None, None)
 
     def on_record(self, span_id: str, values: str, sentry_span: "SentrySpan") -> None:
         if sentry_span is None:
