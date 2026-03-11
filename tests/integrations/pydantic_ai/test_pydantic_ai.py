@@ -12,7 +12,6 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
-
 from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, ImageUrl, UserPromptPart
 from pydantic_ai.usage import RequestUsage
@@ -2675,21 +2674,6 @@ def _find_binary_content(messages_data, expected_modality, expected_mime_type):
     return False
 
 
-def _find_image_content(messages_data, expected_mime_type):
-    """Helper to find and verify image content (from ImageUrl data URLs) in messages."""
-    for msg in messages_data:
-        if "content" not in msg:
-            continue
-        for content_item in msg["content"]:
-            if content_item.get("type") == "image":
-                assert content_item["content"] == BLOB_DATA_SUBSTITUTE
-
-                if expected_mime_type:
-                    assert content_item["mime_type"] == expected_mime_type
-                return True
-    return False
-
-
 @pytest.mark.asyncio
 async def test_binary_content_encoding_image(sentry_init, capture_events):
     """Test that BinaryContent with image data is properly encoded in messages."""
@@ -2812,8 +2796,52 @@ async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
-def test_image_url_redacts_base64_data_url(sentry_init, capture_events):
-    """Test that ImageUrl with a data URL is properly encoded as image content."""
+@pytest.mark.parametrize(
+    "url,image_url_kwargs,expected_content",
+    [
+        pytest.param(
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            {},
+            BLOB_DATA_SUBSTITUTE,
+            id="base64_data_url",
+        ),
+        pytest.param(
+            "https://example.com/image.png",
+            {},
+            "https://example.com/image.png",
+            id="http_url_no_redaction",
+        ),
+        pytest.param(
+            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            {"media_type": "image/png"},
+            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            id="http_url_with_base64_query_param",
+        ),
+        pytest.param(
+            "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=",
+            {},
+            BLOB_DATA_SUBSTITUTE,
+            id="complex_mime_type",
+        ),
+        pytest.param(
+            "data:image/png;name=file.png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            {},
+            BLOB_DATA_SUBSTITUTE,
+            id="optional_parameters",
+        ),
+        pytest.param(
+            "data:text/plain;charset=utf-8;name=hello.txt;base64,SGVsbG8sIFdvcmxkIQ==",
+            {},
+            BLOB_DATA_SUBSTITUTE,
+            id="multiple_optional_parameters",
+        ),
+    ],
+)
+def test_image_url_base64_content_in_span(
+    sentry_init, capture_events, url, image_url_kwargs, expected_content
+):
+    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
+
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
@@ -2823,349 +2851,94 @@ def test_image_url_redacts_base64_data_url(sentry_init, capture_events):
     events = capture_events()
 
     with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        image_url = ImageUrl(
-            url="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs"
-        )
+        image_url = ImageUrl(url=url, **image_url_kwargs)
         user_part = UserPromptPart(content=["Look at this image:", image_url])
         mock_msg = MagicMock()
         mock_msg.parts = [user_part]
         mock_msg.instructions = None
 
-        _set_input_messages(span, [mock_msg])
+        span = ai_client_span([mock_msg], None, None, None)
         span.finish()
 
     (event,) = events
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
-    assert _find_image_content(messages_data, "image/png")
-
-
-@pytest.mark.asyncio
-async def test_image_url_redacts_base64_data_url_via_agent_run(
-    sentry_init, capture_events
-):
-    agent = Agent("test", name="test_image_url_agent")
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-    image_url = ImageUrl(
-        url="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs"
-    )
-    await agent.run([image_url, "Describe this image"])
-
-    (transaction,) = events
-    chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
+    chat_spans = [s for s in event["spans"] if s["op"] == "gen_ai.chat"]
     assert len(chat_spans) >= 1
+    messages_data = _get_messages_from_span(chat_spans[0]["data"])
 
-    chat_span = chat_spans[0]
     found_image = False
-
-    if "gen_ai.request.messages" in chat_span["data"]:
-        messages_data = _get_messages_from_span(chat_span["data"])
-        assert _find_image_content(messages_data, "image/png")
-        found_image = True
+    for msg in messages_data:
+        if "content" not in msg:
+            continue
+        for content_item in msg["content"]:
+            if content_item.get("type") == "image":
+                found_image = True
+                assert content_item["content"] == expected_content
 
     assert found_image, "Image content item should be found in messages data"
 
 
-def test_image_url_http_url_no_redaction_needed(sentry_init, capture_events):
-    """Test that ImageUrl with a regular HTTP URL is not converted to image content."""
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url, image_url_kwargs, expected_content",
+    [
+        pytest.param(
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            {},
+            BLOB_DATA_SUBSTITUTE,
+            id="base64_data_url_redacted",
+        ),
+        pytest.param(
+            "https://example.com/image.png",
+            {},
+            "https://example.com/image.png",
+            id="http_url_no_redaction",
+        ),
+        pytest.param(
+            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            {},
+            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            id="http_url_with_base64_query_param",
+        ),
+        pytest.param(
+            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            {"media_type": "image/png"},
+            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            id="http_url_with_base64_query_param_and_media_type",
+        ),
+    ],
+)
+async def test_invoke_agent_image_url(
+    sentry_init, capture_events, url, image_url_kwargs, expected_content
+):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
 
+    agent = Agent("test", name="test_image_url_agent")
+
     events = capture_events()
+    image_url = ImageUrl(url=url, **image_url_kwargs)
+    await agent.run([image_url, "Describe this image"])
 
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        image_url = ImageUrl(url="https://example.com/image.png")
-        user_part = UserPromptPart(content=["Look at this image:", image_url])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
-
-        _set_input_messages(span, [mock_msg])
-        span.finish()
-
-    (event,) = events
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
+    (transaction,) = events
 
     found_image = False
 
-    for msg in messages_data:
-        if "content" not in msg:
-            continue
-        for content_item in msg["content"]:
-            if content_item.get("type") == "image":
-                found_image = True
-                assert content_item["content"] == "https://example.com/image.png"
-                assert content_item.get("mime_type", None) is None
+    chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
+    for chat_span in chat_spans:
+        if "gen_ai.request.messages" in chat_span.get("data", {}):
+            messages_data = _get_messages_from_span(chat_span["data"])
+            for msg in messages_data:
+                if "content" not in msg:
+                    continue
+                for content_item in msg["content"]:
+                    if content_item.get("type") == "image":
+                        assert content_item["content"] == expected_content
+                        found_image = True
 
     assert found_image, "Image content item should be found in messages data"
-
-
-def test_image_url_http_url_with_base64_data_in_query_param_is_not_redacted_no_mime_type_is_set(
-    sentry_init, capture_events
-):
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        image_url = ImageUrl(
-            url="https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            media_type="image/png",
-        )
-        user_part = UserPromptPart(content=["Look at this image:", image_url])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
-
-        _set_input_messages(span, [mock_msg])
-        span.finish()
-
-    (event,) = events
-    span_data = event["spans"][0]["data"]
-
-    messages_data = _get_messages_from_span(span_data)
-
-    found_image = False
-
-    for msg in messages_data:
-        if "content" not in msg:
-            continue
-        for content_item in msg["content"]:
-            if content_item.get("type") == "image":
-                found_image = True
-
-                assert (
-                    content_item["content"]
-                    == "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs"
-                )
-                assert content_item.get("mime_type") is None
-
-    assert found_image, "Image content item should be found in messages data"
-
-
-def test_image_url_redacts_base64_data_url_with_complex_mime_type(
-    sentry_init, capture_events
-):
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        image_url = ImageUrl(
-            url="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
-        )
-        user_part = UserPromptPart(content=["Look at this image:", image_url])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
-
-        _set_input_messages(span, [mock_msg])
-        span.finish()
-
-    (event,) = events
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
-    assert _find_image_content(messages_data, "image/svg+xml")
-
-
-def test_image_url_redacts_base64_data_url_with_optional_parameters(
-    sentry_init, capture_events
-):
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        # Data URL with a charset parameter before the base64 marker
-        image_url = ImageUrl(
-            url="data:image/png;name=file.png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs"
-        )
-        user_part = UserPromptPart(content=["Look at this image:", image_url])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
-
-        _set_input_messages(span, [mock_msg])
-        span.finish()
-
-    (event,) = events
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
-    assert _find_image_content(messages_data, "image/png")
-
-
-def test_image_url_redacts_base64_data_url_with_multiple_optional_parameters(
-    sentry_init, capture_events
-):
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        # Data URL with multiple parameters before the base64 marker
-        image_url = ImageUrl(
-            url="data:text/plain;charset=utf-8;name=hello.txt;base64,SGVsbG8sIFdvcmxkIQ=="
-        )
-        user_part = UserPromptPart(content=["Look at this text:", image_url])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
-
-        _set_input_messages(span, [mock_msg])
-        span.finish()
-
-    (event,) = events
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
-    assert _find_image_content(messages_data, "text/plain")
-
-
-@pytest.mark.asyncio
-async def test_invoke_agent_image_url_http_url_no_redaction(
-    sentry_init, capture_events
-):
-    agent = Agent("test", name="test_image_url_agent")
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-    image_url = ImageUrl(url="https://example.com/image.png")
-    await agent.run([image_url, "Describe this image"])
-
-    (transaction,) = events
-    trace_data = transaction["contexts"]["trace"].get("data", {})
-    assert "gen_ai.request.messages" in trace_data
-
-    messages_data = _get_messages_from_span(trace_data)
-
-    found_image = False
-    for msg in messages_data:
-        if "content" not in msg:
-            continue
-        for content_item in msg["content"]:
-            if content_item.get("type") == "image":
-                found_image = True
-                assert content_item["content"] == "https://example.com/image.png"
-
-    assert found_image, "Image content item should be found in invoke_agent messages"
-
-
-@pytest.mark.asyncio
-async def test_invoke_agent_image_url_http_url_with_base64_query_param(
-    sentry_init, capture_events
-):
-    agent = Agent("test", name="test_image_url_agent")
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-    image_url = ImageUrl(
-        url="https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs"
-    )
-    await agent.run([image_url, "Describe this image"])
-
-    (transaction,) = events
-    trace_data = transaction["contexts"]["trace"].get("data", {})
-    assert "gen_ai.request.messages" in trace_data
-
-    messages_data = _get_messages_from_span(trace_data)
-
-    found_image = False
-    for msg in messages_data:
-        if "content" not in msg:
-            continue
-        for content_item in msg["content"]:
-            if content_item.get("type") == "image":
-                found_image = True
-                assert (
-                    content_item["content"]
-                    == "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs"
-                )
-
-    assert found_image, "Image content item should be found in invoke_agent messages"
-
-
-@pytest.mark.asyncio
-async def test_invoke_agent_image_url_http_url_with_base64_query_param_no_mime_type_is_set(
-    sentry_init, capture_events
-):
-    """Test that invoke_agent span preserves HTTP URL with base64 query param and includes format when mime type is provided."""
-    agent = Agent("test", name="test_image_url_agent")
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    events = capture_events()
-    image_url = ImageUrl(
-        url="https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-        media_type="image/png",
-    )
-    await agent.run([image_url, "Describe this image"])
-
-    (transaction,) = events
-    trace_data = transaction["contexts"]["trace"].get("data", {})
-    assert "gen_ai.request.messages" in trace_data
-
-    messages_data = _get_messages_from_span(trace_data)
-
-    found_image = False
-    for msg in messages_data:
-        if "content" not in msg:
-            continue
-        for content_item in msg["content"]:
-            if content_item.get("type") == "image":
-                found_image = True
-                assert (
-                    content_item["content"]
-                    == "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs"
-                )
-                assert content_item.get("mime_type", None) is None
-
-    assert found_image, "Image content item should be found in invoke_agent messages"
 
 
 @pytest.mark.asyncio

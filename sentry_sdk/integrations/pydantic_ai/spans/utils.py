@@ -23,10 +23,8 @@ def _serialize_image_url_item(item: "Any") -> "Dict[str, Any]":
     data_url_matches = DATA_URL_BASE64_REGEX.match(item.url)
 
     if data_url_matches:
-        mime_type = data_url_matches[1] or "image"
         return {
             "type": "image",
-            "mime_type": mime_type,
             "content": BLOB_DATA_SUBSTITUTE,
         }
 
