@@ -334,8 +334,8 @@ async def test_streaming_create_message_async(
     capture_events,
     send_default_pii,
     include_prompts,
-    async_iterator,
     get_model_response,
+    async_iterator,
     server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
@@ -606,8 +606,8 @@ async def test_streaming_create_message_with_input_json_delta_async(
     capture_events,
     send_default_pii,
     include_prompts,
-    async_iterator,
     get_model_response,
+    async_iterator,
     server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
@@ -1430,8 +1430,8 @@ async def test_streaming_create_message_with_system_prompt_async(
     capture_events,
     send_default_pii,
     include_prompts,
-    async_iterator,
     get_model_response,
+    async_iterator,
     server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
