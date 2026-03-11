@@ -2928,15 +2928,14 @@ async def test_invoke_agent_image_url(
 
     chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
     for chat_span in chat_spans:
-        if "gen_ai.request.messages" in chat_span.get("data", {}):
-            messages_data = _get_messages_from_span(chat_span["data"])
-            for msg in messages_data:
-                if "content" not in msg:
-                    continue
-                for content_item in msg["content"]:
-                    if content_item.get("type") == "image":
-                        assert content_item["content"] == expected_content
-                        found_image = True
+        messages_data = _get_messages_from_span(chat_span["data"])
+        for msg in messages_data:
+            if "content" not in msg:
+                continue
+            for content_item in msg["content"]:
+                if content_item.get("type") == "image":
+                    assert content_item["content"] == expected_content
+                    found_image = True
 
     assert found_image, "Image content item should be found in messages data"
 
