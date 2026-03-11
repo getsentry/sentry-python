@@ -230,7 +230,6 @@ class StreamedSpan:
         "_trace_id",
         "_parent_span_id",
         "_segment",
-        "_sampled",
         "_parent_sampled",
         "_start_timestamp",
         "_start_timestamp_monotonic_ns",
@@ -600,14 +599,6 @@ class NoOpStreamedSpan(StreamedSpan):
     ) -> None:
         self._end()
 
-    @property
-    def name(self) -> str:
-        return ""
-
-    @name.setter
-    def name(self, value: str) -> None:
-        pass
-
     def _start(self) -> None:
         if self._scope is None:
             return
@@ -652,6 +643,41 @@ class NoOpStreamedSpan(StreamedSpan):
 
         self._end()
 
+    def get_attributes(self) -> "Attributes":
+        return {}
+
+    def set_attribute(self, key: str, value: "AttributeValue") -> None:
+        pass
+
+    def set_attributes(self, attributes: "Attributes") -> None:
+        pass
+
+    def remove_attribute(self, key: str) -> None:
+        pass
+
+    def _is_segment(self) -> bool:
+        return self._scope is not None
+
+    @property
+    def status(self) -> "str":
+        return SpanStatus.OK.value
+
+    @status.setter
+    def status(self, status: "Union[SpanStatus, str]") -> None:
+        pass
+
+    @property
+    def name(self) -> str:
+        return ""
+
+    @name.setter
+    def name(self, value: str) -> None:
+        pass
+
+    @property
+    def active(self) -> bool:
+        return True
+
     # XXX[span-first]: These default span_id and trace_id values will be used
     # in outgoing requests if a noop span is active. Is that how it should be?
 
@@ -668,31 +694,12 @@ class NoOpStreamedSpan(StreamedSpan):
         return False
 
     @property
-    def status(self) -> "str":
-        return SpanStatus.OK.value
-
-    @status.setter
-    def status(self, status: "Union[SpanStatus, str]") -> None:
-        pass
+    def start_timestamp(self) -> "Optional[datetime]":
+        return None
 
     @property
-    def active(self) -> bool:
-        return True
-
-    def get_attributes(self) -> "Attributes":
-        return {}
-
-    def set_attribute(self, key: str, value: "AttributeValue") -> None:
-        pass
-
-    def set_attributes(self, attributes: "Attributes") -> None:
-        pass
-
-    def remove_attribute(self, key: str) -> None:
-        pass
-
-    def _is_segment(self) -> bool:
-        return self._scope is not None
+    def timestamp(self) -> "Optional[datetime]":
+        return None
 
     def _to_traceparent(self) -> str:
         propagation_context = (
@@ -700,14 +707,6 @@ class NoOpStreamedSpan(StreamedSpan):
         )
 
         return f"{propagation_context.trace_id}-{propagation_context.span_id}-0"
-
-    @property
-    def start_timestamp(self) -> "Optional[datetime]":
-        return None
-
-    @property
-    def timestamp(self) -> "Optional[datetime]":
-        return None
 
 
 def trace(
