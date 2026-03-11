@@ -447,6 +447,9 @@ class StreamedSpan:
     def timestamp(self) -> "Optional[datetime]":
         return self._timestamp
 
+    def _is_segment(self) -> bool:
+        return self._segment is self
+
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
@@ -532,6 +535,9 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def remove_attribute(self, key: str) -> None:
         pass
+
+    def _is_segment(self) -> bool:
+        return self._scope is not None
 
     @property
     def status(self) -> "str":
