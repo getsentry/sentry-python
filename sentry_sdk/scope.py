@@ -1258,14 +1258,15 @@ class Scope:
                 attributes,
                 self,
             )
+
+            if sample_rate is not None:
+                self._update_sample_rate(sample_rate)
+
             if sampled is False:
                 return NoOpStreamedSpan(
                     scope=self,
                     unsampled_reason=outcome,
                 )
-
-            if sample_rate is not None:
-                self._update_sample_rate(sample_rate)
 
             return StreamedSpan(
                 name=name,

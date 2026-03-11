@@ -522,11 +522,7 @@ class StreamedSpan:
 
     def _update_active_thread(self) -> None:
         thread_id, thread_name = get_current_thread_meta()
-        self._set_thread(thread_id, thread_name)
 
-    def _set_thread(
-        self, thread_id: "Optional[int]", thread_name: "Optional[str]"
-    ) -> None:
         if thread_id is not None:
             self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
 
