@@ -356,7 +356,9 @@ class StreamedSpan:
             if isinstance(end_timestamp, datetime):
                 self._timestamp = end_timestamp
             else:
-                logger.debug("Failed to set end_timestamp. Using current time instead.")
+                logger.debug(
+                    "[Tracing] Failed to set end_timestamp. Using current time instead."
+                )
 
         if self._timestamp is None:
             try:
@@ -401,7 +403,7 @@ class StreamedSpan:
 
         if status not in {e.value for e in SpanStatus}:
             logger.debug(
-                f'Unsupported span status {status}. Expected one of: "ok", "error"'
+                f'[Tracing] Unsupported span status {status}. Expected one of: "ok", "error"'
             )
             return
 
@@ -491,7 +493,7 @@ class NoOpStreamedSpan(StreamedSpan):
             client = sentry_sdk.get_client()
             if client.is_active() and client.transport:
                 logger.debug(
-                    f"Discarding span because sampled=False (reason: {self._unsampled_reason})"
+                    f"[Tracing] Discarding span because sampled=False (reason: {self._unsampled_reason})"
                 )
                 client.transport.record_lost_event(
                     reason=self._unsampled_reason,
