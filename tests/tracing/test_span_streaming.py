@@ -120,7 +120,7 @@ def test_span_sampled_when_created(sentry_init, capture_envelopes):
     # at start_span() time
 
     def traces_sampler(sampling_context):
-        assert "delayed_attribute" not in sampling_context["attributes"]
+        assert "delayed_attribute" not in sampling_context["span_context"]["attributes"]
         return 1.0
 
     sentry_init(
@@ -169,9 +169,11 @@ def test_start_span_attributes(sentry_init, capture_envelopes):
 
 def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes):
     def traces_sampler(sampling_context):
-        assert "attributes" in sampling_context
-        assert "my_attribute" in sampling_context["attributes"]
-        assert sampling_context["attributes"]["my_attribute"] == "my_value"
+        assert "attributes" in sampling_context["span_context"]
+        assert "my_attribute" in sampling_context["span_context"]["attributes"]
+        assert (
+            sampling_context["span_context"]["attributes"]["my_attribute"] == "my_value"
+        )
         return 1.0
 
     sentry_init(
@@ -202,16 +204,16 @@ def test_sampling_context(sentry_init, capture_envelopes):
     def traces_sampler(sampling_context):
         nonlocal received_trace_id
 
-        assert "trace_id" in sampling_context
-        received_trace_id = sampling_context["trace_id"]
+        assert "trace_id" in sampling_context["span_context"]
+        received_trace_id = sampling_context["span_context"]["trace_id"]
 
-        assert "parent_span_id" in sampling_context
-        assert sampling_context["parent_span_id"] is None
+        assert "parent_span_id" in sampling_context["span_context"]
+        assert sampling_context["span_context"]["parent_span_id"] is None
 
-        assert "parent_sampled" in sampling_context
-        assert sampling_context["parent_sampled"] is None
+        assert "parent_sampled" in sampling_context["span_context"]
+        assert sampling_context["span_context"]["parent_sampled"] is None
 
-        assert "attributes" in sampling_context
+        assert "attributes" in sampling_context["span_context"]
 
         return 1.0
 
@@ -231,6 +233,62 @@ def test_sampling_context(sentry_init, capture_envelopes):
     spans = envelopes_to_spans(events)
 
     assert len(spans) == 1
+
+
+def test_custom_sampling_context(sentry_init):
+    class MyClass: ...
+
+    my_class = MyClass()
+
+    def traces_sampler(sampling_context):
+        assert "class" in sampling_context
+        assert "string" in sampling_context
+        assert sampling_context["class"] == my_class
+        assert sampling_context["string"] == "my string"
+        return 1.0
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context(
+        {
+            "class": my_class,
+            "string": "my string",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+
+def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
+    def traces_sampler(sampling_context):
+        if sampling_context["span_context"]["attributes"]["first"] is True:
+            assert sampling_context["custom_value"] == 1
+        else:
+            assert sampling_context["custom_value"] == 2
+        return 1.0
+
+    sentry_init(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.traces.new_trace()
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 1})
+
+    with sentry_sdk.traces.start_span(name="span", attributes={"first": True}):
+        ...
+
+    sentry_sdk.traces.new_trace()
+
+    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 2})
+
+    with sentry_sdk.traces.start_span(name="span", attributes={"first": False}):
+        ...
 
 
 def test_span_attributes(sentry_init, capture_envelopes):
@@ -305,10 +363,10 @@ def test_span_attributes_serialize_early(sentry_init, capture_envelopes):
 
 def test_traces_sampler_drops_span(sentry_init, capture_envelopes):
     def traces_sampler(sampling_context):
-        assert "attributes" in sampling_context
-        assert "drop" in sampling_context["attributes"]
+        assert "attributes" in sampling_context["span_context"]
+        assert "drop" in sampling_context["span_context"]["attributes"]
 
-        if sampling_context["attributes"]["drop"] is True:
+        if sampling_context["span_context"]["attributes"]["drop"] is True:
             return 0.0
 
         return 1.0
@@ -342,7 +400,7 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
     def traces_sampler(sampling_context):
         nonlocal traces_sampler_called, span_name_in_traces_sampler
         traces_sampler_called += 1
-        span_name_in_traces_sampler = sampling_context["name"]
+        span_name_in_traces_sampler = sampling_context["span_context"]["name"]
         return 1.0
 
     sentry_init(
