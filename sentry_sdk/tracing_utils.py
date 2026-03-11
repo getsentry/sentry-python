@@ -1521,11 +1521,13 @@ def _make_sampling_decision(
     traces_sampler_defined = callable(client.options.get("traces_sampler"))
     if traces_sampler_defined:
         sampling_context = {
-            "name": name,
-            "trace_id": propagation_context.trace_id,
-            "parent_span_id": propagation_context.parent_span_id,
-            "parent_sampled": propagation_context.parent_sampled,
-            "attributes": dict(attributes) if attributes else {},
+            "span_context": {
+                "name": name,
+                "trace_id": propagation_context.trace_id,
+                "parent_span_id": propagation_context.parent_span_id,
+                "parent_sampled": propagation_context.parent_sampled,
+                "attributes": dict(attributes) if attributes else {},
+            },
         }
 
         if propagation_context.custom_sampling_context:
