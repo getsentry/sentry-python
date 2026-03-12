@@ -66,7 +66,9 @@ def otel_propagation_context() -> "Optional[Tuple[str, str]]":
     return (format_trace_id(ctx.trace_id), format_span_id(ctx.span_id))
 
 
-def setup_otlp_traces_exporter(dsn: "Optional[str]" = None) -> None:
+def setup_otlp_traces_exporter(
+    dsn: "Optional[str]" = None, collector_url: "Optional[str]" = None
+) -> None:
     tracer_provider = get_tracer_provider()
 
     if not isinstance(tracer_provider, TracerProvider):
@@ -76,7 +78,10 @@ def setup_otlp_traces_exporter(dsn: "Optional[str]" = None) -> None:
 
     endpoint = None
     headers = None
-    if dsn:
+    if collector_url:
+        endpoint = collector_url
+        logger.debug(f"[OTLP] Sending traces to collector at {endpoint}")
+    elif dsn:
         auth = Dsn(dsn).to_auth(f"sentry.python/{VERSION}")
         endpoint = auth.get_api_url(EndpointType.OTLP_TRACES)
         headers = {"X-Sentry-Auth": auth.to_header()}
@@ -177,7 +182,9 @@ class OTLPIntegration(Integration):
     Automatically setup OTLP ingestion from the DSN.
 
     :param setup_otlp_traces_exporter: Automatically configure an Exporter to send OTLP traces from the DSN, defaults to True.
-        Set to False if using a custom collector or to setup the TracerProvider manually.
+        Set to False to setup the TracerProvider manually.
+    :param collector_url: URL of your own OpenTelemetry collector, defaults to None.
+        When set, the exporter will send traces to this URL instead of the Sentry OTLP endpoint derived from the DSN.
     :param setup_propagator: Automatically configure the Sentry Propagator for Distributed Tracing, defaults to True.
         Set to False to configure propagators manually or to disable propagation.
     :param capture_exceptions: Intercept and capture exceptions on the OpenTelemetry Span in Sentry as well, defaults to False.
@@ -189,10 +196,12 @@ class OTLPIntegration(Integration):
     def __init__(
         self,
         setup_otlp_traces_exporter: bool = True,
+        collector_url: "Optional[str]" = None,
         setup_propagator: bool = True,
         capture_exceptions: bool = False,
     ) -> None:
         self.setup_otlp_traces_exporter = setup_otlp_traces_exporter
+        self.collector_url = collector_url
         self.setup_propagator = setup_propagator
         self.capture_exceptions = capture_exceptions
 
@@ -207,7 +216,7 @@ class OTLPIntegration(Integration):
         if self.setup_otlp_traces_exporter:
             logger.debug("[OTLP] Setting up OTLP exporter")
             dsn: "Optional[str]" = options.get("dsn") if options else None
-            setup_otlp_traces_exporter(dsn)
+            setup_otlp_traces_exporter(dsn, collector_url=self.collector_url)
 
         if self.setup_propagator:
             logger.debug("[OTLP] Setting up propagator for distributed tracing")
