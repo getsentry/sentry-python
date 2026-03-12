@@ -8,7 +8,6 @@ import warnings
 from collections.abc import Mapping, MutableMapping
 from datetime import timedelta
 from random import Random
-from typing import Pattern
 from urllib.parse import quote, unquote
 import uuid
 
@@ -1488,7 +1487,7 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
         return False
 
     def _matches(rule: "Any", value: "Any") -> bool:
-        if isinstance(rule, Pattern):
+        if isinstance(rule, re.Pattern):
             if isinstance(value, str):
                 return bool(rule.fullmatch(value))
             else:
@@ -1497,7 +1496,7 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
         return rule == value
 
     for rule in ignore_spans:
-        if isinstance(rule, (str, Pattern)):
+        if isinstance(rule, (str, re.Pattern)):
             if _matches(rule, name):
                 return True
 

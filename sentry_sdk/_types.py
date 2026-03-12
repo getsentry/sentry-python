@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Pattern, TypeVar, Union
+from re import Pattern
+from typing import TYPE_CHECKING, TypeVar, Union
 
 
 # Re-exported for compat, since code out there in the wild might use this variable.
