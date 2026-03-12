@@ -181,19 +181,11 @@ class SentryAsyncExtension(SchemaExtension):
         event_processor = _make_request_event_processor(self.execution_context)
         scope.add_event_processor(event_processor)
 
-        span = sentry_sdk.get_current_span()
-        if span:
-            self.graphql_span = span.start_child(
-                op=op,
-                name=description,
-                origin=StrawberryIntegration.origin,
-            )
-        else:
-            self.graphql_span = sentry_sdk.start_span(
-                op=op,
-                name=description,
-                origin=StrawberryIntegration.origin,
-            )
+        self.graphql_span = sentry_sdk.start_span(
+            op=op,
+            name=description,
+            origin=StrawberryIntegration.origin,
+        )
 
         self.graphql_span.set_data("graphql.operation.type", operation_type)
         self.graphql_span.set_data("graphql.operation.name", self._operation_name)
