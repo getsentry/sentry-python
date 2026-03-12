@@ -30,6 +30,7 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
     has_span_streaming_enabled,
+    is_ignored_span,
     _make_sampling_decision,
     normalize_incoming_data,
     PropagationContext,
@@ -1207,6 +1208,12 @@ class Scope:
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
+            if is_ignored_span(name, attributes):
+                return NoOpStreamedSpan(
+                    scope=self,
+                    unsampled_reason="ignored",
+                )
+
             sampled, sample_rate, sample_rand, outcome = _make_sampling_decision(
                 name,
                 attributes,
@@ -1238,6 +1245,11 @@ class Scope:
 
         # This is a child span; take propagation context from the parent span
         with new_scope():
+            if is_ignored_span(name, attributes):
+                return NoOpStreamedSpan(
+                    unsampled_reason="ignored",
+                )
+
             if isinstance(parent_span, NoOpStreamedSpan):
                 return NoOpStreamedSpan(unsampled_reason=parent_span._unsampled_reason)
 
