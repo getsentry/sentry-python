@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 import time
-from typing import List, Any, Mapping
+from typing import List, Any, Mapping, Union
 import pytest
 from unittest import mock
 
@@ -19,8 +19,7 @@ minimum_python_37 = pytest.mark.skipif(
 
 
 def otel_attributes_to_dict(otel_attrs: "Mapping[str, Any]") -> "Mapping[str, Any]":
-    def _convert_attr(attr):
-        # type: (Mapping[str, Union[str, float, bool]]) -> Any
+    def _convert_attr(attr: "Mapping[str, Union[str, float, bool]]") -> "Any":
         if attr["type"] == "boolean":
             return attr["value"]
         if attr["type"] == "double":
