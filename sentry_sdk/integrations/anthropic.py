@@ -837,7 +837,7 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
 
     @wraps(f)
     async def _sentry_patched_aenter(
-        self: "MessageStreamManager",
+        self: "AsyncMessageStreamManager",
     ) -> "AsyncMessageStream":
         stream = await f(self)
         if not hasattr(self, "_max_tokens"):
