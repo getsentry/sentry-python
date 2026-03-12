@@ -1,7 +1,6 @@
 import pytest
 from unittest import mock
 import json
-import httpx
 
 try:
     from unittest.mock import AsyncMock
@@ -13,7 +12,7 @@ except ImportError:
 
 
 from anthropic import Anthropic, AnthropicError, AsyncAnthropic, AsyncStream, Stream
-from anthropic.types import MessageDeltaUsage, TextDelta, Usage, MessageStreamEvent
+from anthropic.types import MessageDeltaUsage, TextDelta, Usage
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
 from anthropic.types.content_block_stop_event import ContentBlockStopEvent
