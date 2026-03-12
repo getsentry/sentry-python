@@ -1,6 +1,7 @@
 ---
 name: docs-codebase-refresh
 description: Full refresh of SDK codebase documentation (manual trigger only)
+engine: claude
 on:
   workflow_dispatch:
 permissions:

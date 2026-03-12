@@ -1,6 +1,7 @@
 ---
 name: docs-codebase-update
 description: Incrementally update SDK codebase documentation when source code changes
+engine: claude
 on:
   workflow_dispatch:
 permissions:
