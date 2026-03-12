@@ -91,6 +91,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             "span_id": item.span_id,
             "name": item._name,
             "status": item._status,
+            "is_segment": item._is_segment(),
             "start_timestamp": item._start_timestamp.timestamp(),
         }
 
