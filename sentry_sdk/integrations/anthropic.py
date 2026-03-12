@@ -485,10 +485,10 @@ def _wrap_synchronous_message_iterator(
 
 
 async def _wrap_asynchronous_message_iterator(
-    iterator: "AsyncIterator[RawMessageStreamEvent]",
+    iterator: "AsyncIterator[RawMessageStreamEvent, MessageStreamEvent]",
     span: "Span",
     integration: "AnthropicIntegration",
-) -> "AsyncIterator[RawMessageStreamEvent]":
+) -> "AsyncIterator[RawMessageStreamEvent, MessageStreamEvent]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span.
@@ -833,7 +833,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
 def _wrap_async_message_stream(f: "Any") -> "Any":
     """
     Attaches user-provided arguments to the returned context manager.
-    The attributes are set on `gen_ai.chat` spans in the patch for the context manager.
+    The attributes are set on AI Client Spans in the patch for the context manager.
     """
 
     @wraps(f)
@@ -858,7 +858,7 @@ def _wrap_async_message_stream(f: "Any") -> "Any":
 
 def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
     """
-    Creates and manages `gen_ai.chat` spans.
+    Creates and manages AI Client Spans.
     """
 
     @wraps(f)
