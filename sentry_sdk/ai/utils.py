@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 import sentry_sdk
 from sentry_sdk.utils import logger
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
@@ -530,7 +531,7 @@ def get_start_span_function() -> "Callable[..., Any]":
         return sentry_sdk.traces.start_span
 
     current_span = sentry_sdk.get_current_span()
-    if not isinstance(current_span, Span):
+    if isinstance(current_span, StreamedSpan):
         # mypy
         return sentry_sdk.traces.start_span
 
