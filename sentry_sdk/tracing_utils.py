@@ -12,6 +12,12 @@ from typing import Pattern
 from urllib.parse import quote, unquote
 import uuid
 
+try:
+    from re import Pattern
+except ImportError:
+    # 3.6
+    from typing import Pattern
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.utils import (
