@@ -17,6 +17,17 @@ try:
 except (ImportError, ModuleNotFoundError):
     httpcore = None
 
+try:
+    import gevent  # noqa: F401
+
+    running_under_gevent = True
+except ImportError:
+    running_under_gevent = False
+
+skip_under_gevent = pytest.mark.skipif(
+    running_under_gevent, reason="Async tests not compatible with gevent"
+)
+
 import sentry_sdk
 from sentry_sdk import (
     Client,
@@ -923,6 +934,7 @@ def test_handle_request_error_basic_coverage(make_client, monkeypatch):
     assert calls[2][0:2] == ("record_lost_event", "network_error")
 
 
+@skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
@@ -1004,6 +1016,7 @@ async def test_transport_works_async(
         await client.close_async(timeout=2.0)
 
 
+@skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
 async def test_async_transport_background_thread_capture(
@@ -1035,6 +1048,7 @@ async def test_async_transport_background_thread_capture(
     assert capturing_server.captured
 
 
+@skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
 async def test_async_transport_event_loop_closed_scenario(
@@ -1061,6 +1075,7 @@ async def test_async_transport_event_loop_closed_scenario(
     await client.close_async(timeout=2.0)
 
 
+@skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
 async def test_async_transport_concurrent_requests(
@@ -1084,6 +1099,7 @@ async def test_async_transport_concurrent_requests(
     assert len(capturing_server.captured) == num_messages
 
 
+@skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
 async def test_async_transport_rate_limiting_with_concurrency(
@@ -1117,6 +1133,7 @@ async def test_async_transport_rate_limiting_with_concurrency(
     await client.close_async(timeout=2.0)
 
 
+@skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
 async def test_async_two_way_ssl_authentication():

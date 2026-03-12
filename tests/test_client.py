@@ -32,6 +32,17 @@ from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk._compat import PY38
 
+try:
+    import gevent  # noqa: F401
+
+    running_under_gevent = True
+except ImportError:
+    running_under_gevent = False
+
+skip_under_gevent = pytest.mark.skipif(
+    running_under_gevent, reason="Async tests not compatible with gevent"
+)
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -1769,6 +1780,7 @@ def test_keep_alive(env_value, arg_value, expected_value):
         },
     ],
 )
+@skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
 async def test_async_proxy(monkeypatch, testcase):
@@ -1880,6 +1892,7 @@ async def test_async_proxy(monkeypatch, testcase):
         },
     ],
 )
+@skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
 async def test_async_socks_proxy(testcase):
