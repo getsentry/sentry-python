@@ -1,7 +1,5 @@
 import sentry_sdk
-from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.utils import (
-    get_modality_from_mime_type,
     get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
@@ -16,7 +14,11 @@ from ..utils import (
     _set_model_data,
     _should_send_prompts,
 )
-from .utils import _set_usage_data
+from .utils import (
+    _serialize_binary_content_item,
+    _serialize_image_url_item,
+    _set_usage_data,
+)
 
 from typing import TYPE_CHECKING
 
@@ -24,9 +26,10 @@ if TYPE_CHECKING:
     from typing import Any
 
 try:
-    from pydantic_ai.messages import BinaryContent  # type: ignore
+    from pydantic_ai.messages import BinaryContent, ImageUrl  # type: ignore
 except ImportError:
     BinaryContent = None
+    ImageUrl = None
 
 
 def invoke_agent_span(
@@ -105,17 +108,10 @@ def invoke_agent_span(
                 for item in user_prompt:
                     if isinstance(item, str):
                         content.append({"text": item, "type": "text"})
+                    elif ImageUrl and isinstance(item, ImageUrl):
+                        content.append(_serialize_image_url_item(item))
                     elif BinaryContent and isinstance(item, BinaryContent):
-                        content.append(
-                            {
-                                "type": "blob",
-                                "modality": get_modality_from_mime_type(
-                                    item.media_type
-                                ),
-                                "mime_type": item.media_type,
-                                "content": BLOB_DATA_SUBSTITUTE,
-                            }
-                        )
+                        content.append(_serialize_binary_content_item(item))
                 if content:
                     messages.append(
                         {

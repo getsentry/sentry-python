@@ -30,6 +30,7 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
     has_span_streaming_enabled,
+    _make_sampling_decision,
     normalize_incoming_data,
     PropagationContext,
 )
@@ -695,6 +696,13 @@ class Scope:
             isolation_scope._propagation_context = PropagationContext()
         return isolation_scope._propagation_context
 
+    def set_custom_sampling_context(
+        self, custom_sampling_context: "dict[str, Any]"
+    ) -> None:
+        self.get_active_propagation_context()._set_custom_sampling_context(
+            custom_sampling_context
+        )
+
     def clear(self) -> None:
         """Clears the entire scope."""
         self._level: "Optional[LogLevelStr]" = None
@@ -1199,6 +1207,21 @@ class Scope:
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
+            sampled, sample_rate, sample_rand, outcome = _make_sampling_decision(
+                name,
+                attributes,
+                self,
+            )
+
+            if sample_rate is not None:
+                self._update_sample_rate(sample_rate)
+
+            if sampled is False:
+                return NoOpStreamedSpan(
+                    scope=self,
+                    unsampled_reason=outcome,
+                )
+
             return StreamedSpan(
                 name=name,
                 attributes=attributes,
@@ -1209,12 +1232,14 @@ class Scope:
                 parent_span_id=propagation_context.parent_span_id,
                 parent_sampled=propagation_context.parent_sampled,
                 baggage=propagation_context.baggage,
+                sample_rand=sample_rand,
+                sample_rate=sample_rate,
             )
 
         # This is a child span; take propagation context from the parent span
         with new_scope():
             if isinstance(parent_span, NoOpStreamedSpan):
-                return NoOpStreamedSpan()
+                return NoOpStreamedSpan(unsampled_reason=parent_span._unsampled_reason)
 
             return StreamedSpan(
                 name=name,
@@ -1226,6 +1251,15 @@ class Scope:
                 parent_span_id=parent_span.span_id,
                 parent_sampled=parent_span.sampled,
             )
+
+    def _update_sample_rate(self, sample_rate: float) -> None:
+        # If we had to adjust the sample rate when setting the sampling decision
+        # for a span, it needs to be updated in the propagation context too
+        propagation_context = self.get_active_propagation_context()
+        baggage = propagation_context.baggage
+
+        if baggage is not None:
+            baggage.sentry_items["sample_rate"] = str(sample_rate)
 
     def continue_trace(
         self,
