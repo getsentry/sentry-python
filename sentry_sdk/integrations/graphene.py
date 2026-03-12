@@ -156,6 +156,7 @@ def graphql_span(
         }
         if operation_name:
             attributes["graphql.operation.name"] = operation_name
+
         _graphql_span = sentry_sdk.traces.start_span(
             name=operation_name or "operation", attributes=attributes
         )
@@ -165,10 +166,12 @@ def graphql_span(
         _graphql_span.set_data("graphql.operation.name", operation_name)
         _graphql_span.set_data("graphql.operation.type", operation_type)
 
+        _graphql_span.__enter__()
+
     try:
         yield
     finally:
         if isinstance(_graphql_span, StreamedSpan):
             _graphql_span.end()
         else:
-            _graphql_span.finish()
+            _graphql_span.__exit__(None, None, None)
