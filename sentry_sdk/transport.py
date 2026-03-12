@@ -825,7 +825,7 @@ else:
             body: "Any",
             headers: "Mapping[str, str]",
         ) -> "httpcore.Response":
-            return await self._pool.request(
+            return await self._pool.request(  # type: ignore[misc,unused-ignore]
                 method,
                 self._auth.get_api_url(endpoint_type),
                 content=body,
