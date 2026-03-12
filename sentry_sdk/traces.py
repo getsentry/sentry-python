@@ -291,9 +291,10 @@ class StreamedSpan:
         self._status = SpanStatus.OK.value
         self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
+        self._update_active_thread()
+
         self._continuous_profile: "Optional[ContinuousProfile]" = None
         self._start_profile()
-        self._update_active_thread()
         self._set_profile_id(get_profiler_id())
 
         self._start()

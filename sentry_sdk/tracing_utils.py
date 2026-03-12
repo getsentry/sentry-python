@@ -12,6 +12,12 @@ from random import Random
 from urllib.parse import quote, unquote
 from typing import Pattern
 
+try:
+    from re import Pattern
+except ImportError:
+    # 3.6
+    from typing import Pattern
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.utils import (
@@ -1589,7 +1595,7 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
     def _matches(rule: "Any", value: "Any") -> bool:
         if isinstance(rule, Pattern):
             if isinstance(value, str):
-                return bool(rule.match(value))
+                return bool(rule.fullmatch(value))
             else:
                 return False
 
@@ -1600,23 +1606,22 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
             if _matches(rule, name):
                 return True
 
-        elif isinstance(rule, dict) and rule:
+        elif isinstance(rule, dict) and ("name" in rule or "attributes" in rule):
             name_matches = True
             attributes_match = True
+
+            attributes = attributes or {}
 
             if "name" in rule:
                 name_matches = _matches(rule["name"], name)
 
             if "attributes" in rule:
-                if not attributes:
-                    attributes_match = False
-                else:
-                    for attribute, value in rule["attributes"].items():
-                        if attribute not in attributes or not _matches(
-                            value, attributes[attribute]
-                        ):
-                            attributes_match = False
-                            break
+                for attribute, value in rule["attributes"].items():
+                    if attribute not in attributes or not _matches(
+                        value, attributes[attribute]
+                    ):
+                        attributes_match = False
+                        break
 
             if name_matches and attributes_match:
                 return True

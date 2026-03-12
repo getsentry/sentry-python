@@ -32,7 +32,7 @@ Each native extension requires its own integration.
 
 import json
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Tuple, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
@@ -41,10 +41,6 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
-
-TraceState = Optional[
-    Tuple[Optional[Union[StreamedSpan, Span]], Union[StreamedSpan, Span]]
-]
 
 
 class RustTracingLevel(Enum):
@@ -174,7 +170,7 @@ class RustTracingLayer:
             else self.include_tracing_fields
         )
 
-    def on_event(self, event: str, _span_state: "TraceState") -> None:
+    def on_event(self, event: str, sentry_span: "Span") -> None:
         deserialized_event = json.loads(event)
         metadata = deserialized_event.get("metadata", {})
 
@@ -188,7 +184,7 @@ class RustTracingLayer:
         elif event_type == EventTypeMapping.Event:
             process_event(deserialized_event)
 
-    def on_new_span(self, attrs: str, span_id: str) -> "TraceState":
+    def on_new_span(self, attrs: str, span_id: str) -> "Optional[Span]":
         attrs = json.loads(attrs)
         metadata = attrs.get("metadata", {})
 
@@ -208,36 +204,20 @@ class RustTracingLayer:
         else:
             sentry_span_name = "<unknown>"
 
-        scope = sentry_sdk.get_current_scope()
-        parent_sentry_span = scope.span
-        sentry_span: "Union[StreamedSpan, Span]"
-        if parent_sentry_span:
-            if isinstance(parent_sentry_span, StreamedSpan):
-                sentry_span = sentry_sdk.traces.start_span(
-                    name=sentry_span_name,
-                    parent_span=parent_sentry_span,
-                    attributes={"sentry.op": "function", "sentry.origin": self.origin},
-                )
-            else:
-                sentry_span = parent_sentry_span.start_child(
-                    op="function",
-                    name=sentry_span_name,
-                    origin=self.origin,
-                )
-        else:
-            client = sentry_sdk.get_client()
+        client = sentry_sdk.get_client()
 
-            if has_span_streaming_enabled(client.options):
-                sentry_span = sentry_sdk.traces.start_span(
-                    name=sentry_span_name,
-                    attributes={"sentry.op": "function", "sentry.origin": self.origin},
-                )
-            else:
-                sentry_span = sentry_sdk.start_span(
-                    op="function",
-                    name=sentry_span_name,
-                    origin=self.origin,
-                )
+        if has_span_streaming_enabled(client.options):
+            sentry_span = sentry_sdk.traces.start_span(
+                name=sentry_span_name,
+                attributes={"sentry.op": "function", "sentry.origin": self.origin},
+            )
+        else:
+            sentry_span = sentry_sdk.start_span(
+                op="function",
+                name=sentry_span_name,
+                origin=self.origin,
+            )
+            sentry_span.__enter__()
 
         if isinstance(sentry_span, StreamedSpan):
             set_on_span = sentry_span.set_attribute
@@ -251,24 +231,17 @@ class RustTracingLayer:
             else:
                 set_on_span(field, SENSITIVE_DATA_SUBSTITUTE)
 
-        scope.span = sentry_span
-        return (parent_sentry_span, sentry_span)
+        return sentry_span
 
-    def on_close(self, span_id: str, span_state: "TraceState") -> None:
-        if span_state is None:
+    def on_close(self, span_id: str, sentry_span: "Span") -> None:
+        if sentry_span is None:
             return
 
-        parent_sentry_span, sentry_span = span_state
-        if isinstance(sentry_span, StreamedSpan):
-            sentry_span.end()
-        else:
-            sentry_span.finish()
-        sentry_sdk.get_current_scope().span = parent_sentry_span
+        sentry_span.__exit__(None, None, None)
 
-    def on_record(self, span_id: str, values: str, span_state: "TraceState") -> None:
-        if span_state is None:
+    def on_record(self, span_id: str, values: str, sentry_span: "Span") -> None:
+        if sentry_span is None:
             return
-        _parent_sentry_span, sentry_span = span_state
 
         if isinstance(sentry_span, StreamedSpan):
             set_on_span = sentry_span.set_attribute
