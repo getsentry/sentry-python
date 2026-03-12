@@ -396,34 +396,6 @@ def _set_create_input_data(
     )
 
 
-def _set_stream_input_data(
-    span: "Span",
-    integration: "AnthropicIntegration",
-    max_tokens: "int",
-    messages: "Iterable[MessageParam]",
-    model: "ModelParam",
-    system: "Optional[Union[str, Iterable[TextBlockParam]]]",
-    temperature: "Optional[float]",
-    top_k: "Optional[int]",
-    top_p: "Optional[float]",
-    tools: "Optional[Iterable[ToolUnionParam]]",
-) -> None:
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
-
-    _set_common_input_data(
-        span=span,
-        integration=integration,
-        max_tokens=max_tokens,
-        messages=messages,
-        model=model,
-        system=system,
-        temperature=temperature,
-        top_k=top_k,
-        top_p=top_p,
-        tools=tools,
-    )
-
-
 def _wrap_synchronous_message_iterator(
     iterator: "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
     span: "Span",
@@ -808,9 +780,9 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         span.__enter__()
 
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
-        _set_stream_input_data(
-            span,
-            integration,
+        _set_common_input_data(
+            span=span,
+            integration=integration,
             max_tokens=self._max_tokens,
             messages=self._messages,
             model=model,
