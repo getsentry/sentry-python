@@ -1,0 +1,169 @@
+# Port PR #4572: Add Experimental Async Transport
+
+## Summary
+Port the "Add experimental async transport" PR (#4572) onto latest `origin/master`. The PR was originally merged into `potel-base` (Sep 2025) but never reached master. None of the PR's changes exist on master.
+
+## Approach: Manual Port (Not Cherry-Pick)
+The PR was a merge commit bundling 6 sub-PRs, and master has diverged significantly. Manual porting is the only reliable approach.
+
+## Files to Modify (in dependency order)
+
+### 1. `sentry_sdk/utils.py` — Add internal task marking utilities
+**Add near top (after line 75):**
+- `_is_sentry_internal_task = contextvars.ContextVar("is_sentry_internal_task", default=False)`
+- `is_internal_task()` function
+- `mark_sentry_task_internal()` context manager
+
+**Imports to add:** `contextvars`, `contextlib.contextmanager`, `Generator` type
+
+### 2. `sentry_sdk/worker.py` — Add Worker ABC + AsyncWorker
+**Changes:**
+- Add `from abc import ABC, abstractmethod`, `import asyncio`
+- Import `mark_sentry_task_internal` from utils
+- Add `Worker(ABC)` base class with abstract methods: `is_alive`, `kill`, `full`, `submit`, and default `flush`
+- Make `BackgroundWorker` inherit from `Worker`
+- Change `BackgroundWorker.submit` signature: `Callable[[], None]` → `Callable[[], Any]`
+- Add `AsyncWorker(Worker)` class (~130 lines): asyncio.Queue, asyncio.Task-based, fire-and-forget callbacks
+
+### 3. `sentry_sdk/consts.py` — Add transport_async experiment
+**Add after line 81 (after `transport_http2`):**
+- `"transport_async": Optional[bool],`
+
+### 4. `sentry_sdk/transport.py` — Major refactoring (biggest change)
+**Structural changes:**
+1. **Imports:** Add `import asyncio`, restructure httpcore/h2/anyio imports into separate try/except blocks for `HTTP2_ENABLED` and `ASYNC_TRANSPORT_ENABLED` flags. Import `mark_sentry_task_internal` from utils, import `Worker, AsyncWorker` from worker.
+2. **Rename `BaseHttpTransport` → `HttpTransportCore`** (shared base for sync+async)
+3. **Extract methods from current `_send_request` into:**
+   - `_handle_request_error()` — records loss on network errors
+   - `_handle_response()` — handles rate limits, 413, 429, error status codes. **Must preserve master's 413 handling logic!**
+   - `_update_headers()` — adds User-Agent and X-Sentry-Auth headers
+4. **Rename `_send_envelope` → `_prepare_envelope`** — returns `Optional[Tuple[Envelope, BytesIO, Dict]]` instead of calling `_send_request`
+5. **Add `_create_worker()` abstract method** to `HttpTransportCore`, move `BackgroundWorker` creation out of `__init__`
+6. **Move `kill()` to `HttpTransportCore`**
+7. **Move `_flush_client_reports` out** of `HttpTransportCore` (it calls `capture_envelope` which differs by subclass)
+8. **Update `_make_pool` return type annotation** to include async pool types
+
+**New `BaseHttpTransport(HttpTransportCore)` class:**
+- `_send_envelope()` — calls `_prepare_envelope` then `_send_request`
+- `_send_request()` — calls `_update_headers`, `_request`, `_handle_response`, `_handle_request_error`
+- `_create_worker()` → returns `BackgroundWorker`
+- `_flush_client_reports()` — moved here from core
+- `capture_envelope()`, `flush()` — moved from core (already sync-specific)
+- Keep `hub_cls` deprecation property on this class or its child
+
+**New `AsyncHttpTransport(HttpTransportCore)` class (conditionally defined when `ASYNC_TRANSPORT_ENABLED`):**
+- `__init__` — gets running loop, stores as `self.loop`
+- `_create_worker()` → returns `AsyncWorker`
+- `_get_header_value()` — httpcore-style header parsing
+- `async _send_envelope()` — async version
+- `async _send_request()` — async version
+- `async _request()` — uses `self._pool.request()` with await
+- `async _flush_client_reports()` — async version
+- `capture_envelope()` — sync entry point using `loop.call_soon_threadsafe`
+- `flush()` — returns `Optional[asyncio.Task]`
+- `kill()` — returns `Optional[asyncio.Task]` for pool cleanup
+- `_get_pool_options()` — SSL context setup (similar to Http2Transport)
+- `_make_pool()` — returns async pool types
+
+**Update `make_transport()`:**
+- Add `transport_async` experiment detection
+- Check for running event loop and `AsyncioIntegration`
+- Fall back to sync transport with warnings when conditions not met
+
+**Keep `_FunctionTransport`** (PR removed it, but we preserve backward compat)
+
+### 5. `sentry_sdk/client.py` — Add async close/flush
+**Changes:**
+- Update import: add `HttpTransportCore, AsyncHttpTransport` alongside `BaseHttpTransport`
+- Change `isinstance(self.transport, BaseHttpTransport)` → `isinstance(self.transport, HttpTransportCore)` (line 477)
+- Add to `BaseClient`: `async close_async()` and `async flush_async()` no-op stubs
+- Add `_Client._close_components()` — extracted kill logic for session_flusher, log_batcher, metrics_batcher, span_batcher, monitor
+- Add `_Client._flush_components()` — extracted flush logic for session_flusher, log_batcher, metrics_batcher, span_batcher
+- Modify `close()` — detect AsyncHttpTransport and warn, use `_close_components()`
+- Modify `flush()` — detect AsyncHttpTransport and warn, use `_flush_components()`
+- Add `async close_async()` — async version that awaits transport kill task
+- Add `async flush_async()` — async version that awaits transport flush task
+
+### 6. `sentry_sdk/api.py` — Add public flush_async
+**Add after `flush()` function (~line 349):**
+```python
+@clientmethod
+async def flush_async(
+    timeout: Optional[float] = None,
+    callback: Optional[Callable[[int, float], None]] = None,
+) -> None:
+    return await get_client().flush_async(timeout=timeout, callback=callback)
+```
+
+### 7. `sentry_sdk/integrations/asyncio.py` — Add loop close patching + internal task filtering
+**Changes:**
+- Add imports: `is_internal_task` from utils, `AsyncHttpTransport` from transport
+- Add `patch_loop_close()` function — patches `loop.close` to flush async events before shutdown
+- Add `_create_task_with_factory()` helper — shared task creation logic
+- Modify `_sentry_task_factory` — check `is_internal_task()` first, skip wrapping for internal tasks, use `_create_task_with_factory` for both internal and wrapped tasks
+- Add `patch_loop_close()` call in `AsyncioIntegration.setup_once()`
+
+### 8. `setup.py` — Add asyncio extra
+**Add after `"http2"` line:**
+- `"asyncio": ["httpcore[asyncio]==1.*"],`
+
+### 9. `requirements-testing.txt` — Add asyncio extra to httpcore
+**Change:** `httpcore[http2]` → `httpcore[http2,asyncio]`
+
+### 10. `scripts/populate_tox/config.py` — anyio version changes
+**Change:** `anyio<4` → `anyio>=3,<5` in FastAPI config, add `"<0.80": ["anyio<4"]`
+
+### 11. `scripts/populate_tox/tox.jinja` — anyio version for httpx
+**Change:** `httpx: anyio<4.0.0` → `httpx: anyio>=3,<5`
+
+### 12. Tests
+
+#### `tests/test_transport.py` — Add async transport tests
+Append ~298 lines of async transport tests covering:
+- Basic async transport creation
+- Async envelope sending
+- Rate limiting behavior
+- Proxy configuration (HTTP, SOCKS)
+- SSL configuration
+- Background thread capture
+- Error handling in `_handle_request_error`
+
+#### `tests/test_client.py` — Add async client tests
+Append ~325 lines testing:
+- Async proxy configuration
+- SOCKS proxy support
+- `_handle_request_error` method
+- flush_async/close_async behavior
+
+#### `tests/integrations/asyncio/test_asyncio.py` — Add async integration tests
+Append tests for:
+- `test_internal_tasks_not_wrapped` — verifies internal tasks skip span wrapping
+- `test_loop_close_patching` — verifies loop.close is patched
+- `test_loop_close_flushes_async_transport` — verifies flush happens on loop close
+
+## Key Adaptation Notes for Master Divergence
+
+1. **413 handling**: Master added 413 status code handling in `_send_request`. The new `_handle_response()` method must include this logic.
+2. **`log_item`/`log_byte` in `record_lost_event`**: Already in `HttpTransportCore` (inherited from current `BaseHttpTransport`).
+3. **`"statsd"` in rate-limit category check**: Already in `_send_envelope`/`_prepare_envelope` (line 439 on master).
+4. **`metrics_batcher`/`span_batcher` in flush/close**: `_flush_components()` and `_close_components()` must include these (not in original PR).
+5. **`task_spans` in asyncio integration**: Must preserve alongside new `is_internal_task()` check.
+6. **`_FunctionTransport`**: Keep it (PR removed it but we shouldn't break backward compat).
+7. **`hub_cls` deprecation**: Keep on `BaseHttpTransport` or move to `HttpTransport`.
+
+### 13. Regenerate auto-generated files
+After modifying `scripts/populate_tox/config.py` and `scripts/populate_tox/tox.jinja`:
+```bash
+scripts/generate-test-files.sh
+```
+This regenerates `tox.ini` and `.github/workflows/test-integrations-*.yml`.
+
+## Verification
+
+1. **Linting:** `tox -e linters` must pass
+2. **Type checking:** `tox -e mypy` must pass
+3. **Unit tests:**
+   - `tox -e py3.14-common` for transport/client tests
+   - Asyncio integration tests (need to check tox env name)
+4. **Manual smoke test:** Verify `AsyncHttpTransport` can be imported and instantiated with running loop
+5. **Verify imports:** `from sentry_sdk.transport import HttpTransportCore, AsyncHttpTransport, BaseHttpTransport` should all work
