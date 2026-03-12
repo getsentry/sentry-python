@@ -57,13 +57,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 try:
-    from anyio import create_memory_object_stream, create_task_group, EndOfStream
-    from mcp.types import (
-        JSONRPCMessage,
-        JSONRPCNotification,
-        JSONRPCRequest,
-    )
-    from mcp.shared.message import SessionMessage
     from httpx import (
         ASGITransport,
         Request as HttpxRequest,
@@ -71,6 +64,22 @@ try:
         AsyncByteStream,
         AsyncClient,
     )
+except ImportError:
+    ASGITransport = None
+    HttpxRequest = None
+    HttpxResponse = None
+    AsyncByteStream = None
+    AsyncClient = None
+
+
+try:
+    from anyio import create_memory_object_stream, create_task_group, EndOfStream
+    from mcp.types import (
+        JSONRPCMessage,
+        JSONRPCNotification,
+        JSONRPCRequest,
+    )
+    from mcp.shared.message import SessionMessage
 except ImportError:
     create_memory_object_stream = None
     create_task_group = None
@@ -80,12 +89,6 @@ except ImportError:
     JSONRPCNotification = None
     JSONRPCRequest = None
     SessionMessage = None
-
-    ASGITransport = None
-    HttpxRequest = None
-    HttpxResponse = None
-    AsyncByteStream = None
-    AsyncClient = None
 
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
@@ -1009,6 +1012,39 @@ def async_iterator():
     async def inner(values):
         for value in values:
             yield value
+
+    return inner
+
+
+@pytest.fixture
+def server_side_event_chunks():
+    def inner(events):
+        for event in events:
+            payload = event.model_dump()
+            chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+            yield chunk.encode("utf-8")
+
+    return inner
+
+
+@pytest.fixture
+def get_model_response():
+    def inner(response_content, serialize_pydantic=False):
+        model_request = HttpxRequest(
+            "POST",
+            "/responses",
+        )
+
+        if serialize_pydantic:
+            response_content = json.dumps(response_content.model_dump()).encode("utf-8")
+
+        response = HttpxResponse(
+            200,
+            request=model_request,
+            content=response_content,
+        )
+
+        return response
 
     return inner
 

@@ -364,52 +364,53 @@ def _wrap_synchronous_message_iterator(
     usage = _RecordedUsage()
     content_blocks: "list[str]" = []
 
-    for event in iterator:
-        if not isinstance(
-            event,
+    try:
+        for event in iterator:
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
             (
-                MessageStartEvent,
-                MessageDeltaEvent,
-                MessageStopEvent,
-                ContentBlockStartEvent,
-                ContentBlockDeltaEvent,
-                ContentBlockStopEvent,
-            ),
-        ):
+                model,
+                usage,
+                content_blocks,
+            ) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+            )
             yield event
-            continue
-
-        (
-            model,
-            usage,
-            content_blocks,
-        ) = _collect_ai_data(
-            event,
-            model,
-            usage,
-            content_blocks,
+    finally:
+        # Anthropic's input_tokens excludes cached/cache_write tokens.
+        # Normalize to total input tokens for correct cost calculations.
+        total_input = (
+            usage.input_tokens
+            + (usage.cache_read_input_tokens or 0)
+            + (usage.cache_write_input_tokens or 0)
         )
-        yield event
 
-    # Anthropic's input_tokens excludes cached/cache_write tokens.
-    # Normalize to total input tokens for correct cost calculations.
-    total_input = (
-        usage.input_tokens
-        + (usage.cache_read_input_tokens or 0)
-        + (usage.cache_write_input_tokens or 0)
-    )
-
-    _set_output_data(
-        span=span,
-        integration=integration,
-        model=model,
-        input_tokens=total_input,
-        output_tokens=usage.output_tokens,
-        cache_read_input_tokens=usage.cache_read_input_tokens,
-        cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-        finish_span=True,
-    )
+        _set_output_data(
+            span=span,
+            integration=integration,
+            model=model,
+            input_tokens=total_input,
+            output_tokens=usage.output_tokens,
+            cache_read_input_tokens=usage.cache_read_input_tokens,
+            cache_write_input_tokens=usage.cache_write_input_tokens,
+            content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+            finish_span=True,
+        )
 
 
 async def _wrap_asynchronous_message_iterator(
@@ -425,52 +426,53 @@ async def _wrap_asynchronous_message_iterator(
     usage = _RecordedUsage()
     content_blocks: "list[str]" = []
 
-    async for event in iterator:
-        if not isinstance(
-            event,
+    try:
+        async for event in iterator:
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
             (
-                MessageStartEvent,
-                MessageDeltaEvent,
-                MessageStopEvent,
-                ContentBlockStartEvent,
-                ContentBlockDeltaEvent,
-                ContentBlockStopEvent,
-            ),
-        ):
+                model,
+                usage,
+                content_blocks,
+            ) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+            )
             yield event
-            continue
-
-        (
-            model,
-            usage,
-            content_blocks,
-        ) = _collect_ai_data(
-            event,
-            model,
-            usage,
-            content_blocks,
+    finally:
+        # Anthropic's input_tokens excludes cached/cache_write tokens.
+        # Normalize to total input tokens for correct cost calculations.
+        total_input = (
+            usage.input_tokens
+            + (usage.cache_read_input_tokens or 0)
+            + (usage.cache_write_input_tokens or 0)
         )
-        yield event
 
-    # Anthropic's input_tokens excludes cached/cache_write tokens.
-    # Normalize to total input tokens for correct cost calculations.
-    total_input = (
-        usage.input_tokens
-        + (usage.cache_read_input_tokens or 0)
-        + (usage.cache_write_input_tokens or 0)
-    )
-
-    _set_output_data(
-        span=span,
-        integration=integration,
-        model=model,
-        input_tokens=total_input,
-        output_tokens=usage.output_tokens,
-        cache_read_input_tokens=usage.cache_read_input_tokens,
-        cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-        finish_span=True,
-    )
+        _set_output_data(
+            span=span,
+            integration=integration,
+            model=model,
+            input_tokens=total_input,
+            output_tokens=usage.output_tokens,
+            cache_read_input_tokens=usage.cache_read_input_tokens,
+            cache_write_input_tokens=usage.cache_write_input_tokens,
+            content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+            finish_span=True,
+        )
 
 
 def _set_output_data(
