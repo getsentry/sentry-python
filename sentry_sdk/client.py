@@ -1042,11 +1042,13 @@ class _Client(BaseClient):
             if isinstance(self.transport, AsyncHttpTransport) and hasattr(
                 self.transport, "loop"
             ):
-                logger.debug(
-                    "close() used with AsyncHttpTransport, aborting. Please use close_async() instead."
+                logger.warning(
+                    "close() used with AsyncHttpTransport. "
+                    "Prefer close_async() for graceful async shutdown. "
+                    "Performing synchronous best-effort cleanup."
                 )
-                return
-            self.flush(timeout=timeout, callback=callback)
+            else:
+                self.flush(timeout=timeout, callback=callback)
             self._close_components()
             self.transport.kill()
             self.transport = None
@@ -1092,8 +1094,8 @@ class _Client(BaseClient):
             if isinstance(self.transport, AsyncHttpTransport) and hasattr(
                 self.transport, "loop"
             ):
-                logger.debug(
-                    "flush() used with AsyncHttpTransport, aborting. Please use flush_async() instead."
+                logger.warning(
+                    "flush() used with AsyncHttpTransport. Please use flush_async() instead."
                 )
                 return
             if timeout is None:
@@ -1135,6 +1137,12 @@ class _Client(BaseClient):
 
     def __exit__(self, exc_type: "Any", exc_value: "Any", tb: "Any") -> None:
         self.close()
+
+    async def __aenter__(self) -> "_Client":
+        return self
+
+    async def __aexit__(self, exc_type: "Any", exc_value: "Any", tb: "Any") -> None:
+        await self.close_async()
 
 
 from typing import TYPE_CHECKING

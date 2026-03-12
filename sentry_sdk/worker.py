@@ -213,6 +213,8 @@ class AsyncWorker(Worker):
 
     def kill(self) -> None:
         if self._task:
+            # Cancel the main consumer task to prevent duplicate consumers
+            self._task.cancel()
             if self._queue is not None:
                 try:
                     self._queue.put_nowait(_TERMINATOR)
