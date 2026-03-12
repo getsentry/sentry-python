@@ -889,7 +889,7 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_events):
     """
     pytest.importorskip("mcp")
 
-    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import MagicMock
     from pydantic_ai.mcp import MCPServerStdio
     from pydantic_ai import Agent
     from pydantic_ai.toolsets.combined import CombinedToolset
@@ -1379,7 +1379,6 @@ async def test_agent_data_from_scope(sentry_init, capture_events):
     """
     Test that agent data can be retrieved from Sentry scope when not passed directly.
     """
-    import sentry_sdk
 
     agent = Agent(
         "test",
@@ -1753,7 +1752,7 @@ async def test_message_parts_with_tool_return(sentry_init, capture_events):
     """
     Test that ToolReturnPart messages are handled correctly.
     """
-    from pydantic_ai import Agent, messages
+    from pydantic_ai import Agent
 
     agent = Agent(
         "test",
@@ -2509,7 +2508,6 @@ async def test_tool_execution_without_span_context(sentry_init, capture_events):
     This tests the code path where current_span is None in _patch_tool_execution.
     """
     # Import the patching function
-    from unittest.mock import AsyncMock, MagicMock
 
     sentry_init(
         integrations=[PydanticAIIntegration()],

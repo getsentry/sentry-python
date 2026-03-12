@@ -13,9 +13,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    logger,
     package_version,
-    _get_installed_modules,
 )
 
 try:

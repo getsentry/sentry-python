@@ -2,14 +2,14 @@ import json
 import logging
 import sys
 import time
-from typing import List, Any, Mapping, Union
+from typing import List, Any, Mapping
 import pytest
 from unittest import mock
 
 import sentry_sdk
 import sentry_sdk.logger
 from sentry_sdk import get_client
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk.envelope import Envelope
 from sentry_sdk.types import Log
 from sentry_sdk.consts import SPANDATA, VERSION
 

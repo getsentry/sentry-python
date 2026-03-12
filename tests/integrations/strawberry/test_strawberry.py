@@ -5,7 +5,6 @@ strawberry = pytest.importorskip("strawberry")
 pytest.importorskip("fastapi")
 pytest.importorskip("flask")
 
-from unittest import mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

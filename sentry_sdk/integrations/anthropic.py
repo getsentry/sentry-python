@@ -45,7 +45,7 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncIterator, Iterator, List, Optional, Union
+    from typing import Any, AsyncIterator, Iterator, Optional, Union
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
