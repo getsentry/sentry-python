@@ -210,6 +210,8 @@ class SentryAsyncExtension(SchemaExtension):
                 origin=StrawberryIntegration.origin,
             )
 
+            self.graphql_span.__enter__()
+
             self.graphql_span.set_data("graphql.operation.type", operation_type)
             self.graphql_span.set_data("graphql.operation.name", self._operation_name)
             self.graphql_span.set_data("graphql.document", self.execution_context.query)
@@ -231,7 +233,7 @@ class SentryAsyncExtension(SchemaExtension):
         if isinstance(self.graphql_span, StreamedSpan):
             self.graphql_span.end()
         else:
-            self.graphql_span.finish()
+            self.graphql_span.__exit__(None, None, None)
 
     def on_validate(self) -> "Generator[None, None, None]":
         self.validation_span: "Union[StreamedSpan, Span]"
