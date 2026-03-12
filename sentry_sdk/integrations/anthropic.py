@@ -423,10 +423,10 @@ def _set_stream_input_data(
 
 
 def _wrap_synchronous_message_iterator(
-    iterator: "Iterator[RawMessageStreamEvent, MessageStreamEvent]",
+    iterator: "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
     span: "Span",
     integration: "AnthropicIntegration",
-) -> "Iterator[RawMessageStreamEvent, MessageStreamEvent]":
+) -> "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span.
