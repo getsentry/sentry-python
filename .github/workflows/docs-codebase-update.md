@@ -2,12 +2,7 @@
 name: docs-codebase-update
 description: Incrementally update SDK codebase documentation when source code changes
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - "sentry_sdk/**"
-      - "MIGRATION_GUIDE.md"
-      - "CHANGELOG.md"
+  workflow_dispatch:
 permissions:
   contents: read
   pull-requests: read
