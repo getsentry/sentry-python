@@ -23,7 +23,7 @@ developer-facing internal documentation (`docs/codebase/`) for a Sentry SDK:
 
 | Workflow | Trigger | Scope |
 |----------|---------|-------|
-| `docs-codebase-refresh` | Push to main/master + manual | Full regeneration of every doc page |
+| `docs-codebase-refresh` | Manual (`workflow_dispatch`) | Full regeneration of every doc page |
 | `docs-codebase-update` | Push to main/master (path-filtered) | Incremental update of affected pages only |
 
 Both workflows create PRs (never direct commits) via `safe-outputs: create-pull-request`.
@@ -154,10 +154,8 @@ Frontmatter:
 ```yaml
 ---
 name: docs-codebase-refresh
-description: Full refresh of SDK codebase documentation on merge or manual trigger
+description: Full refresh of SDK codebase documentation (manual trigger only)
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 permissions:
   contents: read
@@ -218,7 +216,7 @@ safe-outputs:
 Body contains:
 1. **SDK Context** block (same values as refresh)
 2. **Step-by-step agent instructions:**
-   - `git diff HEAD~1 --name-only` to find changed files
+   - GitHub compare API to find all changed files across the push (avoids shallow clone issues)
    - Load manifest to map source files to doc pages
    - Change-to-page mapping table (SDK-specific -- maps each core file to its doc pages)
    - Detect new integrations if registry file changed
@@ -304,7 +302,7 @@ After setup, verify with:
 
 | Decision | Rationale |
 |----------|-----------|
-| Two workflows (refresh + update) | Refresh ensures completeness; update keeps latency low on every merge |
+| Two workflows (refresh + update) | Refresh is manual for initial gen or periodic full regen; update runs automatically on every merge |
 | `docs/codebase/` not `docs/` | Avoids conflicts with existing Sphinx/JSDoc/Javadoc in `docs/` |
 | `create-pull-request` not direct push | Human review before merging generated content |
 | Manifest with `sources_hash` | Enables incremental updates without re-reading all source files |

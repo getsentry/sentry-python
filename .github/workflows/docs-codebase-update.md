@@ -41,8 +41,22 @@ only the codebase pages affected by the latest code changes.
 
 ### Step 1: Identify Changed Files
 
-Run `git diff HEAD~1 --name-only` to get the list of changed files in the
-latest commit. Filter to files matching the trigger paths:
+Use the GitHub API to get the list of changed files for the push event.
+Do NOT use `git diff` -- the checkout is a shallow clone without full history.
+
+Use the compare API with the push event's `before` and `after` SHAs:
+
+```bash
+gh api repos/{owner}/{repo}/compare/{before}...{after} --jq '.files[].filename'
+```
+
+If `before` is the zero SHA (new branch), compare against the default branch:
+
+```bash
+gh api repos/{owner}/{repo}/compare/{default_branch}...{after} --jq '.files[].filename'
+```
+
+Filter the resulting file list to paths matching the trigger paths:
 - `sentry_sdk/**`
 - `MIGRATION_GUIDE.md`
 - `CHANGELOG.md`

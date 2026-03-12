@@ -1,9 +1,7 @@
 ---
 name: docs-codebase-refresh
-description: Full refresh of SDK codebase documentation on merge or manual trigger
+description: Full refresh of SDK codebase documentation (manual trigger only)
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 permissions:
   contents: read
