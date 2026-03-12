@@ -1281,8 +1281,8 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "end_timestamp": mock.ANY,
                 "attributes": {
                     "sentry.span.source": {"value": "custom", "type": "string"},
-                    # "thread.id": {"value": mock.ANY, "type": "string"},
-                    # "thread.name": {"value": "MainThread", "type": "string"},
+                    "thread.id": {"value": mock.ANY, "type": "string"},
+                    "thread.name": {"value": "MainThread", "type": "string"},
                     "sentry.segment.id": {"value": mock.ANY, "type": "string"},
                     "sentry.segment.name": {"value": "test", "type": "string"},
                     "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
