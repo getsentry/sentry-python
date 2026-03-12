@@ -186,6 +186,7 @@ class SentryAsyncExtension(SchemaExtension):
             name=description,
             origin=StrawberryIntegration.origin,
         )
+        self.graphql_span.__enter__()
 
         self.graphql_span.set_data("graphql.operation.type", operation_type)
         self.graphql_span.set_data("graphql.operation.name", self._operation_name)
@@ -200,7 +201,7 @@ class SentryAsyncExtension(SchemaExtension):
             transaction.source = TransactionSource.COMPONENT
             transaction.op = op
 
-        self.graphql_span.finish()
+        self.graphql_span.__exit__(None, None, None)
 
     def on_validate(self) -> "Generator[None, None, None]":
         self.validation_span = self.graphql_span.start_child(
