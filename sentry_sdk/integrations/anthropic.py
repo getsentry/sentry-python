@@ -868,9 +868,9 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
         span.__enter__()
 
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
-        _set_stream_input_data(
-            span,
-            integration,
+        _set_common_input_data(
+            span=span,
+            integration=integration,
             max_tokens=self._max_tokens,
             messages=self._messages,
             model=model,
