@@ -100,7 +100,10 @@ def _set_status(status: str) -> None:
     with capture_internal_exceptions():
         scope = sentry_sdk.get_current_scope()
         if scope.span is not None:
-            scope.span.set_status(status)
+            if isinstance(scope.span, Span):
+                scope.span.set_status(status)
+            else:
+                scope.span.status = "ok" if status == "ok" else "error"
 
 
 def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
