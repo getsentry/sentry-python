@@ -11,7 +11,7 @@ asttokens
 responses
 pysocks
 socksio
-httpcore[http2,asyncio]
+httpcore[http2]
 setuptools
 Brotli
 docker
