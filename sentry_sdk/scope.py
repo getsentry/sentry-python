@@ -682,7 +682,11 @@ class Scope:
         span = kwargs.pop("span", None)
         span = span or self.span
 
-        if has_tracing_enabled(client.options) and span is not None:
+        if (
+            has_tracing_enabled(client.options)
+            and span is not None
+            and not isinstance(span, NoOpStreamedSpan)
+        ):
             for header in span._iter_headers():
                 yield header
         elif has_external_propagation_context():
