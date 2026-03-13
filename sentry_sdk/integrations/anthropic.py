@@ -39,7 +39,7 @@ try:
 
     from anthropic import Stream, AsyncStream
     from anthropic.resources import AsyncMessages, Messages
-    from anthropic.lib.streaming._messages import MessageStreamManager
+    from anthropic.lib.streaming import MessageStreamManager
 
     from anthropic.types import (
         MessageStartEvent,
@@ -60,7 +60,6 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
-    from anthropic import AsyncStream
     from anthropic.types import (
         RawMessageStreamEvent,
         MessageParam,
