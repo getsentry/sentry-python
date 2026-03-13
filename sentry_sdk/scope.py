@@ -32,7 +32,6 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     is_ignored_span,
     _make_sampling_decision,
-    normalize_incoming_data,
     PropagationContext,
 )
 from sentry_sdk.traces import _DEFAULT_PARENT_SPAN, StreamedSpan, NoOpStreamedSpan
@@ -57,7 +56,6 @@ from sentry_sdk.utils import (
     has_metrics_enabled,
 )
 
-import typing
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:

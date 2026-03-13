@@ -109,7 +109,6 @@ if TYPE_CHECKING:
     from typing import Mapping
     from typing import NotRequired
     from typing import Optional
-    from typing import Tuple
     from typing import Type
     from typing_extensions import Literal, TypedDict
 

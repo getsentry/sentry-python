@@ -22,7 +22,6 @@ try:
     # not installed. That's why we're adding the second, more specific import
     # after it, even if we don't use it.
     import agents
-    from agents.run import DEFAULT_AGENT_RUNNER
     from agents.run import AgentRunner
     from agents.version import __version__ as OPENAI_AGENTS_VERSION
 

@@ -1,8 +1,6 @@
 import inspect
 import json
-from collections import deque
 from copy import deepcopy
-from sys import getsizeof
 from typing import TYPE_CHECKING
 
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE

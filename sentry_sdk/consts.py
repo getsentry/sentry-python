@@ -54,7 +54,6 @@ if TYPE_CHECKING:
         Hint,
         IgnoreSpansConfig,
         Log,
-        MeasurementUnit,
         Metric,
         ProfilerMode,
         TracesSampler,
