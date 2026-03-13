@@ -10,6 +10,7 @@ import django
 import pytest
 from channels.testing import HttpCommunicator
 from sentry_sdk import capture_message
+from sentry_sdk.tracing import Span
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
@@ -29,7 +30,6 @@ if django.VERSION >= (3, 0):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
 )
@@ -86,7 +86,6 @@ async def test_basic(sentry_init, capture_events, application):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -120,7 +119,6 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 @pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -171,7 +169,6 @@ async def test_active_thread_id(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -214,7 +211,6 @@ async def test_async_views_concurrent_execution(sentry_init, settings):
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -261,12 +257,11 @@ async def test_async_middleware_that_is_function_concurrent_execution(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_async_middleware_spans(
-    sentry_init, render_span_tree, capture_events, settings
+    sentry_init, SpanTreeEqualUnorderedSiblings, capture_events, settings
 ):
     settings.MIDDLEWARE = [
         "django.contrib.sessions.middleware.SessionMiddleware",
@@ -292,26 +287,57 @@ async def test_async_middleware_spans(
 
     (transaction,) = events
 
-    assert (
-        render_span_tree(transaction)
-        == """\
-- op="http.server": description=null
-  - op="event.django": description="django.db.reset_queries"
-  - op="event.django": description="django.db.close_old_connections"
-  - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
-    - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
-      - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__acall__"
-        - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
-          - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-          - op="view.render": description="simple_async_view"
-  - op="event.django": description="django.db.close_old_connections"
-  - op="event.django": description="django.core.cache.close_caches"
-  - op="event.django": description="django.core.handlers.base.reset_urlconf\""""
+    http_server_span = Span(op="http.server", name=None)
+    session_middleware_span = Span(
+        op="middleware.django",
+        name="django.contrib.sessions.middleware.SessionMiddleware.__acall__",
+    )
+    authentication_middleware_span = Span(
+        op="middleware.django",
+        name="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__",
+    )
+    csrf_view_middleware_span = Span(
+        op="middleware.django",
+        name="django.middleware.csrf.CsrfViewMiddleware.__acall__",
+    )
+    test_middleware_span = Span(
+        op="middleware.django",
+        name="tests.integrations.django.myapp.settings.TestMiddleware.__acall__",
+    )
+
+    span_tree = {
+        http_server_span: {
+            session_middleware_span,
+            Span(op="event.django", name="django.db.reset_queries"),
+            Span(op="event.django", name="django.db.close_old_connections"),
+            Span(op="event.django", name="django.db.close_old_connections"),
+            Span(op="event.django", name="django.core.cache.close_caches"),
+            Span(op="event.django", name="django.core.handlers.base.reset_urlconf"),
+        },
+        session_middleware_span: {authentication_middleware_span},
+        authentication_middleware_span: {csrf_view_middleware_span},
+        csrf_view_middleware_span: {test_middleware_span},
+        test_middleware_span: {
+            Span(
+                op="middleware.django",
+                name="django.middleware.csrf.CsrfViewMiddleware.process_view",
+            ),
+            Span(op="view.render", name="simple_async_view"),
+        },
+    }
+
+    assert transaction == SpanTreeEqualUnorderedSiblings(
+        http_server_span,
+        span_tree,
+        check_trace_id=False,
+        check_op=True,
+        check_status=False,
+        check_origin=False,
+        check_name=True,
     )
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -339,7 +365,6 @@ async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -370,7 +395,6 @@ async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -404,7 +428,6 @@ async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_ev
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -535,7 +558,6 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
     ],
 )
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
