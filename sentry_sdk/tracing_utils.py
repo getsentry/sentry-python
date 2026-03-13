@@ -8,7 +8,6 @@ import warnings
 from collections.abc import Mapping, MutableMapping
 from datetime import timedelta
 from random import Random
-from typing import Pattern
 from urllib.parse import quote, unquote
 import uuid
 
