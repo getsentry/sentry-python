@@ -371,57 +371,54 @@ def _wrap_synchronous_message_iterator(
     content_blocks: "list[str]" = []
     response_id = None
 
-    for event in iterator:
-        # Message and content types are aliases for corresponding Raw* types, introduced in
-        # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
-        if not isinstance(
-            event,
-            (
-                MessageStartEvent,
-                MessageDeltaEvent,
-                MessageStopEvent,
-                ContentBlockStartEvent,
-                ContentBlockDeltaEvent,
-                ContentBlockStopEvent,
-            ),
-        ):
+    try:
+        for event in iterator:
+            # Message and content types are aliases for corresponding Raw* types, introduced in
+            # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
+            (model, usage, content_blocks, response_id) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            )
             yield event
-            continue
+    finally:
+        with capture_internal_exceptions():
+            # Anthropic's input_tokens excludes cached/cache_write tokens.
+            # Normalize to total input tokens for correct cost calculations.
+            total_input = (
+                usage.input_tokens
+                + (usage.cache_read_input_tokens or 0)
+                + (usage.cache_write_input_tokens or 0)
+            )
 
-        (
-            model,
-            usage,
-            content_blocks,
-            response_id,
-        ) = _collect_ai_data(
-            event,
-            model,
-            usage,
-            content_blocks,
-            response_id,
-        )
-        yield event
-
-    # Anthropic's input_tokens excludes cached/cache_write tokens.
-    # Normalize to total input tokens for correct cost calculations.
-    total_input = (
-        usage.input_tokens
-        + (usage.cache_read_input_tokens or 0)
-        + (usage.cache_write_input_tokens or 0)
-    )
-
-    _set_output_data(
-        span=span,
-        integration=integration,
-        model=model,
-        input_tokens=total_input,
-        output_tokens=usage.output_tokens,
-        cache_read_input_tokens=usage.cache_read_input_tokens,
-        cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-        finish_span=True,
-        response_id=response_id,
-    )
+            _set_output_data(
+                span=span,
+                integration=integration,
+                model=model,
+                input_tokens=total_input,
+                output_tokens=usage.output_tokens,
+                cache_read_input_tokens=usage.cache_read_input_tokens,
+                cache_write_input_tokens=usage.cache_write_input_tokens,
+                content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+                finish_span=True,
+                response_id=response_id,
+            )
 
 
 async def _wrap_asynchronous_message_iterator(
@@ -438,57 +435,59 @@ async def _wrap_asynchronous_message_iterator(
     content_blocks: "list[str]" = []
     response_id = None
 
-    async for event in iterator:
-        # Message and content types are aliases for corresponding Raw* types, introduced in
-        # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
-        if not isinstance(
-            event,
+    try:
+        async for event in iterator:
+            # Message and content types are aliases for corresponding Raw* types, introduced in
+            # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
             (
-                MessageStartEvent,
-                MessageDeltaEvent,
-                MessageStopEvent,
-                ContentBlockStartEvent,
-                ContentBlockDeltaEvent,
-                ContentBlockStopEvent,
-            ),
-        ):
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            ) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            )
             yield event
-            continue
+    finally:
+        with capture_internal_exceptions():
+            # Anthropic's input_tokens excludes cached/cache_write tokens.
+            # Normalize to total input tokens for correct cost calculations.
+            total_input = (
+                usage.input_tokens
+                + (usage.cache_read_input_tokens or 0)
+                + (usage.cache_write_input_tokens or 0)
+            )
 
-        (
-            model,
-            usage,
-            content_blocks,
-            response_id,
-        ) = _collect_ai_data(
-            event,
-            model,
-            usage,
-            content_blocks,
-            response_id,
-        )
-        yield event
-
-    # Anthropic's input_tokens excludes cached/cache_write tokens.
-    # Normalize to total input tokens for correct cost calculations.
-    total_input = (
-        usage.input_tokens
-        + (usage.cache_read_input_tokens or 0)
-        + (usage.cache_write_input_tokens or 0)
-    )
-
-    _set_output_data(
-        span=span,
-        integration=integration,
-        model=model,
-        input_tokens=total_input,
-        output_tokens=usage.output_tokens,
-        cache_read_input_tokens=usage.cache_read_input_tokens,
-        cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-        finish_span=True,
-        response_id=response_id,
-    )
+            _set_output_data(
+                span=span,
+                integration=integration,
+                model=model,
+                input_tokens=total_input,
+                output_tokens=usage.output_tokens,
+                cache_read_input_tokens=usage.cache_read_input_tokens,
+                cache_write_input_tokens=usage.cache_write_input_tokens,
+                content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+                finish_span=True,
+                response_id=response_id,
+            )
 
 
 def _set_output_data(
