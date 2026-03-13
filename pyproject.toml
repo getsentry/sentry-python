@@ -227,7 +227,6 @@ ignore = [
     "N804", # First argument of classmethod should be named cls
 
     # Additional ignores for codebase compatibility
-    "F401", # Unused imports - many in TYPE_CHECKING blocks used for type comments
     "E721", # Use isinstance instead of type() == - existing pattern in this codebase
 ]
 

@@ -52,8 +52,8 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        IgnoreSpansConfig,
         Log,
-        MeasurementUnit,
         Metric,
         ProfilerMode,
         TracesSampler,
@@ -83,6 +83,7 @@ if TYPE_CHECKING:
             "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
+            "ignore_spans": Optional[IgnoreSpansConfig],
         },
         total=False,
     )

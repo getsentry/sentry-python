@@ -5,7 +5,6 @@ from functools import wraps
 from .consts import ORIGIN, TOOL_ATTRIBUTES_MAP, GEN_AI_SYSTEM
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from typing import (
-    cast,
     TYPE_CHECKING,
     Iterable,
     Any,
@@ -22,7 +21,6 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     truncate_and_annotate_messages,
     normalize_message_roles,
-    redact_blob_message_parts,
     transform_google_content_part,
     get_modality_from_mime_type,
 )

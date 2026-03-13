@@ -4,10 +4,10 @@ import time
 from typing import Any, TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.utils import format_attribute, safe_repr, capture_internal_exceptions
+from sentry_sdk.utils import format_attribute, capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Attributes, Log
+    from sentry_sdk._types import Attributes
 
 
 OTEL_RANGES = [

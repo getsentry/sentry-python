@@ -2,7 +2,6 @@ from unittest import mock
 import pytest
 import re
 import responses
-import httpx
 
 from huggingface_hub import InferenceClient
 

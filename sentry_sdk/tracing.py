@@ -25,7 +25,6 @@ if TYPE_CHECKING:
         List,
         Optional,
         ParamSpec,
-        Set,
         Tuple,
         TypeVar,
         Union,
