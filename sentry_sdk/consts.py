@@ -499,7 +499,7 @@ class SPANDATA:
     GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
     """
     The reason why the model stopped generating.
-    Example: "COMPLETE"
+    Example: ["COMPLETE"]
     """
 
     GEN_AI_RESPONSE_ID = "gen_ai.response.id"

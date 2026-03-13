@@ -64,6 +64,7 @@ EXAMPLE_MESSAGE = Message(
     content=[TextBlock(type="text", text="Hi, I'm Claude.")],
     type="message",
     usage=Usage(input_tokens=10, output_tokens=20),
+    stop_reason="end_turn",
 )
 
 
@@ -135,6 +136,7 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.asyncio
@@ -206,6 +208,122 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+
+
+def test_streaming_create_message_with_finish_reason(sentry_init, capture_events):
+    client = Anthropic(api_key="z")
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = [
+        MessageStartEvent(
+            message=EXAMPLE_MESSAGE,
+            type="message_start",
+        ),
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block=TextBlock(type="text", text=""),
+        ),
+        ContentBlockDeltaEvent(
+            delta=TextDelta(text="Hi!", type="text_delta"),
+            index=0,
+            type="content_block_delta",
+        ),
+        ContentBlockStopEvent(type="content_block_stop", index=0),
+        MessageDeltaEvent(
+            delta=Delta(stop_reason="end_turn"),
+            usage=MessageDeltaUsage(output_tokens=10),
+            type="message_delta",
+        ),
+    ]
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client.messages._post = mock.Mock(return_value=returned_stream)
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        message = client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
+        )
+        for _ in message:
+            pass
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+
+
+@pytest.mark.asyncio
+async def test_streaming_create_message_with_finish_reason_async(
+    sentry_init, capture_events, async_iterator
+):
+    client = AsyncAnthropic(api_key="z")
+    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = async_iterator(
+        [
+            MessageStartEvent(
+                message=EXAMPLE_MESSAGE,
+                type="message_start",
+            ),
+            ContentBlockStartEvent(
+                type="content_block_start",
+                index=0,
+                content_block=TextBlock(type="text", text=""),
+            ),
+            ContentBlockDeltaEvent(
+                delta=TextDelta(text="Hi!", type="text_delta"),
+                index=0,
+                type="content_block_delta",
+            ),
+            ContentBlockStopEvent(type="content_block_stop", index=0),
+            MessageDeltaEvent(
+                delta=Delta(stop_reason="end_turn"),
+                usage=MessageDeltaUsage(output_tokens=10),
+                type="message_delta",
+            ),
+        ]
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+    client.messages._post = AsyncMock(return_value=returned_stream)
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with start_transaction(name="anthropic"):
+        message = await client.messages.create(
+            max_tokens=1024, messages=messages, model="model", stream=True
+        )
+        async for _ in message:
+            pass
+
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.parametrize(
@@ -550,6 +668,7 @@ def test_streaming_create_message_with_input_json_delta(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["tool_use"]
 
 
 @pytest.mark.asyncio
@@ -693,6 +812,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["tool_use"]
 
 
 def test_exception_message_create(sentry_init, capture_events):

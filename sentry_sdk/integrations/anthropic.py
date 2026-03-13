@@ -55,6 +55,7 @@ class _RecordedUsage:
     input_tokens: int = 0
     cache_write_input_tokens: "Optional[int]" = 0
     cache_read_input_tokens: "Optional[int]" = 0
+    finish_reason: "Optional[str]" = None
 
 
 class AnthropicIntegration(Integration):
@@ -185,6 +186,10 @@ def _collect_ai_data(
                 if cache_read_input_tokens is not None:
                     usage.cache_read_input_tokens = cache_read_input_tokens
                 # TODO: Record event.usage.server_tool_use
+
+                stop_reason = getattr(event.delta, "stop_reason", None)
+                if stop_reason is not None:
+                    usage.finish_reason = stop_reason
 
                 return (
                     model,
@@ -349,10 +354,13 @@ def _set_output_data(
     cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
     finish_span: bool = False,
+    finish_reason: "str | None" = None,
 ) -> None:
     """
     Set output data for the span based on the AI response."""
     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    if finish_reason is not None:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, [finish_reason])
     if should_send_default_pii() and integration.include_prompts:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
@@ -444,6 +452,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
                 finish_span=True,
+                finish_reason=getattr(result, "stop_reason", None),
             )
 
         # Streaming response
@@ -486,6 +495,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     cache_write_input_tokens=usage.cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
+                    finish_reason=usage.finish_reason,
                 )
 
             async def new_iterator_async() -> "AsyncIterator[MessageStreamEvent]":
@@ -524,6 +534,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     cache_write_input_tokens=usage.cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
+                    finish_reason=usage.finish_reason,
                 )
 
             if str(type(result._iterator)) == "<class 'async_generator'>":
