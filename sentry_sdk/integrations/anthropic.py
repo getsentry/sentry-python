@@ -39,10 +39,7 @@ try:
 
     from anthropic import Stream, AsyncStream
     from anthropic.resources import AsyncMessages, Messages
-    from anthropic.lib.streaming._messages import (
-        MessageStreamManager,
-        AsyncMessageStreamManager,
-    )
+    from anthropic.lib.streaming import MessageStreamManager, AsyncMessageStreamManager
 
     from anthropic.types import (
         MessageStartEvent,
@@ -59,20 +56,18 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncIterator, Iterator, List, Optional, Union
+    from typing import Any, AsyncIterator, Iterator, Optional, Union
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
-    from anthropic import AsyncStream
     from anthropic.types import (
         RawMessageStreamEvent,
         MessageParam,
         ModelParam,
         TextBlockParam,
         ToolUnionParam,
-        MessageStream,
-        AsyncMessageStream,
     )
+    from anthropic.lib.streaming import MessageStream, AsyncMessageStream
 
 
 class _RecordedUsage:
@@ -163,7 +158,8 @@ def _collect_ai_data(
     model: "str | None",
     usage: "_RecordedUsage",
     content_blocks: "list[str]",
-) -> "tuple[str | None, _RecordedUsage, list[str]]":
+    response_id: "str | None" = None,
+) -> "tuple[str | None, _RecordedUsage, list[str], str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
@@ -183,6 +179,7 @@ def _collect_ai_data(
             # https://github.com/anthropics/anthropic-sdk-python/blob/9c485f6966e10ae0ea9eabb3a921d2ea8145a25b/src/anthropic/lib/streaming/_messages.py#L433-L518
             if event.type == "message_start":
                 model = event.message.model or model
+                response_id = event.message.id
 
                 incoming_usage = event.message.usage
                 usage.output_tokens = incoming_usage.output_tokens
@@ -199,6 +196,7 @@ def _collect_ai_data(
                     model,
                     usage,
                     content_blocks,
+                    response_id,
                 )
 
             # Counterintuitive, but message_delta contains cumulative token counts :)
@@ -227,12 +225,14 @@ def _collect_ai_data(
                     model,
                     usage,
                     content_blocks,
+                    response_id,
                 )
 
     return (
         model,
         usage,
         content_blocks,
+        response_id,
     )
 
 
@@ -293,6 +293,7 @@ def _set_common_input_data(
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
+    span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
     if (
         messages is not None
@@ -409,60 +410,63 @@ def _wrap_synchronous_message_iterator(
     model = None
     usage = _RecordedUsage()
     content_blocks: "list[str]" = []
+    response_id = None
 
-    for event in iterator:
-        if not isinstance(
-            event,
-            (
-                MessageStartEvent,
-                MessageDeltaEvent,
-                MessageStopEvent,
-                ContentBlockStartEvent,
-                ContentBlockDeltaEvent,
-                ContentBlockStopEvent,
-            ),
-        ):
+    try:
+        for event in iterator:
+            # Message and content types are aliases for corresponding Raw* types, introduced in
+            # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
+            (model, usage, content_blocks, response_id) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            )
             yield event
-            continue
+    finally:
+        with capture_internal_exceptions():
+            # Anthropic's input_tokens excludes cached/cache_write tokens.
+            # Normalize to total input tokens for correct cost calculations.
+            total_input = (
+                usage.input_tokens
+                + (usage.cache_read_input_tokens or 0)
+                + (usage.cache_write_input_tokens or 0)
+            )
 
-        (
-            model,
-            usage,
-            content_blocks,
-        ) = _collect_ai_data(
-            event,
-            model,
-            usage,
-            content_blocks,
-        )
-        yield event
-
-    # Anthropic's input_tokens excludes cached/cache_write tokens.
-    # Normalize to total input tokens for correct cost calculations.
-    total_input = (
-        usage.input_tokens
-        + (usage.cache_read_input_tokens or 0)
-        + (usage.cache_write_input_tokens or 0)
-    )
-
-    _set_output_data(
-        span=span,
-        integration=integration,
-        model=model,
-        input_tokens=total_input,
-        output_tokens=usage.output_tokens,
-        cache_read_input_tokens=usage.cache_read_input_tokens,
-        cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-        finish_span=True,
-    )
+            _set_output_data(
+                span=span,
+                integration=integration,
+                model=model,
+                input_tokens=total_input,
+                output_tokens=usage.output_tokens,
+                cache_read_input_tokens=usage.cache_read_input_tokens,
+                cache_write_input_tokens=usage.cache_write_input_tokens,
+                content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+                finish_span=True,
+                response_id=response_id,
+            )
 
 
 async def _wrap_asynchronous_message_iterator(
     iterator: "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
     span: "Span",
     integration: "AnthropicIntegration",
-) -> "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
+) -> "AsyncIterator[RawMessageStreamEvent]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span.
@@ -470,53 +474,61 @@ async def _wrap_asynchronous_message_iterator(
     model = None
     usage = _RecordedUsage()
     content_blocks: "list[str]" = []
+    response_id = None
 
-    async for event in iterator:
-        if not isinstance(
-            event,
+    try:
+        async for event in iterator:
+            # Message and content types are aliases for corresponding Raw* types, introduced in
+            # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
             (
-                MessageStartEvent,
-                MessageDeltaEvent,
-                MessageStopEvent,
-                ContentBlockStartEvent,
-                ContentBlockDeltaEvent,
-                ContentBlockStopEvent,
-            ),
-        ):
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            ) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            )
             yield event
-            continue
+    finally:
+        with capture_internal_exceptions():
+            # Anthropic's input_tokens excludes cached/cache_write tokens.
+            # Normalize to total input tokens for correct cost calculations.
+            total_input = (
+                usage.input_tokens
+                + (usage.cache_read_input_tokens or 0)
+                + (usage.cache_write_input_tokens or 0)
+            )
 
-        (
-            model,
-            usage,
-            content_blocks,
-        ) = _collect_ai_data(
-            event,
-            model,
-            usage,
-            content_blocks,
-        )
-        yield event
-
-    # Anthropic's input_tokens excludes cached/cache_write tokens.
-    # Normalize to total input tokens for correct cost calculations.
-    total_input = (
-        usage.input_tokens
-        + (usage.cache_read_input_tokens or 0)
-        + (usage.cache_write_input_tokens or 0)
-    )
-
-    _set_output_data(
-        span=span,
-        integration=integration,
-        model=model,
-        input_tokens=total_input,
-        output_tokens=usage.output_tokens,
-        cache_read_input_tokens=usage.cache_read_input_tokens,
-        cache_write_input_tokens=usage.cache_write_input_tokens,
-        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-        finish_span=True,
-    )
+            _set_output_data(
+                span=span,
+                integration=integration,
+                model=model,
+                input_tokens=total_input,
+                output_tokens=usage.output_tokens,
+                cache_read_input_tokens=usage.cache_read_input_tokens,
+                cache_write_input_tokens=usage.cache_write_input_tokens,
+                content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+                finish_span=True,
+                response_id=response_id,
+            )
 
 
 def _set_output_data(
@@ -529,10 +541,13 @@ def _set_output_data(
     cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
     finish_span: bool = False,
+    response_id: "str | None" = None,
 ) -> None:
     """
     Set output data for the span based on the AI response."""
     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    if response_id is not None:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
     if should_send_default_pii() and integration.include_prompts:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
@@ -636,6 +651,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
                 finish_span=True,
+                response_id=getattr(result, "id", None),
             )
         else:
             span.set_data("unknown_response", True)
@@ -768,13 +784,9 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         except TypeError:
             return stream
 
-        model = self._model
-        if model is None:
-            model = ""
-
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
-            name=f"chat {model}".strip(),
+            name="chat" if self._model is None else f"chat {self._model}".strip(),
             origin=AnthropicIntegration.origin,
         )
         span.__enter__()
@@ -785,7 +797,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
             integration=integration,
             max_tokens=self._max_tokens,
             messages=self._messages,
-            model=model,
+            model=self._model,
             system=self._system,
             temperature=self._temperature,
             top_k=self._top_k,
@@ -856,13 +868,9 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
         except TypeError:
             return stream
 
-        model = self._model
-        if model is None:
-            model = ""
-
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
-            name=f"chat {model}".strip(),
+            name="chat" if self._model is None else f"chat {self._model}".strip(),
             origin=AnthropicIntegration.origin,
         )
         span.__enter__()
@@ -873,7 +881,7 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
             integration=integration,
             max_tokens=self._max_tokens,
             messages=self._messages,
-            model=model,
+            model=self._model,
             system=self._system,
             temperature=self._temperature,
             top_k=self._top_k,

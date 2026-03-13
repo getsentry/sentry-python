@@ -1,5 +1,4 @@
 import asyncio
-import re
 import pytest
 from unittest.mock import MagicMock, patch
 import os
@@ -19,7 +18,6 @@ from openai import AsyncOpenAI, InternalServerError
 from agents.models.openai_responses import OpenAIResponsesModel
 
 from unittest import mock
-from unittest.mock import AsyncMock
 
 import agents
 from agents import (
@@ -46,15 +44,12 @@ from openai.types.responses import (
     ResponseCompletedEvent,
     Response,
     ResponseUsage,
-    ResponseStreamEvent,
 )
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
 )
 
-from openai._response import AsyncAPIResponse
-from openai._models import FinalRequestOptions
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
 
@@ -201,25 +196,6 @@ def test_agent_custom_model():
     )
 
 
-@pytest.fixture
-def get_model_response():
-    def inner(response_content):
-        model_request = httpx.Request(
-            "POST",
-            "/responses",
-        )
-
-        response = httpx.Response(
-            200,
-            request=model_request,
-            content=json.dumps(response_content.model_dump()).encode("utf-8"),
-        )
-
-        return response
-
-    return inner
-
-
 @pytest.mark.asyncio
 async def test_agent_invocation_span_no_pii(
     sentry_init, capture_events, test_agent, mock_model_response, get_model_response
@@ -228,7 +204,7 @@ async def test_agent_invocation_span_no_pii(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response)
+    response = get_model_response(mock_model_response, serialize_pydantic=True)
 
     with patch.object(
         agent.model._client._client,
@@ -377,7 +353,7 @@ async def test_agent_invocation_span(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent_with_instructions(instructions).clone(model=model)
 
-    response = get_model_response(mock_model_response)
+    response = get_model_response(mock_model_response, serialize_pydantic=True)
 
     with patch.object(
         agent.model._client._client,
@@ -538,7 +514,7 @@ async def test_client_span_custom_model(
     model = OpenAIResponsesModel(model="my-custom-model", openai_client=client)
     agent = test_agent_custom_model.clone(model=model)
 
-    response = get_model_response(mock_model_response)
+    response = get_model_response(mock_model_response, serialize_pydantic=True)
 
     with patch.object(
         agent.model._client._client,
@@ -581,7 +557,7 @@ def test_agent_invocation_span_sync_no_pii(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response)
+    response = get_model_response(mock_model_response, serialize_pydantic=True)
 
     with patch.object(
         agent.model._client._client,
@@ -724,7 +700,7 @@ def test_agent_invocation_span_sync(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent_with_instructions(instructions).clone(model=model)
 
-    response = get_model_response(mock_model_response)
+    response = get_model_response(mock_model_response, serialize_pydantic=True)
 
     with patch.object(
         agent.model._client._client,
@@ -906,7 +882,8 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
                 ),
                 total_tokens=30,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -944,7 +921,8 @@ async def test_handoff_span(sentry_init, capture_events, get_model_response):
                 ),
                 total_tokens=30,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -1032,7 +1010,8 @@ async def test_max_turns_before_handoff_span(
                 ),
                 total_tokens=30,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -1070,7 +1049,8 @@ async def test_max_turns_before_handoff_span(
                 ),
                 total_tokens=30,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -1152,7 +1132,8 @@ async def test_tool_execution_span(
                 ),
                 total_tokens=15,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -1190,7 +1171,8 @@ async def test_tool_execution_span(
                 ),
                 total_tokens=25,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -1386,16 +1368,9 @@ async def test_tool_execution_span(
     assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
 
 
-def server_side_event_chunks(events):
-    for event in events:
-        payload = event.model_dump()
-        chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
-        yield chunk.encode("utf-8")
-
-
 @pytest.mark.asyncio
 async def test_hosted_mcp_tool_propagation_header_streamed(
-    sentry_init, test_agent, async_iterator
+    sentry_init, test_agent, async_iterator, server_side_event_chunks
 ):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
@@ -1594,7 +1569,7 @@ async def test_hosted_mcp_tool_propagation_headers(
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
-    response = get_model_response(EXAMPLE_RESPONSE)
+    response = get_model_response(EXAMPLE_RESPONSE, serialize_pydantic=True)
 
     with patch.object(
         agent_with_tool.model._client._client,
@@ -1905,7 +1880,8 @@ async def test_mcp_tool_execution_spans(
                 ),
                 total_tokens=15,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -1943,7 +1919,8 @@ async def test_mcp_tool_execution_spans(
                 ),
                 total_tokens=25,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2035,7 +2012,8 @@ async def test_mcp_tool_execution_with_error(
                 ),
                 total_tokens=15,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -2073,7 +2051,8 @@ async def test_mcp_tool_execution_with_error(
                 ),
                 total_tokens=25,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2163,7 +2142,8 @@ async def test_mcp_tool_execution_without_pii(
                 ),
                 total_tokens=15,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -2201,7 +2181,8 @@ async def test_mcp_tool_execution_without_pii(
                 ),
                 total_tokens=25,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2259,7 +2240,7 @@ async def test_multiple_agents_asyncio(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response)
+    response = get_model_response(mock_model_response, serialize_pydantic=True)
 
     with patch.object(
         agent.model._client._client,
@@ -2389,7 +2370,8 @@ async def test_tool_execution_error_tracing(
                 ),
                 total_tokens=15,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -2427,7 +2409,8 @@ async def test_tool_execution_error_tracing(
                 ),
                 total_tokens=25,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2522,7 +2505,8 @@ async def test_invoke_agent_span_includes_usage_data(
                 ),
                 total_tokens=30,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2613,7 +2597,8 @@ async def test_ai_client_span_includes_response_model(
                 ),
                 total_tokens=30,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2700,7 +2685,8 @@ async def test_ai_client_span_response_model_with_chat_completions(
                 ),
                 total_tokens=40,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2777,7 +2763,8 @@ async def test_multiple_llm_calls_aggregate_usage(
                 ),
                 total_tokens=15,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -2815,7 +2802,8 @@ async def test_multiple_llm_calls_aggregate_usage(
                 ),
                 total_tokens=35,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2903,7 +2891,8 @@ async def test_invoke_agent_span_includes_response_model(
                 ),
                 total_tokens=30,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -2992,7 +2981,8 @@ async def test_invoke_agent_span_uses_last_response_model(
                 ),
                 total_tokens=15,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     second_response = get_model_response(
@@ -3030,7 +3020,8 @@ async def test_invoke_agent_span_uses_last_response_model(
                 ),
                 total_tokens=35,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -3162,7 +3153,9 @@ async def test_streaming_span_update_captures_response_data(
 
 
 @pytest.mark.asyncio
-async def test_streaming_ttft_on_chat_span(sentry_init, test_agent, async_iterator):
+async def test_streaming_ttft_on_chat_span(
+    sentry_init, test_agent, async_iterator, server_side_event_chunks
+):
     """
     Test that time-to-first-token (TTFT) is recorded on chat spans during streaming.
 
@@ -3330,7 +3323,7 @@ async def test_conversation_id_on_all_spans(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response)
+    response = get_model_response(mock_model_response, serialize_pydantic=True)
 
     with patch.object(
         agent.model._client._client,
@@ -3423,7 +3416,8 @@ async def test_conversation_id_on_tool_span(
                 ),
                 total_tokens=15,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     final_response = get_model_response(
@@ -3461,7 +3455,8 @@ async def test_conversation_id_on_tool_span(
                 ),
                 total_tokens=30,
             ),
-        )
+        ),
+        serialize_pydantic=True,
     )
 
     with patch.object(
@@ -3524,7 +3519,7 @@ async def test_no_conversation_id_when_not_provided(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response)
+    response = get_model_response(mock_model_response, serialize_pydantic=True)
 
     with patch.object(
         agent.model._client._client,

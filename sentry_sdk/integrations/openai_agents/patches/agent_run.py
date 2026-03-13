@@ -1,5 +1,4 @@
 import sys
-from functools import wraps
 
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable

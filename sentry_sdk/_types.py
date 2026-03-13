@@ -1,3 +1,9 @@
+try:
+    from re import Pattern
+except ImportError:
+    # 3.6
+    from typing import Pattern
+
 from typing import TYPE_CHECKING, TypeVar, Union
 
 
@@ -103,7 +109,6 @@ if TYPE_CHECKING:
     from typing import Mapping
     from typing import NotRequired
     from typing import Optional
-    from typing import Tuple
     from typing import Type
     from typing_extensions import Literal, TypedDict
 
@@ -361,3 +366,11 @@ if TYPE_CHECKING:
     class TextPart(TypedDict):
         type: Literal["text"]
         content: str
+
+    IgnoreSpansName = Union[str, Pattern[str]]
+    IgnoreSpansContext = TypedDict(
+        "IgnoreSpansContext",
+        {"name": IgnoreSpansName, "attributes": Attributes},
+        total=False,
+    )
+    IgnoreSpansConfig = list[Union[IgnoreSpansName, IgnoreSpansContext]]

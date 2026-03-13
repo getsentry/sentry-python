@@ -1,7 +1,6 @@
 import pytest
 
 import sentry_sdk
-from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 
 
 @pytest.fixture

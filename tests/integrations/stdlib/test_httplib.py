@@ -1,6 +1,5 @@
 import os
 import datetime
-import socket
 from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
