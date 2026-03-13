@@ -962,6 +962,7 @@ def test_stream_messages_with_input_json_delta(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1279,6 +1280,7 @@ async def test_stream_message_with_input_json_delta_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -2078,6 +2080,7 @@ def test_stream_messages_with_system_prompt(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -2209,6 +2212,7 @@ async def test_stream_message_with_system_prompt_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
