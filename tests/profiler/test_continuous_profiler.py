@@ -643,7 +643,6 @@ def test_continuous_profiler_run_does_not_null_buffer(
     self.buffer = None from run().
     """
     from sentry_sdk.profiler import continuous_profiler as cp
-    from sentry_sdk.profiler.continuous_profiler import ContinuousScheduler
 
     options = get_client_options(True)(
         mode="thread", profile_session_sample_rate=1.0, lifecycle="manual"
