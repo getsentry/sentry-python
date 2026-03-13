@@ -71,7 +71,6 @@ try:
         from openai.types.chat import (
             ChatCompletionMessageParam,
             ChatCompletionChunk,
-            ChatCompletionSystemMessageParam,
         )
 except ImportError:
     raise DidNotEnable("OpenAI not installed")

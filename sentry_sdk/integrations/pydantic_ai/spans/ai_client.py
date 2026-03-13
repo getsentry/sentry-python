@@ -1,12 +1,10 @@
 import json
 
 import sentry_sdk
-from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.utils import (
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_messages,
-    get_modality_from_mime_type,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import safe_serialize
@@ -21,13 +19,16 @@ from ..utils import (
     get_current_agent,
     get_is_streaming,
 )
-from .utils import _set_usage_data
+from .utils import (
+    _serialize_binary_content_item,
+    _serialize_image_url_item,
+    _set_usage_data,
+)
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, List, Dict
-    from pydantic_ai.usage import RequestUsage  # type: ignore
     from pydantic_ai.messages import ModelMessage, SystemPromptPart  # type: ignore
     from sentry_sdk._types import TextPart as SentryTextPart
 
@@ -40,6 +41,7 @@ try:
         TextPart,
         ThinkingPart,
         BinaryContent,
+        ImageUrl,
     )
 except ImportError:
     # Fallback if these classes are not available
@@ -50,6 +52,7 @@ except ImportError:
     TextPart = None
     ThinkingPart = None
     BinaryContent = None
+    ImageUrl = None
 
 
 def _transform_system_instructions(
@@ -158,22 +161,14 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                             for item in part.content:
                                 if isinstance(item, str):
                                     content.append({"type": "text", "text": item})
+                                elif ImageUrl and isinstance(item, ImageUrl):
+                                    content.append(_serialize_image_url_item(item))
                                 elif BinaryContent and isinstance(item, BinaryContent):
-                                    content.append(
-                                        {
-                                            "type": "blob",
-                                            "modality": get_modality_from_mime_type(
-                                                item.media_type
-                                            ),
-                                            "mime_type": item.media_type,
-                                            "content": BLOB_DATA_SUBSTITUTE,
-                                        }
-                                    )
+                                    content.append(_serialize_binary_content_item(item))
                                 else:
                                     content.append(safe_serialize(item))
                         else:
                             content.append({"type": "text", "text": str(part.content)})
-
                     # Add message if we have content or tool calls
                     if content or tool_calls:
                         message: "Dict[str, Any]" = {"role": role}
