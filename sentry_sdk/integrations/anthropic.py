@@ -777,13 +777,9 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         except TypeError:
             return stream
 
-        model = self._model
-        if model is None:
-            model = ""
-
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
-            name=f"chat {model}".strip(),
+            name="chat" if self._model is None else f"chat {self._model}".strip(),
             origin=AnthropicIntegration.origin,
         )
         span.__enter__()
@@ -794,7 +790,7 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
             integration=integration,
             max_tokens=self._max_tokens,
             messages=self._messages,
-            model=model,
+            model=self._model,
             system=self._system,
             temperature=self._temperature,
             top_k=self._top_k,
