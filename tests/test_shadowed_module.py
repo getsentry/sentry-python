@@ -7,7 +7,6 @@ import pathlib
 import pytest
 
 from sentry_sdk import integrations
-from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, Integration
 
 
 def pytest_generate_tests(metafunc):

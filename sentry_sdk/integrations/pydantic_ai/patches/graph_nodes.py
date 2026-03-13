@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from functools import wraps
 
-import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import (

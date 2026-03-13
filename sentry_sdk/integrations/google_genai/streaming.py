@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, TypedDict, Optional, Union
+from typing import TYPE_CHECKING, Any, List, TypedDict, Optional
 
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
