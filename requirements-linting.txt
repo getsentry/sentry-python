@@ -19,3 +19,4 @@ UnleashClient
 typer
 strawberry-graphql
 setuptools<82
+httpx

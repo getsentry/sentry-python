@@ -11,6 +11,12 @@ from random import Random
 from urllib.parse import quote, unquote
 import uuid
 
+try:
+    from re import Pattern
+except ImportError:
+    # 3.6
+    from typing import Pattern
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.utils import (
@@ -23,6 +29,7 @@ from sentry_sdk.utils import (
     to_string,
     try_convert,
     is_sentry_url,
+    is_valid_sample_rate,
     _is_external_source,
     _is_in_project_root,
     _module_in_list,
@@ -40,6 +47,8 @@ if TYPE_CHECKING:
     from typing import Tuple
 
     from types import FrameType
+
+    from sentry_sdk._types import Attributes
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -414,6 +423,7 @@ class PropagationContext:
         "parent_span_id",
         "parent_sampled",
         "baggage",
+        "custom_sampling_context",
     )
 
     def __init__(
@@ -446,6 +456,8 @@ class PropagationContext:
         """DEPRECATED this only exists for backwards compat of constructor."""
         if baggage is None and dynamic_sampling_context is not None:
             self.baggage = Baggage(dynamic_sampling_context)
+
+        self.custom_sampling_context: "Optional[dict[str, Any]]" = None
 
     @classmethod
     def from_incoming_data(
@@ -533,6 +545,11 @@ class PropagationContext:
                 setattr(self, key, value)
             except AttributeError:
                 pass
+
+    def _set_custom_sampling_context(
+        self, custom_sampling_context: "dict[str, Any]"
+    ) -> None:
+        self.custom_sampling_context = custom_sampling_context
 
     def __repr__(self) -> str:
         return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} baggage={}>".format(
@@ -1377,6 +1394,139 @@ def add_sentry_baggage_to_headers(
     headers[BAGGAGE_HEADER_NAME] = (
         stripped_existing_baggage + separator + sentry_baggage
     )
+
+
+def _make_sampling_decision(
+    name: str,
+    attributes: "Optional[Attributes]",
+    scope: "sentry_sdk.Scope",
+) -> "tuple[bool, Optional[float], Optional[float], Optional[str]]":
+    """
+    Decide whether a span should be sampled.
+
+    Returns a tuple with:
+    1. the sampling decision
+    2. the effective sample rate
+    3. the sample rand
+    4. the reason for not sampling the span, if unsampled
+    """
+    client = sentry_sdk.get_client()
+
+    if not has_tracing_enabled(client.options):
+        return False, None, None, None
+
+    propagation_context = scope.get_active_propagation_context()
+
+    sample_rand = None
+    if propagation_context.baggage is not None:
+        sample_rand = propagation_context.baggage._sample_rand()
+    if sample_rand is None:
+        sample_rand = _generate_sample_rand(propagation_context.trace_id)
+
+    # If there's a traces_sampler, use that; otherwise use traces_sample_rate
+    traces_sampler_defined = callable(client.options.get("traces_sampler"))
+    if traces_sampler_defined:
+        sampling_context = {
+            "span_context": {
+                "name": name,
+                "trace_id": propagation_context.trace_id,
+                "parent_span_id": propagation_context.parent_span_id,
+                "parent_sampled": propagation_context.parent_sampled,
+                "attributes": dict(attributes) if attributes else {},
+            },
+        }
+
+        if propagation_context.custom_sampling_context:
+            sampling_context.update(propagation_context.custom_sampling_context)
+
+        sample_rate = client.options["traces_sampler"](sampling_context)
+    else:
+        if propagation_context.parent_sampled is not None:
+            sample_rate = propagation_context.parent_sampled
+        else:
+            sample_rate = client.options["traces_sample_rate"]
+
+    # Validate whether the sample_rate we got is actually valid. Since
+    # traces_sampler is user-provided, it could return anything.
+    if not is_valid_sample_rate(sample_rate, source="Tracing"):
+        logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
+        return False, None, None, "sample_rate"
+
+    sample_rate = float(sample_rate)
+    if not sample_rate:
+        if traces_sampler_defined:
+            reason = "traces_sampler returned 0 or False"
+        else:
+            reason = "traces_sample_rate is set to 0"
+
+        logger.debug(f"[Tracing] Discarding {name} because {reason}")
+        return False, 0.0, None, "sample_rate"
+
+    # Adjust sample rate if we're under backpressure
+    if client.monitor:
+        sample_rate /= 2**client.monitor.downsample_factor
+
+        if not sample_rate:
+            logger.debug(f"[Tracing] Discarding {name} because backpressure")
+            return False, 0.0, None, "backpressure"
+
+    sampled = sample_rand < sample_rate
+
+    if sampled:
+        logger.debug(f"[Tracing] Starting {name}")
+        outcome = None
+    else:
+        logger.debug(
+            f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
+        )
+        outcome = "sample_rate"
+
+    return sampled, sample_rate, sample_rand, outcome
+
+
+def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
+    """Determine if a span fits one of the rules in ignore_spans."""
+    client = sentry_sdk.get_client()
+    ignore_spans = (client.options.get("_experiments") or {}).get("ignore_spans")
+
+    if not ignore_spans:
+        return False
+
+    def _matches(rule: "Any", value: "Any") -> bool:
+        if isinstance(rule, Pattern):
+            if isinstance(value, str):
+                return bool(rule.fullmatch(value))
+            else:
+                return False
+
+        return rule == value
+
+    for rule in ignore_spans:
+        if isinstance(rule, (str, Pattern)):
+            if _matches(rule, name):
+                return True
+
+        elif isinstance(rule, dict) and ("name" in rule or "attributes" in rule):
+            name_matches = True
+            attributes_match = True
+
+            attributes = attributes or {}
+
+            if "name" in rule:
+                name_matches = _matches(rule["name"], name)
+
+            if "attributes" in rule:
+                for attribute, value in rule["attributes"].items():
+                    if attribute not in attributes or not _matches(
+                        value, attributes[attribute]
+                    ):
+                        attributes_match = False
+                        break
+
+            if name_matches and attributes_match:
+                return True
+
+    return False
 
 
 # Circular imports

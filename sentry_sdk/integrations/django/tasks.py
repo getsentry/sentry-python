@@ -2,12 +2,11 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.tracing import SPANSTATUS
 from sentry_sdk.utils import qualname_from_function
 
 try:
     # django.tasks were added in Django 6.0
-    from django.tasks.base import Task, TaskResultStatus
+    from django.tasks.base import Task
 except ImportError:
     Task = None
 
