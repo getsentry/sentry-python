@@ -26,11 +26,15 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, ParamSpec, TypeVar, Union
+    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue
 
     P = ParamSpec("P")
     R = TypeVar("R")
+
+
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
 
 class SpanStatus(str, Enum):
@@ -328,7 +332,7 @@ class StreamedSpan:
     def _start(self) -> None:
         if self._active:
             old_span = self._scope.span
-            self._scope.span = self  # type: ignore
+            self._scope.span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -463,6 +467,67 @@ class StreamedSpan:
             if thread_name is not None:
                 self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
+    def _dynamic_sampling_context(self) -> "dict[str, str]":
+        return self._segment._get_baggage().dynamic_sampling_context()
+
+    def _to_traceparent(self) -> str:
+        if self.sampled is True:
+            sampled = "1"
+        elif self.sampled is False:
+            sampled = "0"
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
+
+    def _to_baggage(self) -> "Optional[Baggage]":
+        if self._segment:
+            return self._segment._get_baggage()
+        return None
+
+    def _get_baggage(self) -> "Baggage":
+        """
+        Return the :py:class:`~sentry_sdk.tracing_utils.Baggage` associated with
+        the segment.
+
+        The first time a new baggage with Sentry items is made, it will be frozen.
+        """
+        if not self._baggage or self._baggage.mutable:
+            self._baggage = Baggage.populate_from_segment(self)
+
+        return self._baggage
+
+    def _iter_headers(self) -> "Iterator[tuple[str, str]]":
+        if not self._segment:
+            return
+
+        yield SENTRY_TRACE_HEADER_NAME, self._to_traceparent()
+
+        baggage = self._segment._get_baggage().serialize()
+        if baggage:
+            yield BAGGAGE_HEADER_NAME, baggage
+
+    def _get_trace_context(self) -> "dict[str, Any]":
+        # Even if spans themselves are not event-based anymore, we need this
+        # to populate trace context on events
+        context: "dict[str, Any]" = {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "parent_span_id": self._parent_span_id,
+            "dynamic_sampling_context": self._dynamic_sampling_context(),
+        }
+
+        if "sentry.op" in self._attributes:
+            context["op"] = self._attributes["sentry.op"]
+        if "sentry.origin" in self._attributes:
+            context["origin"] = self._attributes["sentry.origin"]
+
+        return context
+
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
@@ -498,7 +563,7 @@ class NoOpStreamedSpan(StreamedSpan):
             return
 
         old_span = self._scope.span
-        self._scope.span = self  # type: ignore
+        self._scope.span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
