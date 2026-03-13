@@ -58,7 +58,7 @@ from sentry_sdk.utils import package_version
 ANTHROPIC_VERSION = package_version("anthropic")
 
 EXAMPLE_MESSAGE = Message(
-    id="id",
+    id="msg_01XFDUDYJgAACzvnptvVoYEL",
     model="model",
     role="assistant",
     content=[TextBlock(type="text", text="Hi, I'm Claude.")],
@@ -134,7 +134,7 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "id"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.asyncio
@@ -205,7 +205,7 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "id"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.parametrize(
@@ -308,7 +308,7 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "id"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.asyncio
@@ -414,7 +414,7 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "id"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.skipif(
