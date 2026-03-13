@@ -11,7 +11,7 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
-from anthropic import Anthropic, AnthropicError, AsyncAnthropic, AsyncStream, Stream
+from anthropic import Anthropic, AnthropicError, AsyncAnthropic
 from anthropic.types import MessageDeltaUsage, TextDelta, Usage
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
@@ -498,13 +498,13 @@ def test_streaming_create_message_with_input_json_delta(
                 ),
                 ContentBlockDeltaEvent(
                     delta=InputJSONDelta(
-                        partial_json="{'location':", type="input_json_delta"
+                        partial_json='{"location": "', type="input_json_delta"
                     ),
                     index=0,
                     type="content_block_delta",
                 ),
                 ContentBlockDeltaEvent(
-                    delta=InputJSONDelta(partial_json=" 'S", type="input_json_delta"),
+                    delta=InputJSONDelta(partial_json="S", type="input_json_delta"),
                     index=0,
                     type="content_block_delta",
                 ),
@@ -521,7 +521,7 @@ def test_streaming_create_message_with_input_json_delta(
                     type="content_block_delta",
                 ),
                 ContentBlockDeltaEvent(
-                    delta=InputJSONDelta(partial_json="A'}", type="input_json_delta"),
+                    delta=InputJSONDelta(partial_json='A"}', type="input_json_delta"),
                     index=0,
                     type="content_block_delta",
                 ),
@@ -584,7 +584,7 @@ def test_streaming_create_message_with_input_json_delta(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == "{'location': 'San Francisco, CA'}"
+            == '{"location": "San Francisco, CA"}'
         )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -651,15 +651,13 @@ async def test_streaming_create_message_with_input_json_delta_async(
                     ),
                     ContentBlockDeltaEvent(
                         delta=InputJSONDelta(
-                            partial_json="{'location':", type="input_json_delta"
+                            partial_json='{"location": "', type="input_json_delta"
                         ),
                         index=0,
                         type="content_block_delta",
                     ),
                     ContentBlockDeltaEvent(
-                        delta=InputJSONDelta(
-                            partial_json=" 'S", type="input_json_delta"
-                        ),
+                        delta=InputJSONDelta(partial_json="S", type="input_json_delta"),
                         index=0,
                         type="content_block_delta",
                     ),
@@ -679,7 +677,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
                     ),
                     ContentBlockDeltaEvent(
                         delta=InputJSONDelta(
-                            partial_json="A'}", type="input_json_delta"
+                            partial_json='A"}', type="input_json_delta"
                         ),
                         index=0,
                         type="content_block_delta",
@@ -744,7 +742,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == "{'location': 'San Francisco, CA'}"
+            == '{"location": "San Francisco, CA"}'
         )
 
     else:
