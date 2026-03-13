@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.tracing import Transaction, TransactionSource
+from sentry_sdk.tracing import TransactionSource
 
 from typing import TYPE_CHECKING
 

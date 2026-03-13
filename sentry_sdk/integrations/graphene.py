@@ -141,17 +141,15 @@ def graphql_span(
         },
     )
 
-    scope = sentry_sdk.get_current_scope()
-    if scope.span:
-        _graphql_span = scope.span.start_child(op=op, name=operation_name)
-    else:
-        _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
+    _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
 
     _graphql_span.set_data("graphql.document", source)
     _graphql_span.set_data("graphql.operation.name", operation_name)
     _graphql_span.set_data("graphql.operation.type", operation_type)
 
+    _graphql_span.__enter__()
+
     try:
         yield
     finally:
-        _graphql_span.finish()
+        _graphql_span.__exit__(None, None, None)
