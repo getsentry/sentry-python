@@ -40,6 +40,15 @@ try:
     from anthropic import Stream, AsyncStream
     from anthropic.resources import AsyncMessages, Messages
 
+    from anthropic.types import (
+        MessageStartEvent,
+        MessageDeltaEvent,
+        MessageStopEvent,
+        ContentBlockStartEvent,
+        ContentBlockDeltaEvent,
+        ContentBlockStopEvent,
+    )
+
     if TYPE_CHECKING:
         from anthropic.types import MessageStreamEvent, TextBlockParam
 except ImportError:
@@ -363,6 +372,22 @@ def _wrap_synchronous_message_iterator(
     response_id = None
 
     for event in iterator:
+        # Message and content types are aliases for corresponding Raw* types, introduced in
+        # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+        if not isinstance(
+            event,
+            (
+                MessageStartEvent,
+                MessageDeltaEvent,
+                MessageStopEvent,
+                ContentBlockStartEvent,
+                ContentBlockDeltaEvent,
+                ContentBlockStopEvent,
+            ),
+        ):
+            yield event
+            continue
+
         (
             model,
             usage,
@@ -414,6 +439,22 @@ async def _wrap_asynchronous_message_iterator(
     response_id = None
 
     async for event in iterator:
+        # Message and content types are aliases for corresponding Raw* types, introduced in
+        # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+        if not isinstance(
+            event,
+            (
+                MessageStartEvent,
+                MessageDeltaEvent,
+                MessageStopEvent,
+                ContentBlockStartEvent,
+                ContentBlockDeltaEvent,
+                ContentBlockStopEvent,
+            ),
+        ):
+            yield event
+            continue
+
         (
             model,
             usage,
