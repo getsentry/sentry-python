@@ -15,6 +15,11 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.profiler.continuous_profiler import (
+    get_profiler_id,
+    try_autostart_continuous_profiler,
+    try_profile_lifecycle_trace_start,
+)
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -28,6 +33,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue
+    from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -232,6 +238,7 @@ class StreamedSpan:
         "_baggage",
         "_sample_rand",
         "_sample_rate",
+        "_continuous_profile",
     )
 
     def __init__(
@@ -283,6 +290,10 @@ class StreamedSpan:
         self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
         self._update_active_thread()
+
+        self._continuous_profile: "Optional[ContinuousProfile]" = None
+        self._start_profile()
+        self._set_profile_id(get_profiler_id())
 
         self._start()
 
@@ -339,6 +350,11 @@ class StreamedSpan:
         if self._timestamp is not None:
             # This span is already finished, ignore.
             return
+
+        # Stop the profiler
+        if self._is_segment() and self._continuous_profile is not None:
+            with capture_internal_exceptions():
+                self._continuous_profile.stop()
 
         # Detach from scope
         if self._active:
@@ -527,6 +543,24 @@ class StreamedSpan:
             context["origin"] = self._attributes["sentry.origin"]
 
         return context
+
+    def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
+        if profiler_id is not None:
+            self.set_attribute("sentry.profiler_id", profiler_id)
+
+    def _start_profile(self) -> None:
+        if not self._is_segment():
+            return
+
+        try_autostart_continuous_profiler()
+
+        self._continuous_profile = try_profile_lifecycle_trace_start()
+
+        # Typically, the profiler is set when the segment is created. But when
+        # using the auto lifecycle, the profiler isn't running when the first
+        # segment is started. So make sure we update the profiler id on it.
+        if self._continuous_profile is not None:
+            self._set_profile_id(get_profiler_id())
 
 
 class NoOpStreamedSpan(StreamedSpan):
