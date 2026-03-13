@@ -1,9 +1,6 @@
-import json
-import sys
-from typing import List, Any, Mapping
+from typing import List
 from unittest import mock
 
-import pytest
 
 import sentry_sdk
 from sentry_sdk import get_client

@@ -20,7 +20,6 @@ from importlib.metadata import PackageMetadata, distributions
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pathlib import Path
-from textwrap import dedent
 from typing import Optional, Union
 
 # Adding the scripts directory to PATH. This is necessary in order to be able

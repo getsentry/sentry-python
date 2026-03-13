@@ -255,6 +255,8 @@ class Item:
             return "attachment"
         elif ty == "transaction":
             return "transaction"
+        elif ty == "span":
+            return "span"
         elif ty == "event":
             return "error"
         elif ty == "log":

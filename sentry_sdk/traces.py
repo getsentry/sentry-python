@@ -14,10 +14,12 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
+    get_current_thread_meta,
     logger,
     nanosecond_time,
     should_be_treated_as_error,
@@ -276,6 +278,8 @@ class StreamedSpan:
         self._status = SpanStatus.OK.value
         self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
+        self._update_active_thread()
+
         self._start()
 
     def __repr__(self) -> str:
@@ -449,6 +453,15 @@ class StreamedSpan:
 
     def _is_segment(self) -> bool:
         return self._segment is self
+
+    def _update_active_thread(self) -> None:
+        thread_id, thread_name = get_current_thread_meta()
+
+        if thread_id is not None:
+            self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
+
+            if thread_name is not None:
+                self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
 
 class NoOpStreamedSpan(StreamedSpan):
