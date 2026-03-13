@@ -37,7 +37,7 @@ def check_uwsgi_thread_support() -> bool:
     #    --py-call-uwsgi-fork-hooks to force uWSGI to run regular cpython
     #    after-fork hooks that take care of cleaning up stale thread data.
     try:
-        from uwsgi import opt  # type: ignore
+        from uwsgi import opt
     except ImportError:
         return True
 
@@ -50,11 +50,11 @@ def check_uwsgi_thread_support() -> bool:
 
         if isinstance(value, bytes):
             try:
-                value = value.decode()
+                value = value.decode()  # type: ignore[assignment]
             except Exception:
                 pass
 
-        return value and str(value).lower() not in FALSE_VALUES
+        return bool(value and str(value).lower() not in FALSE_VALUES)
 
     # When `threads` is passed in as a uwsgi option,
     # `enable-threads` is implied on.

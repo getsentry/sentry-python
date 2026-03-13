@@ -9,7 +9,7 @@ from sentry_sdk.utils import AnnotatedValue, logger
 try:
     from django.http.request import RawPostDataException
 except ImportError:
-    RawPostDataException = None
+    RawPostDataException = None  # type: ignore[assignment, misc]
 
 from typing import TYPE_CHECKING
 

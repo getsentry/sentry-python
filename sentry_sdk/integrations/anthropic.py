@@ -44,6 +44,8 @@ try:
 except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
+from sentry_sdk.tracing import Span
+
 if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Iterator, Optional, Union
     from sentry_sdk.tracing import Span
@@ -568,7 +570,7 @@ def _wrap_message_create(f: "Any") -> "Any":
             return _execute_sync(f, *args, **kwargs)
         finally:
             span = sentry_sdk.get_current_span()
-            if span is not None and span.status == SPANSTATUS.INTERNAL_ERROR:
+            if isinstance(span, Span) and span.status == SPANSTATUS.INTERNAL_ERROR:
                 with capture_internal_exceptions():
                     span.__exit__(None, None, None)
 
@@ -606,7 +608,7 @@ def _wrap_message_create_async(f: "Any") -> "Any":
             return await _execute_async(f, *args, **kwargs)
         finally:
             span = sentry_sdk.get_current_span()
-            if span is not None and span.status == SPANSTATUS.INTERNAL_ERROR:
+            if isinstance(span, Span) and span.status == SPANSTATUS.INTERNAL_ERROR:
                 with capture_internal_exceptions():
                     span.__exit__(None, None, None)
 

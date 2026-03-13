@@ -54,7 +54,7 @@ def patch_signals() -> None:
         if DJANGO_VERSION >= (5, 0):
             sync_receivers, async_receivers = old_live_receivers(self, sender)
         else:
-            sync_receivers = old_live_receivers(self, sender)
+            sync_receivers = old_live_receivers(self, sender)  # type: ignore[assignment]
             async_receivers = []
 
         def sentry_sync_receiver_wrapper(
@@ -87,4 +87,4 @@ def patch_signals() -> None:
         else:
             return sync_receivers
 
-    Signal._live_receivers = _sentry_live_receivers
+    Signal._live_receivers = _sentry_live_receivers  # type: ignore[method-assign, assignment]

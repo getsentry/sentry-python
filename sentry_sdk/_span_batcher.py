@@ -83,7 +83,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":
-        # TODO[span-first]
         res: "dict[str, Any]" = {
             "trace_id": item.trace_id,
             "span_id": item.span_id,
@@ -112,11 +111,9 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return
 
             envelopes = []
-            for trace_id, spans in self._span_buffer.items():
+            for spans in self._span_buffer.values():
                 if spans:
-                    # TODO[span-first]
-                    # dsc = spans[0].dynamic_sampling_context()
-                    dsc = None
+                    dsc = spans[0]._dynamic_sampling_context()
 
                     # Max per envelope is 1000, so if we happen to have more than
                     # 1000 spans in one bucket, we'll need to separate them.
