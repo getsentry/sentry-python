@@ -842,7 +842,7 @@ class Scope:
         self._transaction = name
         if self._span:
             if isinstance(self._span, NoOpStreamedSpan):
-                return
+                pass
 
             elif isinstance(self._span, StreamedSpan):
                 self._span._segment.name = name
