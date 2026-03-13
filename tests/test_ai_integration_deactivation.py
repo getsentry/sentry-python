@@ -190,7 +190,6 @@ def test_langchain_and_openai_both_explicit_both_active(
 def test_no_langchain_means_openai_and_anthropic_can_auto_enable(
     sentry_init, reset_integrations, monkeypatch
 ):
-    import sys
     import sentry_sdk.integrations
 
     old_iter = sentry_sdk.integrations.iter_default_integrations

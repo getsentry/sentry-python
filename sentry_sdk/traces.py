@@ -14,10 +14,12 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
+    get_current_thread_meta,
     logger,
     nanosecond_time,
     should_be_treated_as_error,
@@ -224,6 +226,8 @@ class StreamedSpan:
         "_scope",
         "_previous_span_on_scope",
         "_baggage",
+        "_sample_rand",
+        "_sample_rate",
     )
 
     def __init__(
@@ -238,6 +242,8 @@ class StreamedSpan:
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
         baggage: "Optional[Baggage]" = None,
+        sample_rate: "Optional[float]" = None,
+        sample_rand: "Optional[float]" = None,
     ):
         self._name: str = name
         self._active: bool = active
@@ -254,6 +260,8 @@ class StreamedSpan:
         self._parent_span_id = parent_span_id
         self._parent_sampled = parent_sampled
         self._baggage = baggage
+        self._sample_rand = sample_rand
+        self._sample_rate = sample_rate
 
         self._start_timestamp = datetime.now(timezone.utc)
         self._timestamp: "Optional[datetime]" = None
@@ -269,6 +277,8 @@ class StreamedSpan:
 
         self._status = SpanStatus.OK.value
         self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
+
+        self._update_active_thread()
 
         self._start()
 
@@ -350,7 +360,9 @@ class StreamedSpan:
             if isinstance(end_timestamp, datetime):
                 self._timestamp = end_timestamp
             else:
-                logger.debug("Failed to set end_timestamp. Using current time instead.")
+                logger.debug(
+                    "[Tracing] Failed to set end_timestamp. Using current time instead."
+                )
 
         if self._timestamp is None:
             try:
@@ -395,7 +407,7 @@ class StreamedSpan:
 
         if status not in {e.value for e in SpanStatus}:
             logger.debug(
-                f'Unsupported span status {status}. Expected one of: "ok", "error"'
+                f'[Tracing] Unsupported span status {status}. Expected one of: "ok", "error"'
             )
             return
 
@@ -439,15 +451,34 @@ class StreamedSpan:
     def timestamp(self) -> "Optional[datetime]":
         return self._timestamp
 
+    def _is_segment(self) -> bool:
+        return self._segment is self
+
+    def _update_active_thread(self) -> None:
+        thread_id, thread_name = get_current_thread_meta()
+
+        if thread_id is not None:
+            self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
+
+            if thread_name is not None:
+                self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
+
 
 class NoOpStreamedSpan(StreamedSpan):
-    __slots__ = ()
+    __slots__ = (
+        "_finished",
+        "_unsampled_reason",
+    )
 
     def __init__(
         self,
+        unsampled_reason: "Optional[str]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
     ) -> None:
         self._scope = scope  # type: ignore[assignment]
+        self._unsampled_reason = unsampled_reason
+
+        self._finished = False
 
         self._start()
 
@@ -471,16 +502,28 @@ class NoOpStreamedSpan(StreamedSpan):
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        if self._scope is None:
+        if self._finished:
             return
 
-        if not hasattr(self, "_previous_span_on_scope"):
-            return
+        if self._unsampled_reason is not None:
+            client = sentry_sdk.get_client()
+            if client.is_active() and client.transport:
+                logger.debug(
+                    f"[Tracing] Discarding span because sampled=False (reason: {self._unsampled_reason})"
+                )
+                client.transport.record_lost_event(
+                    reason=self._unsampled_reason,
+                    data_category="span",
+                    quantity=1,
+                )
 
-        with capture_internal_exceptions():
-            old_span = self._previous_span_on_scope
-            del self._previous_span_on_scope
-            self._scope.span = old_span
+        if self._scope and hasattr(self, "_previous_span_on_scope"):
+            with capture_internal_exceptions():
+                old_span = self._previous_span_on_scope
+                del self._previous_span_on_scope
+                self._scope.span = old_span
+
+        self._finished = True
 
     def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         self._end()
@@ -505,6 +548,9 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def remove_attribute(self, key: str) -> None:
         pass
+
+    def _is_segment(self) -> bool:
+        return self._scope is not None
 
     @property
     def status(self) -> "str":

@@ -11,7 +11,7 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
-from anthropic import Anthropic, AnthropicError, AsyncAnthropic, AsyncStream, Stream
+from anthropic import Anthropic, AnthropicError, AsyncAnthropic
 from anthropic.types import MessageDeltaUsage, TextDelta, Usage
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
@@ -58,7 +58,7 @@ from sentry_sdk.utils import package_version
 ANTHROPIC_VERSION = package_version("anthropic")
 
 EXAMPLE_MESSAGE = Message(
-    id="id",
+    id="msg_01XFDUDYJgAACzvnptvVoYEL",
     model="model",
     role="assistant",
     content=[TextBlock(type="text", text="Hi, I'm Claude.")],
@@ -117,6 +117,7 @@ def test_nonstreaming_create_message(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -134,6 +135,7 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.asyncio
@@ -187,6 +189,7 @@ async def test_nonstreaming_create_message_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -204,6 +207,7 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.parametrize(
@@ -299,6 +303,7 @@ def test_streaming_create_message(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -317,6 +322,7 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.asyncio
@@ -334,8 +340,8 @@ async def test_streaming_create_message_async(
     capture_events,
     send_default_pii,
     include_prompts,
-    async_iterator,
     get_model_response,
+    async_iterator,
     server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
@@ -417,6 +423,7 @@ async def test_streaming_create_message_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -435,6 +442,7 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.skipif(
@@ -565,6 +573,7 @@ def test_streaming_create_message_with_input_json_delta(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -606,8 +615,8 @@ async def test_streaming_create_message_with_input_json_delta_async(
     capture_events,
     send_default_pii,
     include_prompts,
-    async_iterator,
     get_model_response,
+    async_iterator,
     server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
@@ -722,6 +731,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -786,6 +796,7 @@ def test_span_status_error(sentry_init, capture_events):
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -811,6 +822,7 @@ async def test_span_status_error_async(sentry_init, capture_events):
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -859,6 +871,7 @@ def test_span_origin(sentry_init, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.ai.anthropic"
+    assert event["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert event["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -887,6 +900,7 @@ async def test_span_origin_async(sentry_init, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.ai.anthropic"
+    assert event["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert event["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -908,13 +922,14 @@ def test_collect_ai_data_with_input_json_delta():
 
     content_blocks = []
 
-    model, new_usage, new_content_blocks = _collect_ai_data(
+    model, new_usage, new_content_blocks, response_id = _collect_ai_data(
         event, model, usage, content_blocks
     )
     assert model is None
     assert new_usage.input_tokens == usage.input_tokens
     assert new_usage.output_tokens == usage.output_tokens
     assert new_content_blocks == ["test"]
+    assert response_id is None
 
 
 @pytest.mark.skipif(
@@ -1007,6 +1022,7 @@ def test_anthropic_message_role_mapping(
 
     # Verify that the span was created correctly
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
@@ -1052,6 +1068,7 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
     assert len(chat_spans) > 0
 
     chat_span = chat_spans[0]
+    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
@@ -1103,6 +1120,7 @@ async def test_anthropic_message_truncation_async(sentry_init, capture_events):
     assert len(chat_spans) > 0
 
     chat_span = chat_spans[0]
+    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
@@ -1171,6 +1189,7 @@ def test_nonstreaming_create_message_with_system_prompt(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1255,6 +1274,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1383,6 +1403,7 @@ def test_streaming_create_message_with_system_prompt(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1428,8 +1449,8 @@ async def test_streaming_create_message_with_system_prompt_async(
     capture_events,
     send_default_pii,
     include_prompts,
-    async_iterator,
     get_model_response,
+    async_iterator,
     server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
@@ -1516,6 +1537,7 @@ async def test_streaming_create_message_with_system_prompt_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1582,6 +1604,7 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]

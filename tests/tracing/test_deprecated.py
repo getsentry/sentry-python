@@ -4,9 +4,6 @@ import pytest
 
 import sentry_sdk
 import sentry_sdk.tracing
-from sentry_sdk import start_span
-
-from sentry_sdk.tracing import Span
 
 
 @pytest.mark.parametrize(

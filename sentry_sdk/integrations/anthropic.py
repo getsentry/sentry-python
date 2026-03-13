@@ -45,7 +45,7 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncIterator, Iterator, List, Optional, Union
+    from typing import Any, AsyncIterator, Iterator, Optional, Union
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
@@ -126,7 +126,8 @@ def _collect_ai_data(
     model: "str | None",
     usage: "_RecordedUsage",
     content_blocks: "list[str]",
-) -> "tuple[str | None, _RecordedUsage, list[str]]":
+    response_id: "str | None" = None,
+) -> "tuple[str | None, _RecordedUsage, list[str], str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
@@ -146,6 +147,7 @@ def _collect_ai_data(
             # https://github.com/anthropics/anthropic-sdk-python/blob/9c485f6966e10ae0ea9eabb3a921d2ea8145a25b/src/anthropic/lib/streaming/_messages.py#L433-L518
             if event.type == "message_start":
                 model = event.message.model or model
+                response_id = event.message.id
 
                 incoming_usage = event.message.usage
                 usage.output_tokens = incoming_usage.output_tokens
@@ -162,6 +164,7 @@ def _collect_ai_data(
                     model,
                     usage,
                     content_blocks,
+                    response_id,
                 )
 
             # Counterintuitive, but message_delta contains cumulative token counts :)
@@ -190,12 +193,14 @@ def _collect_ai_data(
                     model,
                     usage,
                     content_blocks,
+                    response_id,
                 )
 
     return (
         model,
         usage,
         content_blocks,
+        response_id,
     )
 
 
@@ -247,6 +252,7 @@ def _set_input_data(
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
+    span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
     system_instructions: "Union[str, Iterable[TextBlockParam]]" = kwargs.get("system")  # type: ignore
     messages = kwargs.get("messages")
@@ -348,10 +354,13 @@ def _set_output_data(
     cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
     finish_span: bool = False,
+    response_id: "str | None" = None,
 ) -> None:
     """
     Set output data for the span based on the AI response."""
     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    if response_id is not None:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
     if should_send_default_pii() and integration.include_prompts:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
@@ -443,6 +452,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
                 finish_span=True,
+                response_id=getattr(result, "id", None),
             )
 
         # Streaming response
@@ -453,17 +463,20 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 model = None
                 usage = _RecordedUsage()
                 content_blocks: "list[str]" = []
+                response_id = None
 
                 for event in old_iterator:
                     (
                         model,
                         usage,
                         content_blocks,
+                        response_id,
                     ) = _collect_ai_data(
                         event,
                         model,
                         usage,
                         content_blocks,
+                        response_id,
                     )
                     yield event
 
@@ -485,23 +498,27 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     cache_write_input_tokens=usage.cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
+                    response_id=response_id,
                 )
 
             async def new_iterator_async() -> "AsyncIterator[MessageStreamEvent]":
                 model = None
                 usage = _RecordedUsage()
                 content_blocks: "list[str]" = []
+                response_id = None
 
                 async for event in old_iterator:
                     (
                         model,
                         usage,
                         content_blocks,
+                        response_id,
                     ) = _collect_ai_data(
                         event,
                         model,
                         usage,
                         content_blocks,
+                        response_id,
                     )
                     yield event
 
@@ -523,6 +540,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                     cache_write_input_tokens=usage.cache_write_input_tokens,
                     content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
+                    response_id=response_id,
                 )
 
             if str(type(result._iterator)) == "<class 'async_generator'>":
