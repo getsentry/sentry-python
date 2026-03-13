@@ -147,7 +147,7 @@ def _collect_ai_data(
             # https://github.com/anthropics/anthropic-sdk-python/blob/9c485f6966e10ae0ea9eabb3a921d2ea8145a25b/src/anthropic/lib/streaming/_messages.py#L433-L518
             if event.type == "message_start":
                 model = event.message.model or model
-                response_id = getattr(event.message, "id", None) or response_id
+                response_id = event.message.id
 
                 incoming_usage = event.message.usage
                 usage.output_tokens = incoming_usage.output_tokens
