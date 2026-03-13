@@ -247,6 +247,7 @@ def _set_input_data(
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
+    span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
     system_instructions: "Union[str, Iterable[TextBlockParam]]" = kwargs.get("system")  # type: ignore
     messages = kwargs.get("messages")
