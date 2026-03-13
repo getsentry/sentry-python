@@ -134,6 +134,7 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "id"
 
 
 @pytest.mark.asyncio
@@ -204,6 +205,7 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "id"
 
 
 @pytest.mark.parametrize(
@@ -306,6 +308,7 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "id"
 
 
 @pytest.mark.asyncio
@@ -411,6 +414,7 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "id"
 
 
 @pytest.mark.skipif(
@@ -852,13 +856,14 @@ def test_collect_ai_data_with_input_json_delta():
 
     content_blocks = []
 
-    model, new_usage, new_content_blocks = _collect_ai_data(
+    model, new_usage, new_content_blocks, response_id = _collect_ai_data(
         event, model, usage, content_blocks
     )
     assert model is None
     assert new_usage.input_tokens == usage.input_tokens
     assert new_usage.output_tokens == usage.output_tokens
     assert new_content_blocks == ["test"]
+    assert response_id is None
 
 
 @pytest.mark.skipif(
