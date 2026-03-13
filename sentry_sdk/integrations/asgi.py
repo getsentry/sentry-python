@@ -183,7 +183,7 @@ class SentryAsgiMiddleware:
 
             except Exception as exc:
                 self._capture_lifespan_exception(exc)
-                raise exc from None
+                raise
 
         _asgi_middleware_applied.set(True)
         try:
@@ -259,7 +259,7 @@ class SentryAsgiMiddleware:
                                 )
                         except Exception as exc:
                             self._capture_request_exception(exc)
-                            raise exc from None
+                            raise
         finally:
             _asgi_middleware_applied.set(False)
 
