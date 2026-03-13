@@ -135,7 +135,7 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "end_turn"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.asyncio
@@ -206,7 +206,7 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "end_turn"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 def test_streaming_create_message_with_finish_reason(sentry_init, capture_events):
@@ -261,7 +261,7 @@ def test_streaming_create_message_with_finish_reason(sentry_init, capture_events
     (event,) = events
     (span,) = event["spans"]
 
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "end_turn"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.asyncio
@@ -321,7 +321,7 @@ async def test_streaming_create_message_with_finish_reason_async(
     (event,) = events
     (span,) = event["spans"]
 
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "end_turn"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.parametrize(
@@ -663,7 +663,7 @@ def test_streaming_create_message_with_input_json_delta(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "tool_use"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["tool_use"]
 
 
 @pytest.mark.asyncio
@@ -806,7 +806,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "tool_use"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["tool_use"]
 
 
 def test_exception_message_create(sentry_init, capture_events):

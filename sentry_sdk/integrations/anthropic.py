@@ -359,7 +359,7 @@ def _set_output_data(
     Set output data for the span based on the AI response."""
     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
     if finish_reason is not None:
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason)
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, [finish_reason])
     if should_send_default_pii() and integration.include_prompts:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
