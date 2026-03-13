@@ -616,7 +616,7 @@ class Scope:
         if (
             has_tracing_enabled(self.get_client().options)
             and self._span is not None
-            and not isinstance(self.span, NoOpStreamedSpan)
+            and not isinstance(self._span, NoOpStreamedSpan)
         ):
             return self._span._get_trace_context()
 
