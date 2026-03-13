@@ -57,6 +57,12 @@ def patch_asyncio() -> None:
             coro: "Coroutine[Any, Any, Any]",
             **kwargs: "Any",
         ) -> "asyncio.Future[Any]":
+            # we get the current span here, as later it may already be closed
+            in_span = sentry_sdk.get_current_span() is not None
+            headers = dict(
+                sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+            )
+
             @_wrap_coroutine(coro)
             async def _task_with_sentry_span_creation() -> "Any":
                 result = None
@@ -66,16 +72,16 @@ def patch_asyncio() -> None:
                 )
                 task_spans = integration.task_spans if integration else False
 
+                if task_spans and in_span:
+                    transaction = sentry_sdk.continue_trace(
+                        headers, op="task", name="downstream"
+                    )
+                    ctx = sentry_sdk.start_transaction(transaction)
+                else:
+                    ctx = nullcontext()
+
                 with sentry_sdk.isolation_scope():
-                    with (
-                        sentry_sdk.start_span(
-                            op=OP.FUNCTION,
-                            name=get_name(coro),
-                            origin=AsyncioIntegration.origin,
-                        )
-                        if task_spans
-                        else nullcontext()
-                    ):
+                    with ctx:
                         try:
                             result = await coro
                         except StopAsyncIteration as e:
