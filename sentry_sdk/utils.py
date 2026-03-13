@@ -46,7 +46,6 @@ if TYPE_CHECKING:
         Dict,
         Iterator,
         List,
-        Literal,
         NoReturn,
         Optional,
         ParamSpec,

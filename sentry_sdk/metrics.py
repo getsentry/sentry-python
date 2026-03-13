@@ -1,8 +1,8 @@
 import time
-from typing import Any, Optional, TYPE_CHECKING, Union
+from typing import Any, Optional, TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.utils import format_attribute, safe_repr
+from sentry_sdk.utils import format_attribute
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Attributes, Metric, MetricType

@@ -1,7 +1,6 @@
 import pytest
 
 import sentry_sdk
-from sentry_sdk import start_span
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.consts import OP
 
