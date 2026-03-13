@@ -37,6 +37,7 @@ try:
     except ImportError:
         Omit = None
 
+    from anthropic import Stream, AsyncStream
     from anthropic.resources import AsyncMessages, Messages
 
     if TYPE_CHECKING:
@@ -48,6 +49,8 @@ if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Iterator, Optional, Union
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
+
+    from anthropic.types import RawMessageStreamEvent
 
 
 class _RecordedUsage:
@@ -344,6 +347,109 @@ def _set_input_data(
         span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
 
 
+def _wrap_synchronous_message_iterator(
+    iterator: "Iterator[RawMessageStreamEvent]",
+    span: "Span",
+    integration: "AnthropicIntegration",
+) -> "Iterator[RawMessageStreamEvent]":
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Responsible for closing the AI Client Span.
+    """
+
+    model = None
+    usage = _RecordedUsage()
+    content_blocks: "list[str]" = []
+    response_id = None
+
+    for event in iterator:
+        (
+            model,
+            usage,
+            content_blocks,
+            response_id,
+        ) = _collect_ai_data(
+            event,
+            model,
+            usage,
+            content_blocks,
+            response_id,
+        )
+        yield event
+
+    # Anthropic's input_tokens excludes cached/cache_write tokens.
+    # Normalize to total input tokens for correct cost calculations.
+    total_input = (
+        usage.input_tokens
+        + (usage.cache_read_input_tokens or 0)
+        + (usage.cache_write_input_tokens or 0)
+    )
+
+    _set_output_data(
+        span=span,
+        integration=integration,
+        model=model,
+        input_tokens=total_input,
+        output_tokens=usage.output_tokens,
+        cache_read_input_tokens=usage.cache_read_input_tokens,
+        cache_write_input_tokens=usage.cache_write_input_tokens,
+        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+        finish_span=True,
+        response_id=response_id,
+    )
+
+
+async def _wrap_asynchronous_message_iterator(
+    iterator: "AsyncIterator[RawMessageStreamEvent]",
+    span: "Span",
+    integration: "AnthropicIntegration",
+) -> "AsyncIterator[RawMessageStreamEvent]":
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Responsible for closing the AI Client Span.
+    """
+    model = None
+    usage = _RecordedUsage()
+    content_blocks: "list[str]" = []
+    response_id = None
+
+    async for event in iterator:
+        (
+            model,
+            usage,
+            content_blocks,
+            response_id,
+        ) = _collect_ai_data(
+            event,
+            model,
+            usage,
+            content_blocks,
+            response_id,
+        )
+        yield event
+
+    # Anthropic's input_tokens excludes cached/cache_write tokens.
+    # Normalize to total input tokens for correct cost calculations.
+    total_input = (
+        usage.input_tokens
+        + (usage.cache_read_input_tokens or 0)
+        + (usage.cache_write_input_tokens or 0)
+    )
+
+    _set_output_data(
+        span=span,
+        integration=integration,
+        model=model,
+        input_tokens=total_input,
+        output_tokens=usage.output_tokens,
+        cache_read_input_tokens=usage.cache_read_input_tokens,
+        cache_write_input_tokens=usage.cache_write_input_tokens,
+        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+        finish_span=True,
+        response_id=response_id,
+    )
+
+
 def _set_output_data(
     span: "Span",
     integration: "AnthropicIntegration",
@@ -424,6 +530,18 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
     result = yield f, args, kwargs
 
+    if isinstance(result, Stream):
+        result._iterator = _wrap_synchronous_message_iterator(
+            result._iterator, span, integration
+        )
+        return result
+
+    if isinstance(result, AsyncStream):
+        result._iterator = _wrap_asynchronous_message_iterator(
+            result._iterator, span, integration
+        )
+        return result
+
     with capture_internal_exceptions():
         if hasattr(result, "content"):
             (
@@ -454,100 +572,6 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 finish_span=True,
                 response_id=getattr(result, "id", None),
             )
-
-        # Streaming response
-        elif hasattr(result, "_iterator"):
-            old_iterator = result._iterator
-
-            def new_iterator() -> "Iterator[MessageStreamEvent]":
-                model = None
-                usage = _RecordedUsage()
-                content_blocks: "list[str]" = []
-                response_id = None
-
-                for event in old_iterator:
-                    (
-                        model,
-                        usage,
-                        content_blocks,
-                        response_id,
-                    ) = _collect_ai_data(
-                        event,
-                        model,
-                        usage,
-                        content_blocks,
-                        response_id,
-                    )
-                    yield event
-
-                # Anthropic's input_tokens excludes cached/cache_write tokens.
-                # Normalize to total input tokens for correct cost calculations.
-                total_input = (
-                    usage.input_tokens
-                    + (usage.cache_read_input_tokens or 0)
-                    + (usage.cache_write_input_tokens or 0)
-                )
-
-                _set_output_data(
-                    span=span,
-                    integration=integration,
-                    model=model,
-                    input_tokens=total_input,
-                    output_tokens=usage.output_tokens,
-                    cache_read_input_tokens=usage.cache_read_input_tokens,
-                    cache_write_input_tokens=usage.cache_write_input_tokens,
-                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-                    finish_span=True,
-                    response_id=response_id,
-                )
-
-            async def new_iterator_async() -> "AsyncIterator[MessageStreamEvent]":
-                model = None
-                usage = _RecordedUsage()
-                content_blocks: "list[str]" = []
-                response_id = None
-
-                async for event in old_iterator:
-                    (
-                        model,
-                        usage,
-                        content_blocks,
-                        response_id,
-                    ) = _collect_ai_data(
-                        event,
-                        model,
-                        usage,
-                        content_blocks,
-                        response_id,
-                    )
-                    yield event
-
-                # Anthropic's input_tokens excludes cached/cache_write tokens.
-                # Normalize to total input tokens for correct cost calculations.
-                total_input = (
-                    usage.input_tokens
-                    + (usage.cache_read_input_tokens or 0)
-                    + (usage.cache_write_input_tokens or 0)
-                )
-
-                _set_output_data(
-                    span=span,
-                    integration=integration,
-                    model=model,
-                    input_tokens=total_input,
-                    output_tokens=usage.output_tokens,
-                    cache_read_input_tokens=usage.cache_read_input_tokens,
-                    cache_write_input_tokens=usage.cache_write_input_tokens,
-                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-                    finish_span=True,
-                    response_id=response_id,
-                )
-
-            if str(type(result._iterator)) == "<class 'async_generator'>":
-                result._iterator = new_iterator_async()
-            else:
-                result._iterator = new_iterator()
-
         else:
             span.set_data("unknown_response", True)
             span.__exit__(None, None, None)
