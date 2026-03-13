@@ -373,6 +373,8 @@ def _wrap_synchronous_message_iterator(
 
     try:
         for event in iterator:
+            # Message and content types are aliases for corresponding Raw* types, introduced in
+            # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
             if not isinstance(
                 event,
                 (
@@ -434,6 +436,8 @@ async def _wrap_asynchronous_message_iterator(
 
     try:
         async for event in iterator:
+            # Message and content types are aliases for corresponding Raw* types, introduced in
+            # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
             if not isinstance(
                 event,
                 (
