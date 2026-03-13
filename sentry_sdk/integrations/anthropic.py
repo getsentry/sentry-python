@@ -39,7 +39,7 @@ try:
 
     from anthropic import Stream, AsyncStream
     from anthropic.resources import AsyncMessages, Messages
-    from anthropic.lib.streaming import MessageStreamManager
+    from anthropic.lib.streaming import MessageStreamManager, AsyncMessageStreamManager
 
     from anthropic.types import (
         MessageStartEvent,
@@ -67,7 +67,7 @@ if TYPE_CHECKING:
         TextBlockParam,
         ToolUnionParam,
     )
-    from anthropic.lib.streaming import MessageStream
+    from anthropic.lib.streaming import MessageStream, AsyncMessageStream
 
 
 class _RecordedUsage:
@@ -95,6 +95,13 @@ class AnthropicIntegration(Integration):
         Messages.stream = _wrap_message_stream(Messages.stream)
         MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
             MessageStreamManager.__enter__
+        )
+
+        AsyncMessages.stream = _wrap_async_message_stream(AsyncMessages.stream)
+        AsyncMessageStreamManager.__aenter__ = (
+            _wrap_async_message_stream_manager_aenter(
+                AsyncMessageStreamManager.__aenter__
+            )
         )
 
 
@@ -391,10 +398,10 @@ def _set_create_input_data(
 
 
 def _wrap_synchronous_message_iterator(
-    iterator: "Iterator[RawMessageStreamEvent]",
+    iterator: "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
     span: "Span",
     integration: "AnthropicIntegration",
-) -> "Iterator[RawMessageStreamEvent]":
+) -> "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span.
@@ -456,10 +463,10 @@ def _wrap_synchronous_message_iterator(
 
 
 async def _wrap_asynchronous_message_iterator(
-    iterator: "AsyncIterator[RawMessageStreamEvent]",
+    iterator: "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
     span: "Span",
     integration: "AnthropicIntegration",
-) -> "AsyncIterator[RawMessageStreamEvent]":
+) -> "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span.
@@ -807,6 +814,90 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         return stream
 
     return _sentry_patched_enter
+
+
+def _wrap_async_message_stream(f: "Any") -> "Any":
+    """
+    Attaches user-provided arguments to the returned context manager.
+    The attributes are set on AI Client Spans in the patch for the context manager.
+    """
+
+    @wraps(f)
+    def _sentry_patched_stream(
+        *args: "Any", **kwargs: "Any"
+    ) -> "AsyncMessageStreamManager":
+        stream_manager = f(*args, **kwargs)
+
+        stream_manager._max_tokens = kwargs.get("max_tokens")
+        stream_manager._messages = kwargs.get("messages")
+        stream_manager._model = kwargs.get("model")
+        stream_manager._system = kwargs.get("system")
+        stream_manager._temperature = kwargs.get("temperature")
+        stream_manager._top_k = kwargs.get("top_k")
+        stream_manager._top_p = kwargs.get("top_p")
+        stream_manager._tools = kwargs.get("tools")
+
+        return stream_manager
+
+    return _sentry_patched_stream
+
+
+def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
+    """
+    Creates and manages AI Client Spans.
+    """
+
+    @wraps(f)
+    async def _sentry_patched_aenter(
+        self: "AsyncMessageStreamManager",
+    ) -> "AsyncMessageStream":
+        stream = await f(self)
+        if not hasattr(self, "_max_tokens"):
+            return stream
+
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+
+        if integration is None:
+            return stream
+
+        if self._messages is None:
+            return stream
+
+        try:
+            iter(self._messages)
+        except TypeError:
+            return stream
+
+        span = get_start_span_function()(
+            op=OP.GEN_AI_CHAT,
+            name="chat" if self._model is None else f"chat {self._model}".strip(),
+            origin=AnthropicIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        _set_common_input_data(
+            span=span,
+            integration=integration,
+            max_tokens=self._max_tokens,
+            messages=self._messages,
+            model=self._model,
+            system=self._system,
+            temperature=self._temperature,
+            top_k=self._top_k,
+            top_p=self._top_p,
+            tools=self._tools,
+        )
+
+        stream._iterator = _wrap_asynchronous_message_iterator(
+            iterator=stream._iterator,
+            span=span,
+            integration=integration,
+        )
+
+        return stream
+
+    return _sentry_patched_aenter
 
 
 def _is_given(obj: "Any") -> bool:
