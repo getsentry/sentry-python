@@ -466,7 +466,7 @@ async def _wrap_asynchronous_message_iterator(
     iterator: "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
     span: "Span",
     integration: "AnthropicIntegration",
-) -> "AsyncIterator[RawMessageStreamEvent]":
+) -> "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span.
