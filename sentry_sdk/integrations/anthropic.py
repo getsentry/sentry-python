@@ -39,6 +39,7 @@ try:
 
     from anthropic import Stream, AsyncStream
     from anthropic.resources import AsyncMessages, Messages
+    from anthropic.lib.streaming import MessageStreamManager
 
     from anthropic.types import (
         MessageStartEvent,
@@ -59,7 +60,14 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
-    from anthropic.types import RawMessageStreamEvent
+    from anthropic.types import (
+        RawMessageStreamEvent,
+        MessageParam,
+        ModelParam,
+        TextBlockParam,
+        ToolUnionParam,
+    )
+    from anthropic.lib.streaming import MessageStream
 
 
 class _RecordedUsage:
@@ -83,6 +91,11 @@ class AnthropicIntegration(Integration):
 
         Messages.create = _wrap_message_create(Messages.create)
         AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
+
+        Messages.stream = _wrap_message_stream(Messages.stream)
+        MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
+            MessageStreamManager.__enter__
+        )
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -258,28 +271,33 @@ def _transform_system_instructions(
     ]
 
 
-def _set_input_data(
-    span: "Span", kwargs: "dict[str, Any]", integration: "AnthropicIntegration"
+def _set_common_input_data(
+    span: "Span",
+    integration: "AnthropicIntegration",
+    max_tokens: "int",
+    messages: "Iterable[MessageParam]",
+    model: "ModelParam",
+    system: "Optional[Union[str, Iterable[TextBlockParam]]]",
+    temperature: "Optional[float]",
+    top_k: "Optional[int]",
+    top_p: "Optional[float]",
+    tools: "Optional[Iterable[ToolUnionParam]]",
 ) -> None:
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
     span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-    system_instructions: "Union[str, Iterable[TextBlockParam]]" = kwargs.get("system")  # type: ignore
-    messages = kwargs.get("messages")
     if (
         messages is not None
-        and len(messages) > 0
+        and len(messages) > 0  # type: ignore
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        if isinstance(system_instructions, str) or isinstance(
-            system_instructions, Iterable
-        ):
+        if isinstance(system, str) or isinstance(system, Iterable):
             span.set_data(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                json.dumps(_transform_system_instructions(system_instructions)),
+                json.dumps(_transform_system_instructions(system)),
             )
 
         normalized_messages = []
@@ -335,25 +353,41 @@ def _set_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
+    if max_tokens is not None and _is_given(max_tokens):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+    if model is not None and _is_given(model):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+    if temperature is not None and _is_given(temperature):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+    if top_k is not None and _is_given(top_k):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_K, top_k)
+    if top_p is not None and _is_given(top_p):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+    if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
+        span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
+
+
+def _set_create_input_data(
+    span: "Span", kwargs: "dict[str, Any]", integration: "AnthropicIntegration"
+) -> None:
+    """
+    Set input data for the span based on the provided keyword arguments for the anthropic message creation.
+    """
     span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False))
 
-    kwargs_keys_to_attributes = {
-        "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-        "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-        "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-        "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
-        "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-    }
-    for key, attribute in kwargs_keys_to_attributes.items():
-        value = kwargs.get(key)
-
-        if value is not None and _is_given(value):
-            span.set_data(attribute, value)
-
-    # Input attributes: Tools
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
+    _set_common_input_data(
+        span=span,
+        integration=integration,
+        max_tokens=kwargs.get("max_tokens"),  # type: ignore
+        messages=kwargs.get("messages"),  # type: ignore
+        model=kwargs.get("model"),
+        system=kwargs.get("system"),
+        temperature=kwargs.get("temperature"),
+        top_k=kwargs.get("top_k"),
+        top_p=kwargs.get("top_p"),
+        tools=kwargs.get("tools"),
+    )
 
 
 def _wrap_synchronous_message_iterator(
@@ -566,7 +600,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
     )
     span.__enter__()
 
-    _set_input_data(span, kwargs, integration)
+    _set_create_input_data(span, kwargs, integration)
 
     result = yield f, args, kwargs
 
@@ -693,6 +727,86 @@ def _wrap_message_create_async(f: "Any") -> "Any":
                     span.__exit__(None, None, None)
 
     return _sentry_patched_create_async
+
+
+def _wrap_message_stream(f: "Any") -> "Any":
+    """
+    Attaches user-provided arguments to the returned context manager.
+    The attributes are set on AI Client Spans in the patch for the context manager.
+    """
+
+    @wraps(f)
+    def _sentry_patched_stream(*args: "Any", **kwargs: "Any") -> "MessageStreamManager":
+        stream_manager = f(*args, **kwargs)
+
+        stream_manager._max_tokens = kwargs.get("max_tokens")
+        stream_manager._messages = kwargs.get("messages")
+        stream_manager._model = kwargs.get("model")
+        stream_manager._system = kwargs.get("system")
+        stream_manager._temperature = kwargs.get("temperature")
+        stream_manager._top_k = kwargs.get("top_k")
+        stream_manager._top_p = kwargs.get("top_p")
+        stream_manager._tools = kwargs.get("tools")
+
+        return stream_manager
+
+    return _sentry_patched_stream
+
+
+def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
+    """
+    Creates and manages AI Client Spans.
+    """
+
+    @wraps(f)
+    def _sentry_patched_enter(self: "MessageStreamManager") -> "MessageStream":
+        stream = f(self)
+        if not hasattr(self, "_max_tokens"):
+            return stream
+
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+
+        if integration is None:
+            return stream
+
+        if self._messages is None:
+            return stream
+
+        try:
+            iter(self._messages)
+        except TypeError:
+            return stream
+
+        span = get_start_span_function()(
+            op=OP.GEN_AI_CHAT,
+            name="chat" if self._model is None else f"chat {self._model}".strip(),
+            origin=AnthropicIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        _set_common_input_data(
+            span=span,
+            integration=integration,
+            max_tokens=self._max_tokens,
+            messages=self._messages,
+            model=self._model,
+            system=self._system,
+            temperature=self._temperature,
+            top_k=self._top_k,
+            top_p=self._top_p,
+            tools=self._tools,
+        )
+
+        stream._iterator = _wrap_synchronous_message_iterator(
+            iterator=stream._iterator,
+            span=span,
+            integration=integration,
+        )
+
+        return stream
+
+    return _sentry_patched_enter
 
 
 def _is_given(obj: "Any") -> bool:
