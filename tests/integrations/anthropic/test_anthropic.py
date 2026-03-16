@@ -2,6 +2,7 @@ import pytest
 from unittest import mock
 import json
 from itertools import islice
+from builtins import anext
 
 try:
     from unittest.mock import AsyncMock
@@ -975,6 +976,218 @@ async def test_streaming_create_message_async(
 
 
 @pytest.mark.asyncio
+async def test_streaming_create_message_async_next_consumption(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(StopAsyncIteration), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            messages = await client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            while True:
+                await anext(messages)
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.asyncio
+async def test_streaming_create_message_async_iterator_methods(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            messages = await client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            await anext(messages)
+            await anext(messages)
+
+            async for item in messages:
+                break
+
+            await anext(messages)
+            await messages.close()
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -1091,6 +1304,223 @@ async def test_stream_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.asyncio
+async def test_stream_messages_async_next_consumption(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(StopAsyncIteration), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                while True:
+                    await anext(stream)
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.asyncio
+async def test_stream_messages_async_iterator_methods(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                await anext(stream)
+                await anext(stream)
+
+                async for item in stream:
+                    break
+
+                await anext(stream)
+                # New versions add TextEvent, so consume one more event.
+                if TextEvent is not None and isinstance(await anext(stream), TextEvent):
+                    await anext(stream)
+                await stream.close()
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
