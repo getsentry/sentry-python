@@ -556,12 +556,6 @@ class StreamedSpan:
 
         self._continuous_profile = try_profile_lifecycle_trace_start()
 
-        # Typically, the profiler is set when the segment is created. But when
-        # using the auto lifecycle, the profiler isn't running when the first
-        # segment is started. So make sure we update the profiler id on it.
-        if self._continuous_profile is not None:
-            self._set_profile_id(get_profiler_id())
-
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
