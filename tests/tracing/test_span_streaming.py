@@ -678,6 +678,67 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_envelopes):
     assert segment["trace_id"] == trace_id
 
 
+def test_outgoing_traceparent_and_baggage(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.traces.new_trace()
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        assert span.sampled is True
+
+        trace_id = span.trace_id
+        span_id = span.span_id
+
+        traceparent = sentry_sdk.get_traceparent()
+        assert traceparent == f"{trace_id}-{span_id}-1"
+
+        baggage = sentry_sdk.get_baggage()
+        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert "sentry-trace_id" in baggage_items
+        assert baggage_items["sentry-trace_id"] == trace_id
+        assert "sentry-sampled" in baggage_items
+        assert baggage_items["sentry-sampled"] == "true"
+
+
+def test_outgoing_traceparent_and_baggage_when_noop_span_is_active(
+    sentry_init, capture_envelopes
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "ignore_spans": ["ignored"],
+        },
+    )
+
+    sentry_sdk.traces.new_trace()
+
+    propagation_context = (
+        sentry_sdk.get_current_scope().get_active_propagation_context()
+    )
+    propagation_trace_id = propagation_context.trace_id
+    propagation_span_id = propagation_context.span_id
+
+    with sentry_sdk.traces.start_span(name="ignored") as span:
+        assert span.sampled is False
+
+        noop_trace_id = span.trace_id
+        noop_span_id = span.span_id
+
+        traceparent = sentry_sdk.get_traceparent()
+        assert traceparent != f"{noop_trace_id}-{noop_span_id}"
+        assert traceparent == f"{propagation_trace_id}-{propagation_span_id}"
+
+        baggage = sentry_sdk.get_baggage()
+        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert "sentry-trace_id" in baggage_items
+        assert baggage_items["sentry-trace_id"] != noop_trace_id
+        assert baggage_items["sentry-trace_id"] == propagation_trace_id
+
+
 def test_trace_decorator(sentry_init, capture_envelopes):
     sentry_init(
         traces_sample_rate=1.0,
@@ -878,6 +939,23 @@ def test_set_span_status_on_error(sentry_init, capture_envelopes):
     (span,) = spans
 
     assert span["status"] == "error"
+
+
+def test_set_span_status_on_ignored_span(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream", "ignore_spans": ["ignored"]},
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="ignored") as span:
+        span.status = "error"
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 0
 
 
 @pytest.mark.parametrize(
