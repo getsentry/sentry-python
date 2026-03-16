@@ -554,7 +554,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     finish_reason = generation.generation_info.get("finish_reason")
                     if finish_reason is not None:
                         span.set_data(
-                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason
+                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                            [finish_reason],
                         )
                 except AttributeError:
                     pass

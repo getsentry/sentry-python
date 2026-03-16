@@ -312,6 +312,105 @@ class TestTruncateMessagesBySize:
         assert user_msgs[0]["content"].endswith("...")
         assert len(user_msgs[0]["content"]) < len(large_content)
 
+    def test_single_message_truncation_list_content_exceeds_limit(self):
+        """Test that list-based content (e.g. pydantic-ai multimodal format) is truncated."""
+        large_text = "A" * 200_000
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": large_text},
+                ],
+            },
+        ]
+
+        result, _ = truncate_messages_by_size(messages)
+
+        text_part = result[0]["content"][0]
+        assert text_part["text"].endswith("...")
+        assert len(text_part["text"]) == MAX_SINGLE_MESSAGE_CONTENT_CHARS + 3
+
+    def test_single_message_truncation_list_content_under_limit(self):
+        """Test that small text parts are preserved when non-text parts push size over byte limit."""
+        short_text = "Hello world"
+        large_data_url = "data:image/png;base64," + "A" * 200_000
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": short_text},
+                    {"type": "image_url", "image_url": {"url": large_data_url}},
+                ],
+            },
+        ]
+
+        result, _ = truncate_messages_by_size(messages)
+
+        text_part = result[0]["content"][0]
+        assert text_part["text"] == short_text
+
+    def test_single_message_truncation_list_content_mixed_parts(self):
+        """Test truncation with mixed content types (text + non-text parts)."""
+        max_chars = 50
+        large_data_url = "data:image/png;base64," + "X" * 200_000
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "A" * 30},
+                    {"type": "image_url", "image_url": {"url": large_data_url}},
+                    {"type": "text", "text": "B" * 30},
+                ],
+            },
+        ]
+
+        result, _ = truncate_messages_by_size(
+            messages, max_single_message_chars=max_chars
+        )
+
+        parts = result[0]["content"]
+        # First text part uses 30 chars of the 50 budget
+        assert parts[0]["text"] == "A" * 30
+        # Image part is unchanged
+        assert parts[1]["type"] == "image_url"
+        # Second text part is truncated to remaining 20 chars
+        assert parts[2]["text"] == "B" * 20 + "..."
+
+    def test_single_message_truncation_list_content_multiple_text_parts(self):
+        """Test that budget is distributed across multiple text parts."""
+        max_chars = 10
+        # Two large text parts that together exceed 128KB byte limit
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "A" * 100_000},
+                    {"type": "text", "text": "B" * 100_000},
+                ],
+            },
+        ]
+
+        result, _ = truncate_messages_by_size(
+            messages, max_single_message_chars=max_chars
+        )
+
+        parts = result[0]["content"]
+        # First part is truncated to the full budget
+        assert parts[0]["text"] == "A" * 10 + "..."
+        # Second part gets truncated to 0 chars + ellipsis
+        assert parts[1]["text"] == "..."
+
+    @pytest.mark.parametrize("content", [None, 42, 3.14, True])
+    def test_single_message_truncation_non_str_non_list_content(self, content):
+        messages = [{"role": "user", "content": content}]
+
+        result, _ = truncate_messages_by_size(messages)
+
+        assert result[0]["content"] is content
+
 
 class TestTruncateAndAnnotateMessages:
     def test_only_keeps_last_message(self, sample_messages):

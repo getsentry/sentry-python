@@ -556,10 +556,25 @@ def _truncate_single_message_content_if_present(
         return message
     content = message["content"]
 
-    if not isinstance(content, str) or len(content) <= max_chars:
+    if isinstance(content, str):
+        if len(content) <= max_chars:
+            return message
+        message["content"] = content[:max_chars] + "..."
         return message
 
-    message["content"] = content[:max_chars] + "..."
+    if isinstance(content, list):
+        remaining = max_chars
+        for item in content:
+            if isinstance(item, dict) and "text" in item:
+                text = item["text"]
+                if isinstance(text, str):
+                    if len(text) > remaining:
+                        item["text"] = text[:remaining] + "..."
+                        remaining = 0
+                    else:
+                        remaining -= len(text)
+        return message
+
     return message
 
 
