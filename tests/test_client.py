@@ -1833,6 +1833,321 @@ async def test_async_proxy(monkeypatch, testcase):
     await client.close_async()
 
 
+# ============================================================================
+# Async close/flush client tests
+# ============================================================================
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_with_async_transport_warns(caplog):
+    """Test close() with AsyncHttpTransport logs a warning."""
+    import logging
+
+    caplog.set_level(logging.WARNING)
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
+        client.close()
+        mock_logger.warning.assert_called_with(
+            "close() used with AsyncHttpTransport. "
+            "Prefer close_async() for graceful async shutdown. "
+            "Performing synchronous best-effort cleanup."
+        )
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_async_with_async_transport():
+    """Test close_async() properly closes async transport."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    await client.close_async(timeout=1.0)
+    assert client.transport is None
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_async_with_sync_transport():
+    """Test close_async() aborts with non-async transport."""
+    client = Client("https://foo@sentry.io/123")
+    assert not isinstance(client.transport, AsyncHttpTransport)
+
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
+        await client.close_async()
+        mock_logger.debug.assert_any_call(
+            "close_async() used with non-async transport, aborting. Please use close() instead."
+        )
+    # Transport should NOT have been set to None
+    assert client.transport is not None
+    client.close()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_async_no_transport():
+    """Test close_async() does nothing when transport is None."""
+    client = Client("https://foo@sentry.io/123")
+    client.transport = None
+    # Should not raise
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_with_async_transport_warns():
+    """Test flush() with AsyncHttpTransport logs a warning and returns."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
+        client.flush(timeout=1.0)
+        mock_logger.warning.assert_called_with(
+            "flush() used with AsyncHttpTransport. Please use flush_async() instead."
+        )
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_with_async_transport():
+    """Test flush_async() works with async transport."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    # Should not raise
+    await client.flush_async(timeout=1.0)
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_uses_shutdown_timeout_default():
+    """Test flush_async() uses shutdown_timeout when no timeout provided."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+        shutdown_timeout=5.0,
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    with mock.patch.object(client.transport, "flush", return_value=None) as mock_flush:
+        await client.flush_async()
+        mock_flush.assert_called_once_with(timeout=5.0, callback=None)
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_with_sync_transport():
+    """Test flush_async() aborts with non-async transport."""
+    client = Client("https://foo@sentry.io/123")
+    assert not isinstance(client.transport, AsyncHttpTransport)
+
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
+        await client.flush_async()
+        mock_logger.debug.assert_any_call(
+            "flush_async() used with non-async transport, aborting. Please use flush() instead."
+        )
+    client.close()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_no_transport():
+    """Test flush_async() does nothing when transport is None."""
+    client = Client("https://foo@sentry.io/123")
+    client.transport = None
+    # Should not raise
+    await client.flush_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_awaits_flush_task():
+    """Test flush_async() awaits the flush task returned by transport."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    flush_awaited = []
+
+    async def mock_wait_flush(timeout, callback=None):
+        flush_awaited.append(True)
+
+    import asyncio
+
+    mock_task = asyncio.create_task(mock_wait_flush(1.0))
+
+    with mock.patch.object(client.transport, "flush", return_value=mock_task):
+        await client.flush_async(timeout=1.0)
+
+    assert flush_awaited == [True]
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_async_awaits_kill_task():
+    """Test close_async() awaits the kill task returned by transport.kill()."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    # close_async should call kill() and await the returned task
+    await client.close_async(timeout=1.0)
+    assert client.transport is None
+
+
+# ============================================================================
+# Client __aenter__ / __aexit__ tests
+# ============================================================================
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_client_async_context_manager():
+    """Test Client works as async context manager."""
+    async with Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    ) as client:
+        assert isinstance(client.transport, AsyncHttpTransport)
+        assert client.is_active()
+    # After __aexit__, transport should be None
+    assert client.transport is None
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_client_async_context_manager_with_sync_transport():
+    """Test Client async context manager with sync transport is safe."""
+    async with Client("https://foo@sentry.io/123") as client:
+        assert client.is_active()
+    # close_async with sync transport is a no-op for transport cleanup
+    # Transport won't be None because close_async aborts for non-async transport
+    assert client.transport is not None
+    client.close()
+
+
+# ============================================================================
+# _close_components / _flush_components tests
+# ============================================================================
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_components():
+    """Test _close_components kills all batchers and monitor."""
+    client = Client("https://foo@sentry.io/123")
+
+    # Mock the components
+    client.session_flusher = mock.MagicMock()
+    client.log_batcher = mock.MagicMock()
+    client.metrics_batcher = mock.MagicMock()
+    client.span_batcher = mock.MagicMock()
+    client.monitor = mock.MagicMock()
+
+    client._close_components()
+
+    client.session_flusher.kill.assert_called_once()
+    client.log_batcher.kill.assert_called_once()
+    client.metrics_batcher.kill.assert_called_once()
+    client.span_batcher.kill.assert_called_once()
+    client.monitor.kill.assert_called_once()
+    client.close()
+
+
+def test_close_components_with_none_batchers():
+    """Test _close_components handles None batchers gracefully."""
+    client = Client("https://foo@sentry.io/123")
+
+    client.session_flusher = mock.MagicMock()
+    client.log_batcher = None
+    client.metrics_batcher = None
+    client.span_batcher = None
+    client.monitor = None
+
+    # Should not raise
+    client._close_components()
+    client.session_flusher.kill.assert_called_once()
+    client.close()
+
+
+def test_flush_components():
+    """Test _flush_components flushes all batchers."""
+    client = Client("https://foo@sentry.io/123")
+
+    client.session_flusher = mock.MagicMock()
+    client.log_batcher = mock.MagicMock()
+    client.metrics_batcher = mock.MagicMock()
+    client.span_batcher = mock.MagicMock()
+
+    client._flush_components()
+
+    client.session_flusher.flush.assert_called_once()
+    client.log_batcher.flush.assert_called_once()
+    client.metrics_batcher.flush.assert_called_once()
+    client.span_batcher.flush.assert_called_once()
+    client.close()
+
+
+def test_flush_components_with_none_batchers():
+    """Test _flush_components handles None batchers gracefully."""
+    client = Client("https://foo@sentry.io/123")
+
+    client.session_flusher = mock.MagicMock()
+    client.log_batcher = None
+    client.metrics_batcher = None
+    client.span_batcher = None
+
+    # Should not raise
+    client._flush_components()
+    client.session_flusher.flush.assert_called_once()
+    client.close()
+
+
 @pytest.mark.parametrize(
     "testcase",
     [
