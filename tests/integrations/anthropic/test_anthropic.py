@@ -13,6 +13,7 @@ except ImportError:
 
 
 from anthropic import Anthropic, AnthropicError, AsyncAnthropic
+from anthropic.lib.streaming import TextEvent
 from anthropic.types import MessageDeltaUsage, TextDelta, Usage
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
@@ -815,8 +816,10 @@ def test_stream_messages_iterator_methods(
             ) as stream:
                 next(stream)
                 next(stream)
-                list(islice(stream, 2))
-                next(stream)
+                list(islice(stream, 1))
+                # New versions add TextEvent, so consume one more event.
+                if isinstance(next(stream), TextEvent):
+                    next(stream)
                 stream.close()
 
     assert len(events) == 1

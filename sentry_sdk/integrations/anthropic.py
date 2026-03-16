@@ -120,9 +120,13 @@ class AnthropicIntegration(Integration):
         MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
             MessageStreamManager.__enter__
         )
-        MessageStream.__iter__ = _wrap_message_stream_iter(MessageStream.__iter__)
-        MessageStream.__next__ = _wrap_message_stream_next(MessageStream.__next__)
-        MessageStream.close = _wrap_message_stream_close(MessageStream.close)
+
+        # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
+        # MessageStream inherits from Stream, so patching Stream is sufficient on these versions.
+        if version >= (0, 26, 2):
+            MessageStream.__iter__ = _wrap_message_stream_iter(MessageStream.__iter__)
+            MessageStream.__next__ = _wrap_message_stream_next(MessageStream.__next__)
+            MessageStream.close = _wrap_message_stream_close(MessageStream.close)
 
         AsyncMessages.stream = _wrap_async_message_stream(AsyncMessages.stream)
         AsyncMessageStreamManager.__aenter__ = (
@@ -779,7 +783,7 @@ def _wrap_stream_iter(
     output attributes on the AI Client Span and end the span.
     """
 
-    def __iter__(self) -> "Iterator[RawMessageStreamEvent]":
+    def __iter__(self: "Stream") -> "Iterator[RawMessageStreamEvent]":
         if not hasattr(self, "_span"):
             for event in f(self):
                 yield event
@@ -801,24 +805,26 @@ def _wrap_stream_next(
     Accumulates output data from the returned event.
     """
 
-    def __next__(self) -> "RawMessageStreamEvent":
+    def __next__(self: "Stream") -> "RawMessageStreamEvent":
         _initialize_data_accumulation_state(self)
         try:
             event = f(self)
         except StopIteration:
-            if not hasattr(self, "_span"):
-                raise
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                if not hasattr(self, "_span"):
+                    raise
 
-            _finish_streaming_span(
-                self._span,
-                self._integration,
-                self._model,
-                self._usage,
-                self._content_blocks,
-                self._response_id,
-            )
-            del self._span
-            raise
+                _finish_streaming_span(
+                    self._span,
+                    self._integration,
+                    self._model,
+                    self._usage,
+                    self._content_blocks,
+                    self._response_id,
+                )
+                del self._span
+            reraise(*exc_info)
 
         _accumulate_event_data(self, event)
         return event
@@ -833,7 +839,7 @@ def _wrap_stream_close(
     Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
     """
 
-    def close(self) -> None:
+    def close(self: "Stream") -> None:
         if not hasattr(self, "_span"):
             return f(self)
 
@@ -979,7 +985,7 @@ def _wrap_message_stream_iter(
     output attributes on the AI Client Span and end the span.
     """
 
-    def __iter__(self) -> "Iterator[MessageStreamEvent]":
+    def __iter__(self: "MessageStream") -> "Iterator[MessageStreamEvent]":
         if not hasattr(self, "_span"):
             for event in f(self):
                 yield event
@@ -1001,24 +1007,26 @@ def _wrap_message_stream_next(
     Accumulates output data from the returned event.
     """
 
-    def __next__(self) -> "MessageStreamEvent":
+    def __next__(self: "MessageStream") -> "MessageStreamEvent":
         _initialize_data_accumulation_state(self)
         try:
             event = f(self)
         except StopIteration:
-            if not hasattr(self, "_span"):
-                raise
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                if not hasattr(self, "_span"):
+                    raise
 
-            _finish_streaming_span(
-                self._span,
-                self._integration,
-                self._model,
-                self._usage,
-                self._content_blocks,
-                self._response_id,
-            )
-            del self._span
-            raise
+                _finish_streaming_span(
+                    self._span,
+                    self._integration,
+                    self._model,
+                    self._usage,
+                    self._content_blocks,
+                    self._response_id,
+                )
+                del self._span
+            reraise(*exc_info)
 
         _accumulate_event_data(self, event)
         return event
@@ -1033,7 +1041,7 @@ def _wrap_message_stream_close(
     Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
     """
 
-    def close(self) -> None:
+    def close(self: "MessageStream") -> None:
         if not hasattr(self, "_span"):
             return f(self)
 
