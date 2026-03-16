@@ -1199,6 +1199,7 @@ async def test_async_worker_is_alive_after_start():
     worker.start()
     assert worker.is_alive is True
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1218,6 +1219,7 @@ async def test_async_worker_is_alive_wrong_pid():
 
     worker._task_for_pid = os.getpid()
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1248,6 +1250,7 @@ async def test_async_worker_start_creates_queue_and_task():
     assert worker._loop is not None
     assert worker._task_for_pid == __import__("os").getpid()
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
@@ -1275,9 +1278,11 @@ async def test_async_worker_start_reuses_existing_queue():
     queue_ref = worker._queue
     # Kill and restart — queue should be reused
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
     worker.start()
     assert worker._queue is queue_ref
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1302,6 +1307,7 @@ async def test_async_worker_full_when_not_full():
     worker.start()
     assert worker.full() is False
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1325,6 +1331,7 @@ async def test_async_worker_full_when_full():
     worker.submit(slow_cb)
     assert worker.full() is True
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1346,6 +1353,7 @@ async def test_async_worker_submit_and_process():
     await asyncio.sleep(0.1)
     assert results == ["done"]
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1368,6 +1376,7 @@ async def test_async_worker_submit_returns_false_when_queue_full():
     # Now it's full
     assert worker.submit(slow_cb) is False
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1408,6 +1417,7 @@ async def test_async_worker_kill_cancels_tasks():
 
     assert len(worker._active_tasks) > 0
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
     await asyncio.sleep(0.05)  # Let cancellation propagate
 
     assert worker._task is None
@@ -1435,6 +1445,7 @@ async def test_async_worker_kill_queue_full():
     worker.submit(slow_cb)
     # Now queue is full, kill should still work
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
     assert worker._task is None
 
 
@@ -1448,6 +1459,7 @@ async def test_async_worker_kill_no_task():
     worker = AsyncWorker()
     # Should not raise
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
     assert worker._task is None
 
 
@@ -1465,6 +1477,7 @@ async def test_async_worker_flush_returns_task():
     assert isinstance(task, asyncio.Task)
     await task
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1489,6 +1502,7 @@ async def test_async_worker_flush_returns_none_zero_timeout():
     worker.start()
     assert worker.flush(timeout=0.0) is None
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1529,6 +1543,7 @@ async def test_async_worker_wait_flush_with_callback():
     await worker._wait_flush(timeout=0.2, callback=flush_callback)
     assert len(callback_calls) >= 1
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1554,6 +1569,7 @@ async def test_async_worker_wait_flush_second_timeout():
         assert "flush timed out" in str(mock_logger.error.call_args)
 
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1618,6 +1634,7 @@ async def test_async_worker_on_task_complete_cancelled_error():
 
     worker._queue = saved_queue
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1640,6 +1657,7 @@ async def test_async_worker_on_task_complete_exception():
     # Check that the task was removed from active_tasks
     assert len(worker._active_tasks) == 0
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1669,6 +1687,7 @@ async def test_async_worker_on_task_complete_queue_none():
     worker._on_task_complete(mock_task)
     assert mock_task not in worker._active_tasks
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 @skip_under_gevent
@@ -1683,6 +1702,7 @@ async def test_async_worker_ensure_task_calls_start():
     worker._ensure_task()
     assert worker.is_alive is True
     worker.kill()
+    await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
 # ============================================================================
