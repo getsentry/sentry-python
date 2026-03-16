@@ -1250,16 +1250,14 @@ async def test_async_worker_start_creates_queue_and_task():
     worker.kill()
 
 
-@skip_under_gevent
-@pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
-async def test_async_worker_start_no_running_loop():
+def test_async_worker_start_no_running_loop():
     """Test start() handles no running event loop gracefully."""
     from sentry_sdk.worker import AsyncWorker
 
     worker = AsyncWorker()
-    with mock.patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
-        worker.start()
+    # No running loop in a sync test, so start() should handle RuntimeError
+    worker.start()
     assert worker._loop is None
     assert worker._task is None
     assert worker._task_for_pid is None
