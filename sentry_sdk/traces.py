@@ -22,7 +22,6 @@ from sentry_sdk.profiler.continuous_profiler import (
 )
 from sentry_sdk.tracing_utils import (
     Baggage,
-    has_tracing_enabled,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -35,7 +34,7 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
-    from sentry_sdk._types import Attributes, AttributeValue, SamplingContext
+    from sentry_sdk._types import Attributes, AttributeValue
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
     P = ParamSpec("P")
@@ -237,10 +236,10 @@ class StreamedSpan:
         "_status",
         "_scope",
         "_previous_span_on_scope",
-        "_continuous_profile",
         "_baggage",
         "_sample_rand",
         "_sample_rate",
+        "_continuous_profile",
     )
 
     def __init__(
@@ -530,10 +529,6 @@ class StreamedSpan:
             if thread_name is not None:
                 self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
-    def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
-        if profiler_id is not None:
-            self.set_attribute("sentry.profiler_id", profiler_id)
-
     def _get_trace_context(self) -> "dict[str, Any]":
         # Even if spans themselves are not event-based anymore, we need this
         # to populate trace context on events
@@ -550,6 +545,10 @@ class StreamedSpan:
             context["origin"] = self._attributes["sentry.origin"]
 
         return context
+
+    def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
+        if profiler_id is not None:
+            self.set_attribute("sentry.profiler_id", profiler_id)
 
     def _start_profile(self) -> None:
         if not self._is_segment():
