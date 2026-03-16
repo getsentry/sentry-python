@@ -144,7 +144,7 @@ class AnthropicIntegration(Integration):
 
         # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
         # MessageStream inherits from Stream, so patching Stream is sufficient on these versions.
-        if version is not None and version >= (0, 26, 2):
+        if not issubclass(MessageStream, Stream):
             MessageStream.__iter__ = _wrap_message_stream_iter(MessageStream.__iter__)
             MessageStream.__next__ = _wrap_message_stream_next(MessageStream.__next__)
             MessageStream.close = _wrap_message_stream_close(MessageStream.close)
@@ -783,8 +783,7 @@ def _wrap_stream_iter(
 
     def __iter__(self: "Stream") -> "Iterator[RawMessageStreamEvent]":
         if not hasattr(self, "_span"):
-            for event in f(self):
-                yield event
+            yield from f(self)
             return
 
         _initialize_data_accumulation_state(self)
@@ -1073,8 +1072,7 @@ def _wrap_message_stream_iter(
 
     def __iter__(self: "MessageStream") -> "Iterator[MessageStreamEvent]":
         if not hasattr(self, "_span"):
-            for event in f(self):
-                yield event
+            yield from f(self)
             return
 
         _initialize_data_accumulation_state(self)
