@@ -291,6 +291,10 @@ class SentryAsgiMiddleware:
                                                 if event["status"] >= 400
                                                 else "ok"
                                             )
+                                            span.set_attribute(
+                                                "http.response.status_code",
+                                                event["status"],
+                                            )
                                         else:
                                             span.set_http_status(event["status"])
 
