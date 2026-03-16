@@ -18,5 +18,5 @@ statsig
 UnleashClient
 typer
 strawberry-graphql
-setuptools<82
+setuptools<83
 httpx
