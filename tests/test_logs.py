@@ -9,7 +9,7 @@ from unittest import mock
 import sentry_sdk
 import sentry_sdk.logger
 from sentry_sdk import get_client
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk.envelope import Envelope
 from sentry_sdk.types import Log
 from sentry_sdk.consts import SPANDATA, VERSION
 
@@ -19,8 +19,7 @@ minimum_python_37 = pytest.mark.skipif(
 
 
 def otel_attributes_to_dict(otel_attrs: "Mapping[str, Any]") -> "Mapping[str, Any]":
-    def _convert_attr(attr):
-        # type: (Mapping[str, Union[str, float, bool]]) -> Any
+    def _convert_attr(attr: "Mapping[str, Union[str, float, bool]]") -> "Any":
         if attr["type"] == "boolean":
             return attr["value"]
         if attr["type"] == "double":

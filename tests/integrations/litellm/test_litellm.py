@@ -19,7 +19,6 @@ try:
 except ImportError:
     pytest.skip("litellm not installed", allow_module_level=True)
 
-import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE

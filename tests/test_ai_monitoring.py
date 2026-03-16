@@ -1,19 +1,14 @@
-import json
-import uuid
-
 import pytest
 
 import sentry_sdk
 from sentry_sdk._types import (
     AnnotatedValue,
-    SENSITIVE_DATA_SUBSTITUTE,
     BLOB_DATA_SUBSTITUTE,
 )
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
     MAX_SINGLE_MESSAGE_CONTENT_CHARS,
-    set_data_normalized,
     truncate_and_annotate_messages,
     truncate_messages_by_size,
     _find_truncation_index,
@@ -27,7 +22,6 @@ from sentry_sdk.ai.utils import (
     transform_content_part,
     transform_message_content,
 )
-from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import safe_serialize
 
 

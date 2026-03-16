@@ -13,9 +13,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    logger,
     package_version,
-    _get_installed_modules,
 )
 
 try:
@@ -181,19 +179,12 @@ class SentryAsyncExtension(SchemaExtension):
         event_processor = _make_request_event_processor(self.execution_context)
         scope.add_event_processor(event_processor)
 
-        span = sentry_sdk.get_current_span()
-        if span:
-            self.graphql_span = span.start_child(
-                op=op,
-                name=description,
-                origin=StrawberryIntegration.origin,
-            )
-        else:
-            self.graphql_span = sentry_sdk.start_span(
-                op=op,
-                name=description,
-                origin=StrawberryIntegration.origin,
-            )
+        self.graphql_span = sentry_sdk.start_span(
+            op=op,
+            name=description,
+            origin=StrawberryIntegration.origin,
+        )
+        self.graphql_span.__enter__()
 
         self.graphql_span.set_data("graphql.operation.type", operation_type)
         self.graphql_span.set_data("graphql.operation.name", self._operation_name)
@@ -208,7 +199,7 @@ class SentryAsyncExtension(SchemaExtension):
             transaction.source = TransactionSource.COMPONENT
             transaction.op = op
 
-        self.graphql_span.finish()
+        self.graphql_span.__exit__(None, None, None)
 
     def on_validate(self) -> "Generator[None, None, None]":
         self.validation_span = self.graphql_span.start_child(

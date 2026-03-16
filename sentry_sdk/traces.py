@@ -14,21 +14,33 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
+from sentry_sdk.profiler.continuous_profiler import (
+    get_profiler_id,
+    try_autostart_continuous_profiler,
+    try_profile_lifecycle_trace_start,
+)
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
+    get_current_thread_meta,
     logger,
     nanosecond_time,
     should_be_treated_as_error,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, ParamSpec, TypeVar, Union
+    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue
+    from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
     P = ParamSpec("P")
     R = TypeVar("R")
+
+
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
 
 class SpanStatus(str, Enum):
@@ -224,6 +236,9 @@ class StreamedSpan:
         "_scope",
         "_previous_span_on_scope",
         "_baggage",
+        "_sample_rand",
+        "_sample_rate",
+        "_continuous_profile",
     )
 
     def __init__(
@@ -238,6 +253,8 @@ class StreamedSpan:
         parent_span_id: "Optional[str]" = None,
         parent_sampled: "Optional[bool]" = None,
         baggage: "Optional[Baggage]" = None,
+        sample_rate: "Optional[float]" = None,
+        sample_rand: "Optional[float]" = None,
     ):
         self._name: str = name
         self._active: bool = active
@@ -254,6 +271,8 @@ class StreamedSpan:
         self._parent_span_id = parent_span_id
         self._parent_sampled = parent_sampled
         self._baggage = baggage
+        self._sample_rand = sample_rand
+        self._sample_rate = sample_rate
 
         self._start_timestamp = datetime.now(timezone.utc)
         self._timestamp: "Optional[datetime]" = None
@@ -269,6 +288,12 @@ class StreamedSpan:
 
         self._status = SpanStatus.OK.value
         self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
+
+        self._update_active_thread()
+
+        self._continuous_profile: "Optional[ContinuousProfile]" = None
+        self._start_profile()
+        self._set_profile_id(get_profiler_id())
 
         self._start()
 
@@ -318,13 +343,18 @@ class StreamedSpan:
     def _start(self) -> None:
         if self._active:
             old_span = self._scope.span
-            self._scope.span = self  # type: ignore
+            self._scope.span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         if self._timestamp is not None:
             # This span is already finished, ignore.
             return
+
+        # Stop the profiler
+        if self._is_segment() and self._continuous_profile is not None:
+            with capture_internal_exceptions():
+                self._continuous_profile.stop()
 
         # Detach from scope
         if self._active:
@@ -350,7 +380,9 @@ class StreamedSpan:
             if isinstance(end_timestamp, datetime):
                 self._timestamp = end_timestamp
             else:
-                logger.debug("Failed to set end_timestamp. Using current time instead.")
+                logger.debug(
+                    "[Tracing] Failed to set end_timestamp. Using current time instead."
+                )
 
         if self._timestamp is None:
             try:
@@ -395,7 +427,7 @@ class StreamedSpan:
 
         if status not in {e.value for e in SpanStatus}:
             logger.debug(
-                f'Unsupported span status {status}. Expected one of: "ok", "error"'
+                f'[Tracing] Unsupported span status {status}. Expected one of: "ok", "error"'
             )
             return
 
@@ -439,15 +471,107 @@ class StreamedSpan:
     def timestamp(self) -> "Optional[datetime]":
         return self._timestamp
 
+    def _is_segment(self) -> bool:
+        return self._segment is self
+
+    def _update_active_thread(self) -> None:
+        thread_id, thread_name = get_current_thread_meta()
+
+        if thread_id is not None:
+            self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
+
+            if thread_name is not None:
+                self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
+
+    def _dynamic_sampling_context(self) -> "dict[str, str]":
+        return self._segment._get_baggage().dynamic_sampling_context()
+
+    def _to_traceparent(self) -> str:
+        if self.sampled is True:
+            sampled = "1"
+        elif self.sampled is False:
+            sampled = "0"
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
+
+    def _to_baggage(self) -> "Optional[Baggage]":
+        if self._segment:
+            return self._segment._get_baggage()
+        return None
+
+    def _get_baggage(self) -> "Baggage":
+        """
+        Return the :py:class:`~sentry_sdk.tracing_utils.Baggage` associated with
+        the segment.
+
+        The first time a new baggage with Sentry items is made, it will be frozen.
+        """
+        if not self._baggage or self._baggage.mutable:
+            self._baggage = Baggage.populate_from_segment(self)
+
+        return self._baggage
+
+    def _iter_headers(self) -> "Iterator[tuple[str, str]]":
+        if not self._segment:
+            return
+
+        yield SENTRY_TRACE_HEADER_NAME, self._to_traceparent()
+
+        baggage = self._segment._get_baggage().serialize()
+        if baggage:
+            yield BAGGAGE_HEADER_NAME, baggage
+
+    def _get_trace_context(self) -> "dict[str, Any]":
+        # Even if spans themselves are not event-based anymore, we need this
+        # to populate trace context on events
+        context: "dict[str, Any]" = {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "parent_span_id": self._parent_span_id,
+            "dynamic_sampling_context": self._dynamic_sampling_context(),
+        }
+
+        if "sentry.op" in self._attributes:
+            context["op"] = self._attributes["sentry.op"]
+        if "sentry.origin" in self._attributes:
+            context["origin"] = self._attributes["sentry.origin"]
+
+        return context
+
+    def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
+        if profiler_id is not None:
+            self.set_attribute("sentry.profiler_id", profiler_id)
+
+    def _start_profile(self) -> None:
+        if not self._is_segment():
+            return
+
+        try_autostart_continuous_profiler()
+
+        self._continuous_profile = try_profile_lifecycle_trace_start()
+
 
 class NoOpStreamedSpan(StreamedSpan):
-    __slots__ = ()
+    __slots__ = (
+        "_finished",
+        "_unsampled_reason",
+    )
 
     def __init__(
         self,
+        unsampled_reason: "Optional[str]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
     ) -> None:
         self._scope = scope  # type: ignore[assignment]
+        self._unsampled_reason = unsampled_reason
+
+        self._finished = False
 
         self._start()
 
@@ -467,20 +591,32 @@ class NoOpStreamedSpan(StreamedSpan):
             return
 
         old_span = self._scope.span
-        self._scope.span = self  # type: ignore
+        self._scope.span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        if self._scope is None:
+        if self._finished:
             return
 
-        if not hasattr(self, "_previous_span_on_scope"):
-            return
+        if self._unsampled_reason is not None:
+            client = sentry_sdk.get_client()
+            if client.is_active() and client.transport:
+                logger.debug(
+                    f"[Tracing] Discarding span because sampled=False (reason: {self._unsampled_reason})"
+                )
+                client.transport.record_lost_event(
+                    reason=self._unsampled_reason,
+                    data_category="span",
+                    quantity=1,
+                )
 
-        with capture_internal_exceptions():
-            old_span = self._previous_span_on_scope
-            del self._previous_span_on_scope
-            self._scope.span = old_span
+        if self._scope and hasattr(self, "_previous_span_on_scope"):
+            with capture_internal_exceptions():
+                old_span = self._previous_span_on_scope
+                del self._previous_span_on_scope
+                self._scope.span = old_span
+
+        self._finished = True
 
     def end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         self._end()
@@ -505,6 +641,9 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def remove_attribute(self, key: str) -> None:
         pass
+
+    def _is_segment(self) -> bool:
+        return self._scope is not None
 
     @property
     def status(self) -> "str":

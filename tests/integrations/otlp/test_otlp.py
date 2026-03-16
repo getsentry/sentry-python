@@ -32,6 +32,11 @@ def mock_otlp_ingest():
         url="https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/",
         status=200,
     )
+    responses.add(
+        responses.POST,
+        url="https://my-collector.example.com/v1/traces",
+        status=200,
+    )
 
     yield
 
@@ -231,6 +236,67 @@ def test_propagator_inject_continue_trace(sentry_init):
         assert carrier["baggage"] == incoming_headers["baggage"]
 
     detach(token)
+
+
+def test_collector_url_sets_endpoint(sentry_init):
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        integrations=[
+            OTLPIntegration(collector_url="https://my-collector.example.com/v1/traces")
+        ],
+    )
+
+    tracer_provider = get_tracer_provider()
+    assert isinstance(tracer_provider, TracerProvider)
+
+    (span_processor,) = tracer_provider._active_span_processor._span_processors
+    assert isinstance(span_processor, BatchSpanProcessor)
+
+    exporter = span_processor.span_exporter
+    assert isinstance(exporter, OTLPSpanExporter)
+    assert exporter._endpoint == "https://my-collector.example.com/v1/traces"
+    assert exporter._headers is None or "X-Sentry-Auth" not in exporter._headers
+
+
+def test_collector_url_takes_precedence_over_dsn(sentry_init):
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        integrations=[
+            OTLPIntegration(collector_url="https://my-collector.example.com/v1/traces")
+        ],
+    )
+
+    tracer_provider = get_tracer_provider()
+    assert isinstance(tracer_provider, TracerProvider)
+
+    (span_processor,) = tracer_provider._active_span_processor._span_processors
+    exporter = span_processor.span_exporter
+    assert isinstance(exporter, OTLPSpanExporter)
+    # Should use collector_url, NOT the DSN-derived endpoint
+    assert exporter._endpoint == "https://my-collector.example.com/v1/traces"
+    assert (
+        exporter._endpoint
+        != "https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/"
+    )
+
+
+def test_collector_url_none_falls_back_to_dsn(sentry_init):
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        integrations=[OTLPIntegration(collector_url=None)],
+    )
+
+    tracer_provider = get_tracer_provider()
+    assert isinstance(tracer_provider, TracerProvider)
+
+    (span_processor,) = tracer_provider._active_span_processor._span_processors
+    exporter = span_processor.span_exporter
+    assert isinstance(exporter, OTLPSpanExporter)
+    assert (
+        exporter._endpoint
+        == "https://bla.ingest.sentry.io/api/12312012/integration/otlp/v1/traces/"
+    )
+    assert "X-Sentry-Auth" in exporter._headers
 
 
 def test_capture_exceptions_enabled(sentry_init, capture_events):

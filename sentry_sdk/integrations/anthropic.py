@@ -37,7 +37,18 @@ try:
     except ImportError:
         Omit = None
 
+    from anthropic import Stream, AsyncStream
     from anthropic.resources import AsyncMessages, Messages
+    from anthropic.lib.streaming import MessageStreamManager, AsyncMessageStreamManager
+
+    from anthropic.types import (
+        MessageStartEvent,
+        MessageDeltaEvent,
+        MessageStopEvent,
+        ContentBlockStartEvent,
+        ContentBlockDeltaEvent,
+        ContentBlockStopEvent,
+    )
 
     if TYPE_CHECKING:
         from anthropic.types import MessageStreamEvent, TextBlockParam
@@ -45,9 +56,18 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncIterator, Iterator, List, Optional, Union
+    from typing import Any, AsyncIterator, Iterator, Optional, Union
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
+
+    from anthropic.types import (
+        RawMessageStreamEvent,
+        MessageParam,
+        ModelParam,
+        TextBlockParam,
+        ToolUnionParam,
+    )
+    from anthropic.lib.streaming import MessageStream, AsyncMessageStream
 
 
 class _RecordedUsage:
@@ -71,6 +91,18 @@ class AnthropicIntegration(Integration):
 
         Messages.create = _wrap_message_create(Messages.create)
         AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
+
+        Messages.stream = _wrap_message_stream(Messages.stream)
+        MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
+            MessageStreamManager.__enter__
+        )
+
+        AsyncMessages.stream = _wrap_async_message_stream(AsyncMessages.stream)
+        AsyncMessageStreamManager.__aenter__ = (
+            _wrap_async_message_stream_manager_aenter(
+                AsyncMessageStreamManager.__aenter__
+            )
+        )
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -126,7 +158,8 @@ def _collect_ai_data(
     model: "str | None",
     usage: "_RecordedUsage",
     content_blocks: "list[str]",
-) -> "tuple[str | None, _RecordedUsage, list[str]]":
+    response_id: "str | None" = None,
+) -> "tuple[str | None, _RecordedUsage, list[str], str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
@@ -146,6 +179,7 @@ def _collect_ai_data(
             # https://github.com/anthropics/anthropic-sdk-python/blob/9c485f6966e10ae0ea9eabb3a921d2ea8145a25b/src/anthropic/lib/streaming/_messages.py#L433-L518
             if event.type == "message_start":
                 model = event.message.model or model
+                response_id = event.message.id
 
                 incoming_usage = event.message.usage
                 usage.output_tokens = incoming_usage.output_tokens
@@ -162,6 +196,7 @@ def _collect_ai_data(
                     model,
                     usage,
                     content_blocks,
+                    response_id,
                 )
 
             # Counterintuitive, but message_delta contains cumulative token counts :)
@@ -190,12 +225,14 @@ def _collect_ai_data(
                     model,
                     usage,
                     content_blocks,
+                    response_id,
                 )
 
     return (
         model,
         usage,
         content_blocks,
+        response_id,
     )
 
 
@@ -241,27 +278,33 @@ def _transform_system_instructions(
     ]
 
 
-def _set_input_data(
-    span: "Span", kwargs: "dict[str, Any]", integration: "AnthropicIntegration"
+def _set_common_input_data(
+    span: "Span",
+    integration: "AnthropicIntegration",
+    max_tokens: "int",
+    messages: "Iterable[MessageParam]",
+    model: "ModelParam",
+    system: "Optional[Union[str, Iterable[TextBlockParam]]]",
+    temperature: "Optional[float]",
+    top_k: "Optional[int]",
+    top_p: "Optional[float]",
+    tools: "Optional[Iterable[ToolUnionParam]]",
 ) -> None:
     """
     Set input data for the span based on the provided keyword arguments for the anthropic message creation.
     """
+    span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-    system_instructions: "Union[str, Iterable[TextBlockParam]]" = kwargs.get("system")  # type: ignore
-    messages = kwargs.get("messages")
     if (
         messages is not None
-        and len(messages) > 0
+        and len(messages) > 0  # type: ignore
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        if isinstance(system_instructions, str) or isinstance(
-            system_instructions, Iterable
-        ):
+        if isinstance(system, str) or isinstance(system, Iterable):
             span.set_data(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                json.dumps(_transform_system_instructions(system_instructions)),
+                json.dumps(_transform_system_instructions(system)),
             )
 
         normalized_messages = []
@@ -317,25 +360,175 @@ def _set_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
+    if max_tokens is not None and _is_given(max_tokens):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+    if model is not None and _is_given(model):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+    if temperature is not None and _is_given(temperature):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+    if top_k is not None and _is_given(top_k):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_K, top_k)
+    if top_p is not None and _is_given(top_p):
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+    if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
+        span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
+
+
+def _set_create_input_data(
+    span: "Span", kwargs: "dict[str, Any]", integration: "AnthropicIntegration"
+) -> None:
+    """
+    Set input data for the span based on the provided keyword arguments for the anthropic message creation.
+    """
     span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False))
 
-    kwargs_keys_to_attributes = {
-        "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-        "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-        "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-        "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
-        "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-    }
-    for key, attribute in kwargs_keys_to_attributes.items():
-        value = kwargs.get(key)
+    _set_common_input_data(
+        span=span,
+        integration=integration,
+        max_tokens=kwargs.get("max_tokens"),  # type: ignore
+        messages=kwargs.get("messages"),  # type: ignore
+        model=kwargs.get("model"),
+        system=kwargs.get("system"),
+        temperature=kwargs.get("temperature"),
+        top_k=kwargs.get("top_k"),
+        top_p=kwargs.get("top_p"),
+        tools=kwargs.get("tools"),
+    )
 
-        if value is not None and _is_given(value):
-            span.set_data(attribute, value)
 
-    # Input attributes: Tools
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
+def _wrap_synchronous_message_iterator(
+    iterator: "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
+    span: "Span",
+    integration: "AnthropicIntegration",
+) -> "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Responsible for closing the AI Client Span.
+    """
+
+    model = None
+    usage = _RecordedUsage()
+    content_blocks: "list[str]" = []
+    response_id = None
+
+    try:
+        for event in iterator:
+            # Message and content types are aliases for corresponding Raw* types, introduced in
+            # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
+            (model, usage, content_blocks, response_id) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            )
+            yield event
+    finally:
+        with capture_internal_exceptions():
+            # Anthropic's input_tokens excludes cached/cache_write tokens.
+            # Normalize to total input tokens for correct cost calculations.
+            total_input = (
+                usage.input_tokens
+                + (usage.cache_read_input_tokens or 0)
+                + (usage.cache_write_input_tokens or 0)
+            )
+
+            _set_output_data(
+                span=span,
+                integration=integration,
+                model=model,
+                input_tokens=total_input,
+                output_tokens=usage.output_tokens,
+                cache_read_input_tokens=usage.cache_read_input_tokens,
+                cache_write_input_tokens=usage.cache_write_input_tokens,
+                content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+                finish_span=True,
+                response_id=response_id,
+            )
+
+
+async def _wrap_asynchronous_message_iterator(
+    iterator: "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
+    span: "Span",
+    integration: "AnthropicIntegration",
+) -> "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Responsible for closing the AI Client Span.
+    """
+    model = None
+    usage = _RecordedUsage()
+    content_blocks: "list[str]" = []
+    response_id = None
+
+    try:
+        async for event in iterator:
+            # Message and content types are aliases for corresponding Raw* types, introduced in
+            # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
+            if not isinstance(
+                event,
+                (
+                    MessageStartEvent,
+                    MessageDeltaEvent,
+                    MessageStopEvent,
+                    ContentBlockStartEvent,
+                    ContentBlockDeltaEvent,
+                    ContentBlockStopEvent,
+                ),
+            ):
+                yield event
+                continue
+
+            (
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            ) = _collect_ai_data(
+                event,
+                model,
+                usage,
+                content_blocks,
+                response_id,
+            )
+            yield event
+    finally:
+        with capture_internal_exceptions():
+            # Anthropic's input_tokens excludes cached/cache_write tokens.
+            # Normalize to total input tokens for correct cost calculations.
+            total_input = (
+                usage.input_tokens
+                + (usage.cache_read_input_tokens or 0)
+                + (usage.cache_write_input_tokens or 0)
+            )
+
+            _set_output_data(
+                span=span,
+                integration=integration,
+                model=model,
+                input_tokens=total_input,
+                output_tokens=usage.output_tokens,
+                cache_read_input_tokens=usage.cache_read_input_tokens,
+                cache_write_input_tokens=usage.cache_write_input_tokens,
+                content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+                finish_span=True,
+                response_id=response_id,
+            )
 
 
 def _set_output_data(
@@ -348,10 +541,13 @@ def _set_output_data(
     cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
     finish_span: bool = False,
+    response_id: "str | None" = None,
 ) -> None:
     """
     Set output data for the span based on the AI response."""
     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    if response_id is not None:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
     if should_send_default_pii() and integration.include_prompts:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
@@ -411,9 +607,21 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
     )
     span.__enter__()
 
-    _set_input_data(span, kwargs, integration)
+    _set_create_input_data(span, kwargs, integration)
 
     result = yield f, args, kwargs
+
+    if isinstance(result, Stream):
+        result._iterator = _wrap_synchronous_message_iterator(
+            result._iterator, span, integration
+        )
+        return result
+
+    if isinstance(result, AsyncStream):
+        result._iterator = _wrap_asynchronous_message_iterator(
+            result._iterator, span, integration
+        )
+        return result
 
     with capture_internal_exceptions():
         if hasattr(result, "content"):
@@ -443,93 +651,8 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
                 finish_span=True,
+                response_id=getattr(result, "id", None),
             )
-
-        # Streaming response
-        elif hasattr(result, "_iterator"):
-            old_iterator = result._iterator
-
-            def new_iterator() -> "Iterator[MessageStreamEvent]":
-                model = None
-                usage = _RecordedUsage()
-                content_blocks: "list[str]" = []
-
-                for event in old_iterator:
-                    (
-                        model,
-                        usage,
-                        content_blocks,
-                    ) = _collect_ai_data(
-                        event,
-                        model,
-                        usage,
-                        content_blocks,
-                    )
-                    yield event
-
-                # Anthropic's input_tokens excludes cached/cache_write tokens.
-                # Normalize to total input tokens for correct cost calculations.
-                total_input = (
-                    usage.input_tokens
-                    + (usage.cache_read_input_tokens or 0)
-                    + (usage.cache_write_input_tokens or 0)
-                )
-
-                _set_output_data(
-                    span=span,
-                    integration=integration,
-                    model=model,
-                    input_tokens=total_input,
-                    output_tokens=usage.output_tokens,
-                    cache_read_input_tokens=usage.cache_read_input_tokens,
-                    cache_write_input_tokens=usage.cache_write_input_tokens,
-                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-                    finish_span=True,
-                )
-
-            async def new_iterator_async() -> "AsyncIterator[MessageStreamEvent]":
-                model = None
-                usage = _RecordedUsage()
-                content_blocks: "list[str]" = []
-
-                async for event in old_iterator:
-                    (
-                        model,
-                        usage,
-                        content_blocks,
-                    ) = _collect_ai_data(
-                        event,
-                        model,
-                        usage,
-                        content_blocks,
-                    )
-                    yield event
-
-                # Anthropic's input_tokens excludes cached/cache_write tokens.
-                # Normalize to total input tokens for correct cost calculations.
-                total_input = (
-                    usage.input_tokens
-                    + (usage.cache_read_input_tokens or 0)
-                    + (usage.cache_write_input_tokens or 0)
-                )
-
-                _set_output_data(
-                    span=span,
-                    integration=integration,
-                    model=model,
-                    input_tokens=total_input,
-                    output_tokens=usage.output_tokens,
-                    cache_read_input_tokens=usage.cache_read_input_tokens,
-                    cache_write_input_tokens=usage.cache_write_input_tokens,
-                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-                    finish_span=True,
-                )
-
-            if str(type(result._iterator)) == "<class 'async_generator'>":
-                result._iterator = new_iterator_async()
-            else:
-                result._iterator = new_iterator()
-
         else:
             span.set_data("unknown_response", True)
             span.__exit__(None, None, None)
@@ -611,6 +734,170 @@ def _wrap_message_create_async(f: "Any") -> "Any":
                     span.__exit__(None, None, None)
 
     return _sentry_patched_create_async
+
+
+def _wrap_message_stream(f: "Any") -> "Any":
+    """
+    Attaches user-provided arguments to the returned context manager.
+    The attributes are set on AI Client Spans in the patch for the context manager.
+    """
+
+    @wraps(f)
+    def _sentry_patched_stream(*args: "Any", **kwargs: "Any") -> "MessageStreamManager":
+        stream_manager = f(*args, **kwargs)
+
+        stream_manager._max_tokens = kwargs.get("max_tokens")
+        stream_manager._messages = kwargs.get("messages")
+        stream_manager._model = kwargs.get("model")
+        stream_manager._system = kwargs.get("system")
+        stream_manager._temperature = kwargs.get("temperature")
+        stream_manager._top_k = kwargs.get("top_k")
+        stream_manager._top_p = kwargs.get("top_p")
+        stream_manager._tools = kwargs.get("tools")
+
+        return stream_manager
+
+    return _sentry_patched_stream
+
+
+def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
+    """
+    Creates and manages AI Client Spans.
+    """
+
+    @wraps(f)
+    def _sentry_patched_enter(self: "MessageStreamManager") -> "MessageStream":
+        stream = f(self)
+        if not hasattr(self, "_max_tokens"):
+            return stream
+
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+
+        if integration is None:
+            return stream
+
+        if self._messages is None:
+            return stream
+
+        try:
+            iter(self._messages)
+        except TypeError:
+            return stream
+
+        span = get_start_span_function()(
+            op=OP.GEN_AI_CHAT,
+            name="chat" if self._model is None else f"chat {self._model}".strip(),
+            origin=AnthropicIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        _set_common_input_data(
+            span=span,
+            integration=integration,
+            max_tokens=self._max_tokens,
+            messages=self._messages,
+            model=self._model,
+            system=self._system,
+            temperature=self._temperature,
+            top_k=self._top_k,
+            top_p=self._top_p,
+            tools=self._tools,
+        )
+
+        stream._iterator = _wrap_synchronous_message_iterator(
+            iterator=stream._iterator,
+            span=span,
+            integration=integration,
+        )
+
+        return stream
+
+    return _sentry_patched_enter
+
+
+def _wrap_async_message_stream(f: "Any") -> "Any":
+    """
+    Attaches user-provided arguments to the returned context manager.
+    The attributes are set on AI Client Spans in the patch for the context manager.
+    """
+
+    @wraps(f)
+    def _sentry_patched_stream(
+        *args: "Any", **kwargs: "Any"
+    ) -> "AsyncMessageStreamManager":
+        stream_manager = f(*args, **kwargs)
+
+        stream_manager._max_tokens = kwargs.get("max_tokens")
+        stream_manager._messages = kwargs.get("messages")
+        stream_manager._model = kwargs.get("model")
+        stream_manager._system = kwargs.get("system")
+        stream_manager._temperature = kwargs.get("temperature")
+        stream_manager._top_k = kwargs.get("top_k")
+        stream_manager._top_p = kwargs.get("top_p")
+        stream_manager._tools = kwargs.get("tools")
+
+        return stream_manager
+
+    return _sentry_patched_stream
+
+
+def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
+    """
+    Creates and manages AI Client Spans.
+    """
+
+    @wraps(f)
+    async def _sentry_patched_aenter(
+        self: "AsyncMessageStreamManager",
+    ) -> "AsyncMessageStream":
+        stream = await f(self)
+        if not hasattr(self, "_max_tokens"):
+            return stream
+
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+
+        if integration is None:
+            return stream
+
+        if self._messages is None:
+            return stream
+
+        try:
+            iter(self._messages)
+        except TypeError:
+            return stream
+
+        span = get_start_span_function()(
+            op=OP.GEN_AI_CHAT,
+            name="chat" if self._model is None else f"chat {self._model}".strip(),
+            origin=AnthropicIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+        _set_common_input_data(
+            span=span,
+            integration=integration,
+            max_tokens=self._max_tokens,
+            messages=self._messages,
+            model=self._model,
+            system=self._system,
+            temperature=self._temperature,
+            top_k=self._top_k,
+            top_p=self._top_p,
+            tools=self._tools,
+        )
+
+        stream._iterator = _wrap_asynchronous_message_iterator(
+            iterator=stream._iterator,
+            span=span,
+            integration=integration,
+        )
+
+        return stream
+
+    return _sentry_patched_aenter
 
 
 def _is_given(obj: "Any") -> bool:
