@@ -298,20 +298,23 @@ class AsyncWorker(Worker):
     async def _target(self) -> None:
         if self._queue is None:
             return
-        while True:
-            callback = await self._queue.get()
-            if callback is _TERMINATOR:
-                self._queue.task_done()
-                break
-            # Firing tasks instead of awaiting them allows for concurrent requests
-            with mark_sentry_task_internal():
-                task = asyncio.create_task(self._process_callback(callback))
-            # Create a strong reference to the task so it can be cancelled on kill
-            # and does not get garbage collected while running
-            self._active_tasks.add(task)
-            task.add_done_callback(self._on_task_complete)
-            # Yield to let the event loop run other tasks
-            await asyncio.sleep(0)
+        try:
+            while True:
+                callback = await self._queue.get()
+                if callback is _TERMINATOR:
+                    self._queue.task_done()
+                    break
+                # Firing tasks instead of awaiting them allows for concurrent requests
+                with mark_sentry_task_internal():
+                    task = asyncio.create_task(self._process_callback(callback))
+                # Create a strong reference to the task so it can be cancelled on kill
+                # and does not get garbage collected while running
+                self._active_tasks.add(task)
+                task.add_done_callback(self._on_task_complete)
+                # Yield to let the event loop run other tasks
+                await asyncio.sleep(0)
+        except asyncio.CancelledError:
+            pass  # Expected during kill()
 
     async def _process_callback(self, callback: "Callable[[], Any]") -> None:
         # Callback is an async coroutine, need to await it
