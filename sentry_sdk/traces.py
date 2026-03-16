@@ -38,9 +38,6 @@ if TYPE_CHECKING:
     P = ParamSpec("P")
     R = TypeVar("R")
 
-BAGGAGE_HEADER_NAME = "baggage"
-SENTRY_TRACE_HEADER_NAME = "sentry-trace"
-
 
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
@@ -307,7 +304,6 @@ class StreamedSpan:
             f"trace_id={self.trace_id}, "
             f"span_id={self.span_id}, "
             f"parent_span_id={self._parent_span_id}, "
-            f"sampled={self.sampled}, "
             f"active={self._active})>"
         )
 
@@ -478,6 +474,15 @@ class StreamedSpan:
     def _is_segment(self) -> bool:
         return self._segment is self
 
+    def _update_active_thread(self) -> None:
+        thread_id, thread_name = get_current_thread_meta()
+
+        if thread_id is not None:
+            self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
+
+            if thread_name is not None:
+                self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
+
     def _dynamic_sampling_context(self) -> "dict[str, str]":
         return self._segment._get_baggage().dynamic_sampling_context()
 
@@ -521,15 +526,6 @@ class StreamedSpan:
         baggage = self._segment._get_baggage().serialize()
         if baggage:
             yield BAGGAGE_HEADER_NAME, baggage
-
-    def _update_active_thread(self) -> None:
-        thread_id, thread_name = get_current_thread_meta()
-
-        if thread_id is not None:
-            self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
-
-            if thread_name is not None:
-                self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
     def _get_trace_context(self) -> "dict[str, Any]":
         # Even if spans themselves are not event-based anymore, we need this
