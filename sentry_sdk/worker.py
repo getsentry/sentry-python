@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 import asyncio
 import os
@@ -49,7 +47,7 @@ class Worker(ABC):
         pass
 
     def flush(
-        self, timeout: float, callback: Optional[Callable[[int, float], Any]] = None
+        self, timeout: float, callback: "Optional[Callable[[int, float], Any]]" = None
     ) -> None:
         """
         Flush the worker.
@@ -70,7 +68,7 @@ class Worker(ABC):
         pass
 
     @abstractmethod
-    def submit(self, callback: Callable[[], Any]) -> bool:
+    def submit(self, callback: "Callable[[], Any]") -> bool:
         """
         Schedule a callback to be executed by the worker.
 
@@ -81,10 +79,10 @@ class Worker(ABC):
 
 class BackgroundWorker(Worker):
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
-        self._queue: Queue = Queue(queue_size)
+        self._queue: "Queue" = Queue(queue_size)
         self._lock = threading.Lock()
-        self._thread: Optional[threading.Thread] = None
-        self._thread_for_pid: Optional[int] = None
+        self._thread: "Optional[threading.Thread]" = None
+        self._thread_for_pid: "Optional[int]" = None
 
     @property
     def is_alive(self) -> bool:
@@ -147,7 +145,7 @@ class BackgroundWorker(Worker):
                 self._thread = None
                 self._thread_for_pid = None
 
-    def flush(self, timeout: float, callback: Optional[Any] = None) -> None:
+    def flush(self, timeout: float, callback: "Optional[Any]" = None) -> None:
         logger.debug("background worker got flush request")
         with self._lock:
             if self.is_alive and timeout > 0.0:
@@ -157,7 +155,7 @@ class BackgroundWorker(Worker):
     def full(self) -> bool:
         return self._queue.full()
 
-    def _wait_flush(self, timeout: float, callback: Optional[Any]) -> None:
+    def _wait_flush(self, timeout: float, callback: "Optional[Any]") -> None:
         initial_timeout = min(0.1, timeout)
         if not self._timed_queue_join(initial_timeout):
             pending = self._queue.qsize() + 1
@@ -169,7 +167,7 @@ class BackgroundWorker(Worker):
                 pending = self._queue.qsize() + 1
                 logger.error("flush timed out, dropped %s events", pending)
 
-    def submit(self, callback: Callable[[], Any]) -> bool:
+    def submit(self, callback: "Callable[[], Any]") -> bool:
         self._ensure_thread()
         try:
             self._queue.put_nowait(callback)
@@ -194,14 +192,14 @@ class BackgroundWorker(Worker):
 
 class AsyncWorker(Worker):
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
-        self._queue: Optional[asyncio.Queue[Any]] = None
+        self._queue: "Optional[asyncio.Queue[Any]]" = None
         self._queue_size = queue_size
-        self._task: Optional[asyncio.Task[None]] = None
+        self._task: "Optional[asyncio.Task[None]]" = None
         # Event loop needs to remain in the same process
-        self._task_for_pid: Optional[int] = None
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._task_for_pid: "Optional[int]" = None
+        self._loop: "Optional[asyncio.AbstractEventLoop]" = None
         # Track active callback tasks so they have a strong reference and can be cancelled on kill
-        self._active_tasks: set[asyncio.Task[None]] = set()
+        self._active_tasks: "set[asyncio.Task[None]]" = set()
 
     @property
     def is_alive(self) -> bool:
@@ -255,7 +253,9 @@ class AsyncWorker(Worker):
         if not self.is_alive:
             self.start()
 
-    async def _wait_flush(self, timeout: float, callback: Optional[Any] = None) -> None:
+    async def _wait_flush(
+        self, timeout: float, callback: "Optional[Any]" = None
+    ) -> None:
         if not self._loop or not self._loop.is_running() or self._queue is None:
             return
 
@@ -278,14 +278,14 @@ class AsyncWorker(Worker):
                 logger.error("flush timed out, dropped %s events", pending)
 
     def flush(  # type: ignore[override]
-        self, timeout: float, callback: Optional[Any] = None
-    ) -> Optional[asyncio.Task[None]]:
+        self, timeout: float, callback: "Optional[Any]" = None
+    ) -> "Optional[asyncio.Task[None]]":
         if self.is_alive and timeout > 0.0 and self._loop and self._loop.is_running():
             with mark_sentry_task_internal():
                 return self._loop.create_task(self._wait_flush(timeout, callback))
         return None
 
-    def submit(self, callback: Callable[[], Any]) -> bool:
+    def submit(self, callback: "Callable[[], Any]") -> bool:
         self._ensure_task()
         if self._queue is None:
             return False
@@ -313,11 +313,11 @@ class AsyncWorker(Worker):
             # Yield to let the event loop run other tasks
             await asyncio.sleep(0)
 
-    async def _process_callback(self, callback: Callable[[], Any]) -> None:
+    async def _process_callback(self, callback: "Callable[[], Any]") -> None:
         # Callback is an async coroutine, need to await it
         await callback()
 
-    def _on_task_complete(self, task: asyncio.Task[None]) -> None:
+    def _on_task_complete(self, task: "asyncio.Task[None]") -> None:
         try:
             task.result()
         except asyncio.CancelledError:
