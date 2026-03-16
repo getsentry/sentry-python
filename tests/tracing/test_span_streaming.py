@@ -1,12 +1,14 @@
 import asyncio
 import re
 import sys
+import time
 from typing import Any
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
+from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.traces import NoOpStreamedSpan, SpanStatus, StreamedSpan
 
 minimum_python_38 = pytest.mark.skipif(
@@ -1320,6 +1322,102 @@ def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
     assert span5["name"] == "child 2"
     assert span3["parent_span_id"] == span1["span_id"]
     assert span5["parent_span_id"] == span3["span_id"]
+
+
+@mock.patch("sentry_sdk.profiler.continuous_profiler.DEFAULT_SAMPLING_FREQUENCY", 21)
+def test_segment_span_has_profiler_id(
+    sentry_init, capture_envelopes, teardown_profiling
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        profile_lifecycle="trace",
+        profiler_mode="thread",
+        profile_session_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "continuous_profiling_auto_start": True,
+        },
+    )
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="profiled segment"):
+        time.sleep(0.1)
+
+    sentry_sdk.get_client().flush()
+    time.sleep(0.3)  # wait for profiler to flush
+
+    spans = envelopes_to_spans(envelopes)
+    assert len(spans) == 1
+    assert "sentry.profiler_id" in spans[0]["attributes"]
+
+    profile_chunks = [
+        item
+        for envelope in envelopes
+        for item in envelope.items
+        if item.type == "profile_chunk"
+    ]
+    assert len(profile_chunks) > 0
+
+
+def test_segment_span_no_profiler_id_when_unsampled(
+    sentry_init, capture_envelopes, teardown_profiling
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        profile_lifecycle="trace",
+        profiler_mode="thread",
+        profile_session_sample_rate=0.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "continuous_profiling_auto_start": True,
+        },
+    )
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        time.sleep(0.05)
+
+    sentry_sdk.get_client().flush()
+    time.sleep(0.2)
+
+    spans = envelopes_to_spans(envelopes)
+    assert len(spans) == 1
+    assert "sentry.profiler_id" not in spans[0]["attributes"]
+
+    profile_chunks = [
+        item
+        for envelope in envelopes
+        for item in envelope.items
+        if item.type == "profile_chunk"
+    ]
+    assert len(profile_chunks) == 0
+
+
+@mock.patch("sentry_sdk.profiler.continuous_profiler.DEFAULT_SAMPLING_FREQUENCY", 21)
+def test_profile_stops_when_segment_ends(
+    sentry_init, capture_envelopes, teardown_profiling
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        profile_lifecycle="trace",
+        profiler_mode="thread",
+        profile_session_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "continuous_profiling_auto_start": True,
+        },
+    )
+    capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="segment") as span:
+        time.sleep(0.1)
+        assert span._continuous_profile is not None
+        assert span._continuous_profile.active is True
+
+    assert span._continuous_profile.active is False
+
+    time.sleep(0.3)
+    assert get_profiler_id() is None, "profiler should have stopped"
 
 
 def test_transport_format(sentry_init, capture_envelopes):
