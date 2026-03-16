@@ -13,7 +13,6 @@ except ImportError:
 
 
 from anthropic import Anthropic, AnthropicError, AsyncAnthropic
-from anthropic.lib.streaming import TextEvent
 from anthropic.types import MessageDeltaUsage, TextDelta, Usage
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
@@ -29,6 +28,11 @@ except ImportError:
         from anthropic.types import InputJsonDelta as InputJSONDelta
     except ImportError:
         pass
+
+try:
+    from anthropic.lib.streaming import TextEvent
+except ImportError:
+    TextEvent = None
 
 try:
     # 0.27+
@@ -818,7 +822,7 @@ def test_stream_messages_iterator_methods(
                 next(stream)
                 list(islice(stream, 1))
                 # New versions add TextEvent, so consume one more event.
-                if isinstance(next(stream), TextEvent):
+                if TextEvent is not None and isinstance(next(stream), TextEvent):
                     next(stream)
                 stream.close()
 
