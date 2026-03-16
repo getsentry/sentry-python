@@ -508,7 +508,6 @@ async def test_streaming_create_message_async(
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
-        default_integrations=False,
         send_default_pii=send_default_pii,
     )
     events = capture_events()
