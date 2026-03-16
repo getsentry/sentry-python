@@ -711,35 +711,36 @@ def _wrap_message_create(f: "Any") -> "Any":
     return _sentry_patched_create_sync
 
 
-def _initialize_data_accumulation_state(stream: "Union[Stream, MessageStream]"):
+def _initialize_data_accumulation_state(stream: "Union[Stream, MessageStream]") -> None:
     """
     Initialize fields for accumulating output on the Stream instance.
     """
     if not hasattr(stream, "_model"):
         stream._model = None
         stream._usage = _RecordedUsage()
-        stream._content_blocks: "list[str]" = []
+        stream._content_blocks = []
         stream._response_id = None
 
 
 def _accumulate_event_data(
-    self, event: "Union[RawMessageStreamEvent, MessageStreamEvent]"
-):
+    stream: "Union[Stream, MessageStream]",
+    event: "Union[RawMessageStreamEvent, MessageStreamEvent]",
+) -> None:
     """
     Update accumulated output from a single stream event.
     """
     (model, usage, content_blocks, response_id) = _collect_ai_data(
         event,
-        self._model,
-        self._usage,
-        self._content_blocks,
-        self._response_id,
+        stream._model,
+        stream._usage,
+        stream._content_blocks,
+        stream._response_id,
     )
 
-    self._model = model
-    self._usage = usage
-    self._content_blocks = content_blocks
-    self._response_id = response_id
+    stream._model = model
+    stream._usage = usage
+    stream._content_blocks = content_blocks
+    stream._response_id = response_id
 
 
 def _finish_streaming_span(
@@ -749,7 +750,7 @@ def _finish_streaming_span(
     usage: "_RecordedUsage",
     content_blocks: "list[str]",
     response_id: "Optional[str]",
-):
+) -> None:
     """
     Set output attributes on the AI Client Span and end the span.
     """
