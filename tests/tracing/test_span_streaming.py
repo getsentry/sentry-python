@@ -941,6 +941,23 @@ def test_set_span_status_on_error(sentry_init, capture_envelopes):
     assert span["status"] == "error"
 
 
+def test_set_span_status_on_ignored_span(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream", "ignore_spans": ["ignored"]},
+    )
+
+    events = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="ignored") as span:
+        span.status = "error"
+
+    sentry_sdk.get_client().flush()
+    spans = envelopes_to_spans(events)
+
+    assert len(spans) == 0
+
+
 @pytest.mark.parametrize(
     ("ignore_spans", "name", "attributes", "ignored"),
     [
