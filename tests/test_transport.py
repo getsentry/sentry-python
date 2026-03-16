@@ -1164,6 +1164,7 @@ async def test_async_two_way_ssl_authentication():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_init():
     """Test AsyncWorker.__init__ sets up default state correctly."""
     from sentry_sdk.worker import AsyncWorker
@@ -1180,6 +1181,7 @@ async def test_async_worker_init():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_is_alive_not_started():
     """Test is_alive returns False before start()."""
     from sentry_sdk.worker import AsyncWorker
@@ -1191,6 +1193,7 @@ async def test_async_worker_is_alive_not_started():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_is_alive_after_start():
     """Test is_alive returns True after start() in a running loop."""
     from sentry_sdk.worker import AsyncWorker
@@ -1205,6 +1208,7 @@ async def test_async_worker_is_alive_after_start():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_is_alive_wrong_pid():
     """Test is_alive returns False when pid mismatches."""
     from sentry_sdk.worker import AsyncWorker
@@ -1225,6 +1229,7 @@ async def test_async_worker_is_alive_wrong_pid():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_is_alive_no_loop():
     """Test is_alive returns False when loop is None."""
     from sentry_sdk.worker import AsyncWorker
@@ -1238,6 +1243,7 @@ async def test_async_worker_is_alive_no_loop():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_start_creates_queue_and_task():
     """Test start() creates asyncio queue and consumer task."""
     from sentry_sdk.worker import AsyncWorker
@@ -1269,6 +1275,7 @@ def test_async_worker_start_no_running_loop():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_start_reuses_existing_queue():
     """Test start() reuses existing queue if already created."""
     from sentry_sdk.worker import AsyncWorker
@@ -1288,6 +1295,7 @@ async def test_async_worker_start_reuses_existing_queue():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_full_when_queue_is_none():
     """Test full() returns True when queue is None."""
     from sentry_sdk.worker import AsyncWorker
@@ -1299,6 +1307,7 @@ async def test_async_worker_full_when_queue_is_none():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_full_when_not_full():
     """Test full() returns False when queue has capacity."""
     from sentry_sdk.worker import AsyncWorker
@@ -1313,6 +1322,7 @@ async def test_async_worker_full_when_not_full():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_full_when_full():
     """Test full() returns True when queue is at capacity."""
     from sentry_sdk.worker import AsyncWorker
@@ -1337,6 +1347,7 @@ async def test_async_worker_full_when_full():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_submit_and_process():
     """Test submit() queues a callback and it gets processed."""
     from sentry_sdk.worker import AsyncWorker
@@ -1359,6 +1370,7 @@ async def test_async_worker_submit_and_process():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_submit_returns_false_when_queue_full():
     """Test submit() returns False when queue is full."""
     from sentry_sdk.worker import AsyncWorker
@@ -1382,6 +1394,7 @@ async def test_async_worker_submit_returns_false_when_queue_full():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_submit_returns_false_when_no_queue():
     """Test submit() returns False when no queue (no running loop during start)."""
     from sentry_sdk.worker import AsyncWorker
@@ -1396,6 +1409,7 @@ async def test_async_worker_submit_returns_false_when_no_queue():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_kill_cancels_tasks():
     """Test kill() cancels the main task and active callback tasks."""
     from sentry_sdk.worker import AsyncWorker
@@ -1429,6 +1443,7 @@ async def test_async_worker_kill_cancels_tasks():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_kill_queue_full():
     """Test kill() handles QueueFull when adding terminator."""
     from sentry_sdk.worker import AsyncWorker
@@ -1452,6 +1467,7 @@ async def test_async_worker_kill_queue_full():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_kill_no_task():
     """Test kill() is a no-op when there's no task."""
     from sentry_sdk.worker import AsyncWorker
@@ -1466,6 +1482,7 @@ async def test_async_worker_kill_no_task():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_flush_returns_task():
     """Test flush() returns an asyncio task when alive."""
     from sentry_sdk.worker import AsyncWorker
@@ -1483,6 +1500,7 @@ async def test_async_worker_flush_returns_task():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_flush_returns_none_when_not_alive():
     """Test flush() returns None when worker is not alive."""
     from sentry_sdk.worker import AsyncWorker
@@ -1494,6 +1512,7 @@ async def test_async_worker_flush_returns_none_when_not_alive():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_flush_returns_none_zero_timeout():
     """Test flush() returns None when timeout is 0."""
     from sentry_sdk.worker import AsyncWorker
@@ -1508,6 +1527,7 @@ async def test_async_worker_flush_returns_none_zero_timeout():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_wait_flush_early_return_no_loop():
     """Test _wait_flush returns early if loop/queue is None."""
     from sentry_sdk.worker import AsyncWorker
@@ -1521,6 +1541,7 @@ async def test_async_worker_wait_flush_early_return_no_loop():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_wait_flush_with_callback():
     """Test _wait_flush calls callback on initial timeout."""
     from sentry_sdk.worker import AsyncWorker
@@ -1549,6 +1570,7 @@ async def test_async_worker_wait_flush_with_callback():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_wait_flush_second_timeout():
     """Test _wait_flush logs error on second timeout."""
     from sentry_sdk.worker import AsyncWorker
@@ -1575,6 +1597,7 @@ async def test_async_worker_wait_flush_second_timeout():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_target_terminator():
     """Test _target exits on _TERMINATOR sentinel."""
     from sentry_sdk.worker import AsyncWorker, _TERMINATOR
@@ -1591,6 +1614,7 @@ async def test_async_worker_target_terminator():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_target_with_none_queue():
     """Test _target returns immediately when queue is None."""
     from sentry_sdk.worker import AsyncWorker
@@ -1604,6 +1628,7 @@ async def test_async_worker_target_with_none_queue():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_on_task_complete_cancelled_error():
     """Test _on_task_complete handles CancelledError gracefully."""
     from sentry_sdk.worker import AsyncWorker
@@ -1640,6 +1665,7 @@ async def test_async_worker_on_task_complete_cancelled_error():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_on_task_complete_exception():
     """Test _on_task_complete logs error on exception."""
     from sentry_sdk.worker import AsyncWorker
@@ -1663,6 +1689,7 @@ async def test_async_worker_on_task_complete_exception():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_on_task_complete_queue_none():
     """Test _on_task_complete handles queue being None (e.g., during shutdown)."""
     from sentry_sdk.worker import AsyncWorker
@@ -1693,6 +1720,7 @@ async def test_async_worker_on_task_complete_queue_none():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 async def test_async_worker_ensure_task_calls_start():
     """Test _ensure_task calls start() when not alive."""
     from sentry_sdk.worker import AsyncWorker
