@@ -15,6 +15,11 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.profiler.continuous_profiler import (
+    get_profiler_id,
+    try_autostart_continuous_profiler,
+    try_profile_lifecycle_trace_start,
+)
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -26,11 +31,16 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, ParamSpec, TypeVar, Union
+    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
     from sentry_sdk._types import Attributes, AttributeValue
+    from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
     P = ParamSpec("P")
     R = TypeVar("R")
+
+
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
 
 class SpanStatus(str, Enum):
@@ -228,6 +238,7 @@ class StreamedSpan:
         "_baggage",
         "_sample_rand",
         "_sample_rate",
+        "_continuous_profile",
     )
 
     def __init__(
@@ -280,6 +291,10 @@ class StreamedSpan:
 
         self._update_active_thread()
 
+        self._continuous_profile: "Optional[ContinuousProfile]" = None
+        self._start_profile()
+        self._set_profile_id(get_profiler_id())
+
         self._start()
 
     def __repr__(self) -> str:
@@ -328,13 +343,18 @@ class StreamedSpan:
     def _start(self) -> None:
         if self._active:
             old_span = self._scope.span
-            self._scope.span = self  # type: ignore
+            self._scope.span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
         if self._timestamp is not None:
             # This span is already finished, ignore.
             return
+
+        # Stop the profiler
+        if self._is_segment() and self._continuous_profile is not None:
+            with capture_internal_exceptions():
+                self._continuous_profile.stop()
 
         # Detach from scope
         if self._active:
@@ -463,6 +483,79 @@ class StreamedSpan:
             if thread_name is not None:
                 self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
+    def _dynamic_sampling_context(self) -> "dict[str, str]":
+        return self._segment._get_baggage().dynamic_sampling_context()
+
+    def _to_traceparent(self) -> str:
+        if self.sampled is True:
+            sampled = "1"
+        elif self.sampled is False:
+            sampled = "0"
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
+
+    def _to_baggage(self) -> "Optional[Baggage]":
+        if self._segment:
+            return self._segment._get_baggage()
+        return None
+
+    def _get_baggage(self) -> "Baggage":
+        """
+        Return the :py:class:`~sentry_sdk.tracing_utils.Baggage` associated with
+        the segment.
+
+        The first time a new baggage with Sentry items is made, it will be frozen.
+        """
+        if not self._baggage or self._baggage.mutable:
+            self._baggage = Baggage.populate_from_segment(self)
+
+        return self._baggage
+
+    def _iter_headers(self) -> "Iterator[tuple[str, str]]":
+        if not self._segment:
+            return
+
+        yield SENTRY_TRACE_HEADER_NAME, self._to_traceparent()
+
+        baggage = self._segment._get_baggage().serialize()
+        if baggage:
+            yield BAGGAGE_HEADER_NAME, baggage
+
+    def _get_trace_context(self) -> "dict[str, Any]":
+        # Even if spans themselves are not event-based anymore, we need this
+        # to populate trace context on events
+        context: "dict[str, Any]" = {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "parent_span_id": self._parent_span_id,
+            "dynamic_sampling_context": self._dynamic_sampling_context(),
+        }
+
+        if "sentry.op" in self._attributes:
+            context["op"] = self._attributes["sentry.op"]
+        if "sentry.origin" in self._attributes:
+            context["origin"] = self._attributes["sentry.origin"]
+
+        return context
+
+    def _set_profile_id(self, profiler_id: "Optional[str]") -> None:
+        if profiler_id is not None:
+            self.set_attribute("sentry.profiler_id", profiler_id)
+
+    def _start_profile(self) -> None:
+        if not self._is_segment():
+            return
+
+        try_autostart_continuous_profiler()
+
+        self._continuous_profile = try_profile_lifecycle_trace_start()
+
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
@@ -498,7 +591,7 @@ class NoOpStreamedSpan(StreamedSpan):
             return
 
         old_span = self._scope.span
-        self._scope.span = self  # type: ignore
+        self._scope.span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:

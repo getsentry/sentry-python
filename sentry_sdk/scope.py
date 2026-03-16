@@ -581,8 +581,12 @@ class Scope:
         client = self.get_client()
 
         # If we have an active span, return traceparent from there
-        if has_tracing_enabled(client.options) and self.span is not None:
-            return self.span.to_traceparent()
+        if (
+            has_tracing_enabled(client.options)
+            and self.span is not None
+            and not isinstance(self.span, NoOpStreamedSpan)
+        ):
+            return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
         return self.get_active_propagation_context().to_traceparent()
@@ -595,8 +599,12 @@ class Scope:
         client = self.get_client()
 
         # If we have an active span, return baggage from there
-        if has_tracing_enabled(client.options) and self.span is not None:
-            return self.span.to_baggage()
+        if (
+            has_tracing_enabled(client.options)
+            and self.span is not None
+            and not isinstance(self.span, NoOpStreamedSpan)
+        ):
+            return self.span._to_baggage()
 
         # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
@@ -605,8 +613,12 @@ class Scope:
         """
         Returns the Sentry "trace" context from the Propagation Context.
         """
-        if has_tracing_enabled(self.get_client().options) and self._span is not None:
-            return self._span.get_trace_context()
+        if (
+            has_tracing_enabled(self.get_client().options)
+            and self._span is not None
+            and not isinstance(self._span, NoOpStreamedSpan)
+        ):
+            return self._span._get_trace_context()
 
         # if we are tracing externally (otel), those values take precedence
         external_propagation_context = get_external_propagation_context()
@@ -670,8 +682,12 @@ class Scope:
         span = kwargs.pop("span", None)
         span = span or self.span
 
-        if has_tracing_enabled(client.options) and span is not None:
-            for header in span.iter_headers():
+        if (
+            has_tracing_enabled(client.options)
+            and span is not None
+            and not isinstance(span, NoOpStreamedSpan)
+        ):
+            for header in span._iter_headers():
                 yield header
         elif has_external_propagation_context():
             # when we have an external_propagation_context (otlp)
@@ -718,7 +734,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture: bool = True
 
-        self._span: "Optional[Span]" = None
+        self._span: "Optional[Union[Span, StreamedSpan]]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
 
@@ -772,6 +788,14 @@ class Scope:
         if self._span is None:
             return None
 
+        if isinstance(self._span, StreamedSpan):
+            warnings.warn(
+                "Scope.transaction is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return None
+
         # there is an orphan span on the scope
         if self._span.containing_transaction is None:
             return None
@@ -801,17 +825,36 @@ class Scope:
             "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
         )
         self._transaction = value
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = value
+        if self._span:
+            if isinstance(self._span, StreamedSpan):
+                warnings.warn(
+                    "Scope.transaction is not available in streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return None
+
+            if self._span.containing_transaction:
+                self._span.containing_transaction.name = value
 
     def set_transaction_name(self, name: str, source: "Optional[str]" = None) -> None:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
+        if self._span:
+            if isinstance(self._span, NoOpStreamedSpan):
+                return
 
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = name
-            if source:
-                self._span.containing_transaction.source = source
+            elif isinstance(self._span, StreamedSpan):
+                self._span._segment.name = name
+                if source:
+                    self._span._segment.set_attribute(
+                        "sentry.span.source", getattr(source, "value", source)
+                    )
+
+            elif self._span.containing_transaction:
+                self._span.containing_transaction.name = name
+                if source:
+                    self._span.containing_transaction.source = source
 
         if source:
             self._transaction_info["source"] = source
@@ -834,12 +877,12 @@ class Scope:
             session.update(user=value)
 
     @property
-    def span(self) -> "Optional[Span]":
+    def span(self) -> "Optional[Union[Span, StreamedSpan]]":
         """Get/set current tracing span or transaction."""
         return self._span
 
     @span.setter
-    def span(self, span: "Optional[Span]") -> None:
+    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -1148,6 +1191,15 @@ class Scope:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        client = sentry_sdk.get_client()
+        if has_span_streaming_enabled(client.options):
+            warnings.warn(
+                "Scope.start_span is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return NoOpSpan()
+
         if kwargs.get("description") is not None:
             warnings.warn(
                 "The `description` parameter is deprecated. Please use `name` instead.",
@@ -1167,6 +1219,9 @@ class Scope:
 
             # get current span or transaction
             span = self.span or self.get_isolation_scope().span
+            if isinstance(span, StreamedSpan):
+                # make mypy happy
+                return NoOpSpan()
 
             if span is None:
                 # New spans get the `trace_id` from the scope
