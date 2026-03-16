@@ -1,6 +1,7 @@
 import copy
 import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
+from sentry_sdk.tracing import Span
 from threading import Lock
 
 from typing import TYPE_CHECKING, Any
@@ -61,5 +62,5 @@ def add_feature_flag(flag: str, result: bool) -> None:
     flags.set(flag, result)
 
     span = sentry_sdk.get_current_span()
-    if span:
+    if span and isinstance(span, Span):
         span.set_flag(f"flag.evaluation.{flag}", result)

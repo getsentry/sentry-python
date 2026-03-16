@@ -767,6 +767,55 @@ class Baggage:
 
         return Baggage(sentry_items, mutable=False)
 
+    @classmethod
+    def populate_from_segment(cls, segment: "StreamedSpan") -> "Baggage":
+        """
+        Populate fresh baggage entry with sentry_items and make it immutable
+        if this is the head SDK which originates traces.
+        """
+        client = sentry_sdk.get_client()
+        sentry_items: "Dict[str, str]" = {}
+
+        if not client.is_active():
+            return Baggage(sentry_items)
+
+        options = client.options or {}
+
+        sentry_items["trace_id"] = segment.trace_id
+        sentry_items["sample_rand"] = f"{segment._sample_rand:.6f}"  # noqa: E231
+
+        if options.get("environment"):
+            sentry_items["environment"] = options["environment"]
+
+        if options.get("release"):
+            sentry_items["release"] = options["release"]
+
+        if client.parsed_dsn:
+            sentry_items["public_key"] = client.parsed_dsn.public_key
+            if client.parsed_dsn.org_id:
+                sentry_items["org_id"] = client.parsed_dsn.org_id
+
+        if (
+            segment.get_attributes().get("sentry.span.source")
+            not in LOW_QUALITY_SEGMENT_SOURCES
+        ) and segment._name:
+            sentry_items["transaction"] = segment._name
+
+        if segment._sample_rate is not None:
+            sentry_items["sample_rate"] = str(segment._sample_rate)
+
+        if segment.sampled is not None:
+            sentry_items["sampled"] = "true" if segment.sampled else "false"
+
+        # There's an existing baggage but it was mutable, which is why we are
+        # creating this new baggage.
+        # However, if by chance the user put some sentry items in there, give
+        # them precedence.
+        if segment._baggage and segment._baggage.sentry_items:
+            sentry_items.update(segment._baggage.sentry_items)
+
+        return Baggage(sentry_items, mutable=False)
+
     def freeze(self) -> None:
         self.mutable = False
 
@@ -890,6 +939,14 @@ def create_span_decorator(
                 )
                 return await f(*args, **kwargs)
 
+            if isinstance(current_span, StreamedSpan):
+                warnings.warn(
+                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return await f(*args, **kwargs)
+
             span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
@@ -924,6 +981,14 @@ def create_span_decorator(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
                     qualname_from_function(f),
+                )
+                return f(*args, **kwargs)
+
+            if isinstance(current_span, StreamedSpan):
+                warnings.warn(
+                    "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
+                    DeprecationWarning,
+                    stacklevel=2,
                 )
                 return f(*args, **kwargs)
 
@@ -1027,7 +1092,9 @@ def create_streaming_span_decorator(
     return span_decorator
 
 
-def get_current_span(scope: "Optional[sentry_sdk.Scope]" = None) -> "Optional[Span]":
+def get_current_span(
+    scope: "Optional[sentry_sdk.Scope]" = None,
+) -> "Optional[Union[Span, StreamedSpan]]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -1036,16 +1103,24 @@ def get_current_span(scope: "Optional[sentry_sdk.Scope]" = None) -> "Optional[Sp
     return current_span
 
 
-def set_span_errored(span: "Optional[Span]" = None) -> None:
+def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
     """
     Set the status of the current or given span to INTERNAL_ERROR.
     Also sets the status of the transaction (root span) to INTERNAL_ERROR.
     """
+    from sentry_sdk.traces import StreamedSpan, SpanStatus
+
     span = span or get_current_span()
+
     if span is not None:
-        span.set_status(SPANSTATUS.INTERNAL_ERROR)
-        if span.containing_transaction is not None:
-            span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+        if isinstance(span, Span):
+            span.set_status(SPANSTATUS.INTERNAL_ERROR)
+            if span.containing_transaction is not None:
+                span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+        elif isinstance(span, StreamedSpan):
+            span.status = SpanStatus.ERROR
+            if span._segment is not None:
+                span._segment.status = SpanStatus.ERROR
 
 
 def _generate_sample_rand(
@@ -1534,8 +1609,11 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
+    Span,
 )
 from sentry_sdk.traces import (
+    LOW_QUALITY_SEGMENT_SOURCES,
+    StreamedSpan,
     start_span as start_streaming_span,
 )
 
