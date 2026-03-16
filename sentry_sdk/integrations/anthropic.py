@@ -135,6 +135,13 @@ class AnthropicIntegration(Integration):
             MessageStreamManager.__enter__
         )
 
+        # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
+        # MessageStream inherits from Stream, so patching Stream is sufficient on these versions.
+        if not issubclass(MessageStream, Stream):
+            MessageStream.__iter__ = _wrap_message_stream_iter(MessageStream.__iter__)
+            MessageStream.__next__ = _wrap_message_stream_next(MessageStream.__next__)
+            MessageStream.close = _wrap_message_stream_close(MessageStream.close)
+
         AsyncMessages.stream = _wrap_async_message_stream(AsyncMessages.stream)
         AsyncMessageStreamManager.__aenter__ = (
             _wrap_async_message_stream_manager_aenter(
@@ -143,12 +150,8 @@ class AnthropicIntegration(Integration):
         )
 
         # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
-        # MessageStream inherits from Stream, so patching Stream is sufficient on these versions.
-        if not issubclass(MessageStream, Stream):
-            MessageStream.__iter__ = _wrap_message_stream_iter(MessageStream.__iter__)
-            MessageStream.__next__ = _wrap_message_stream_next(MessageStream.__next__)
-            MessageStream.close = _wrap_message_stream_close(MessageStream.close)
-
+        # AsyncMessageStream inherits from AsyncStream, so patching Stream is sufficient on these versions.
+        if not issubclass(AsyncMessageStream, AsyncStream):
             AsyncMessageStream.__aiter__ = _wrap_async_message_stream_aiter(
                 AsyncMessageStream.__aiter__
             )

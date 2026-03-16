@@ -2,7 +2,6 @@ import pytest
 from unittest import mock
 import json
 from itertools import islice
-from builtins import anext
 
 try:
     from unittest.mock import AsyncMock
@@ -1049,7 +1048,7 @@ async def test_streaming_create_message_async_next_consumption(
             )
 
             while True:
-                await anext(messages)
+                await messages.__anext__()
 
     assert len(events) == 1
     (event,) = events
@@ -1151,13 +1150,13 @@ async def test_streaming_create_message_async_iterator_methods(
                 max_tokens=1024, messages=messages, model="model", stream=True
             )
 
-            await anext(messages)
-            await anext(messages)
+            await messages.__anext__()
+            await messages.__anext__()
 
             async for item in messages:
                 break
 
-            await anext(messages)
+            await messages.__anext__()
             await messages.close()
 
     assert len(events) == 1
@@ -1383,7 +1382,7 @@ async def test_stream_messages_async_next_consumption(
                 model="model",
             ) as stream:
                 while True:
-                    await anext(stream)
+                    await stream.__anext__()
 
     assert len(events) == 1
     (event,) = events
@@ -1486,16 +1485,18 @@ async def test_stream_messages_async_iterator_methods(
                 messages=messages,
                 model="model",
             ) as stream:
-                await anext(stream)
-                await anext(stream)
+                await stream.__anext__()
+                await stream.__anext__()
 
                 async for item in stream:
                     break
 
-                await anext(stream)
+                await stream.__anext__()
                 # New versions add TextEvent, so consume one more event.
-                if TextEvent is not None and isinstance(await anext(stream), TextEvent):
-                    await anext(stream)
+                if TextEvent is not None and isinstance(
+                    await stream.__anext__(), TextEvent
+                ):
+                    await stream.__anext__()
                 await stream.close()
 
     assert len(events) == 1
