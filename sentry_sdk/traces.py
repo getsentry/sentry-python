@@ -20,9 +20,7 @@ from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     try_profile_lifecycle_trace_start,
 )
-from sentry_sdk.tracing_utils import (
-    Baggage,
-)
+from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     format_attribute,
@@ -39,6 +37,10 @@ if TYPE_CHECKING:
 
     P = ParamSpec("P")
     R = TypeVar("R")
+
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+
 
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
@@ -345,7 +347,7 @@ class StreamedSpan:
     def _start(self) -> None:
         if self._active:
             old_span = self._scope.span
-            self._scope.span = self  # type: ignore
+            self._scope.span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -354,8 +356,8 @@ class StreamedSpan:
             return
 
         # Stop the profiler
-        if self._is_segment():
-            if self._continuous_profile is not None:
+        if self._is_segment() and self._continuous_profile is not None:
+            with capture_internal_exceptions():
                 self._continuous_profile.stop()
 
         # Detach from scope
@@ -558,12 +560,6 @@ class StreamedSpan:
 
         self._continuous_profile = try_profile_lifecycle_trace_start()
 
-        # Typically, the profiler is set when the segment is created. But when
-        # using the auto lifecycle, the profiler isn't running when the first
-        # segment is started. So make sure we update the profiler id on it.
-        if self._continuous_profile is not None:
-            self._set_profile_id(get_profiler_id())
-
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
@@ -600,7 +596,7 @@ class NoOpStreamedSpan(StreamedSpan):
             return
 
         old_span = self._scope.span
-        self._scope.span = self  # type: ignore
+        self._scope.span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:

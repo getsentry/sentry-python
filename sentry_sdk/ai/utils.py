@@ -531,12 +531,12 @@ def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str,
 
 
 def get_start_span_function() -> "Callable[..., Any]":
-    client = sentry_sdk.get_client()
+    if has_span_streaming_enabled(sentry_sdk.get_client().options):
+        return sentry_sdk.traces.start_span
 
     current_span = sentry_sdk.get_current_span()
-    if isinstance(current_span, StreamedSpan) or has_span_streaming_enabled(
-        client.options
-    ):
+    if isinstance(current_span, StreamedSpan):
+        # mypy
         return sentry_sdk.traces.start_span
 
     transaction_exists = (

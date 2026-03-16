@@ -1637,10 +1637,7 @@ from sentry_sdk.tracing import (
     Span,
 )
 from sentry_sdk.traces import (
-    start_span as start_streaming_span,
-)
-
-from sentry_sdk.traces import (
     LOW_QUALITY_SEGMENT_SOURCES,
     StreamedSpan,
+    start_span as start_streaming_span,
 )
