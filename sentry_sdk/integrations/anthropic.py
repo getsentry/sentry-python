@@ -123,7 +123,7 @@ class AnthropicIntegration(Integration):
 
         # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
         # MessageStream inherits from Stream, so patching Stream is sufficient on these versions.
-        if version >= (0, 26, 2):
+        if version is not None and version >= (0, 26, 2):
             MessageStream.__iter__ = _wrap_message_stream_iter(MessageStream.__iter__)
             MessageStream.__next__ = _wrap_message_stream_next(MessageStream.__next__)
             MessageStream.close = _wrap_message_stream_close(MessageStream.close)

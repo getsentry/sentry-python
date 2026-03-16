@@ -821,6 +821,7 @@ def test_stream_messages_iterator_methods(
                 next(stream)
                 next(stream)
                 list(islice(stream, 1))
+                next(stream)
                 # New versions add TextEvent, so consume one more event.
                 if TextEvent is not None and isinstance(next(stream), TextEvent):
                     next(stream)
