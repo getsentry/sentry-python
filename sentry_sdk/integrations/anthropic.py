@@ -834,10 +834,10 @@ def _wrap_stream_next(
             event = f(self)
         except StopIteration:
             exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                if not hasattr(self, "_span"):
-                    raise
+            if not hasattr(self, "_span"):
+                reraise(*exc_info)
 
+            with capture_internal_exceptions():
                 _finish_streaming_span(
                     self._span,
                     self._integration,
@@ -870,6 +870,7 @@ def _wrap_stream_close(
 
         if not hasattr(self, "_model"):
             self._span.__exit__(None, None, None)
+            del self._span
             return f(self)
 
         _finish_streaming_span(
@@ -1006,92 +1007,19 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
 def _wrap_message_stream_iter(
     f: "Callable[..., Iterator[MessageStreamEvent]]",
 ) -> "Callable[..., Iterator[MessageStreamEvent]]":
-    """
-    Accumulates output data while iterating. When the returned iterator ends, set
-    output attributes on the AI Client Span and ends the span (unless the `close()`
-    or `__next__()` patches have already closed it).
-    """
-
-    def __iter__(self: "MessageStream") -> "Iterator[MessageStreamEvent]":
-        if not hasattr(self, "_span"):
-            yield from f(self)
-            return
-
-        _initialize_data_accumulation_state(self)
-        yield from _wrap_synchronous_message_iterator(
-            self,
-            f(self),
-        )
-
-    return __iter__
+    return _wrap_stream_iter(f)
 
 
 def _wrap_message_stream_next(
     f: "Callable[..., MessageStreamEvent]",
 ) -> "Callable[..., MessageStreamEvent]":
-    """
-    Accumulates output data from the returned event.
-    Closes the AI Client Span if `StopIteration` is raised.
-    """
-
-    def __next__(self: "MessageStream") -> "MessageStreamEvent":
-        _initialize_data_accumulation_state(self)
-        try:
-            event = f(self)
-        except StopIteration:
-            exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                if not hasattr(self, "_span"):
-                    raise
-
-                _finish_streaming_span(
-                    self._span,
-                    self._integration,
-                    self._model,
-                    self._usage,
-                    self._content_blocks,
-                    self._response_id,
-                    self._finish_reason,
-                )
-                del self._span
-            reraise(*exc_info)
-
-        _accumulate_event_data(self, event)
-        return event
-
-    return __next__
+    return _wrap_stream_next(f)
 
 
 def _wrap_message_stream_close(
     f: "Callable[..., None]",
 ) -> "Callable[..., None]":
-    """
-    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` or
-    the except block in the `__next__()` patch runs first.
-    """
-
-    def close(self: "MessageStream") -> None:
-        if not hasattr(self, "_span"):
-            return f(self)
-
-        if not hasattr(self, "_model"):
-            self._span.__exit__(None, None, None)
-            return f(self)
-
-        _finish_streaming_span(
-            self._span,
-            self._integration,
-            self._model,
-            self._usage,
-            self._content_blocks,
-            self._response_id,
-            self._finish_reason,
-        )
-        del self._span
-
-        return f(self)
-
-    return close
+    return _wrap_stream_close(f)
 
 
 def _wrap_async_message_stream(f: "Any") -> "Any":
