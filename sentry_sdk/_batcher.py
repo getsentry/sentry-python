@@ -115,11 +115,12 @@ class Batcher(Generic[T]):
         self._flusher = None
 
     def flush(self) -> None:
+        was_active = getattr(self._active, "flag", False)
         self._active.flag = True
         try:
             self._flush()
         finally:
-            self._active.flag = False
+            self._active.flag = was_active
 
     def _add_to_envelope(self, envelope: "Envelope") -> None:
         envelope.add_item(
