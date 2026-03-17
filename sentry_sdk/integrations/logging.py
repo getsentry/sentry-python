@@ -1,6 +1,5 @@
 import logging
 import sys
-import threading
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 
@@ -322,29 +321,20 @@ class SentryLogsHandler(_BaseHandler):
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
 
-    _emitting = threading.local()
-
     def emit(self, record: "LogRecord") -> "Any":
-        if getattr(self._emitting, "active", False):
-            return
+        with capture_internal_exceptions():
+            self.format(record)
+            if not self._can_record(record):
+                return
 
-        self._emitting.active = True
-        try:
-            with capture_internal_exceptions():
-                self.format(record)
-                if not self._can_record(record):
-                    return
+            client = sentry_sdk.get_client()
+            if not client.is_active():
+                return
 
-                client = sentry_sdk.get_client()
-                if not client.is_active():
-                    return
+            if not has_logs_enabled(client.options):
+                return
 
-                if not has_logs_enabled(client.options):
-                    return
-
-                self._capture_log_from_record(client, record)
-        finally:
-            self._emitting.active = False
+            self._capture_log_from_record(client, record)
 
     def _capture_log_from_record(
         self, client: "BaseClient", record: "LogRecord"
