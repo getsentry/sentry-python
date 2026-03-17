@@ -800,7 +800,8 @@ def _wrap_stream_iter(
 ) -> "Callable[..., Iterator[RawMessageStreamEvent]]":
     """
     Accumulates output data while iterating. When the returned iterator ends, set
-    output attributes on the AI Client Span and end the span.
+    output attributes on the AI Client Span and ends the span (unless the `close()`
+    or `__next__()` patches have already closed it).
     """
 
     def __iter__(self: "Stream") -> "Iterator[RawMessageStreamEvent]":
@@ -822,6 +823,7 @@ def _wrap_stream_next(
 ) -> "Callable[..., RawMessageStreamEvent]":
     """
     Accumulates output data from the returned event.
+    Closes the AI Client Span if `StopIteration` is raised.
     """
 
     def __next__(self: "Stream") -> "RawMessageStreamEvent":
@@ -856,7 +858,8 @@ def _wrap_stream_close(
     f: "Callable[..., None]",
 ) -> "Callable[..., None]":
     """
-    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
+    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` or
+    the except block in the `__next__()` patch runs first.
     """
 
     def close(self: "Stream") -> None:
