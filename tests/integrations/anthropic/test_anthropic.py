@@ -77,6 +77,7 @@ EXAMPLE_MESSAGE = Message(
     role="assistant",
     content=[TextBlock(type="text", text="Hi, I'm Claude.")],
     type="message",
+    stop_reason="end_turn",
     usage=Usage(input_tokens=10, output_tokens=20),
 )
 
@@ -150,6 +151,7 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.asyncio
@@ -272,7 +274,7 @@ def test_streaming_create_message(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -337,6 +339,7 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 def test_streaming_create_message_next_consumption(
@@ -376,7 +379,7 @@ def test_streaming_create_message_next_consumption(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -436,6 +439,7 @@ def test_streaming_create_message_next_consumption(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 def test_streaming_create_message_iterator_methods(
@@ -475,7 +479,7 @@ def test_streaming_create_message_iterator_methods(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -690,7 +694,7 @@ def test_stream_messages(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -756,6 +760,7 @@ def test_stream_messages(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 def test_stream_messages_next_consumption(
@@ -795,7 +800,7 @@ def test_stream_messages_next_consumption(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -856,6 +861,7 @@ def test_stream_messages_next_consumption(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 def test_stream_messages_iterator_methods(
@@ -895,7 +901,7 @@ def test_stream_messages_iterator_methods(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -1118,7 +1124,7 @@ async def test_streaming_create_message_async(
                     ),
                     ContentBlockStopEvent(type="content_block_stop", index=0),
                     MessageDeltaEvent(
-                        delta=Delta(),
+                        delta=Delta(stop_reason="max_tokens"),
                         usage=MessageDeltaUsage(output_tokens=10),
                         type="message_delta",
                     ),
@@ -1130,6 +1136,7 @@ async def test_streaming_create_message_async(
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
+        default_integrations=False,
         send_default_pii=send_default_pii,
     )
     events = capture_events()
@@ -1185,6 +1192,7 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 @pytest.mark.asyncio
@@ -1227,7 +1235,7 @@ async def test_streaming_create_message_async_next_consumption(
                     ),
                     ContentBlockStopEvent(type="content_block_stop", index=0),
                     MessageDeltaEvent(
-                        delta=Delta(),
+                        delta=Delta(stop_reason="max_tokens"),
                         usage=MessageDeltaUsage(output_tokens=10),
                         type="message_delta",
                     ),
@@ -1288,6 +1296,7 @@ async def test_streaming_create_message_async_next_consumption(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 @pytest.mark.asyncio
@@ -1330,7 +1339,7 @@ async def test_streaming_create_message_async_iterator_methods(
                     ),
                     ContentBlockStopEvent(type="content_block_stop", index=0),
                     MessageDeltaEvent(
-                        delta=Delta(),
+                        delta=Delta(stop_reason="max_tokens"),
                         usage=MessageDeltaUsage(output_tokens=10),
                         type="message_delta",
                     ),
@@ -1666,7 +1675,7 @@ async def test_stream_messages_async_next_consumption(
                     ),
                     ContentBlockStopEvent(type="content_block_stop", index=0),
                     MessageDeltaEvent(
-                        delta=Delta(),
+                        delta=Delta(stop_reason="max_tokens"),
                         usage=MessageDeltaUsage(output_tokens=10),
                         type="message_delta",
                     ),
@@ -1728,6 +1737,7 @@ async def test_stream_messages_async_next_consumption(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 @pytest.mark.skipif(
@@ -1877,7 +1887,7 @@ async def test_stream_messages_async_iterator_methods(
                     ),
                     ContentBlockStopEvent(type="content_block_stop", index=0),
                     MessageDeltaEvent(
-                        delta=Delta(),
+                        delta=Delta(stop_reason="max_tokens"),
                         usage=MessageDeltaUsage(output_tokens=10),
                         type="message_delta",
                     ),
@@ -2741,7 +2751,7 @@ def test_collect_ai_data_with_input_json_delta():
 
     content_blocks = []
 
-    model, new_usage, new_content_blocks, response_id = _collect_ai_data(
+    model, new_usage, new_content_blocks, response_id, finish_reason = _collect_ai_data(
         event, model, usage, content_blocks
     )
     assert model is None
@@ -2749,6 +2759,7 @@ def test_collect_ai_data_with_input_json_delta():
     assert new_usage.output_tokens == usage.output_tokens
     assert new_content_blocks == ["test"]
     assert response_id is None
+    assert finish_reason is None
 
 
 @pytest.mark.skipif(
@@ -3036,6 +3047,7 @@ def test_nonstreaming_create_message_with_system_prompt(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.asyncio
@@ -3121,6 +3133,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.parametrize(
