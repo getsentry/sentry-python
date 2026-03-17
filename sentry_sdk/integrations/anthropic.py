@@ -104,13 +104,15 @@ class AnthropicIntegration(Integration):
         """
         client.messages.create(stream=True) can return an instance of the Stream class, which implements the iterator protocol.
         Analogously, an AsyncStream instance can be returned, which implements the asynchronous iterator protocol.
-
         The underlying stream can be consumed using either __iter__ or __next__, so both are patched to intercept
-        streamed events (and analogously, asynchronous iterators are consumed using __aiter__ or __anext__). The
-        streamed events are used to populate output attributes on the AI Client Span.
+        streamed events (and analogously, asynchronous iterators are consumed using __aiter__ or __anext__).
+        The streamed events are used to populate output attributes on the AI Client Span.
 
-        The close() method is patched for situations in which the method is directly invoked by the user, and otherwise
-        the finally block in the __iter__/__aiter__ patch closes the span.
+        The span is finished in two possible places:
+        - When the user exits the context manager or directly calls close(), the patched close() ends the span.
+        - When iteration ends, the finally block in the __iter__/__aiter__ patch or the except block in the __next__/__anext__ patch finishes the span.
+
+        Both paths may run, for example, when the iterator is exhausted and then the context manager exits.
         """
         Messages.create = _wrap_message_create(Messages.create)
         Stream.__iter__ = _wrap_stream_iter(Stream.__iter__)
@@ -123,12 +125,17 @@ class AnthropicIntegration(Integration):
         AsyncStream.close = _wrap_async_stream_close(AsyncStream.close)
 
         """
-        client.messages.stream() returns an instance of the MessageStream class, which implements the iterator protocol.
+        client.messages.stream() can return an instance of the MessageStream class, which implements the iterator protocol.
+        Analogously, an AsyncMessageStream instance can be returned, which implements the asynchronous iterator protocol.
         The underlying stream can be consumed using either __iter__ or __next__, so both are patched to intercept
-        streamed events. The streamed events are used to populate output attributes on the AI Client Span.
+        streamed events (and analogously, asynchronous iterators are consumed using __aiter__ or __anext__).
+        The streamed events are used to populate output attributes on the AI Client Span.
 
-        The close() method is patched for situations in which the method is directly invoked by the user, and otherwise
-        the finally block in the __iter__ patch closes the span.
+        The span is finished in two possible places:
+        - When the user exits the context manager or directly calls close(), the patched close() ends the span.
+        - When iteration ends, the finally block in the __iter__/__aiter__ patch or the except block in the __next__/__anext__ patch finishes the span.
+
+        Both paths may run, for example, when the iterator is exhausted and then the context manager exits.
         """
         Messages.stream = _wrap_message_stream(Messages.stream)
         MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
