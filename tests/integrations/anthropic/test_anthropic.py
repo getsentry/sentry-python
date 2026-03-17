@@ -20,8 +20,14 @@ from anthropic.types.content_block_stop_event import ContentBlockStopEvent
 from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
-from anthropic.types import ErrorResponse, OverloadedError
-from anthropic import APIStatusError
+
+try:
+    from anthropic.types import ErrorResponse, OverloadedError
+    from anthropic import APIStatusError
+except ImportError:
+    ErrorResponse = None
+    OverloadedError = None
+    APIStatusError = None
 
 try:
     from anthropic.types import InputJSONDelta
@@ -534,6 +540,10 @@ def test_streaming_create_message_iterator_methods(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
 def test_streaming_create_message_api_error(
     sentry_init,
     capture_events,
@@ -954,6 +964,10 @@ def test_stream_messages_iterator_methods(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
 def test_stream_messages_api_error(
     sentry_init,
     capture_events,
@@ -1385,6 +1399,10 @@ async def test_streaming_create_message_async_iterator_methods(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
 @pytest.mark.asyncio
 async def test_streaming_create_message_async_api_error(
     sentry_init,
@@ -1712,6 +1730,10 @@ async def test_stream_messages_async_next_consumption(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
 @pytest.mark.asyncio
 async def test_stream_messages_async_api_error(
     sentry_init,
