@@ -371,7 +371,7 @@ def test_streaming_create_message_next_consumption(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -431,6 +431,7 @@ def test_streaming_create_message_next_consumption(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 def test_streaming_create_message_iterator_methods(
@@ -470,7 +471,7 @@ def test_streaming_create_message_iterator_methods(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -689,7 +690,7 @@ def test_stream_messages_next_consumption(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
@@ -750,6 +751,7 @@ def test_stream_messages_next_consumption(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
 def test_stream_messages_iterator_methods(
@@ -789,7 +791,7 @@ def test_stream_messages_iterator_methods(
                 ),
                 ContentBlockStopEvent(type="content_block_stop", index=0),
                 MessageDeltaEvent(
-                    delta=Delta(),
+                    delta=Delta(stop_reason="max_tokens"),
                     usage=MessageDeltaUsage(output_tokens=10),
                     type="message_delta",
                 ),
