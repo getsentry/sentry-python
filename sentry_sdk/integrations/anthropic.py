@@ -498,7 +498,6 @@ async def _wrap_asynchronous_message_iterator(
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span, unless the span has already been closed in the close() patch.
     """
-    generator_exit = False
     try:
         async for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
@@ -519,14 +518,9 @@ async def _wrap_asynchronous_message_iterator(
 
             _accumulate_event_data(stream, event)
             yield event
-    except (
-        GeneratorExit
-    ):  # https://docs.python.org/3/reference/expressions.html#generator.close
-        generator_exit = True
-        raise
     finally:
         with capture_internal_exceptions():
-            if not generator_exit and hasattr(stream, "_span"):
+            if hasattr(stream, "_span"):
                 _finish_streaming_span(
                     span=stream._span,
                     integration=stream._integration,
