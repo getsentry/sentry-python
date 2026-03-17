@@ -833,19 +833,17 @@ def _wrap_stream_next(
         except StopIteration:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
-                if not hasattr(self, "_span"):
-                    raise
-
-                _finish_streaming_span(
-                    self._span,
-                    self._integration,
-                    self._model,
-                    self._usage,
-                    self._content_blocks,
-                    self._response_id,
-                    self._finish_reason,
-                )
-                del self._span
+                if hasattr(self, "_span"):
+                    _finish_streaming_span(
+                        self._span,
+                        self._integration,
+                        self._model,
+                        self._usage,
+                        self._content_blocks,
+                        self._response_id,
+                        self._finish_reason,
+                    )
+                    del self._span
             reraise(*exc_info)
 
         _accumulate_event_data(self, event)
@@ -868,6 +866,7 @@ def _wrap_stream_close(
 
         if not hasattr(self, "_model"):
             self._span.__exit__(None, None, None)
+            del self._span
             return f(self)
 
         _finish_streaming_span(
@@ -1132,19 +1131,17 @@ def _wrap_message_stream_next(
         except StopIteration:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
-                if not hasattr(self, "_span"):
-                    raise
-
-                _finish_streaming_span(
-                    self._span,
-                    self._integration,
-                    self._model,
-                    self._usage,
-                    self._content_blocks,
-                    self._response_id,
-                    self._finish_reason,
-                )
-                del self._span
+                if hasattr(self, "_span"):
+                    _finish_streaming_span(
+                        self._span,
+                        self._integration,
+                        self._model,
+                        self._usage,
+                        self._content_blocks,
+                        self._response_id,
+                        self._finish_reason,
+                    )
+                    del self._span
             reraise(*exc_info)
 
         _accumulate_event_data(self, event)
@@ -1167,6 +1164,7 @@ def _wrap_message_stream_close(
 
         if not hasattr(self, "_model"):
             self._span.__exit__(None, None, None)
+            del self._span
             return f(self)
 
         _finish_streaming_span(
