@@ -783,3 +783,39 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelo
     )
 
     get_client().flush()
+
+
+@minimum_python_37
+@pytest.mark.timeout(5)
+def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
+    """Adding to the batcher from within a flush must not deadlock.
+
+    This covers the scenario where GC emits a ResourceWarning during
+    _add_to_envelope (or _flush_event.wait/set), and the warning is
+    routed through the logging integration back into batcher.add().
+    See https://github.com/getsentry/sentry-python/issues/5681
+    """
+    sentry_init(enable_logs=True)
+    capture_envelopes()
+
+    client = sentry_sdk.get_client()
+    batcher = client.log_batcher
+
+    reentrant_add_called = False
+    original_add_to_envelope = batcher._add_to_envelope
+
+    def add_to_envelope_with_reentrant_add(envelope):
+        nonlocal reentrant_add_called
+        # Simulate a GC warning routing back into add() during flush
+        batcher.add({"fake": "log"})
+        reentrant_add_called = True
+        original_add_to_envelope(envelope)
+
+    batcher._add_to_envelope = add_to_envelope_with_reentrant_add
+
+    sentry_sdk.logger.warning("test log")
+    client.flush()
+
+    assert reentrant_add_called
+    # If the re-entrancy guard didn't work, this test would hang and it'd
+    # eventually be timed out by pytest-timeout
