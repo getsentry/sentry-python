@@ -105,7 +105,7 @@ class AnthropicIntegration(Integration):
         Both paths may run. For example, the context manager exit can follow iterator exhaustion.
         """
         Messages.create = _wrap_message_create(Messages.create)
-        Stream.close = _wrap_stream_close(Stream.close)
+        Stream.close = _wrap_close(Stream.close)
 
         AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
 
@@ -128,7 +128,7 @@ class AnthropicIntegration(Integration):
         # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
         # MessageStream inherits from Stream, so patching Stream is sufficient on these versions.
         if not issubclass(MessageStream, Stream):
-            MessageStream.close = _wrap_message_stream_close(MessageStream.close)
+            MessageStream.close = _wrap_close(MessageStream.close)
 
         AsyncMessages.stream = _wrap_async_message_stream(AsyncMessages.stream)
         AsyncMessageStreamManager.__aenter__ = (
@@ -794,15 +794,14 @@ def _finish_streaming_span(
     )
 
 
-def _wrap_stream_close(
+def _wrap_close(
     f: "Callable[..., None]",
 ) -> "Callable[..., None]":
     """
-    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` or
-    the except block in the `__next__()` patch runs first.
+    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
     """
 
-    def close(self: "Stream") -> None:
+    def close(self: "Union[Stream, MessageStream]") -> None:
         if not hasattr(self, "_span"):
             return f(self)
 
@@ -946,39 +945,6 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
         return stream
 
     return _sentry_patched_enter
-
-
-def _wrap_message_stream_close(
-    f: "Callable[..., None]",
-) -> "Callable[..., None]":
-    """
-    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` or
-    the except block in the `__next__()` patch runs first.
-    """
-
-    def close(self: "MessageStream") -> None:
-        if not hasattr(self, "_span"):
-            return f(self)
-
-        if not hasattr(self, "_model"):
-            self._span.__exit__(None, None, None)
-            del self._span
-            return f(self)
-
-        _finish_streaming_span(
-            self._span,
-            self._integration,
-            self._model,
-            self._usage,
-            self._content_blocks,
-            self._response_id,
-            self._finish_reason,
-        )
-        del self._span
-
-        return f(self)
-
-    return close
 
 
 def _wrap_async_message_stream(f: "Any") -> "Any":
