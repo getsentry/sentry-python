@@ -190,7 +190,8 @@ def _collect_ai_data(
     usage: "_RecordedUsage",
     content_blocks: "list[str]",
     response_id: "str | None" = None,
-) -> "tuple[str | None, _RecordedUsage, list[str], str | None]":
+    finish_reason: "str | None" = None,
+) -> "tuple[str | None, _RecordedUsage, list[str], str | None, str | None]":
     """
     Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
@@ -228,6 +229,7 @@ def _collect_ai_data(
                     usage,
                     content_blocks,
                     response_id,
+                    finish_reason,
                 )
 
             # Counterintuitive, but message_delta contains cumulative token counts :)
@@ -252,18 +254,17 @@ def _collect_ai_data(
                     usage.cache_read_input_tokens = cache_read_input_tokens
                 # TODO: Record event.usage.server_tool_use
 
-                return (
-                    model,
-                    usage,
-                    content_blocks,
-                    response_id,
-                )
+                if event.delta.stop_reason is not None:
+                    finish_reason = event.delta.stop_reason
+
+                return (model, usage, content_blocks, response_id, finish_reason)
 
     return (
         model,
         usage,
         content_blocks,
         response_id,
+        finish_reason,
     )
 
 
@@ -472,6 +473,7 @@ def _wrap_synchronous_message_iterator(
                     stream._usage,
                     stream._content_blocks,
                     stream._response_id,
+                    stream._finish_reason,
                 )
                 del stream._span
 
@@ -489,6 +491,7 @@ async def _wrap_asynchronous_message_iterator(
     usage = _RecordedUsage()
     content_blocks: "list[str]" = []
     response_id = None
+    finish_reason = None
 
     try:
         async for event in iterator:
@@ -513,12 +516,14 @@ async def _wrap_asynchronous_message_iterator(
                 usage,
                 content_blocks,
                 response_id,
+                finish_reason,
             ) = _collect_ai_data(
                 event,
                 model,
                 usage,
                 content_blocks,
                 response_id,
+                finish_reason,
             )
             yield event
     finally:
@@ -542,6 +547,7 @@ async def _wrap_asynchronous_message_iterator(
                 content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                 finish_span=True,
                 response_id=response_id,
+                finish_reason=finish_reason,
             )
 
 
@@ -556,12 +562,15 @@ def _set_output_data(
     content_blocks: "list[Any]",
     finish_span: bool = False,
     response_id: "str | None" = None,
+    finish_reason: "str | None" = None,
 ) -> None:
     """
     Set output data for the span based on the AI response."""
     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
     if response_id is not None:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
+    if finish_reason is not None:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, [finish_reason])
     if should_send_default_pii() and integration.include_prompts:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
@@ -665,6 +674,7 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 content_blocks=content_blocks,
                 finish_span=True,
                 response_id=getattr(result, "id", None),
+                finish_reason=getattr(result, "stop_reason", None),
             )
         else:
             span.set_data("unknown_response", True)
@@ -720,6 +730,7 @@ def _initialize_data_accumulation_state(stream: "Union[Stream, MessageStream]") 
         stream._usage = _RecordedUsage()
         stream._content_blocks = []
         stream._response_id = None
+        stream._finish_reason = None
 
 
 def _accumulate_event_data(
@@ -729,18 +740,20 @@ def _accumulate_event_data(
     """
     Update accumulated output from a single stream event.
     """
-    (model, usage, content_blocks, response_id) = _collect_ai_data(
+    (model, usage, content_blocks, response_id, finish_reason) = _collect_ai_data(
         event,
         stream._model,
         stream._usage,
         stream._content_blocks,
         stream._response_id,
+        stream._finish_reason,
     )
 
     stream._model = model
     stream._usage = usage
     stream._content_blocks = content_blocks
     stream._response_id = response_id
+    stream._finish_reason = finish_reason
 
 
 def _finish_streaming_span(
@@ -750,6 +763,7 @@ def _finish_streaming_span(
     usage: "_RecordedUsage",
     content_blocks: "list[str]",
     response_id: "Optional[str]",
+    finish_reason: "Optional[str]",
 ) -> None:
     """
     Set output attributes on the AI Client Span and end the span.
@@ -773,6 +787,7 @@ def _finish_streaming_span(
         content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
         finish_span=True,
         response_id=response_id,
+        finish_reason=finish_reason,
     )
 
 
@@ -822,6 +837,7 @@ def _wrap_stream_next(
                     self._usage,
                     self._content_blocks,
                     self._response_id,
+                    self._finish_reason,
                 )
                 del self._span
             reraise(*exc_info)
@@ -854,6 +870,7 @@ def _wrap_stream_close(
             self._usage,
             self._content_blocks,
             self._response_id,
+            self._finish_reason,
         )
         del self._span
 
@@ -1023,6 +1040,7 @@ def _wrap_message_stream_next(
                     self._usage,
                     self._content_blocks,
                     self._response_id,
+                    self._finish_reason,
                 )
                 del self._span
             reraise(*exc_info)
@@ -1055,6 +1073,7 @@ def _wrap_message_stream_close(
             self._usage,
             self._content_blocks,
             self._response_id,
+            self._finish_reason,
         )
         del self._span
 

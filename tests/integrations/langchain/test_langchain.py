@@ -297,6 +297,12 @@ def test_langchain_agent(
             f"and include_prompts={include_prompts}"
         )
 
+    # Verify finish_reasons is always an array of strings
+    assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "function_call"
+    ]
+    assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
+
     # Verify that available tools are always recorded regardless of PII settings
     for chat_span in chat_spans:
         span_data = chat_span.get("data", {})
