@@ -490,9 +490,10 @@ def _wrap_synchronous_message_iterator(
         generator_exit = True
         raise
     finally:
+        exc_info = sys.exc_info()
         with capture_internal_exceptions():
             if not generator_exit and hasattr(stream, "_span"):
-                _finish_streaming_span(
+                _set_streaming_output_data(
                     stream._span,
                     stream._integration,
                     stream._model,
@@ -500,6 +501,7 @@ def _wrap_synchronous_message_iterator(
                     stream._content_blocks,
                     stream._response_id,
                 )
+                stream._span.__exit__(*exc_info)
                 del stream._span
 
 
@@ -538,9 +540,10 @@ async def _wrap_asynchronous_message_iterator(
         generator_exit = True
         raise
     finally:
+        exc_info = sys.exc_info()
         with capture_internal_exceptions():
             if not generator_exit and hasattr(stream, "_span"):
-                _finish_streaming_span(
+                _set_streaming_output_data(
                     stream._span,
                     stream._integration,
                     stream._model,
@@ -548,6 +551,7 @@ async def _wrap_asynchronous_message_iterator(
                     stream._content_blocks,
                     stream._response_id,
                 )
+                stream._span.__exit__(*exc_info)
                 del stream._span
 
 
@@ -560,7 +564,6 @@ def _set_output_data(
     cache_read_input_tokens: "int | None",
     cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
-    finish_span: bool = False,
     response_id: "str | None" = None,
 ) -> None:
     """
@@ -600,9 +603,6 @@ def _set_output_data(
         input_tokens_cached=cache_read_input_tokens,
         input_tokens_cache_write=cache_write_input_tokens,
     )
-
-    if finish_span:
-        span.__exit__(None, None, None)
 
 
 def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
@@ -663,9 +663,9 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 cache_read_input_tokens=cache_read_input_tokens,
                 cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
-                finish_span=True,
                 response_id=getattr(result, "id", None),
             )
+            span.__exit__(None, None, None)
         else:
             span.set_data("unknown_response", True)
             span.__exit__(None, None, None)
@@ -743,7 +743,7 @@ def _accumulate_event_data(
     stream._response_id = response_id
 
 
-def _finish_streaming_span(
+def _set_streaming_output_data(
     span: "Span",
     integration: "AnthropicIntegration",
     model: "Optional[str]",
@@ -752,7 +752,7 @@ def _finish_streaming_span(
     response_id: "Optional[str]",
 ) -> None:
     """
-    Set output attributes on the AI Client Span and end the span.
+    Set output attributes on the AI Client Span.
     """
     # Anthropic's input_tokens excludes cached/cache_write tokens.
     # Normalize to total input tokens for correct cost calculations.
@@ -771,7 +771,6 @@ def _finish_streaming_span(
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
         content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-        finish_span=True,
         response_id=response_id,
     )
 
@@ -815,7 +814,7 @@ def _wrap_stream_next(
                 if not hasattr(self, "_span"):
                     raise
 
-                _finish_streaming_span(
+                _set_streaming_output_data(
                     self._span,
                     self._integration,
                     self._model,
@@ -823,6 +822,7 @@ def _wrap_stream_next(
                     self._content_blocks,
                     self._response_id,
                 )
+                self._span.__exit__(None, None, None)
                 del self._span
             reraise(*exc_info)
 
@@ -847,7 +847,7 @@ def _wrap_stream_close(
             self._span.__exit__(None, None, None)
             return f(self)
 
-        _finish_streaming_span(
+        _set_streaming_output_data(
             self._span,
             self._integration,
             self._model,
@@ -855,6 +855,7 @@ def _wrap_stream_close(
             self._content_blocks,
             self._response_id,
         )
+        self._span.__exit__(None, None, None)
         del self._span
 
         return f(self)
@@ -941,7 +942,7 @@ def _wrap_async_stream_anext(
                 if not hasattr(self, "_span"):
                     raise
 
-                _finish_streaming_span(
+                _set_streaming_output_data(
                     self._span,
                     self._integration,
                     self._model,
@@ -949,6 +950,7 @@ def _wrap_async_stream_anext(
                     self._content_blocks,
                     self._response_id,
                 )
+                self._span.__exit__(None, None, None)
                 del self._span
             reraise(*exc_info)
 
@@ -973,7 +975,7 @@ def _wrap_async_stream_close(
             self._span.__exit__(None, None, None)
             return await f(self)
 
-        _finish_streaming_span(
+        _set_streaming_output_data(
             self._span,
             self._integration,
             self._model,
@@ -981,6 +983,7 @@ def _wrap_async_stream_close(
             self._content_blocks,
             self._response_id,
         )
+        self._span.__exit__(None, None, None)
         del self._span
 
         return await f(self)
@@ -1104,7 +1107,7 @@ def _wrap_message_stream_next(
                 if not hasattr(self, "_span"):
                     raise
 
-                _finish_streaming_span(
+                _set_streaming_output_data(
                     self._span,
                     self._integration,
                     self._model,
@@ -1112,6 +1115,7 @@ def _wrap_message_stream_next(
                     self._content_blocks,
                     self._response_id,
                 )
+                self._span.__exit__(None, None, None)
                 del self._span
             reraise(*exc_info)
 
@@ -1136,7 +1140,7 @@ def _wrap_message_stream_close(
             self._span.__exit__(None, None, None)
             return f(self)
 
-        _finish_streaming_span(
+        _set_streaming_output_data(
             self._span,
             self._integration,
             self._model,
@@ -1144,6 +1148,7 @@ def _wrap_message_stream_close(
             self._content_blocks,
             self._response_id,
         )
+        self._span.__exit__(None, None, None)
         del self._span
 
         return f(self)
@@ -1275,7 +1280,7 @@ def _wrap_async_message_stream_anext(
                 if not hasattr(self, "_span"):
                     raise
 
-                _finish_streaming_span(
+                _set_streaming_output_data(
                     self._span,
                     self._integration,
                     self._model,
@@ -1283,6 +1288,7 @@ def _wrap_async_message_stream_anext(
                     self._content_blocks,
                     self._response_id,
                 )
+                self._span.__exit__(None, None, None)
                 del self._span
             reraise(*exc_info)
 
@@ -1307,7 +1313,7 @@ def _wrap_async_message_stream_close(
             self._span.__exit__(None, None, None)
             return await f(self)
 
-        _finish_streaming_span(
+        _set_streaming_output_data(
             self._span,
             self._integration,
             self._model,
@@ -1315,6 +1321,7 @@ def _wrap_async_message_stream_close(
             self._content_blocks,
             self._response_id,
         )
+        self._span.__exit__(None, None, None)
         del self._span
 
         return await f(self)
