@@ -993,7 +993,7 @@ def _wrap_async_stream_close(
     the except block in the `__next__()` patch runs first.
     """
 
-    async def close(self: "Stream") -> None:
+    async def close(self: "AsyncStream") -> None:
         if not hasattr(self, "_span"):
             return await f(self)
 
