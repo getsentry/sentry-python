@@ -929,7 +929,8 @@ def _wrap_async_stream_aiter(
 ) -> "Callable[..., AsyncIterator[RawMessageStreamEvent]]":
     """
     Accumulates output data while iterating. When the returned iterator ends, set
-    output attributes on the AI Client Span and end the span.
+    output attributes on the AI Client Span and ends the span (unless the `close()`
+    or `__next__()` patches have already closed it).
     """
 
     async def __aiter__(self: "AsyncStream") -> "AsyncIterator[RawMessageStreamEvent]":
@@ -953,6 +954,7 @@ def _wrap_async_stream_anext(
 ) -> "Callable[..., Awaitable[RawMessageStreamEvent]]":
     """
     Accumulates output data from the returned event.
+    Closes the AI Client Span if `StopIteration` is raised.
     """
 
     async def __anext__(self: "AsyncStream") -> "RawMessageStreamEvent":
@@ -987,7 +989,8 @@ def _wrap_async_stream_close(
     f: "Callable[..., Awaitable[None]]",
 ) -> "Callable[..., Awaitable[None]]":
     """
-    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
+    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` or
+    the except block in the `__next__()` patch runs first.
     """
 
     async def close(self: "Stream") -> None:
@@ -1268,7 +1271,8 @@ def _wrap_async_message_stream_aiter(
 ) -> "Callable[..., AsyncIterator[MessageStreamEvent]]":
     """
     Accumulates output data while iterating. When the returned iterator ends, set
-    output attributes on the AI Client Span and end the span.
+    output attributes on the AI Client Span and ends the span (unless the `close()`
+    or `__next__()` patches have already closed it).
     """
 
     async def __aiter__(
@@ -1294,6 +1298,7 @@ def _wrap_async_message_stream_anext(
 ) -> "Callable[..., Awaitable[MessageStreamEvent]]":
     """
     Accumulates output data from the returned event.
+    Closes the AI Client Span if `StopIteration` is raised.
     """
 
     async def __anext__(self: "AsyncMessageStream") -> "MessageStreamEvent":
@@ -1328,7 +1333,8 @@ def _wrap_async_message_stream_close(
     f: "Callable[..., Awaitable[None]]",
 ) -> "Callable[..., Awaitable[None]]":
     """
-    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
+    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` or
+    the except block in the `__next__()` patch runs first.
     """
 
     async def close(self: "AsyncMessageStream") -> None:
