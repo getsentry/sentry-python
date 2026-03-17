@@ -962,6 +962,7 @@ def _wrap_async_stream_anext(
                     self._usage,
                     self._content_blocks,
                     self._response_id,
+                    self._finish_reason,
                 )
                 del self._span
             reraise(*exc_info)
@@ -994,6 +995,7 @@ def _wrap_async_stream_close(
             self._usage,
             self._content_blocks,
             self._response_id,
+            self._finish_reason,
         )
         del self._span
 
