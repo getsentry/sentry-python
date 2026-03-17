@@ -105,7 +105,7 @@ class AnthropicIntegration(Integration):
         client.messages.create(stream=True) can return an instance of the Stream class, which implements the iterator protocol.
         Analogously, the function can return an AsyncStream, which implements the asynchronous iterator protocol.
         The private _iterator variable and the close() method are patched. During iteration over the _iterator generator,
-        information from intercepted events are accumulated and used to populate output attributes on the AI Client Span.
+        information from intercepted events is accumulated and used to populate output attributes on the AI Client Span.
 
         The span can be finished in two places:
         - When the user exits the context manager or directly calls close(), the patched close() finishes the span.
@@ -120,10 +120,10 @@ class AnthropicIntegration(Integration):
         AsyncStream.close = _wrap_async_close(AsyncStream.close)
 
         """
-        client.messages.stream() can return an instance of the Stream class, which implements the iterator protocol.
+        client.messages.stream() can return an instance of the MessageStream class, which implements the iterator protocol.
         Analogously, the function can return an AsyncMessageStream, which implements the asynchronous iterator protocol.
         The private _iterator variable and the close() method are patched. During iteration over the _iterator generator,
-        information from intercepted events are accumulated and used to populate output attributes on the AI Client Span.
+        information from intercepted events is accumulated and used to populate output attributes on the AI Client Span.
 
         The span can be finished in two places:
         - When the user exits the context manager or directly calls close(), the patched close() finishes the span.
@@ -139,7 +139,7 @@ class AnthropicIntegration(Integration):
         # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
         # MessageStream inherits from Stream, so patching Stream is sufficient on these versions.
         if not issubclass(MessageStream, Stream):
-            MessageStream.close = _wrap_async_close(MessageStream.close)
+            MessageStream.close = _wrap_close(MessageStream.close)
 
         AsyncMessages.stream = _wrap_async_message_stream(AsyncMessages.stream)
         AsyncMessageStreamManager.__aenter__ = (
@@ -479,13 +479,13 @@ def _wrap_synchronous_message_iterator(
         with capture_internal_exceptions():
             if hasattr(stream, "_span"):
                 _finish_streaming_span(
-                    stream._span,
-                    stream._integration,
-                    stream._model,
-                    stream._usage,
-                    stream._content_blocks,
-                    stream._response_id,
-                    stream._finish_reason,
+                    span=stream._span,
+                    integration=stream._integration,
+                    model=stream._model,
+                    usage=stream._usage,
+                    content_blocks=stream._content_blocks,
+                    response_id=stream._response_id,
+                    finish_reason=stream._finish_reason,
                 )
                 del stream._span
 
@@ -528,13 +528,13 @@ async def _wrap_asynchronous_message_iterator(
         with capture_internal_exceptions():
             if not generator_exit and hasattr(stream, "_span"):
                 _finish_streaming_span(
-                    stream._span,
-                    stream._integration,
-                    stream._model,
-                    stream._usage,
-                    stream._content_blocks,
-                    stream._response_id,
-                    stream._finish_reason,
+                    span=stream._span,
+                    integration=stream._integration,
+                    model=stream._model,
+                    usage=stream._usage,
+                    content_blocks=stream._content_blocks,
+                    response_id=stream._response_id,
+                    finish_reason=stream._finish_reason,
                 )
                 del stream._span
 
@@ -809,13 +809,13 @@ def _wrap_close(
             return f(self)
 
         _finish_streaming_span(
-            self._span,
-            self._integration,
-            self._model,
-            self._usage,
-            self._content_blocks,
-            self._response_id,
-            self._finish_reason,
+            span=self._span,
+            integration=self._integration,
+            model=self._model,
+            usage=self._usage,
+            content_blocks=self._content_blocks,
+            response_id=self._response_id,
+            finish_reason=self._finish_reason,
         )
         del self._span
 
@@ -879,13 +879,13 @@ def _wrap_async_close(
             return await f(self)
 
         _finish_streaming_span(
-            self._span,
-            self._integration,
-            self._model,
-            self._usage,
-            self._content_blocks,
-            self._response_id,
-            self._finish_reason,
+            span=self._span,
+            integration=self._integration,
+            model=self._model,
+            usage=self._usage,
+            content_blocks=self._content_blocks,
+            response_id=self._response_id,
+            finish_reason=self._finish_reason,
         )
         del self._span
 
