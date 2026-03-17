@@ -1477,15 +1477,15 @@ def test_collect_ai_data_with_input_json_delta():
 
     content_blocks = []
 
-    model, new_usage, new_content_blocks, response_id, finish_reasons = (
-        _collect_ai_data(event, model, usage, content_blocks)
+    model, new_usage, new_content_blocks, response_id, finish_reason = _collect_ai_data(
+        event, model, usage, content_blocks
     )
     assert model is None
     assert new_usage.input_tokens == usage.input_tokens
     assert new_usage.output_tokens == usage.output_tokens
     assert new_content_blocks == ["test"]
     assert response_id is None
-    assert finish_reasons is None
+    assert finish_reason is None
 
 
 @pytest.mark.skipif(
