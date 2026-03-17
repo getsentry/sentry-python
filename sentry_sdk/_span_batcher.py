@@ -56,16 +56,15 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # _add_to_envelope during flush, or _flush_event.wait/set) triggers
         # a GC-emitted warning that routes back through the logging
         # integration into add().
-
         if getattr(self._active, "flag", False):
             return None
 
         self._active.flag = True
 
-        if not self._ensure_thread() or self._flusher is None:
-            return None
-
         try:
+            if not self._ensure_thread() or self._flusher is None:
+                return None
+
             with self._lock:
                 size = len(self._span_buffer[span.trace_id])
                 if size >= self.MAX_BEFORE_DROP:
