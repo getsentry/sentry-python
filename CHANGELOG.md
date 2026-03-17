@@ -49,12 +49,6 @@
 - Stream valid JSON by @alexander-alderman-webb in [#5641](https://github.com/getsentry/sentry-python/pull/5641)
 - Stop mocking response iterator by @alexander-alderman-webb in [#5573](https://github.com/getsentry/sentry-python/pull/5573)
 
-#### Docs
-
-- Remove agentic codebase documentation workflows by @dingsdax in [#5655](https://github.com/getsentry/sentry-python/pull/5655)
-- Switch agentic workflows from Copilot to Claude engine by @dingsdax in [#5654](https://github.com/getsentry/sentry-python/pull/5654)
-- Add agentic workflows for codebase documentation by @dingsdax in [#5649](https://github.com/getsentry/sentry-python/pull/5649)
-
 #### Openai Agents
 
 - Do not fail on new tool fields by @alexander-alderman-webb in [#5625](https://github.com/getsentry/sentry-python/pull/5625)
