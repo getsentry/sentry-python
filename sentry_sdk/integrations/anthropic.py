@@ -94,12 +94,15 @@ class AnthropicIntegration(Integration):
         _check_minimum_version(AnthropicIntegration, version)
 
         """
-        client.messages.create(stream=True) returns an instance of the Stream class, which implements the iterator protocol.
+        client.messages.create(stream=True) can return an instance of the Stream class, which implements the iterator protocol.
         The underlying stream can be consumed using either __iter__ or __next__, so both are patched to intercept
         streamed events. The streamed events are used to populate output attributes on the AI Client Span.
 
-        The close() method is patched for situations in which the method is directly invoked by the user, and otherwise
-        the finally block in the __iter__ patch closes the span.
+        The span is finished in two possible places:
+        - When the user exits the context manager or directly calls close(), the patched close() ends the span.
+        - When iteration ends, the finally block in the __iter__ patch or the except block in the __next__ patch finishes the span.
+
+        Both paths may run, for example, when the iterator is exhausted and then the context manager exits.
         """
         Messages.create = _wrap_message_create(Messages.create)
         Stream.__iter__ = _wrap_stream_iter(Stream.__iter__)
@@ -109,12 +112,15 @@ class AnthropicIntegration(Integration):
         AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
 
         """
-        client.messages.stream() returns an instance of the MessageStream class, which implements the iterator protocol.
+        client.messages.stream() can return an instance of the MessageStream class, which implements the iterator protocol.
         The underlying stream can be consumed using either __iter__ or __next__, so both are patched to intercept
         streamed events. The streamed events are used to populate output attributes on the AI Client Span.
 
-        The close() method is patched for situations in which the method is directly invoked by the user, and otherwise
-        the finally block in the __iter__ patch closes the span.
+        The span is finished in two possible places:
+        - When the user exits the context manager or directly calls close(), the patched close() ends the span.
+        - When iteration ends, the finally block in the __iter__ patch or the except block in the __next__ patch finishes the span.
+
+        Both paths may run, for example, when the iterator is exhausted and then the context manager exits.
         """
         Messages.stream = _wrap_message_stream(Messages.stream)
         MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
