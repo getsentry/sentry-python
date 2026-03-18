@@ -28,12 +28,22 @@ except ImportError:
 
 
 def _patch_tool_execution() -> None:
-    if hasattr(ToolManager, "execute_tool_call"):
+    # Try to access the method directly, as hasattr() can return True
+    # but accessing the attribute may still raise AttributeError (e.g., for properties)
+    try:
+        ToolManager.execute_tool_call
         _patch_execute_tool_call()
+        return
+    except AttributeError:
+        pass
 
-    elif hasattr(ToolManager, "_call_tool"):
+    try:
+        ToolManager._call_tool
         # older versions
         _patch_call_tool()
+        return
+    except AttributeError:
+        pass
 
 
 def _patch_execute_tool_call() -> None:
