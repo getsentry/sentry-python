@@ -482,7 +482,7 @@ def _wrap_synchronous_message_iterator(
 
 
 async def _wrap_asynchronous_message_iterator(
-    stream: "Union[Stream, MessageStream]",
+    stream: "Union[AsyncStream, AsyncMessageStream]",
     iterator: "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
 ) -> "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
