@@ -167,6 +167,7 @@ def test_nonstreaming_chat_completion_no_prompts(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
@@ -259,6 +260,7 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
@@ -338,6 +340,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
@@ -430,6 +433,7 @@ async def test_nonstreaming_chat_completion_async(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100

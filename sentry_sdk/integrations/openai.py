@@ -361,10 +361,6 @@ def _set_completions_api_input_data(
     if model is not None:
         span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-    stream = kwargs.get("stream")
-    if stream is not None and _is_given(stream):
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
-
     max_tokens = kwargs.get("max_tokens")
     if max_tokens is not None and _is_given(max_tokens):
         span.set_data(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
@@ -614,12 +610,14 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     span.__enter__()
 
     span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+    is_streaming_response = kwargs.get("stream", False)
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+
     _set_completions_api_input_data(span, kwargs, integration)
 
     start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    is_streaming_response = kwargs.get("stream", False)
     if is_streaming_response:
         _set_streaming_completions_api_output_data(
             span, response, kwargs, integration, start_time, finish_span=True
