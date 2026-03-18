@@ -110,15 +110,7 @@ class AnthropicIntegration(Integration):
         AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
 
         """
-        client.messages.stream() can return an instance of the MessageStream class, which implements the iterator protocol.
-        The private _iterator variable and the close() method are patched. During iteration over the _iterator generator,
-        information from intercepted events is accumulated and used to populate output attributes on the AI Client Span.
-
-        The span can be finished in two places:
-        - When the user exits the context manager or directly calls close(), the patched close() finishes the span.
-        - When iteration ends, the finally block in the _iterator wrapper finishes the span.
-
-        Both paths may run. For example, the context manager exit can follow iterator exhaustion.
+        client.messages.stream() patches are analogous to the patches for client.messages.create(stream=True) described above.
         """
         Messages.stream = _wrap_message_stream(Messages.stream)
         MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
@@ -437,7 +429,7 @@ def _wrap_synchronous_message_iterator(
 ) -> "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
-    Responsible for closing the AI Client Span, unless the span has already been closed in the close() patch.
+    Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
     try:
         for event in iterator:
@@ -798,7 +790,7 @@ def _wrap_close(
     f: "Callable[..., None]",
 ) -> "Callable[..., None]":
     """
-    Closes the AI Client Span, unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
+    Closes the AI Client Span unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
     """
 
     def close(self: "Union[Stream, MessageStream]") -> None:
