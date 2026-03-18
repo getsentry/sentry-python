@@ -151,6 +151,11 @@ def test_nonstreaming_chat_completion_no_prompts(
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": "hello"},
                 ],
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
             )
             .choices[0]
             .message.content
@@ -162,6 +167,13 @@ def test_nonstreaming_chat_completion_no_prompts(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -231,6 +243,11 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
             client.chat.completions.create(
                 model="some-model",
                 messages=messages,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
             )
             .choices[0]
             .message.content
@@ -242,6 +259,13 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -300,6 +324,11 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "hello"},
             ],
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response = response.choices[0].message.content
 
@@ -309,6 +338,13 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -380,6 +416,11 @@ async def test_nonstreaming_chat_completion_async(
         response = await client.chat.completions.create(
             model="some-model",
             messages=messages,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response = response.choices[0].message.content
 
@@ -389,6 +430,13 @@ async def test_nonstreaming_chat_completion_async(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -498,6 +546,11 @@ def test_streaming_chat_completion_no_prompts(
                 {"role": "user", "content": "hello"},
             ],
             stream=True,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -508,6 +561,14 @@ def test_streaming_chat_completion_no_prompts(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -626,6 +687,11 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
             model="some-model",
             messages=messages,
             stream=True,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -636,6 +702,14 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -753,6 +827,11 @@ async def test_streaming_chat_completion_async_no_prompts(
                 {"role": "user", "content": "hello"},
             ],
             stream=True,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
 
         response_string = ""
@@ -765,6 +844,14 @@ async def test_streaming_chat_completion_async_no_prompts(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -891,6 +978,11 @@ async def test_streaming_chat_completion_async(
             model="some-model",
             messages=messages,
             stream=True,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
 
         response_string = ""
@@ -903,6 +995,14 @@ async def test_streaming_chat_completion_async(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
