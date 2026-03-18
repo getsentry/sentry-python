@@ -487,7 +487,7 @@ async def _wrap_asynchronous_message_iterator(
 ) -> "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
-    Responsible for closing the AI Client Span, unless the span has already been closed in the close() patch.
+    Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
     try:
         async for event in iterator:
@@ -851,7 +851,7 @@ def _wrap_async_close(
     f: "Callable[..., Awaitable[None]]",
 ) -> "Callable[..., Awaitable[None]]":
     """
-    Closes the AI Client Span, unless the finally block in `_wrap_asynchronous_message_iterator()` runs first.
+    Closes the AI Client Span unless the finally block in `_wrap_asynchronous_message_iterator()` runs first.
     """
 
     async def close(self: "AsyncStream") -> None:
