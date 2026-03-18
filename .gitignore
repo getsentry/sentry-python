@@ -21,6 +21,7 @@ sentry-python-serverless*.zip
 .eggs
 venv
 .venv
+tox.venv
 .vscode/tags
 .pytest_cache
 .hypothesis
