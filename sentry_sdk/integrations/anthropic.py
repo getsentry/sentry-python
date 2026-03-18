@@ -90,6 +90,11 @@ class _RecordedUsage:
 
 
 class _StreamSpanContext:
+    """
+    Sets accumulated data on the stream's span and finishes the span on exit.
+    No-ops if the stream has no span set, the case when the span has already been finished.
+    """
+
     def __init__(
         self,
         stream: "Union[Stream, MessageStream, AsyncStream, AsyncMessageStream]",
