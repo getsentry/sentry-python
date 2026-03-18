@@ -91,9 +91,12 @@ class _RecordedUsage:
 
 class _StreamSpanContext:
     def __init__(
-        self, stream: "Union[Stream, MessageStream, AsyncStream, AsyncMessageStream]"
+        self,
+        stream: "Union[Stream, MessageStream, AsyncStream, AsyncMessageStream]",
+        guaranteed_streaming_state: bool = False,
     ) -> None:
         self._stream = stream
+        self._guaranteed_streaming_state = guaranteed_streaming_state
 
     def __enter__(self) -> "_StreamSpanContext":
         return self
@@ -108,7 +111,9 @@ class _StreamSpanContext:
             if not hasattr(self._stream, "_span"):
                 return
 
-            if not hasattr(self._stream, "_model"):
+            if not self._guaranteed_streaming_state and not hasattr(
+                self._stream, "_model"
+            ):
                 self._stream._span.__exit__(exc_type, exc_val, exc_tb)
                 del self._stream._span
                 return
@@ -484,7 +489,7 @@ def _wrap_synchronous_message_iterator(
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
-    with _StreamSpanContext(stream):
+    with _StreamSpanContext(stream, guaranteed_streaming_state=True):
         for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
             # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
@@ -514,7 +519,7 @@ async def _wrap_asynchronous_message_iterator(
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
-    with _StreamSpanContext(stream):
+    with _StreamSpanContext(stream, guaranteed_streaming_state=True):
         async for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
             # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
