@@ -389,10 +389,6 @@ def _set_completions_api_input_data(
     if top_p is not None and _is_given(top_p):
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
-    if not should_send_default_pii() or not integration.include_prompts:
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
-        return
-
     if (
         not should_send_default_pii()
         or not integration.include_prompts
@@ -484,10 +480,6 @@ def _set_embeddings_input_data(
     top_p = kwargs.get("top_p")
     if top_p is not None and _is_given(top_p):
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
-
-    if not should_send_default_pii() or not integration.include_prompts:
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
-        return
 
     if (
         not should_send_default_pii()
