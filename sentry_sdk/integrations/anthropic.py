@@ -103,15 +103,15 @@ class _StreamSpanContext:
         exc_type: "Optional[type[BaseException]]",
         exc_val: "Optional[BaseException]",
         exc_tb: "Optional[Any]",
-    ) -> bool:
+    ) -> None:
         with capture_internal_exceptions():
             if not hasattr(self._stream, "_span"):
-                return False
+                return
 
             if not hasattr(self._stream, "_model"):
                 self._stream._span.__exit__(exc_type, exc_val, exc_tb)
                 del self._stream._span
-                return False
+                return
 
             _set_streaming_output_data(
                 span=self._stream._span,
