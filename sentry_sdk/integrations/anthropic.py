@@ -89,6 +89,44 @@ class _RecordedUsage:
     cache_read_input_tokens: "Optional[int]" = 0
 
 
+class _StreamSpanContext:
+    def __init__(
+        self, stream: "Union[Stream, MessageStream, AsyncStream, AsyncMessageStream]"
+    ) -> None:
+        self._stream = stream
+
+    def __enter__(self) -> "_StreamSpanContext":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: "Optional[type[BaseException]]",
+        exc_val: "Optional[BaseException]",
+        exc_tb: "Optional[Any]",
+    ) -> bool:
+        with capture_internal_exceptions():
+            if not hasattr(self._stream, "_span"):
+                return False
+
+            if not hasattr(self._stream, "_model"):
+                self._stream._span.__exit__(exc_type, exc_val, exc_tb)
+                del self._stream._span
+                return False
+
+            _set_streaming_output_data(
+                span=self._stream._span,
+                integration=self._stream._integration,
+                model=self._stream._model,
+                usage=self._stream._usage,
+                content_blocks=self._stream._content_blocks,
+                response_id=self._stream._response_id,
+                finish_reason=self._stream._finish_reason,
+            )
+
+            self._stream._span.__exit__(exc_type, exc_val, exc_tb)
+            del self._stream._span
+
+
 class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
@@ -446,7 +484,7 @@ def _wrap_synchronous_message_iterator(
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
-    try:
+    with _StreamSpanContext(stream):
         for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
             # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
@@ -466,21 +504,6 @@ def _wrap_synchronous_message_iterator(
 
             _accumulate_event_data(stream, event)
             yield event
-    finally:
-        exc_info = sys.exc_info()
-        with capture_internal_exceptions():
-            if hasattr(stream, "_span"):
-                _set_streaming_output_data(
-                    span=stream._span,
-                    integration=stream._integration,
-                    model=stream._model,
-                    usage=stream._usage,
-                    content_blocks=stream._content_blocks,
-                    response_id=stream._response_id,
-                    finish_reason=stream._finish_reason,
-                )
-                stream._span.__exit__(*exc_info)
-                del stream._span
 
 
 async def _wrap_asynchronous_message_iterator(
@@ -491,7 +514,7 @@ async def _wrap_asynchronous_message_iterator(
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
-    try:
+    with _StreamSpanContext(stream):
         async for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
             # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
@@ -511,21 +534,6 @@ async def _wrap_asynchronous_message_iterator(
 
             _accumulate_event_data(stream, event)
             yield event
-    finally:
-        exc_info = sys.exc_info()
-        with capture_internal_exceptions():
-            if hasattr(stream, "_span"):
-                _set_streaming_output_data(
-                    span=stream._span,
-                    integration=stream._integration,
-                    model=stream._model,
-                    usage=stream._usage,
-                    content_blocks=stream._content_blocks,
-                    response_id=stream._response_id,
-                    finish_reason=stream._finish_reason,
-                )
-                stream._span.__exit__(*exc_info)
-                del stream._span
 
 
 def _set_output_data(
@@ -784,27 +792,8 @@ def _wrap_close(
     """
 
     def close(self: "Union[Stream, MessageStream]") -> None:
-        if not hasattr(self, "_span"):
+        with _StreamSpanContext(self):
             return f(self)
-
-        if not hasattr(self, "_model"):
-            self._span.__exit__(None, None, None)
-            del self._span
-            return f(self)
-
-        _set_streaming_output_data(
-            span=self._span,
-            integration=self._integration,
-            model=self._model,
-            usage=self._usage,
-            content_blocks=self._content_blocks,
-            response_id=self._response_id,
-            finish_reason=self._finish_reason,
-        )
-        self._span.__exit__(None, None, None)
-        del self._span
-
-        return f(self)
 
     return close
 
