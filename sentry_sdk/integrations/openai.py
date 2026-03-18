@@ -236,33 +236,35 @@ def _set_responses_api_input_data(
 
     model = kwargs.get("model")
     if model is not None and _is_given(model):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     stream = kwargs.get("stream")
     if stream is not None and _is_given(stream):
-        set_data_normalized(SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
 
     max_tokens = kwargs.get("max_tokens")
     if max_tokens is not None and _is_given(max_tokens):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
 
     presence_penalty = kwargs.get("presence_penalty")
     if presence_penalty is not None and _is_given(presence_penalty):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty)
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
+        )
 
     frequency_penalty = kwargs.get("frequency_penalty")
     if frequency_penalty is not None and _is_given(frequency_penalty):
         set_data_normalized(
-            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
+            span, SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
         )
 
     temperature = kwargs.get("temperature")
     if temperature is not None and _is_given(temperature):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
 
     top_p = kwargs.get("top_p")
     if top_p is not None and _is_given(top_p):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
     if not should_send_default_pii() or not integration.include_prompts:
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
@@ -357,33 +359,39 @@ def _set_completions_api_input_data(
 
     model = kwargs.get("model")
     if model is not None and _is_given(model):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     stream = kwargs.get("stream")
     if stream is not None and _is_given(stream):
-        set_data_normalized(SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
 
     max_tokens = kwargs.get("max_tokens")
     if max_tokens is not None and _is_given(max_tokens):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
 
     presence_penalty = kwargs.get("presence_penalty")
     if presence_penalty is not None and _is_given(presence_penalty):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty)
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
+        )
 
     frequency_penalty = kwargs.get("frequency_penalty")
     if frequency_penalty is not None and _is_given(frequency_penalty):
         set_data_normalized(
-            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
+            span, SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
         )
 
     temperature = kwargs.get("temperature")
     if temperature is not None and _is_given(temperature):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
 
     top_p = kwargs.get("top_p")
     if top_p is not None and _is_given(top_p):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+    if not should_send_default_pii() or not integration.include_prompts:
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        return
 
     if (
         not should_send_default_pii()
@@ -447,33 +455,39 @@ def _set_embeddings_input_data(
 
     model = kwargs.get("model")
     if model is not None and _is_given(model):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     stream = kwargs.get("stream")
     if stream is not None and _is_given(stream):
-        set_data_normalized(SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
 
     max_tokens = kwargs.get("max_tokens")
     if max_tokens is not None and _is_given(max_tokens):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
 
     presence_penalty = kwargs.get("presence_penalty")
     if presence_penalty is not None and _is_given(presence_penalty):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty)
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
+        )
 
     frequency_penalty = kwargs.get("frequency_penalty")
     if frequency_penalty is not None and _is_given(frequency_penalty):
         set_data_normalized(
-            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
+            span, SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
         )
 
     temperature = kwargs.get("temperature")
     if temperature is not None and _is_given(temperature):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
 
     top_p = kwargs.get("top_p")
     if top_p is not None and _is_given(top_p):
-        set_data_normalized(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+    if not should_send_default_pii() or not integration.include_prompts:
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        return
 
     if (
         not should_send_default_pii()
