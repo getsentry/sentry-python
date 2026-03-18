@@ -447,12 +447,6 @@ def _set_embeddings_input_data(
         "input"
     )
 
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
-
     model = kwargs.get("model")
     if model is not None:
         span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
