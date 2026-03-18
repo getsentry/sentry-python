@@ -241,9 +241,9 @@ def _set_responses_api_input_data(
     if stream is not None and _is_given(stream):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
 
-    max_tokens = kwargs.get("max_tokens")
+    max_tokens = kwargs.get("max_output_tokens")
     if max_tokens is not None and _is_given(max_tokens):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        span.set_data(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
 
     presence_penalty = kwargs.get("presence_penalty")
     if presence_penalty is not None and _is_given(presence_penalty):
