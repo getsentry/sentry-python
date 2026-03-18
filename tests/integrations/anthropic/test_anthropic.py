@@ -29,6 +29,11 @@ except ImportError:
         pass
 
 try:
+    from anthropic.lib.streaming import TextEvent
+except ImportError:
+    TextEvent = None
+
+try:
     # 0.27+
     from anthropic.types.raw_message_delta_event import Delta
     from anthropic.types.tool_use_block import ToolUseBlock
@@ -328,6 +333,107 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
+def test_streaming_create_message_close(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            messages = client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            for _ in range(4):
+                next(messages)
+
+            messages.close()
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -443,6 +549,112 @@ def test_stream_messages(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+
+
+def test_stream_messages_close(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for _ in range(4):
+                    next(stream)
+
+                # New versions add TextEvent, so consume one more event.
+                if TextEvent is not None and isinstance(next(stream), TextEvent):
+                    next(stream)
+
+                stream.close()
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.asyncio
