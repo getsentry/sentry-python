@@ -844,27 +844,8 @@ def _wrap_async_close(
     """
 
     async def close(self: "AsyncStream") -> None:
-        if not hasattr(self, "_span"):
+        with _StreamSpanContext(self):
             return await f(self)
-
-        if not hasattr(self, "_model"):
-            self._span.__exit__(None, None, None)
-            del self._span
-            return await f(self)
-
-        _set_streaming_output_data(
-            span=self._span,
-            integration=self._integration,
-            model=self._model,
-            usage=self._usage,
-            content_blocks=self._content_blocks,
-            response_id=self._response_id,
-            finish_reason=self._finish_reason,
-        )
-        self._span.__exit__(None, None, None)
-        del self._span
-
-        return await f(self)
 
     return close
 
