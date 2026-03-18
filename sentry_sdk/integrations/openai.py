@@ -243,7 +243,7 @@ def _set_responses_api_input_data(
 
     max_tokens = kwargs.get("max_output_tokens")
     if max_tokens is not None and _is_given(max_tokens):
-        span.set_data(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
 
     presence_penalty = kwargs.get("presence_penalty")
     if presence_penalty is not None and _is_given(presence_penalty):
