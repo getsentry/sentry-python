@@ -161,6 +161,7 @@ def test_nonstreaming_chat_completion_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -240,6 +241,7 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -306,6 +308,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -385,6 +388,7 @@ async def test_nonstreaming_chat_completion_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -503,6 +507,7 @@ def test_streaming_chat_completion_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -630,6 +635,7 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -758,6 +764,7 @@ async def test_streaming_chat_completion_async_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -895,6 +902,7 @@ async def test_streaming_chat_completion_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -1036,6 +1044,7 @@ def test_embeddings_create_no_pii(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
@@ -1116,6 +1125,7 @@ def test_embeddings_create(sentry_init, capture_events, input, request):
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     param_id = request.node.callspec.id
     if param_id == "string":
@@ -1187,6 +1197,7 @@ async def test_embeddings_create_async_no_pii(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
@@ -1270,6 +1281,7 @@ async def test_embeddings_create_async(sentry_init, capture_events, input, reque
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     param_id = request.node.callspec.id
     if param_id == "string":
@@ -2772,6 +2784,7 @@ def test_streaming_responses_api(
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -2829,6 +2842,7 @@ async def test_streaming_responses_api_async(
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
