@@ -132,7 +132,6 @@ TEST_SUITE_CONFIG = {
             # FastAPI versions we use older httpx which still supports the
             # deprecated argument.
             "<0.110.1": ["httpx<0.28.0"],
-            "py3.6": ["aiocontextvars"],
         },
     },
     "flask": {
@@ -157,7 +156,6 @@ TEST_SUITE_CONFIG = {
         "package": "graphene",
         "deps": {
             "*": ["blinker", "fastapi", "flask", "httpx"],
-            "py3.6": ["aiocontextvars"],
         },
     },
     "grpc": {
@@ -349,7 +347,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],
-            "py3.6,py3.7,py3.8": ["fakeredis<2.26.0"],
+            "py3.7,py3.8": ["fakeredis<2.26.0"],
             "py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13": ["pytest-asyncio"],
         },
     },
@@ -367,9 +365,9 @@ TEST_SUITE_CONFIG = {
             # https://github.com/jamesls/fakeredis/issues/245
             # https://github.com/cunla/fakeredis-py/issues/341
             "*": ["fakeredis<2.28.0"],
-            "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
-            ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
-            "py3.6,py3.7": ["fakeredis!=2.26.0"],
+            "<0.13": ["fakeredis<1.0", "redis<3.2.2"],
+            ">=0.13,<0.14": ["fakeredis>=1.0,<1.7.4"],
+            "py3.7": ["fakeredis!=2.26.0"],
         },
         "python": {
             "<0.13": "<3.7",
@@ -380,7 +378,6 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["websockets<11.0", "aiohttp"],
             ">=22": ["sanic-testing"],
-            "py3.6": ["aiocontextvars==0.2.1"],
             "py3.8": ["tracerite<1.1.2"],
         },
         "num_versions": 4,
@@ -409,7 +406,6 @@ TEST_SUITE_CONFIG = {
             # See the comment on FastAPI's httpx bound for more info
             "<0.37.2": ["httpx<0.28.0"],
             "<0.15": ["jinja2<3.1"],
-            "py3.6": ["aiocontextvars"],
         },
     },
     "starlite": {
@@ -450,7 +446,6 @@ TEST_SUITE_CONFIG = {
             "<=6.4.1": [
                 "pytest<8.2"
             ],  # https://github.com/tornadoweb/tornado/pull/3382
-            "py3.6": ["aiocontextvars"],
         },
         "num_versions": 2,
     },

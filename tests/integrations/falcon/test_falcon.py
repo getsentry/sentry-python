@@ -5,7 +5,6 @@ import pytest
 import falcon
 import falcon.testing
 import sentry_sdk
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import parse_version
@@ -207,10 +206,15 @@ def test_http_status(sentry_init, capture_exceptions, capture_events):
     assert len(events) == 0
 
 
-def test_falcon_large_json_request(sentry_init, capture_events):
-    sentry_init(integrations=[FalconIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_falcon_large_json_request(sentry_init, capture_events, max_value_length):
+    sentry_init(
+        integrations=[FalconIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
-    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
+    data = {"foo": {"bar": "a" * (1034)}}
 
     class Resource:
         def on_post(self, req, resp):
@@ -228,15 +232,16 @@ def test_falcon_large_json_request(sentry_init, capture_events):
     assert response.status == falcon.HTTP_200
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1034
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])

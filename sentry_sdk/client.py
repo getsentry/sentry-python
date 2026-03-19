@@ -34,7 +34,6 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
     SPANDATA,
-    DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
     VERSION,
@@ -585,7 +584,7 @@ class _Client(BaseClient):
                                     "include_local_variables", True
                                 ),
                                 max_value_length=self.options.get(
-                                    "max_value_length", DEFAULT_MAX_VALUE_LENGTH
+                                    "max_value_length", None
                                 ),
                             ),
                             "crashed": False,

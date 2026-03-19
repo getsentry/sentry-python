@@ -1,3 +1,17 @@
+# Sentry SDK 3.0 Migration Guide
+
+
+Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of what's changed. Looking for a more digestable summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x) with the most common migration patterns.
+
+## New Features
+
+## Changed
+
+## Removed
+
+## Deprecated
+
+
 # Sentry SDK 2.0 Migration Guide
 
 Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed. Looking for a more digestable summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/1.x-to-2.x) with the most common migration patterns.
