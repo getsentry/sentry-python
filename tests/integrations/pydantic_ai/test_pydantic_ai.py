@@ -1637,7 +1637,7 @@ async def test_input_messages_error_handling(sentry_init, capture_events):
     Test that _set_input_messages handles errors gracefully.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
+    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1646,14 +1646,11 @@ async def test_input_messages_error_handling(sentry_init, capture_events):
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
         # Pass invalid messages that would cause an error
         invalid_messages = [object()]  # Plain object without expected attributes
 
-        # Should not raise, error is caught internally
-        _set_input_messages(span, invalid_messages)
-
+        # Should not raise, error is caught internally via ai_client_span
+        span = ai_client_span(invalid_messages, None, None, None)
         span.finish()
 
     # Should not crash
@@ -1789,9 +1786,7 @@ async def test_message_parts_with_list_content(sentry_init, capture_events):
     """
     Test that message parts with list content are handled correctly.
     """
-    import sentry_sdk
-    from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
+    from pydantic_ai import Agent
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1799,24 +1794,13 @@ async def test_message_parts_with_list_content(sentry_init, capture_events):
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    events = capture_events()
+    agent = Agent("test")
 
-        # Create message with list content
-        mock_msg = MagicMock()
-        mock_part = MagicMock()
-        mock_part.content = ["item1", "item2", {"complex": "item"}]
-        mock_msg.parts = [mock_part]
-        mock_msg.instructions = None
+    # Run with list content
+    await agent.run(["item1", "item2"])
 
-        messages = [mock_msg]
-
-        # Should handle list content
-        _set_input_messages(span, messages)
-
-        span.finish()
-
-    # Should not crash
+    (transaction,) = events
     assert transaction is not None
 
 
@@ -1896,10 +1880,7 @@ async def test_message_with_system_prompt_part(sentry_init, capture_events):
     """
     Test that SystemPromptPart is handled with correct role.
     """
-    import sentry_sdk
-    from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
-    from pydantic_ai import messages
+    from pydantic_ai import Agent, messages
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1907,24 +1888,19 @@ async def test_message_with_system_prompt_part(sentry_init, capture_events):
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    events = capture_events()
+    agent = Agent("test")
 
-        # Create message with SystemPromptPart
-        system_part = messages.SystemPromptPart(content="You are a helpful assistant")
+    # Create message with SystemPromptPart
+    system_part = messages.SystemPromptPart(content="You are a helpful assistant")
+    history = [
+        messages.ModelRequest(parts=[system_part])
+    ]
 
-        mock_msg = MagicMock()
-        mock_msg.parts = [system_part]
-        mock_msg.instructions = None
+    # Run with history
+    await agent.run("What did I say?", message_history=history)
 
-        msgs = [mock_msg]
-
-        # Should handle system prompt
-        _set_input_messages(span, msgs)
-
-        span.finish()
-
-    # Should not crash
+    (transaction,) = events
     assert transaction is not None
 
 
@@ -1935,7 +1911,7 @@ async def test_message_with_instructions(sentry_init, capture_events):
     """
     import sentry_sdk
     from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
+    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1944,8 +1920,6 @@ async def test_message_with_instructions(sentry_init, capture_events):
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
         # Create message with instructions
         mock_msg = MagicMock()
         mock_msg.instructions = "System instructions here"
@@ -1955,9 +1929,8 @@ async def test_message_with_instructions(sentry_init, capture_events):
 
         msgs = [mock_msg]
 
-        # Should extract system prompt from instructions
-        _set_input_messages(span, msgs)
-
+        # Should handle system prompt via ai_client_span wrappers
+        span = ai_client_span(msgs, None, None, None)
         span.finish()
 
     # Should not crash
@@ -1969,8 +1942,7 @@ async def test_set_input_messages_without_prompts(sentry_init, capture_events):
     """
     Test that _set_input_messages respects _should_send_prompts().
     """
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
+    from pydantic_ai import Agent
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=False)],
@@ -1978,16 +1950,13 @@ async def test_set_input_messages_without_prompts(sentry_init, capture_events):
         send_default_pii=True,
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    events = capture_events()
+    agent = Agent("test")
 
-        # Even with messages, should not set them
-        messages = ["test"]
-        _set_input_messages(span, messages)
+    # Run with prompts disabled
+    await agent.run("test")
 
-        span.finish()
-
-    # Should not crash and should not set messages
+    (transaction,) = events
     assert transaction is not None
 
 
@@ -2705,6 +2674,8 @@ async def test_binary_content_encoding_image(sentry_init, capture_events):
 @pytest.mark.asyncio
 async def test_binary_content_encoding_mixed_content(sentry_init, capture_events):
     """Test that BinaryContent mixed with text content is properly handled."""
+    from pydantic_ai import Agent
+
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
@@ -2712,21 +2683,14 @@ async def test_binary_content_encoding_mixed_content(sentry_init, capture_events
     )
 
     events = capture_events()
+    agent = Agent("test")
 
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        binary_content = BinaryContent(
-            data=b"fake_image_bytes", media_type="image/jpeg"
-        )
-        user_part = UserPromptPart(
-            content=["Here is an image:", binary_content, "What do you see?"]
-        )
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
+    binary_content = BinaryContent(
+        data=b"fake_image_bytes", media_type="image/jpeg"
+    )
 
-        _set_input_messages(span, [mock_msg])
-        span.finish()
+    # Run with mixed content
+    await agent.run(["Here is an image:", binary_content, "What do you see?"])
 
     (event,) = events
     span_data = event["spans"][0]["data"]
