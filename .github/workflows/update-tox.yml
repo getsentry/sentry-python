@@ -42,7 +42,7 @@ jobs:
         run: |
           COMMIT_TITLE="ci: 🤖 Update test matrix with new releases"
           DATE=`date +%m/%d`
-          BRANCH_NAME="toxgen/update"
+          BRANCH_NAME="toxgen/update-`date +%m-%d`"
 
           git checkout -B "$BRANCH_NAME"
           git add --all
@@ -78,20 +78,21 @@ jobs:
 
             // Close existing toxgen PRs as they're now obsolete
 
-            const { data: existingPRs } = await github.rest.pulls.list({
+            const existingPRs = await github.paginate(github.rest.pulls.list, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                head: `${context.repo.owner}:${branchName}`,
                 state: 'open'
             });
 
             for (const pr of existingPRs) {
-                await github.rest.pulls.update({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    pull_number: pr.number,
-                    state: 'closed'
-                })
+                if (pr.head.ref.startsWith('toxgen/')) {
+                    await github.rest.pulls.update({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: pr.number,
+                        state: 'closed'
+                    })
+                }
             };
 
             const { data: pr } = await github.rest.pulls.create({
