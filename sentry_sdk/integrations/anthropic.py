@@ -98,6 +98,7 @@ class _StreamSpanContext:
     def __init__(
         self,
         stream: "Union[Stream, MessageStream, AsyncStream, AsyncMessageStream]",
+        # Flag to avoid unreachable branches when the stream state is known to be initialized (stream._model, etc. are set).
         guaranteed_streaming_state: bool = False,
     ) -> None:
         self._stream = stream
