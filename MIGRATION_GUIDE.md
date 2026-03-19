@@ -190,3 +190,41 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - Deprecated `sentry_sdk.transport.Transport.capture_event`. Please use `sentry_sdk.transport.Transport.capture_envelope`, instead.
 - Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
 - The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
+
+## Migrating Span Filtering to Span First
+
+If you are using the experimental **Span First** mode (also known as span streaming, enabled via `_experiments={"trace_lifecycle": "stream"}`), you might notice that individual spans are sent in real-time and do not pass together through `before_send_transaction`.
+
+To filter or ignore individual spans in Span First mode, you can use the experimental `ignore_spans` configuration option:
+
+```python
+import sentry_sdk
+import re
+
+sentry_sdk.init(
+    dsn="...",
+    traces_sample_rate=1.0,  # Required for tracing
+    _experiments={
+        "trace_lifecycle": "stream",
+        "ignore_spans": [
+            "ignore_this_exact_name",  # 1. Match by name (String)
+            re.compile(r"^GET /static/.*"),  # 2. Match by name (Regex Range)
+            {"name": "ignore_by_name_dict"},  # 3. Match by name (Dict)
+            {  # 4. Match by Span Attribute
+                "attributes": {
+                    "http.status_code": 200,
+                }
+            }
+        ]
+    }
+)
+```
+
+### Key Differences:
+- **Before (Transaction Mode)**: You filtered child spans by mutating `event["spans"]` inside `before_send_transaction`.
+- **After (Span First)**: You define rules up-front in `ignore_spans`. If a rule matches, a `NoOpStreamedSpan` is returned immediately resulting in no overhead.
+- **Inheritance**: Any child span started with an ignored parent will automatically be ignored as well.
+
+> [!NOTE]
+> `ignore_spans` is currently an experimental feature reading from `_experiments`.
+
