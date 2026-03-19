@@ -169,6 +169,7 @@ def _wrap_connect_addr(
             origin=AsyncPGIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+            span.set_data("db.driver", "asyncpg")
             addr = kwargs.get("addr")
             if addr:
                 try:
