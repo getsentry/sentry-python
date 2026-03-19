@@ -31,6 +31,7 @@ class Batcher(Generic[T]):
         self._record_lost_func = record_lost_func
         self._running = True
         self._lock = threading.Lock()
+        self._active: "threading.local" = threading.local()
 
         self._flush_event: "threading.Event" = threading.Event()
 
@@ -70,23 +71,40 @@ class Batcher(Generic[T]):
         return True
 
     def _flush_loop(self) -> None:
+        # Mark the flush-loop thread as active for its entire lifetime so
+        # that any re-entrant add() triggered by GC warnings during wait(),
+        # flush(), or Event operations is silently dropped instead of
+        # deadlocking on internal locks.
+        self._active.flag = True
         while self._running:
             self._flush_event.wait(self.FLUSH_WAIT_TIME + random.random())
             self._flush_event.clear()
             self._flush()
 
     def add(self, item: "T") -> None:
-        if not self._ensure_thread() or self._flusher is None:
+        # Bail out if the current thread is already executing batcher code.
+        # This prevents deadlocks when code running inside the batcher (e.g.
+        # _add_to_envelope during flush, or _flush_event.wait/set) triggers
+        # a GC-emitted warning that routes back through the logging
+        # integration into add().
+        if getattr(self._active, "flag", False):
             return None
 
-        with self._lock:
-            if len(self._buffer) >= self.MAX_BEFORE_DROP:
-                self._record_lost(item)
+        self._active.flag = True
+        try:
+            if not self._ensure_thread() or self._flusher is None:
                 return None
 
-            self._buffer.append(item)
-            if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
-                self._flush_event.set()
+            with self._lock:
+                if len(self._buffer) >= self.MAX_BEFORE_DROP:
+                    self._record_lost(item)
+                    return None
+
+                self._buffer.append(item)
+                if len(self._buffer) >= self.MAX_BEFORE_FLUSH:
+                    self._flush_event.set()
+        finally:
+            self._active.flag = False
 
     def kill(self) -> None:
         if self._flusher is None:
@@ -97,7 +115,12 @@ class Batcher(Generic[T]):
         self._flusher = None
 
     def flush(self) -> None:
-        self._flush()
+        was_active = getattr(self._active, "flag", False)
+        self._active.flag = True
+        try:
+            self._flush()
+        finally:
+            self._active.flag = was_active
 
     def _add_to_envelope(self, envelope: "Envelope") -> None:
         envelope.add_item(

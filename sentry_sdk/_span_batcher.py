@@ -43,6 +43,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._record_lost_func = record_lost_func
         self._running = True
         self._lock = threading.Lock()
+        self._active: "threading.local" = threading.local()
 
         self._flush_event: "threading.Event" = threading.Event()
 
@@ -50,29 +51,42 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._flusher_pid: "Optional[int]" = None
 
     def add(self, span: "StreamedSpan") -> None:
-        if not self._ensure_thread() or self._flusher is None:
+        # Bail out if the current thread is already executing batcher code.
+        # This prevents deadlocks when code running inside the batcher (e.g.
+        # _add_to_envelope during flush, or _flush_event.wait/set) triggers
+        # a GC-emitted warning that routes back through the logging
+        # integration into add().
+        if getattr(self._active, "flag", False):
             return None
 
-        with self._lock:
-            size = len(self._span_buffer[span.trace_id])
-            if size >= self.MAX_BEFORE_DROP:
-                self._record_lost_func(
-                    reason="queue_overflow",
-                    data_category="span",
-                    quantity=1,
-                )
+        self._active.flag = True
+
+        try:
+            if not self._ensure_thread() or self._flusher is None:
                 return None
 
-            self._span_buffer[span.trace_id].append(span)
-            self._running_size[span.trace_id] += self._estimate_size(span)
+            with self._lock:
+                size = len(self._span_buffer[span.trace_id])
+                if size >= self.MAX_BEFORE_DROP:
+                    self._record_lost_func(
+                        reason="queue_overflow",
+                        data_category="span",
+                        quantity=1,
+                    )
+                    return None
 
-            if size + 1 >= self.MAX_BEFORE_FLUSH:
-                self._flush_event.set()
-                return
+                self._span_buffer[span.trace_id].append(span)
+                self._running_size[span.trace_id] += self._estimate_size(span)
 
-            if self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH:
-                self._flush_event.set()
-                return
+                if size + 1 >= self.MAX_BEFORE_FLUSH:
+                    self._flush_event.set()
+                    return
+
+                if self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH:
+                    self._flush_event.set()
+                    return
+        finally:
+            self._active.flag = False
 
     @staticmethod
     def _estimate_size(item: "StreamedSpan") -> int:

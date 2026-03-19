@@ -22,12 +22,13 @@ from sentry_sdk.integrations._wsgi_common import (
     nullcontext,
 )
 from sentry_sdk.sessions import track_session
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
+    Transaction,
     TransactionSource,
     Span,
 )
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import (
     ContextVar,
     event_from_exception,
@@ -37,21 +38,20 @@ from sentry_sdk.utils import (
     transaction_from_function,
     _get_installed_modules,
 )
-from sentry_sdk.tracing import Transaction
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
     from typing import ContextManager
+    from typing import Dict
     from typing import Optional
     from typing import Tuple
     from typing import Union
 
     from sentry_sdk._types import Attributes, Event, Hint
-    from sentry_sdk.tracing import NoOpSpan
+    from sentry_sdk.tracing import Span
 
 
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
@@ -217,27 +217,41 @@ class SentryAsgiMiddleware:
                     span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
                     if span_streaming:
                         segment: "Optional[StreamedSpan]" = None
-                        attributes: "Attributes" = {}
-                        sentry_scope.set_custom_sampling_context({"asgi_scope": scope})
+                        attributes: "Attributes" = {
+                            "sentry.span.source": getattr(
+                                transaction_source, "value", transaction_source
+                            ),
+                            "sentry.origin": self.span_origin,
+                            "asgi.type": ty,
+                        }
+
                         if ty in ("http", "websocket"):
                             if (
                                 ty == "websocket"
                                 or method in self.http_methods_to_capture
                             ):
                                 sentry_sdk.traces.continue_trace(_get_headers(scope))
+
+                                sentry_scope.set_custom_sampling_context(
+                                    {"asgi_scope": scope}
+                                )
+
                                 attributes["sentry.op"] = f"{ty}.server"
+                                segment = sentry_sdk.traces.start_span(
+                                    name=transaction_name, attributes=attributes
+                                )
                         else:
                             sentry_sdk.traces.new_trace()
-                            attributes["sentry.op"] = OP.HTTP_SERVER
 
-                        attributes["sentry.span.source"] = getattr(
-                            transaction_source, "value", transaction_source
-                        )
-                        attributes["sentry.origin"] = self.span_origin
-                        attributes["asgi.type"] = ty
-                        segment = sentry_sdk.traces.start_span(
-                            name=transaction_name, attributes=attributes
-                        )
+                            sentry_scope.set_custom_sampling_context(
+                                {"asgi_scope": scope}
+                            )
+
+                            attributes["sentry.op"] = OP.HTTP_SERVER
+                            segment = sentry_sdk.traces.start_span(
+                                name=transaction_name, attributes=attributes
+                            )
+
                         span_ctx = segment or nullcontext()
 
                     else:
@@ -291,6 +305,10 @@ class SentryAsgiMiddleware:
                                                 "error"
                                                 if event["status"] >= 400
                                                 else "ok"
+                                            )
+                                            span.set_attribute(
+                                                "http.response.status_code",
+                                                event["status"],
                                             )
                                         else:
                                             span.set_http_status(event["status"])
