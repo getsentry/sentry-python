@@ -9,7 +9,7 @@ _Bad software is everywhere, and we're tired of it. Sentry is on a mission to he
 [![Discord](https://img.shields.io/discord/621778831602221064?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb)](https://discord.com/invite/Ww9hbqr)
 [![X Follow](https://img.shields.io/twitter/follow/sentry?label=sentry&style=social)](https://x.com/intent/follow?screen_name=sentry)
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
-<img src="https://img.shields.io/badge/python-3.7 | 3.8 | 3.9 | 3.10 | 3.11 | 3.12 | 3.13-blue.svg" alt="python">
+<img src="https://img.shields.io/badge/python-3.7 | 3.8 | 3.9 | 3.10 | 3.11 | 3.12 | 3.13 | 3.14-blue.svg" alt="python">
 [![Build Status](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml/badge.svg)](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml)
 
 <br/>

@@ -24,29 +24,30 @@ class CompressionAlgo(Enum):
 
 
 if TYPE_CHECKING:
+    from typing import (
+        AbstractSet,
+        Any,
+        Callable,
+        Dict,
+        List,
+        Optional,
+        Sequence,
+        Tuple,
+        Type,
+        Union,
+    )
+
+    from typing_extensions import Literal, TypedDict
+
     import sentry_sdk
-
-    from typing import Optional
-    from typing import Callable
-    from typing import Union
-    from typing import List
-    from typing import Type
-    from typing import Dict
-    from typing import Any
-    from typing import Sequence
-    from typing import Tuple
-    from typing import AbstractSet
-    from typing_extensions import Literal
-    from typing_extensions import TypedDict
-
     from sentry_sdk._types import (
         BreadcrumbProcessor,
         ContinuousProfilerMode,
         Event,
         EventProcessor,
         Hint,
+        IgnoreSpansConfig,
         Log,
-        MeasurementUnit,
         Metric,
         ProfilerMode,
         TracesSampler,
@@ -75,6 +76,8 @@ if TYPE_CHECKING:
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
             "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
+            "trace_lifecycle": Optional[Literal["static", "stream"]],
+            "ignore_spans": Optional[IgnoreSpansConfig],
         },
         total=False,
     )
@@ -98,14 +101,18 @@ class SPANTEMPLATE(str, Enum):
     AI_TOOL = "ai_tool"
     AI_CHAT = "ai_chat"
 
-    def __str__(self):
-        # type: () -> str
+    def __str__(self) -> str:
         return self.value
 
 
 class INSTRUMENTER:
     SENTRY = "sentry"
     OTEL = "otel"
+
+
+class SPANNAME:
+    DB_COMMIT = "COMMIT"
+    DB_ROLLBACK = "ROLLBACK"
 
 
 class SPANDATA:
@@ -453,10 +460,22 @@ class SPANDATA:
     Example: "ResearchAssistant"
     """
 
+    GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
+    """
+    The unique identifier for the conversation/thread with the AI model.
+    Example: "conv_abc123"
+    """
+
     GEN_AI_CHOICE = "gen_ai.choice"
     """
     The model's response message.
     Example: "The weather in Paris is rainy and overcast, with temperatures around 57°F"
+    """
+
+    GEN_AI_EMBEDDINGS_INPUT = "gen_ai.embeddings.input"
+    """
+    The input to the embeddings operation.
+    Example: "Hello!"
     """
 
     GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
@@ -501,6 +520,12 @@ class SPANDATA:
     Example: ["The weather in Paris is rainy and overcast, with temperatures around 57°F", "The weather in London is sunny and warm, with temperatures around 65°F"]
     """
 
+    GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN = "gen_ai.response.time_to_first_token"
+    """
+    The time it took to receive the first token from the model.
+    Example: 0.1
+    """
+
     GEN_AI_RESPONSE_TOOL_CALLS = "gen_ai.response.tool_calls"
     """
     The tool calls in the model's response.
@@ -523,6 +548,12 @@ class SPANDATA:
     """
     The maximum number of tokens to generate in the response.
     Example: 2048
+    """
+
+    GEN_AI_SYSTEM_INSTRUCTIONS = "gen_ai.system_instructions"
+    """
+    The system instructions passed to the model.
+    Example: [{"type": "text", "text": "You are a helpful assistant."},{"type": "text", "text": "Be concise and clear."}]
     """
 
     GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
@@ -613,6 +644,12 @@ class SPANDATA:
     """
     The number of cached tokens in the input.
     Example: 50
+    """
+
+    GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE = "gen_ai.usage.input_tokens.cache_write"
+    """
+    The number of tokens written to the cache when processing the AI input (prompt).
+    Example: 100
     """
 
     GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
@@ -847,12 +884,11 @@ class SPANSTATUS:
     CANCELLED = "cancelled"
     DATA_LOSS = "data_loss"
     DEADLINE_EXCEEDED = "deadline_exceeded"
-    ERROR = "error"  # OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
     FAILED_PRECONDITION = "failed_precondition"
     INTERNAL_ERROR = "internal_error"
     INVALID_ARGUMENT = "invalid_argument"
     NOT_FOUND = "not_found"
-    OK = "ok"  # HTTP 200 and OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
+    OK = "ok"
     OUT_OF_RANGE = "out_of_range"
     PERMISSION_DENIED = "permission_denied"
     RESOURCE_EXHAUSTED = "resource_exhausted"
@@ -860,7 +896,6 @@ class SPANSTATUS:
     UNAVAILABLE = "unavailable"
     UNIMPLEMENTED = "unimplemented"
     UNKNOWN_ERROR = "unknown_error"
-    UNSET = "unset"  # OTel status code: https://opentelemetry.io/docs/concepts/signals/traces/#span-status
 
 
 class OP:
@@ -921,6 +956,7 @@ class OP:
     QUEUE_SUBMIT_RAY = "queue.submit.ray"
     QUEUE_TASK_RAY = "queue.task.ray"
     QUEUE_TASK_DRAMATIQ = "queue.task.dramatiq"
+    QUEUE_SUBMIT_DJANGO = "queue.submit.django"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
@@ -938,78 +974,79 @@ class OP:
 class ClientConstructor:
     def __init__(
         self,
-        dsn=None,  # type: Optional[str]
+        dsn: "Optional[str]" = None,
         *,
-        max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
-        release=None,  # type: Optional[str]
-        environment=None,  # type: Optional[str]
-        server_name=None,  # type: Optional[str]
-        shutdown_timeout=2,  # type: float
-        integrations=[],  # type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006
-        in_app_include=[],  # type: List[str]  # noqa: B006
-        in_app_exclude=[],  # type: List[str]  # noqa: B006
-        default_integrations=True,  # type: bool
-        dist=None,  # type: Optional[str]
-        transport=None,  # type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]
-        transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
-        sample_rate=1.0,  # type: float
-        send_default_pii=None,  # type: Optional[bool]
-        http_proxy=None,  # type: Optional[str]
-        https_proxy=None,  # type: Optional[str]
-        ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
-        max_request_body_size="medium",  # type: str
-        socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
-        keep_alive=None,  # type: Optional[bool]
-        before_send=None,  # type: Optional[EventProcessor]
-        before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
-        debug=None,  # type: Optional[bool]
-        attach_stacktrace=False,  # type: bool
-        ca_certs=None,  # type: Optional[str]
-        propagate_traces=True,  # type: bool
-        traces_sample_rate=None,  # type: Optional[float]
-        traces_sampler=None,  # type: Optional[TracesSampler]
-        profiles_sample_rate=None,  # type: Optional[float]
-        profiles_sampler=None,  # type: Optional[TracesSampler]
-        profiler_mode=None,  # type: Optional[ProfilerMode]
-        profile_lifecycle="manual",  # type: Literal["manual", "trace"]
-        profile_session_sample_rate=None,  # type: Optional[float]
-        auto_enabling_integrations=True,  # type: bool
-        disabled_integrations=None,  # type: Optional[Sequence[sentry_sdk.integrations.Integration]]
-        auto_session_tracking=True,  # type: bool
-        send_client_reports=True,  # type: bool
-        _experiments={},  # type: Experiments  # noqa: B006
-        proxy_headers=None,  # type: Optional[Dict[str, str]]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
-        before_send_transaction=None,  # type: Optional[TransactionProcessor]
-        project_root=None,  # type: Optional[str]
-        enable_tracing=None,  # type: Optional[bool]
-        include_local_variables=True,  # type: Optional[bool]
-        include_source_context=True,  # type: Optional[bool]
-        trace_propagation_targets=[  # noqa: B006
+        max_breadcrumbs: int = DEFAULT_MAX_BREADCRUMBS,
+        release: "Optional[str]" = None,
+        environment: "Optional[str]" = None,
+        server_name: "Optional[str]" = None,
+        shutdown_timeout: float = 2,
+        integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],  # noqa: B006
+        in_app_include: "List[str]" = [],  # noqa: B006
+        in_app_exclude: "List[str]" = [],  # noqa: B006
+        default_integrations: bool = True,
+        dist: "Optional[str]" = None,
+        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]" = None,
+        transport_queue_size: int = DEFAULT_QUEUE_SIZE,
+        sample_rate: float = 1.0,
+        send_default_pii: "Optional[bool]" = None,
+        http_proxy: "Optional[str]" = None,
+        https_proxy: "Optional[str]" = None,
+        ignore_errors: "Sequence[Union[type, str]]" = [],  # noqa: B006
+        max_request_body_size: str = "medium",
+        socket_options: "Optional[List[Tuple[int, int, int | bytes]]]" = None,
+        keep_alive: "Optional[bool]" = None,
+        before_send: "Optional[EventProcessor]" = None,
+        before_breadcrumb: "Optional[BreadcrumbProcessor]" = None,
+        debug: "Optional[bool]" = None,
+        attach_stacktrace: bool = False,
+        ca_certs: "Optional[str]" = None,
+        propagate_traces: bool = True,
+        traces_sample_rate: "Optional[float]" = None,
+        traces_sampler: "Optional[TracesSampler]" = None,
+        profiles_sample_rate: "Optional[float]" = None,
+        profiles_sampler: "Optional[TracesSampler]" = None,
+        profiler_mode: "Optional[ProfilerMode]" = None,
+        profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
+        profile_session_sample_rate: "Optional[float]" = None,
+        auto_enabling_integrations: bool = True,
+        disabled_integrations: "Optional[Sequence[sentry_sdk.integrations.Integration]]" = None,
+        auto_session_tracking: bool = True,
+        send_client_reports: bool = True,
+        _experiments: "Experiments" = {},  # noqa: B006
+        proxy_headers: "Optional[Dict[str, str]]" = None,
+        instrumenter: "Optional[str]" = INSTRUMENTER.SENTRY,
+        before_send_transaction: "Optional[TransactionProcessor]" = None,
+        project_root: "Optional[str]" = None,
+        enable_tracing: "Optional[bool]" = None,
+        include_local_variables: "Optional[bool]" = True,
+        include_source_context: "Optional[bool]" = True,
+        trace_propagation_targets: "Optional[Sequence[str]]" = [  # noqa: B006
             MATCH_ALL
-        ],  # type: Optional[Sequence[str]]
-        functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
-        event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
-        max_value_length=None,  # type: Optional[int]
-        enable_backpressure_handling=True,  # type: bool
-        error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
-        enable_db_query_source=True,  # type: bool
-        db_query_source_threshold_ms=100,  # type: int
-        enable_http_request_source=True,  # type: bool
-        http_request_source_threshold_ms=100,  # type: int
-        spotlight=None,  # type: Optional[Union[bool, str]]
-        cert_file=None,  # type: Optional[str]
-        key_file=None,  # type: Optional[str]
-        custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
-        add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
-        max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
-        enable_logs=False,  # type: bool
-        before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
-        trace_ignore_status_codes=frozenset(),  # type: AbstractSet[int]
-        enable_metrics=True,  # type: bool
-        before_send_metric=None,  # type: Optional[Callable[[Metric, Hint], Optional[Metric]]]
-    ):
-        # type: (...) -> None
+        ],
+        functions_to_trace: "Sequence[Dict[str, str]]" = [],  # noqa: B006
+        event_scrubber: "Optional[sentry_sdk.scrubber.EventScrubber]" = None,
+        max_value_length: "Optional[int]" = None,
+        enable_backpressure_handling: bool = True,
+        error_sampler: "Optional[Callable[[Event, Hint], Union[float, bool]]]" = None,
+        enable_db_query_source: bool = True,
+        db_query_source_threshold_ms: int = 100,
+        enable_http_request_source: bool = True,
+        http_request_source_threshold_ms: int = 100,
+        spotlight: "Optional[Union[bool, str]]" = None,
+        cert_file: "Optional[str]" = None,
+        key_file: "Optional[str]" = None,
+        custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
+        add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
+        max_stack_frames: "Optional[int]" = DEFAULT_MAX_STACK_FRAMES,
+        enable_logs: bool = False,
+        before_send_log: "Optional[Callable[[Log, Hint], Optional[Log]]]" = None,
+        trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
+        enable_metrics: bool = True,
+        before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
+        org_id: "Optional[str]" = None,
+        strict_trace_continuation: bool = False,
+    ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
         :param dsn: The DSN tells the SDK where to send the events.
@@ -1411,13 +1448,25 @@ class ClientConstructor:
             If `trace_ignore_status_codes` is not provided, requests with any status code
             may be traced.
 
+        :param strict_trace_continuation: If set to `True`, the SDK will only continue a trace if the `org_id` of the incoming trace found in the
+           `baggage` header matches the `org_id` of the current Sentry client and only if BOTH are present.
+
+            If set to `False`, consistency of `org_id` will only be enforced if both are present. If either are missing, the trace will be continued.
+
+            The client's organization ID is extracted from the DSN or can be set with the `org_id` option.
+            If the organization IDs do not match, the SDK will start a new trace instead of continuing the incoming one.
+            This is useful to prevent traces of unknown third-party services from being continued in your application.
+
+        :param org_id: An optional organization ID. The SDK will try to extract if from the DSN in most cases
+            but you can provide it explicitly for self-hosted and Relay setups. This value is used for
+            trace propagation and for features like `strict_trace_continuation`.
+
         :param _experiments:
         """
         pass
 
 
-def _get_default_options():
-    # type: () -> dict[str, Any]
+def _get_default_options() -> "dict[str, Any]":
     import inspect
 
     a = inspect.getfullargspec(ClientConstructor.__init__)
@@ -1436,4 +1485,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.45.0"
+VERSION = "2.55.0"

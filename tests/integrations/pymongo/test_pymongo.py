@@ -99,8 +99,11 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
             and "4" not in insert_fail["description"]
         )
 
+    assert find["status"] == "ok"
     assert find["tags"]["status"] == "ok"
+    assert insert_success["status"] == "ok"
     assert insert_success["tags"]["status"] == "ok"
+    assert insert_fail["status"] == "internal_error"
     assert insert_fail["tags"]["status"] == "internal_error"
 
 

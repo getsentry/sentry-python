@@ -25,7 +25,7 @@ from sentry_sdk import (
     Hub,
 )
 from sentry_sdk._compat import PY37, PY38
-from sentry_sdk.envelope import Envelope, Item, parse_json
+from sentry_sdk.envelope import Envelope, Item, parse_json, PayloadRef
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     _parse_rate_limits,
@@ -63,8 +63,7 @@ def make_client(request, capturing_server):
     return inner
 
 
-def mock_transaction_envelope(span_count):
-    # type: (int) -> Envelope
+def mock_transaction_envelope(span_count: int) -> "Envelope":
     event = defaultdict(
         mock.MagicMock,
         type="transaction",
@@ -386,6 +385,33 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
+def test_envelope_too_large_response(capturing_server, make_client):
+    client = make_client()
+
+    capturing_server.respond_with(code=413)
+    client.capture_event({"type": "error"})
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    # Error, transaction, and client report payloads
+    assert len(capturing_server.captured) == 3
+    report = parse_json(capturing_server.captured[2].envelope.items[0].get_bytes())
+
+    # Client reports for error, transaction and included span
+    assert len(report["discarded_events"]) == 3
+    assert {"reason": "send_error", "category": "error", "quantity": 1} in report[
+        "discarded_events"
+    ]
+    assert {"reason": "send_error", "category": "span", "quantity": 1} in report[
+        "discarded_events"
+    ]
+    assert {"reason": "send_error", "category": "transaction", "quantity": 1} in report[
+        "discarded_events"
+    ]
+
+    capturing_server.clear_captured()
+
+
 def test_simple_rate_limits(capturing_server, make_client):
     client = make_client()
     capturing_server.respond_with(code=429, headers={"Retry-After": "4"})
@@ -591,7 +617,110 @@ def test_complex_limits_without_data_category(
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
-def test_log_item_limits(capturing_server, response_code, make_client):
+@pytest.mark.parametrize(
+    "item",
+    [
+        Item(payload=b"{}", type="log"),
+        Item(
+            type="log",
+            content_type="application/vnd.sentry.items.log+json",
+            headers={
+                "item_count": 2,
+            },
+            payload=PayloadRef(
+                json={
+                    "items": [
+                        {
+                            "body": "This is a 'info' log...",
+                            "level": "info",
+                            "timestamp": datetime(
+                                2025, 1, 1, tzinfo=timezone.utc
+                            ).timestamp(),
+                            "trace_id": "00000000-0000-0000-0000-000000000000",
+                            "attributes": {
+                                "sentry.environment": {
+                                    "value": "production",
+                                    "type": "string",
+                                },
+                                "sentry.release": {
+                                    "value": "1.0.0",
+                                    "type": "string",
+                                },
+                                "sentry.sdk.name": {
+                                    "value": "sentry.python",
+                                    "type": "string",
+                                },
+                                "sentry.sdk.version": {
+                                    "value": "2.45.0",
+                                    "type": "string",
+                                },
+                                "sentry.severity_number": {
+                                    "value": 9,
+                                    "type": "integer",
+                                },
+                                "sentry.severity_text": {
+                                    "value": "info",
+                                    "type": "string",
+                                },
+                                "server.address": {
+                                    "value": "test-server",
+                                    "type": "string",
+                                },
+                            },
+                        },
+                        {
+                            "body": "The recorded value was '2.0'",
+                            "level": "warn",
+                            "timestamp": datetime(
+                                2025, 1, 1, tzinfo=timezone.utc
+                            ).timestamp(),
+                            "trace_id": "00000000-0000-0000-0000-000000000000",
+                            "attributes": {
+                                "sentry.message.parameter.float_var": {
+                                    "value": 2.0,
+                                    "type": "double",
+                                },
+                                "sentry.message.template": {
+                                    "value": "The recorded value was '{float_var}'",
+                                    "type": "string",
+                                },
+                                "sentry.sdk.name": {
+                                    "value": "sentry.python",
+                                    "type": "string",
+                                },
+                                "sentry.sdk.version": {
+                                    "value": "2.45.0",
+                                    "type": "string",
+                                },
+                                "server.address": {
+                                    "value": "test-server",
+                                    "type": "string",
+                                },
+                                "sentry.environment": {
+                                    "value": "production",
+                                    "type": "string",
+                                },
+                                "sentry.release": {
+                                    "value": "1.0.0",
+                                    "type": "string",
+                                },
+                                "sentry.severity_number": {
+                                    "value": 13,
+                                    "type": "integer",
+                                },
+                                "sentry.severity_text": {
+                                    "value": "warn",
+                                    "type": "string",
+                                },
+                            },
+                        },
+                    ]
+                }
+            ),
+        ),
+    ],
+)
+def test_log_item_limits(capturing_server, response_code, item, make_client):
     client = make_client()
     capturing_server.respond_with(
         code=response_code,
@@ -601,7 +730,7 @@ def test_log_item_limits(capturing_server, response_code, make_client):
     )
 
     envelope = Envelope()
-    envelope.add_item(Item(payload=b"{}", type="log"))
+    envelope.add_item(item)
     client.transport.capture_envelope(envelope)
     client.flush()
 
@@ -622,9 +751,22 @@ def test_log_item_limits(capturing_server, response_code, make_client):
     envelope = capturing_server.captured[1].envelope
     assert envelope.items[0].type == "client_report"
     report = parse_json(envelope.items[0].get_bytes())
-    assert report["discarded_events"] == [
-        {"category": "log_item", "reason": "ratelimit_backoff", "quantity": 1},
-    ]
+
+    assert {
+        "category": "log_item",
+        "reason": "ratelimit_backoff",
+        "quantity": 1,
+    } in report["discarded_events"]
+
+    expected_lost_bytes = 1243
+    if item.payload.bytes == b"{}":
+        expected_lost_bytes = 2
+
+    assert {
+        "category": "log_byte",
+        "reason": "ratelimit_backoff",
+        "quantity": expected_lost_bytes,
+    } in report["discarded_events"]
 
 
 def test_hub_cls_backwards_compat():

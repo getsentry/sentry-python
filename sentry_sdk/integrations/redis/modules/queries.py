@@ -15,8 +15,9 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def _compile_db_span_properties(integration, redis_command, args):
-    # type: (RedisIntegration, str, tuple[Any, ...]) -> dict[str, Any]
+def _compile_db_span_properties(
+    integration: "RedisIntegration", redis_command: str, args: "tuple[Any, ...]"
+) -> "dict[str, Any]":
     description = _get_db_span_description(integration, redis_command, args)
 
     properties = {
@@ -27,8 +28,9 @@ def _compile_db_span_properties(integration, redis_command, args):
     return properties
 
 
-def _get_db_span_description(integration, command_name, args):
-    # type: (RedisIntegration, str, tuple[Any, ...]) -> str
+def _get_db_span_description(
+    integration: "RedisIntegration", command_name: str, args: "tuple[Any, ...]"
+) -> str:
     description = command_name
 
     with capture_internal_exceptions():
@@ -40,8 +42,7 @@ def _get_db_span_description(integration, command_name, args):
     return description
 
 
-def _set_db_data_on_span(span, connection_params):
-    # type: (Span, dict[str, Any]) -> None
+def _set_db_data_on_span(span: "Span", connection_params: "dict[str, Any]") -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "redis")
 
     db = connection_params.get("db")
@@ -57,8 +58,7 @@ def _set_db_data_on_span(span, connection_params):
         span.set_data(SPANDATA.SERVER_PORT, port)
 
 
-def _set_db_data(span, redis_instance):
-    # type: (Span, Redis[Any]) -> None
+def _set_db_data(span: "Span", redis_instance: "Redis[Any]") -> None:
     try:
         _set_db_data_on_span(span, redis_instance.connection_pool.connection_kwargs)
     except AttributeError:

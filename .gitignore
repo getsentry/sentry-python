@@ -21,6 +21,8 @@ sentry-python-serverless*.zip
 .eggs
 venv
 .venv
+tox.venv
+toxgen.venv
 .vscode/tags
 .pytest_cache
 .hypothesis
@@ -29,6 +31,7 @@ pip-wheel-metadata
 .mypy_cache
 .vscode/
 .claude/
+.serena
 .tool-versions
 
 # for running AWS Lambda tests using AWS SAM

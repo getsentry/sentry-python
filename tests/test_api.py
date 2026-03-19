@@ -22,6 +22,7 @@ from sentry_sdk import (
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
+from tests.conftest import TestTransportWithOptions
 
 
 def test_get_current_span():
@@ -91,6 +92,21 @@ def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_transaction() as transaction:
         expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=1\.0\.0,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
+            transaction.trace_id, "true" if transaction.sampled else "false"
+        )
+        assert re.match(expected_baggage_re, get_baggage())
+
+
+def test_baggage_with_dsn(sentry_init):
+    sentry_init(
+        dsn="http://97333d956c9e40989a0139756c121c34@sentry-x.sentry-y.s.c.local/976543210",
+        traces_sample_rate=1.0,
+        release="2.0.0",
+        environment="dev",
+        transport=TestTransportWithOptions,
+    )
+    with start_transaction() as transaction:
+        expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=2\.0\.0,sentry-public_key=97333d956c9e40989a0139756c121c34,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
             transaction.trace_id, "true" if transaction.sampled else "false"
         )
         assert re.match(expected_baggage_re, get_baggage())

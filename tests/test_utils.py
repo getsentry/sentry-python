@@ -35,6 +35,7 @@ from sentry_sdk.utils import (
     exc_info_from_error,
     get_lines_from_file,
     package_version,
+    safe_serialize,
 )
 
 
@@ -53,8 +54,7 @@ except ImportError:
     gevent = None
 
 
-def _normalize_distribution_name(name):
-    # type: (str) -> str
+def _normalize_distribution_name(name: str) -> str:
     """Normalize distribution name according to PEP-0503.
 
     See:
@@ -722,6 +722,36 @@ def test_get_default_release_other_release_env(monkeypatch):
     assert release == "other-env-release"
 
 
+def test_get_default_release_heroku_build_commit(monkeypatch):
+    monkeypatch.setenv("HEROKU_BUILD_COMMIT", "heroku-build-commit-sha")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "heroku-build-commit-sha"
+
+
+def test_get_default_release_heroku_slug_commit_fallback(monkeypatch):
+    # Although deprecated by Heroku, HEROKU_SLUG_COMMIT should still be used if HEROKU_BUILD_COMMIT is not set
+    monkeypatch.setenv("HEROKU_SLUG_COMMIT", "heroku-slug-commit-sha")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "heroku-slug-commit-sha"
+
+
+def test_get_default_release_heroku_build_commit_takes_priority(monkeypatch):
+    # HEROKU_BUILD_COMMIT should take priority over HEROKU_SLUG_COMMIT since it's the non-deprecated variable
+    monkeypatch.setenv("HEROKU_BUILD_COMMIT", "heroku-build-commit-sha")
+    monkeypatch.setenv("HEROKU_SLUG_COMMIT", "heroku-slug-commit-sha")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "heroku-build-commit-sha"
+
+
 def test_ensure_integration_enabled_integration_enabled(sentry_init):
     def original_function():
         return "original"
@@ -1031,6 +1061,37 @@ def test_get_lines_from_file_handle_linecache_errors():
     with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
         result = get_lines_from_file("filename", 10)
         assert result == expected_result
+
+
+def test_safe_serialize_plain_string():
+    assert safe_serialize("already a string") == "already a string"
+
+
+def test_safe_serialize_json_string():
+    assert safe_serialize('{"key": "value"}') == '{"key": "value"}'
+
+
+def test_safe_serialize_dict():
+    assert safe_serialize({"key": "value"}) == '{"key": "value"}'
+
+
+def test_safe_serialize_callable():
+    def my_func():
+        pass
+
+    result = safe_serialize(my_func)
+    assert result.startswith("<function")
+    assert '"' not in result[:1]  # no wrapping quotes from json.dumps
+
+
+def test_safe_serialize_object():
+    class MyClass:
+        def __init__(self):
+            self.x = 1
+
+    result = safe_serialize(MyClass())
+    assert result.startswith("<MyClass")
+    assert '"' not in result[:1]  # no wrapping quotes from json.dumps
 
 
 def test_package_version_is_none():

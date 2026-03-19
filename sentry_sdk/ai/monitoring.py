@@ -1,11 +1,12 @@
 import inspect
+import sys
 from functools import wraps
 
 from sentry_sdk.consts import SPANDATA
 import sentry_sdk.utils
 from sentry_sdk import start_span
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import ContextVar
+from sentry_sdk.utils import ContextVar, reraise, capture_internal_exceptions
 
 from typing import TYPE_CHECKING
 
@@ -17,22 +18,17 @@ if TYPE_CHECKING:
 _ai_pipeline_name = ContextVar("ai_pipeline_name", default=None)
 
 
-def set_ai_pipeline_name(name):
-    # type: (Optional[str]) -> None
+def set_ai_pipeline_name(name: "Optional[str]") -> None:
     _ai_pipeline_name.set(name)
 
 
-def get_ai_pipeline_name():
-    # type: () -> Optional[str]
+def get_ai_pipeline_name() -> "Optional[str]":
     return _ai_pipeline_name.get()
 
 
-def ai_track(description, **span_kwargs):
-    # type: (str, Any) -> Callable[[F], F]
-    def decorator(f):
-        # type: (F) -> F
-        def sync_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
+    def decorator(f: "F") -> "F":
+        def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
@@ -49,19 +45,20 @@ def ai_track(description, **span_kwargs):
                     try:
                         res = f(*args, **kwargs)
                     except Exception as e:
-                        event, hint = sentry_sdk.utils.event_from_exception(
-                            e,
-                            client_options=sentry_sdk.get_client().options,
-                            mechanism={"type": "ai_monitoring", "handled": False},
-                        )
-                        sentry_sdk.capture_event(event, hint=hint)
-                        raise e from None
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            event, hint = sentry_sdk.utils.event_from_exception(
+                                e,
+                                client_options=sentry_sdk.get_client().options,
+                                mechanism={"type": "ai_monitoring", "handled": False},
+                            )
+                            sentry_sdk.capture_event(event, hint=hint)
+                        reraise(*exc_info)
                     finally:
                         _ai_pipeline_name.set(None)
                     return res
 
-        async def async_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+        async def async_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
@@ -78,13 +75,15 @@ def ai_track(description, **span_kwargs):
                     try:
                         res = await f(*args, **kwargs)
                     except Exception as e:
-                        event, hint = sentry_sdk.utils.event_from_exception(
-                            e,
-                            client_options=sentry_sdk.get_client().options,
-                            mechanism={"type": "ai_monitoring", "handled": False},
-                        )
-                        sentry_sdk.capture_event(event, hint=hint)
-                        raise e from None
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            event, hint = sentry_sdk.utils.event_from_exception(
+                                e,
+                                client_options=sentry_sdk.get_client().options,
+                                mechanism={"type": "ai_monitoring", "handled": False},
+                            )
+                            sentry_sdk.capture_event(event, hint=hint)
+                        reraise(*exc_info)
                     finally:
                         _ai_pipeline_name.set(None)
                     return res
@@ -98,15 +97,14 @@ def ai_track(description, **span_kwargs):
 
 
 def record_token_usage(
-    span,
-    input_tokens=None,
-    input_tokens_cached=None,
-    output_tokens=None,
-    output_tokens_reasoning=None,
-    total_tokens=None,
-):
-    # type: (Span, Optional[int], Optional[int], Optional[int], Optional[int], Optional[int]) -> None
-
+    span: "Span",
+    input_tokens: "Optional[int]" = None,
+    input_tokens_cached: "Optional[int]" = None,
+    input_tokens_cache_write: "Optional[int]" = None,
+    output_tokens: "Optional[int]" = None,
+    output_tokens_reasoning: "Optional[int]" = None,
+    total_tokens: "Optional[int]" = None,
+) -> None:
     # TODO: move pipeline name elsewhere
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
@@ -119,6 +117,12 @@ def record_token_usage(
         span.set_data(
             SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
             input_tokens_cached,
+        )
+
+    if input_tokens_cache_write is not None:
+        span.set_data(
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+            input_tokens_cache_write,
         )
 
     if output_tokens is not None:

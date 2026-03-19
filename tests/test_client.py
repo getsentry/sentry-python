@@ -1169,7 +1169,8 @@ def test_debug_option(
         (None, "t", DEFAULT_SPOTLIGHT_URL),
         (None, "1", DEFAULT_SPOTLIGHT_URL),
         (True, None, DEFAULT_SPOTLIGHT_URL),
-        (True, "http://localhost:8080/slurp", DEFAULT_SPOTLIGHT_URL),
+        # Per spec: spotlight=True + env URL -> use env URL
+        (True, "http://localhost:8080/slurp", "http://localhost:8080/slurp"),
         ("http://localhost:8080/slurp", "f", "http://localhost:8080/slurp"),
         (None, "http://localhost:8080/slurp", "http://localhost:8080/slurp"),
     ],
@@ -1201,12 +1202,11 @@ def test_spotlight_option(
 class IssuesSamplerTestConfig:
     def __init__(
         self,
-        expected_events,
-        sampler_function=None,
-        sample_rate=None,
-        exception_to_raise=Exception,
-    ):
-        # type: (int, Optional[Callable[[Event], Union[float, bool]]], Optional[float], type[Exception]) -> None
+        expected_events: int,
+        sampler_function: "Optional[Callable[[Event], Union[float, bool]]]" = None,
+        sample_rate: "Optional[float]" = None,
+        exception_to_raise: "type[Exception]" = Exception,
+    ) -> None:
         self.sampler_function_mock = (
             None
             if sampler_function is None
@@ -1216,14 +1216,12 @@ class IssuesSamplerTestConfig:
         self.sample_rate = sample_rate
         self.exception_to_raise = exception_to_raise
 
-    def init_sdk(self, sentry_init):
-        # type: (Callable[[*Any], None]) -> None
+    def init_sdk(self, sentry_init: "Callable[[*Any], None]") -> None:
         sentry_init(
             error_sampler=self.sampler_function_mock, sample_rate=self.sample_rate
         )
 
-    def raise_exception(self):
-        # type: () -> None
+    def raise_exception(self) -> None:
         raise self.exception_to_raise()
 
 
@@ -1285,7 +1283,9 @@ class IssuesSamplerTestConfig:
         ),
         # If sampler returns invalid value, we should still send the event
         IssuesSamplerTestConfig(
-            sampler_function=lambda *_: "This is an invalid return value for the sampler",
+            sampler_function=lambda *_: (
+                "This is an invalid return value for the sampler"
+            ),
             expected_events=1,
         ),
     ),

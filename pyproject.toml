@@ -202,6 +202,7 @@ extend-exclude = [
     "*_pb2_grpc.py", # Protocol Buffer files (covers all pb2_grpc files including grpc_test_service_pb2_grpc.py)
     "checkouts",    # From flake8
     "lol*",         # From flake8
+    ".agents", # Developer tooling that will not be included in user applications where python 3.7 needs to be supported
 ]
 
 [tool.ruff.lint]
@@ -226,7 +227,6 @@ ignore = [
     "N804", # First argument of classmethod should be named cls
 
     # Additional ignores for codebase compatibility
-    "F401", # Unused imports - many in TYPE_CHECKING blocks used for type comments
     "E721", # Use isinstance instead of type() == - existing pattern in this codebase
 ]
 

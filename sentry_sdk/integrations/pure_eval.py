@@ -15,12 +15,12 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint
 
 try:
-    import executing
+    from executing import Source
 except ImportError:
     raise DidNotEnable("executing is not installed")
 
 try:
-    import pure_eval
+    from pure_eval import Evaluator
 except ImportError:
     raise DidNotEnable("pure_eval is not installed")
 
@@ -35,12 +35,11 @@ class PureEvalIntegration(Integration):
     identifier = "pure_eval"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         @add_global_event_processor
-        def add_executing_info(event, hint):
-            # type: (Event, Optional[Hint]) -> Optional[Event]
+        def add_executing_info(
+            event: "Event", hint: "Optional[Hint]"
+        ) -> "Optional[Event]":
             if sentry_sdk.get_client().get_integration(PureEvalIntegration) is None:
                 return event
 
@@ -81,9 +80,8 @@ class PureEvalIntegration(Integration):
             return event
 
 
-def pure_eval_frame(frame):
-    # type: (FrameType) -> Dict[str, Any]
-    source = executing.Source.for_frame(frame)
+def pure_eval_frame(frame: "FrameType") -> "Dict[str, Any]":
+    source = Source.for_frame(frame)
     if not source.tree:
         return {}
 
@@ -100,19 +98,17 @@ def pure_eval_frame(frame):
         if isinstance(scope, (ast.FunctionDef, ast.ClassDef, ast.Module)):
             break
 
-    evaluator = pure_eval.Evaluator.from_frame(frame)
+    evaluator = Evaluator.from_frame(frame)
     expressions = evaluator.interesting_expressions_grouped(scope)
 
-    def closeness(expression):
-        # type: (Tuple[List[Any], Any]) -> Tuple[int, int]
+    def closeness(expression: "Tuple[List[Any], Any]") -> "Tuple[int, int]":
         # Prioritise expressions with a node closer to the statement executed
         # without being after that statement
         # A higher return value is better - the expression will appear
         # earlier in the list of values and is less likely to be trimmed
         nodes, _value = expression
 
-        def start(n):
-            # type: (ast.expr) -> Tuple[int, int]
+        def start(n: "ast.expr") -> "Tuple[int, int]":
             return (n.lineno, n.col_offset)
 
         nodes_before_stmt = [

@@ -1,13 +1,17 @@
 from contextlib import asynccontextmanager
 from functools import wraps
 
-import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import (
     ai_client_span,
     update_ai_client_span,
 )
-from pydantic_ai._agent_graph import ModelRequestNode  # type: ignore
+
+try:
+    from pydantic_ai._agent_graph import ModelRequestNode  # type: ignore
+except ImportError:
+    raise DidNotEnable("pydantic-ai not installed")
 
 from typing import TYPE_CHECKING
 
@@ -15,8 +19,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable
 
 
-def _extract_span_data(node, ctx):
-    # type: (Any, Any) -> tuple[list[Any], Any, Any]
+def _extract_span_data(node: "Any", ctx: "Any") -> "tuple[list[Any], Any, Any]":
     """Extract common data needed for creating chat spans.
 
     Returns:
@@ -41,8 +44,7 @@ def _extract_span_data(node, ctx):
     return messages, model, model_settings
 
 
-def _patch_graph_nodes():
-    # type: () -> None
+def _patch_graph_nodes() -> None:
     """
     Patches the graph node execution to create appropriate spans.
 
@@ -54,8 +56,7 @@ def _patch_graph_nodes():
     original_model_request_run = ModelRequestNode.run
 
     @wraps(original_model_request_run)
-    async def wrapped_model_request_run(self, ctx):
-        # type: (Any, Any) -> Any
+    async def wrapped_model_request_run(self: "Any", ctx: "Any") -> "Any":
         messages, model, model_settings = _extract_span_data(self, ctx)
 
         with ai_client_span(messages, None, model, model_settings) as span:
@@ -74,14 +75,14 @@ def _patch_graph_nodes():
     # Patch ModelRequestNode.stream for streaming requests
     original_model_request_stream = ModelRequestNode.stream
 
-    def create_wrapped_stream(original_stream_method):
-        # type: (Callable[..., Any]) -> Callable[..., Any]
+    def create_wrapped_stream(
+        original_stream_method: "Callable[..., Any]",
+    ) -> "Callable[..., Any]":
         """Create a wrapper for ModelRequestNode.stream that creates chat spans."""
 
         @asynccontextmanager
         @wraps(original_stream_method)
-        async def wrapped_model_request_stream(self, ctx):
-            # type: (Any, Any) -> Any
+        async def wrapped_model_request_stream(self: "Any", ctx: "Any") -> "Any":
             messages, model, model_settings = _extract_span_data(self, ctx)
 
             # Create chat span for streaming request

@@ -1,3 +1,9 @@
+try:
+    from re import Pattern
+except ImportError:
+    # 3.6
+    from typing import Pattern
+
 from typing import TYPE_CHECKING, TypeVar, Union
 
 
@@ -6,6 +12,7 @@ MYPY = TYPE_CHECKING
 
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
+BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
 
 
 class AnnotatedValue:
@@ -18,32 +25,27 @@ class AnnotatedValue:
 
     __slots__ = ("value", "metadata")
 
-    def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
+    def __init__(self, value: "Optional[Any]", metadata: "Dict[str, Any]") -> None:
         self.value = value
         self.metadata = metadata
 
-    def __eq__(self, other):
-        # type: (Any) -> bool
+    def __eq__(self, other: "Any") -> bool:
         if not isinstance(other, AnnotatedValue):
             return False
 
         return self.value == other.value and self.metadata == other.metadata
 
-    def __str__(self):
-        # type: (AnnotatedValue) -> str
+    def __str__(self: "AnnotatedValue") -> str:
         return str({"value": str(self.value), "metadata": str(self.metadata)})
 
-    def __len__(self):
-        # type: (AnnotatedValue) -> int
+    def __len__(self: "AnnotatedValue") -> int:
         if self.value is not None:
             return len(self.value)
         else:
             return 0
 
     @classmethod
-    def removed_because_raw_data(cls):
-        # type: () -> AnnotatedValue
+    def removed_because_raw_data(cls) -> "AnnotatedValue":
         """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
         return AnnotatedValue(
             value="",
@@ -58,8 +60,7 @@ class AnnotatedValue:
         )
 
     @classmethod
-    def removed_because_over_size_limit(cls, value=""):
-        # type: (Any) -> AnnotatedValue
+    def removed_because_over_size_limit(cls, value: "Any" = "") -> "AnnotatedValue":
         """
         The actual value was removed because the size of the field exceeded the configured maximum size,
         for example specified with the max_request_body_size sdk option.
@@ -77,8 +78,7 @@ class AnnotatedValue:
         )
 
     @classmethod
-    def substituted_because_contains_sensitive_data(cls):
-        # type: () -> AnnotatedValue
+    def substituted_because_contains_sensitive_data(cls) -> "AnnotatedValue":
         """The actual value was removed because it contained sensitive information."""
         return AnnotatedValue(
             value=SENSITIVE_DATA_SUBSTITUTE,
@@ -109,14 +109,13 @@ if TYPE_CHECKING:
     from typing import Mapping
     from typing import NotRequired
     from typing import Optional
-    from typing import Tuple
     from typing import Type
     from typing_extensions import Literal, TypedDict
 
     class SDKInfo(TypedDict):
         name: str
         version: str
-        packages: Sequence[Mapping[str, str]]
+        packages: "Sequence[Mapping[str, str]]"
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
@@ -222,27 +221,52 @@ if TYPE_CHECKING:
     # TODO: Make a proper type definition for this (PRs welcome!)
     Hint = Dict[str, Any]
 
+    AttributeValue = (
+        str
+        | bool
+        | float
+        | int
+        | list[str]
+        | list[bool]
+        | list[float]
+        | list[int]
+        | tuple[str, ...]
+        | tuple[bool, ...]
+        | tuple[float, ...]
+        | tuple[int, ...]
+    )
+    Attributes = dict[str, AttributeValue]
+
+    SerializedAttributeValue = TypedDict(
+        # https://develop.sentry.dev/sdk/telemetry/attributes/#supported-types
+        "SerializedAttributeValue",
+        {
+            "type": Literal[
+                "string",
+                "boolean",
+                "double",
+                "integer",
+                "array",
+            ],
+            "value": AttributeValue,
+        },
+    )
+
     Log = TypedDict(
         "Log",
         {
             "severity_text": str,
             "severity_number": int,
             "body": str,
-            "attributes": dict[str, str | bool | float | int],
+            "attributes": Attributes,
             "time_unix_nano": int,
             "trace_id": Optional[str],
+            "span_id": Optional[str],
         },
     )
 
     MetricType = Literal["counter", "gauge", "distribution"]
-
-    MetricAttributeValue = TypedDict(
-        "MetricAttributeValue",
-        {
-            "value": Union[str, bool, float, int],
-            "type": Literal["string", "boolean", "double", "integer"],
-        },
-    )
+    MetricUnit = Union[DurationUnit, InformationUnit, str]
 
     Metric = TypedDict(
         "Metric",
@@ -253,8 +277,8 @@ if TYPE_CHECKING:
             "name": str,
             "type": MetricType,
             "value": float,
-            "unit": Optional[str],
-            "attributes": dict[str, str | bool | float | int],
+            "unit": Optional[MetricUnit],
+            "attributes": Attributes,
         },
     )
 
@@ -294,6 +318,7 @@ if TYPE_CHECKING:
         "monitor",
         "span",
         "log_item",
+        "log_byte",
         "trace_metric",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
@@ -331,8 +356,21 @@ if TYPE_CHECKING:
             "max_runtime": int,
             "failure_issue_threshold": int,
             "recovery_threshold": int,
+            "owner": str,
         },
         total=False,
     )
 
     HttpStatusCodeRange = Union[int, Container[int]]
+
+    class TextPart(TypedDict):
+        type: Literal["text"]
+        content: str
+
+    IgnoreSpansName = Union[str, Pattern[str]]
+    IgnoreSpansContext = TypedDict(
+        "IgnoreSpansContext",
+        {"name": IgnoreSpansName, "attributes": Attributes},
+        total=False,
+    )
+    IgnoreSpansConfig = list[Union[IgnoreSpansName, IgnoreSpansContext]]

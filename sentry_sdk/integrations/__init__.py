@@ -1,22 +1,13 @@
 from abc import ABC, abstractmethod
 from threading import Lock
 import sys
+from typing import TYPE_CHECKING
 
 from sentry_sdk.utils import logger
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import Callable
-    from typing import Dict
-    from typing import Iterator
-    from typing import List
-    from typing import Optional
-    from typing import Set
-    from typing import Type
-    from typing import Union
-    from typing import Any
+    from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Type, Union
 
 
 _DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
@@ -25,20 +16,19 @@ _DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
 _installer_lock = Lock()
 
 # Set of all integration identifiers we have attempted to install
-_processed_integrations = set()  # type: Set[str]
+_processed_integrations: "Set[str]" = set()
 
 # Set of all integration identifiers we have actually installed
-_installed_integrations = set()  # type: Set[str]
+_installed_integrations: "Set[str]" = set()
 
 
 def _generate_default_integrations_iterator(
-    integrations,  # type: List[str]
-    auto_enabling_integrations,  # type: List[str]
-):
-    # type: (...) -> Callable[[bool], Iterator[Type[Integration]]]
-
-    def iter_default_integrations(with_auto_enabling_integrations):
-        # type: (bool) -> Iterator[Type[Integration]]
+    integrations: "List[str]",
+    auto_enabling_integrations: "List[str]",
+) -> "Callable[[bool], Iterator[Type[Integration]]]":
+    def iter_default_integrations(
+        with_auto_enabling_integrations: bool,
+    ) -> "Iterator[Type[Integration]]":
         """Returns an iterator of the default integration classes:"""
         from importlib import import_module
 
@@ -97,6 +87,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.fastapi.FastApiIntegration",
     "sentry_sdk.integrations.flask.FlaskIntegration",
     "sentry_sdk.integrations.gql.GQLIntegration",
+    "sentry_sdk.integrations.google_genai.GoogleGenAIIntegration",
     "sentry_sdk.integrations.graphene.GrapheneIntegration",
     "sentry_sdk.integrations.httpx.HttpxIntegration",
     "sentry_sdk.integrations.huey.HueyIntegration",
@@ -164,6 +155,7 @@ _MIN_VERSIONS = {
     "openai_agents": (0, 0, 19),
     "openfeature": (0, 7, 1),
     "pydantic_ai": (1, 0, 0),
+    "pymongo": (3, 5, 0),
     "quart": (0, 16, 0),
     "ray": (2, 7, 0),
     "requests": (2, 0, 0),
@@ -181,18 +173,19 @@ _MIN_VERSIONS = {
 
 
 _INTEGRATION_DEACTIVATES = {
-    "langchain": {"openai", "anthropic"},
+    "langchain": {"openai", "anthropic", "google_genai"},
+    "openai_agents": {"openai"},
+    "pydantic_ai": {"openai", "anthropic"},
 }
 
 
 def setup_integrations(
-    integrations,  # type: Sequence[Integration]
-    with_defaults=True,  # type: bool
-    with_auto_enabling_integrations=False,  # type: bool
-    disabled_integrations=None,  #  type: Optional[Sequence[Union[type[Integration], Integration]]]
-    options=None,  # type: Optional[Dict[str, Any]]
-):
-    # type: (...) -> Dict[str, Integration]
+    integrations: "Sequence[Integration]",
+    with_defaults: bool = True,
+    with_auto_enabling_integrations: bool = False,
+    disabled_integrations: "Optional[Sequence[Union[type[Integration], Integration]]]" = None,
+    options: "Optional[Dict[str, Any]]" = None,
+) -> "Dict[str, Integration]":
     """
     Given a list of integration instances, this installs them all.
 
@@ -294,8 +287,11 @@ def setup_integrations(
     return integrations
 
 
-def _check_minimum_version(integration, version, package=None):
-    # type: (type[Integration], Optional[tuple[int, ...]], Optional[str]) -> None
+def _check_minimum_version(
+    integration: "type[Integration]",
+    version: "Optional[tuple[int, ...]]",
+    package: "Optional[str]" = None,
+) -> None:
     package = package or integration.identifier
 
     if version is None:
@@ -331,13 +327,12 @@ class Integration(ABC):
     install = None
     """Legacy method, do not implement."""
 
-    identifier = None  # type: str
+    identifier: "str" = None  # type: ignore[assignment]
     """String unique ID of integration type"""
 
     @staticmethod
     @abstractmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         Initialize the integration.
 
@@ -350,8 +345,9 @@ class Integration(ABC):
         """
         pass
 
-    def setup_once_with_options(self, options=None):
-        # type: (Optional[Dict[str, Any]]) -> None
+    def setup_once_with_options(
+        self, options: "Optional[Dict[str, Any]]" = None
+    ) -> None:
         """
         Called after setup_once in rare cases on the instance and with options since we don't have those available above.
         """

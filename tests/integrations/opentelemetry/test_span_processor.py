@@ -11,6 +11,7 @@ from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
 )
+from sentry_sdk.utils import Dsn
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
@@ -23,7 +24,7 @@ def test_is_sentry_span():
 
     client = MagicMock()
     client.options = {"instrumenter": "otel"}
-    client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
+    client.parsed_dsn = Dsn("https://1234567890abcdef@o123456.ingest.sentry.io/123456")
     sentry_sdk.get_global_scope().set_client(client)
 
     assert not span_processor._is_sentry_span(otel_span)

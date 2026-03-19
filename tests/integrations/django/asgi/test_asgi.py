@@ -118,19 +118,25 @@ async def test_async_views(sentry_init, capture_events, application):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+@pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.asyncio
 @pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_active_thread_id(
-    sentry_init, capture_envelopes, teardown_profiling, endpoint, application
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+    endpoint,
+    application,
+    middleware_spans,
 ):
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
     ):
         sentry_init(
-            integrations=[DjangoIntegration()],
+            integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
             traces_sample_rate=1.0,
             profiles_sample_rate=1.0,
         )

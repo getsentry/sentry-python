@@ -1,5 +1,10 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
+from sentry_sdk.ai.utils import (
+    get_start_span_function,
+    normalize_message_roles,
+    set_data_normalized,
+    truncate_and_annotate_messages,
+)
 from sentry_sdk.consts import OP, SPANDATA
 
 from ..consts import SPAN_ORIGIN
@@ -9,15 +14,31 @@ from ..utils import (
     _set_model_data,
     _should_send_prompts,
 )
+from .utils import (
+    _serialize_binary_content_item,
+    _serialize_image_url_item,
+    _set_usage_data,
+)
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
 
+try:
+    from pydantic_ai.messages import BinaryContent, ImageUrl  # type: ignore
+except ImportError:
+    BinaryContent = None
+    ImageUrl = None
 
-def invoke_agent_span(user_prompt, agent, model, model_settings, is_streaming=False):
-    # type: (Any, Any, Any, Any, bool) -> sentry_sdk.tracing.Span
+
+def invoke_agent_span(
+    user_prompt: "Any",
+    agent: "Any",
+    model: "Any",
+    model_settings: "Any",
+    is_streaming: bool = False,
+) -> "sentry_sdk.tracing.Span":
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
@@ -87,6 +108,10 @@ def invoke_agent_span(user_prompt, agent, model, model_settings, is_streaming=Fa
                 for item in user_prompt:
                     if isinstance(item, str):
                         content.append({"text": item, "type": "text"})
+                    elif ImageUrl and isinstance(item, ImageUrl):
+                        content.append(_serialize_image_url_item(item))
+                    elif BinaryContent and isinstance(item, BinaryContent):
+                        content.append(_serialize_binary_content_item(item))
                 if content:
                     messages.append(
                         {
@@ -96,17 +121,48 @@ def invoke_agent_span(user_prompt, agent, model, model_settings, is_streaming=Fa
                     )
 
         if messages:
+            normalized_messages = normalize_message_roles(messages)
+            scope = sentry_sdk.get_current_scope()
+            messages_data = truncate_and_annotate_messages(
+                normalized_messages, span, scope
+            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
 
     return span
 
 
-def update_invoke_agent_span(span, output):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> None:
     """Update and close the invoke agent span."""
-    if span and _should_send_prompts() and output:
+    if not span or not result:
+        return
+
+    # Extract output from result
+    output = getattr(result, "output", None)
+
+    # Set response text if prompts are enabled
+    if _should_send_prompts() and output:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
         )
+
+    # Set token usage data if available
+    if hasattr(result, "usage") and callable(result.usage):
+        try:
+            usage = result.usage()
+            if usage:
+                _set_usage_data(span, usage)
+        except Exception:
+            # If usage() call fails, continue without setting usage data
+            pass
+
+    # Set model name from response if available
+    if hasattr(result, "response"):
+        try:
+            response = result.response
+            if hasattr(response, "model_name") and response.model_name:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+        except Exception:
+            # If response access fails, continue without setting model name
+            pass

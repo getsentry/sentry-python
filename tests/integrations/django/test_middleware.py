@@ -5,8 +5,7 @@ import pytest
 from sentry_sdk.integrations.django.middleware import _wrap_middleware
 
 
-def _sync_capable_middleware_factory(sync_capable):
-    # type: (Optional[bool]) -> type
+def _sync_capable_middleware_factory(sync_capable: "Optional[bool]") -> type:
     """Create a middleware class with a sync_capable attribute set to the value passed to the factory.
     If the factory is called with None, the middleware class will not have a sync_capable attribute.
     """

@@ -1,5 +1,11 @@
+import json
+
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import (
+    normalize_message_roles,
+    set_data_normalized,
+    truncate_and_annotate_messages,
+)
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import safe_serialize
 
@@ -13,21 +19,29 @@ from ..utils import (
     get_current_agent,
     get_is_streaming,
 )
+from .utils import (
+    _serialize_binary_content_item,
+    _serialize_image_url_item,
+    _set_usage_data,
+)
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, List, Dict
-    from pydantic_ai.usage import RequestUsage  # type: ignore
+    from pydantic_ai.messages import ModelMessage, SystemPromptPart  # type: ignore
+    from sentry_sdk._types import TextPart as SentryTextPart
 
 try:
-    from pydantic_ai.messages import (  # type: ignore
+    from pydantic_ai.messages import (
         BaseToolCallPart,
         BaseToolReturnPart,
         SystemPromptPart,
         UserPromptPart,
         TextPart,
         ThinkingPart,
+        BinaryContent,
+        ImageUrl,
     )
 except ImportError:
     # Fallback if these classes are not available
@@ -37,26 +51,52 @@ except ImportError:
     UserPromptPart = None
     TextPart = None
     ThinkingPart = None
+    BinaryContent = None
+    ImageUrl = None
 
 
-def _set_usage_data(span, usage):
-    # type: (sentry_sdk.tracing.Span, RequestUsage) -> None
-    """Set token usage data on a span."""
-    if usage is None:
-        return
+def _transform_system_instructions(
+    permanent_instructions: "list[SystemPromptPart]",
+    current_instructions: "list[str]",
+) -> "list[SentryTextPart]":
+    text_parts: "list[SentryTextPart]" = [
+        {
+            "type": "text",
+            "content": instruction.content,
+        }
+        for instruction in permanent_instructions
+    ]
 
-    if hasattr(usage, "input_tokens") and usage.input_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
+    text_parts.extend(
+        {
+            "type": "text",
+            "content": instruction,
+        }
+        for instruction in current_instructions
+    )
 
-    if hasattr(usage, "output_tokens") and usage.output_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
-
-    if hasattr(usage, "total_tokens") and usage.total_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
+    return text_parts
 
 
-def _set_input_messages(span, messages):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _get_system_instructions(
+    messages: "list[ModelMessage]",
+) -> "tuple[list[SystemPromptPart], list[str]]":
+    permanent_instructions = []
+    current_instructions = []
+
+    for msg in messages:
+        if hasattr(msg, "parts"):
+            for part in msg.parts:
+                if SystemPromptPart and isinstance(part, SystemPromptPart):
+                    permanent_instructions.append(part)
+
+        if hasattr(msg, "instructions") and msg.instructions is not None:
+            current_instructions.append(msg.instructions)
+
+    return permanent_instructions, current_instructions
+
+
+def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     """Set input messages data on a span."""
     if not _should_send_prompts():
         return
@@ -64,21 +104,19 @@ def _set_input_messages(span, messages):
     if not messages:
         return
 
+    permanent_instructions, current_instructions = _get_system_instructions(messages)
+    if len(permanent_instructions) > 0 or len(current_instructions) > 0:
+        span.set_data(
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(
+                _transform_system_instructions(
+                    permanent_instructions, current_instructions
+                )
+            ),
+        )
+
     try:
         formatted_messages = []
-        system_prompt = None
-
-        # Extract system prompt from any ModelRequest with instructions
-        for msg in messages:
-            if hasattr(msg, "instructions") and msg.instructions:
-                system_prompt = msg.instructions
-                break
-
-        # Add system prompt as first message if present
-        if system_prompt:
-            formatted_messages.append(
-                {"role": "system", "content": [{"type": "text", "text": system_prompt}]}
-            )
 
         for msg in messages:
             if hasattr(msg, "parts"):
@@ -86,7 +124,7 @@ def _set_input_messages(span, messages):
                     role = "user"
                     # Use isinstance checks with proper base classes
                     if SystemPromptPart and isinstance(part, SystemPromptPart):
-                        role = "system"
+                        continue
                     elif (
                         (TextPart and isinstance(part, TextPart))
                         or (ThinkingPart and isinstance(part, ThinkingPart))
@@ -96,7 +134,7 @@ def _set_input_messages(span, messages):
                     elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
                         role = "tool"
 
-                    content = []  # type: List[Dict[str, Any] | str]
+                    content: "List[Dict[str, Any] | str]" = []
                     tool_calls = None
                     tool_call_id = None
 
@@ -123,14 +161,17 @@ def _set_input_messages(span, messages):
                             for item in part.content:
                                 if isinstance(item, str):
                                     content.append({"type": "text", "text": item})
+                                elif ImageUrl and isinstance(item, ImageUrl):
+                                    content.append(_serialize_image_url_item(item))
+                                elif BinaryContent and isinstance(item, BinaryContent):
+                                    content.append(_serialize_binary_content_item(item))
                                 else:
                                     content.append(safe_serialize(item))
                         else:
                             content.append({"type": "text", "text": str(part.content)})
-
                     # Add message if we have content or tool calls
                     if content or tool_calls:
-                        message = {"role": role}  # type: Dict[str, Any]
+                        message: "Dict[str, Any]" = {"role": role}
                         if content:
                             message["content"] = content
                         if tool_calls:
@@ -140,16 +181,20 @@ def _set_input_messages(span, messages):
                         formatted_messages.append(message)
 
         if formatted_messages:
+            normalized_messages = normalize_message_roles(formatted_messages)
+            scope = sentry_sdk.get_current_scope()
+            messages_data = truncate_and_annotate_messages(
+                normalized_messages, span, scope
+            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, formatted_messages, unpack=False
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
     except Exception:
         # If we fail to format messages, just skip it
         pass
 
 
-def _set_output_data(span, response):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def _set_output_data(span: "sentry_sdk.tracing.Span", response: "Any") -> None:
     """Set output data on a span."""
     if not _should_send_prompts():
         return
@@ -157,7 +202,7 @@ def _set_output_data(span, response):
     if not response:
         return
 
-    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
     try:
         # Extract text from ModelResponse
         if hasattr(response, "parts"):
@@ -190,8 +235,9 @@ def _set_output_data(span, response):
         pass
 
 
-def ai_client_span(messages, agent, model, model_settings):
-    # type: (Any, Any, Any, Any) -> sentry_sdk.tracing.Span
+def ai_client_span(
+    messages: "Any", agent: "Any", model: "Any", model_settings: "Any"
+) -> "sentry_sdk.tracing.Span":
     """Create a span for an AI client call (model request).
 
     Args:
@@ -232,8 +278,9 @@ def ai_client_span(messages, agent, model, model_settings):
     return span
 
 
-def update_ai_client_span(span, model_response):
-    # type: (sentry_sdk.tracing.Span, Any) -> None
+def update_ai_client_span(
+    span: "sentry_sdk.tracing.Span", model_response: "Any"
+) -> None:
     """Update the AI client span with response data."""
     if not span:
         return
