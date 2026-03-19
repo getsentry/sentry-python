@@ -192,6 +192,7 @@ def _wrap_connect_addr(
 
 def _set_db_data(span: "Span", conn: "Any") -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+    span.set_data("db.driver", "asyncpg")
 
     addr = conn._addr
     if addr:

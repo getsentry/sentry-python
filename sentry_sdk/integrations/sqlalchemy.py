@@ -137,6 +137,9 @@ def _set_db_data(span: "Span", conn: "Any") -> None:
     if db_system is not None:
         span.set_data(SPANDATA.DB_SYSTEM, db_system)
 
+    if hasattr(conn.engine, "dialect") and hasattr(conn.engine.dialect, "driver"):
+        span.set_data("db.driver", conn.engine.dialect.driver)
+
     if conn.engine.url is None:
         return
 
