@@ -351,7 +351,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         metadata: "Optional[Dict[str, Any]]" = None,
         **kwargs: "Any",
     ) -> "Any":
-        """Run when LLM starts running."""
         with capture_internal_exceptions():
             if not run_id:
                 return
