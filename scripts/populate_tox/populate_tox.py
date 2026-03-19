@@ -760,18 +760,30 @@ def write_tox_file(packages: dict) -> None:
     for group, integrations in packages.items():
         context["groups"][group] = []
         for integration in integrations:
+            # Find the highest stable (non-prerelease) release for the
+            # -latest alias.  Prereleases are always appended last by
+            # pick_releases_to_test, so we walk backwards.
+            latest_stable = None
+            for rel in reversed(integration["releases"]):
+                if not rel.is_prerelease:
+                    latest_stable = rel
+                    break
+
             context["groups"][group].append(
                 {
                     "name": integration["name"],
                     "package": integration["package"],
                     "extra": integration["extra"],
                     "releases": integration["releases"],
+                    "latest_stable": latest_stable,
                     "dependencies": _render_dependencies(
                         integration["name"], integration["releases"]
                     ),
                     "latest_dependencies": _render_latest_dependencies(
-                        integration["name"], integration["releases"][-1]
-                    ),
+                        integration["name"], latest_stable
+                    )
+                    if latest_stable
+                    else [],
                 }
             )
             context["testpaths"].append(
