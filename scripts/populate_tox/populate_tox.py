@@ -724,6 +724,31 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
     return rendered
 
 
+def _render_latest_dependencies(
+    integration: str, latest_release: Version
+) -> list[str]:
+    """Render version-specific dependencies for the 'latest' alias.
+
+    Dependencies with "*" or "py3.*" constraints already match the latest
+    env via tox factor matching, so only version-specific constraints need
+    to be duplicated here.
+    """
+    rendered = []
+
+    if TEST_SUITE_CONFIG[integration].get("deps") is None:
+        return rendered
+
+    for constraint, deps in TEST_SUITE_CONFIG[integration]["deps"].items():
+        if constraint == "*" or constraint.startswith("py3"):
+            continue
+        restriction = SpecifierSet(constraint, prereleases=True)
+        if latest_release in restriction:
+            for dep in deps:
+                rendered.append(f"{integration}-latest: {dep}")
+
+    return rendered
+
+
 def write_tox_file(packages: dict) -> None:
     template = ENV.get_template("tox.jinja")
 
@@ -735,15 +760,30 @@ def write_tox_file(packages: dict) -> None:
     for group, integrations in packages.items():
         context["groups"][group] = []
         for integration in integrations:
+            # Find the highest stable (non-prerelease) release for the
+            # -latest alias.  Prereleases are always appended last by
+            # pick_releases_to_test, so we walk backwards.
+            latest_stable = None
+            for rel in reversed(integration["releases"]):
+                if not rel.is_prerelease:
+                    latest_stable = rel
+                    break
+
             context["groups"][group].append(
                 {
                     "name": integration["name"],
                     "package": integration["package"],
                     "extra": integration["extra"],
                     "releases": integration["releases"],
+                    "latest_stable": latest_stable,
                     "dependencies": _render_dependencies(
                         integration["name"], integration["releases"]
                     ),
+                    "latest_dependencies": _render_latest_dependencies(
+                        integration["name"], latest_stable
+                    )
+                    if latest_stable
+                    else [],
                 }
             )
             context["testpaths"].append(
