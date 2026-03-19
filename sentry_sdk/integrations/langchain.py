@@ -366,14 +366,24 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 or ""
             )
 
+            pipeline_name = kwargs.get("name")
             watched_span = self._create_span(
                 run_id,
                 parent_run_id,
-                op=OP.GEN_AI_PIPELINE,
-                name=kwargs.get("name") or "Langchain LLM call",
+                op=OP.GEN_AI_GENERATE_TEXT,
+                name=f"generate_text {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
+
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "generate_text")
+
+            agent_name = _get_current_agent()
+            if agent_name:
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+
+            if pipeline_name:
+                span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, pipeline_name)
 
             if model:
                 span.set_data(
