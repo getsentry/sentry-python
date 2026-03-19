@@ -8,5 +8,6 @@ visit the `GitHub repository <https://github.com/getsentry/sentry-python>`_.
 
 .. toctree::
     api
+    tracing
     integrations
     apidocs

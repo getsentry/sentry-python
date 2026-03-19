@@ -66,3 +66,7 @@ Managing Scope (advanced)
 .. autofunction:: sentry_sdk.api.push_scope
 
 .. autofunction:: sentry_sdk.api.new_scope
+.. autofunction:: sentry_sdk.api.isolation_scope
+
+.. autofunction:: sentry_sdk.api.get_current_scope
+.. autofunction:: sentry_sdk.api.get_isolation_scope
