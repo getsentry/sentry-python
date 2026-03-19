@@ -15,7 +15,12 @@ fi
 
 searchstring="$1"
 
-ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
+# Filter out -latest environments unless explicitly requested
+if [[ "$searchstring" == *-latest* ]]; then
+    ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
+else
+    ENV="$($TOXPATH -l | grep -- "$searchstring" | grep -v -- '-latest$' | tr $'\n' ',')"
+fi
 
 if [ -z "${ENV}" ]; then
     echo "No targets found. Skipping."
