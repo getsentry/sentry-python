@@ -31,7 +31,7 @@ Spans represent individual units of work within a transaction, such as a databas
     import sentry_sdk
 
     # Start a child span under the current transaction
-    with sentry_sdk.start_child_span(op="db.query", name="SELECT * FROM users"):
+    with sentry_sdk.start_span(op="db.query", name="SELECT * FROM users"):
         # Your operation here
         pass
 
