@@ -78,7 +78,7 @@ def patch_asyncio() -> None:
                     ):
                         try:
                             result = await coro
-                        except StopAsyncIteration as e:
+                        except StopAsyncIteration:
                             raise
                         except Exception:
                             reraise(*_capture_exception())
