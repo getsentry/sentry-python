@@ -173,8 +173,8 @@ def patch_asyncio() -> None:
                     with span_ctx if span_ctx else nullcontext():
                         try:
                             result = await coro
-                        except StopAsyncIteration as e:
-                            raise e from None
+                        except StopAsyncIteration:
+                            raise
                         except Exception:
                             reraise(*_capture_exception())
 
