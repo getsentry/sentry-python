@@ -223,7 +223,6 @@ class SentryAsgiMiddleware:
                             "sentry.origin": self.span_origin,
                             "asgi.type": ty,
                         }
-                        sentry_scope.set_custom_sampling_context({"asgi_scope": scope})
 
                         if ty in ("http", "websocket"):
                             if (
@@ -231,12 +230,22 @@ class SentryAsgiMiddleware:
                                 or method in self.http_methods_to_capture
                             ):
                                 sentry_sdk.traces.continue_trace(_get_headers(scope))
+
+                                sentry_scope.set_custom_sampling_context(
+                                    {"asgi_scope": scope}
+                                )
+
                                 attributes["sentry.op"] = f"{ty}.server"
                                 segment = sentry_sdk.traces.start_span(
                                     name=transaction_name, attributes=attributes
                                 )
                         else:
                             sentry_sdk.traces.new_trace()
+
+                            sentry_scope.set_custom_sampling_context(
+                                {"asgi_scope": scope}
+                            )
+
                             attributes["sentry.op"] = OP.HTTP_SERVER
                             segment = sentry_sdk.traces.start_span(
                                 name=transaction_name, attributes=attributes
