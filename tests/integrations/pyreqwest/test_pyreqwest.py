@@ -2,13 +2,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 import pytest
 
-try:
-    import pyreqwest
-    from pyreqwest.client import ClientBuilder, SyncClientBuilder
-    from pyreqwest.simple.request import pyreqwest_get as async_pyreqwest_get
-    from pyreqwest.simple.sync_request import pyreqwest_get as sync_pyreqwest_get
-except ImportError:
-    pyreqwest = None
+import pyreqwest
+from pyreqwest.client import ClientBuilder, SyncClientBuilder
+from pyreqwest.simple.request import pyreqwest_get as async_pyreqwest_get
+from pyreqwest.simple.sync_request import pyreqwest_get as sync_pyreqwest_get
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA

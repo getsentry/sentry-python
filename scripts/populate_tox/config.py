@@ -292,13 +292,6 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.10",
     },
-    "pydantic_ai": {
-        "package": "pydantic-ai",
-        "deps": {
-            "*": ["pytest-asyncio"],
-        },
-        "python": ">=3.10",
-    },
     "openfeature": {
         "package": "openfeature-sdk",
         "num_versions": 2,
@@ -306,6 +299,13 @@ TEST_SUITE_CONFIG = {
     "pure_eval": {
         "package": "pure_eval",
         "num_versions": 2,
+    },
+    "pydantic_ai": {
+        "package": "pydantic-ai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.10",
     },
     "pyreqwest": {
         "package": "pyreqwest",
