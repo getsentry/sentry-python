@@ -61,6 +61,7 @@ envlist =
     {% for release in integration.releases %}
     {{ release.rendered_python_versions }}-{{ integration.name }}-v{{ release }}
     {% endfor %}
+    {{ integration.releases[-1].rendered_python_versions }}-{{ integration.name }}-latest
 
     {% endfor %}
 
@@ -143,7 +144,15 @@ deps =
     {{ integration.name }}-v{{ release }}: {{ integration.package }}=={{ release }}
     {% endif %}
     {% endfor %}
+    {% if integration.extra %}
+    {{ integration.name }}-latest: {{ integration.package }}[{{ integration.extra }}]=={{ integration.releases[-1] }}
+    {% else %}
+    {{ integration.name }}-latest: {{ integration.package }}=={{ integration.releases[-1] }}
+    {% endif %}
     {% for dep in integration.dependencies %}
+    {{ dep }}
+    {% endfor %}
+    {% for dep in integration.latest_dependencies %}
     {{ dep }}
     {% endfor %}
 
