@@ -53,9 +53,9 @@ def _record_exception_on_span(
     set_span_errored(span)
 
     if isinstance(span, Span):
-        set_on_span = span.set_attribute
-    else:
         set_on_span = span.set_data
+    else:
+        set_on_span = span.set_attribute
 
     set_on_span("span.status", "error")
 
