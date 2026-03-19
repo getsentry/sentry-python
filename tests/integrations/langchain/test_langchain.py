@@ -2000,6 +2000,94 @@ class TestTransformLangchainContentBlock:
         }
 
 
+@pytest.mark.parametrize(
+    "ai_type,expected_system",
+    [
+        # Real LangChain _type values (from _llm_type properties)
+        # OpenAI
+        ("openai-chat", "openai"),
+        ("openai", "openai"),
+        # Azure OpenAI
+        ("azure-openai-chat", "openai"),
+        ("azure", "azure"),
+        # Anthropic
+        ("anthropic-chat", "anthropic"),
+        # Google
+        ("vertexai", "vertexai"),
+        ("chat-google-generative-ai", "google"),
+        ("google_gemini", "google_gemini"),
+        # AWS Bedrock (underscore-separated, no split)
+        ("amazon_bedrock_chat", "amazon_bedrock_chat"),
+        ("amazon_bedrock", "amazon_bedrock"),
+        # Cohere
+        ("cohere-chat", "cohere"),
+        # Ollama
+        ("chat-ollama", "ollama"),
+        ("ollama-llm", "ollama"),
+        # Mistral
+        ("mistralai-chat", "mistralai"),
+        # Fireworks
+        ("fireworks-chat", "fireworks"),
+        ("fireworks", "fireworks"),
+        # HuggingFace
+        ("huggingface-chat-wrapper", "huggingface"),
+        # Groq
+        ("groq-chat", "groq"),
+        # NVIDIA
+        ("chat-nvidia-ai-playground", "nvidia"),
+        # xAI
+        ("xai-chat", "xai"),
+        # DeepSeek
+        ("chat-deepseek", "deepseek"),
+        # Edge cases
+        ("", None),
+        (None, None),
+    ],
+)
+def test_langchain_ai_system_detection(
+    sentry_init, capture_events, ai_type, expected_system
+):
+    sentry_init(
+        integrations=[LangchainIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "test-ai-system-uuid"
+    serialized = {"_type": ai_type} if ai_type is not None else {}
+    prompts = ["Test prompt"]
+
+    with start_transaction():
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            invocation_params={"_type": ai_type, "model": "test-model"},
+        )
+
+        generation = Mock(text="Test response", message=None)
+        response = Mock(generations=[[generation]])
+        callback.on_llm_end(response=response, run_id=run_id)
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+
+    if expected_system is not None:
+        assert llm_span["data"][SPANDATA.GEN_AI_SYSTEM] == expected_system
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM not in llm_span.get("data", {})
+
+
 class TestTransformLangchainMessageContent:
     """Tests for _transform_langchain_message_content function."""
 

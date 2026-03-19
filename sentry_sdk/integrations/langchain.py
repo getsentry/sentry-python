@@ -108,6 +108,31 @@ except ImportError:
     OllamaEmbeddings = None
 
 
+_NON_PROVIDER_PARTS = frozenset({"azure", "aws", "gcp", "vertex", "chat", "llm"})
+
+
+def _get_ai_system(all_params: "Dict[str, Any]") -> "Optional[str]":
+    """Extract the AI provider from the ``_type`` field in LangChain params.
+
+    Splits on ``-`` and skips generic segments (cloud prefixes and model-type
+    descriptors like ``chat`` / ``llm``) to return the actual provider name.
+    """
+    ai_type = all_params.get("_type")
+
+    if not ai_type or not isinstance(ai_type, str):
+        return None
+
+    parts = [p.strip().lower() for p in ai_type.split("-") if p.strip()]
+    if not parts:
+        return None
+
+    for part in parts:
+        if part not in _NON_PROVIDER_PARTS:
+            return part
+
+    return parts[0]
+
+
 DATA_FIELDS = {
     "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
     "function_call": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -381,11 +406,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     model,
                 )
 
-            ai_type = all_params.get("_type", "")
-            if "anthropic" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
-            elif "openai" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+            ai_system = _get_ai_system(all_params)
+            if ai_system:
+                span.set_data(SPANDATA.GEN_AI_SYSTEM, ai_system)
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
@@ -449,11 +472,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if model:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            ai_type = all_params.get("_type", "")
-            if "anthropic" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
-            elif "openai" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+            ai_system = _get_ai_system(all_params)
+            if ai_system:
+                span.set_data(SPANDATA.GEN_AI_SYSTEM, ai_system)
 
             agent_name = _get_current_agent()
             if agent_name:
