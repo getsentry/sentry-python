@@ -1017,33 +1017,37 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         )
         span.__enter__()
 
+        try:
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+            _set_tools_on_span(span, tools)
 
-        _set_tools_on_span(span, tools)
-
-        input = args[0].get("input") if len(args) >= 1 else None
-        if (
-            input is not None
-            and should_send_default_pii()
-            and integration.include_prompts
-        ):
-            normalized_messages = normalize_message_roles([input])
-            scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
-            )
-            if messages_data is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages_data,
-                    unpack=False,
+            input = args[0].get("input") if len(args) >= 1 else None
+            if (
+                input is not None
+                and should_send_default_pii()
+                and integration.include_prompts
+            ):
+                normalized_messages = normalize_message_roles([input])
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    normalized_messages, span, scope
                 )
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
 
-        # Run the agent
-        result = f(self, *args, **kwargs)
+            # Run the agent
+            result = f(self, *args, **kwargs)
+        except Exception:
+            span.__exit__(None, None, None)
+            CURRENT_LANGCHAIN_AGENT_NAME.reset(token)
+            raise
 
         old_iterator = result
 
