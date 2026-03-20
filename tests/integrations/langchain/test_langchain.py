@@ -20,7 +20,6 @@ from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
 from langchain_core.language_models.chat_models import BaseChatModel
 
-
 import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.langchain import (
