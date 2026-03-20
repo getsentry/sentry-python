@@ -313,6 +313,46 @@ def test_langchain_agent(
             )
 
 
+def test_langchain_agent_name_propagation(sentry_init, capture_events, monkeypatch):
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are very powerful assistant, but don't know current events",
+            ),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    llm = MockOpenAI(model_name="gpt-3.5-turbo", temperature=0, openai_api_key="badkey")
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    # Mock _get_request_data to return a test agent name
+    def mock_get_request_data(self, args, kwargs):
+        return "test_agent_name", [get_word_length]
+
+    monkeypatch.setattr(
+        "sentry_sdk.integrations.langchain._get_request_data", mock_get_request_data
+    )
+
+    with start_transaction():
+        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    for span in tx["spans"]:
+        assert span["data"].get(SPANDATA.GEN_AI_AGENT_NAME) == "test_agent_name"
+
+
 def test_langchain_error(sentry_init, capture_events):
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],

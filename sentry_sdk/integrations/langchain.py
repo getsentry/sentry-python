@@ -23,6 +23,13 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import _get_value, set_span_errored
 from sentry_sdk.utils import capture_internal_exceptions, logger
 
+CURRENT_LANGCHAIN_AGENT_NAME = contextvars.ContextVar("CURRENT_LANGCHAIN_AGENT_NAME", default=None)
+
+
+def _get_current_langchain_agent_name() -> "Optional[str]":
+    return CURRENT_LANGCHAIN_AGENT_NAME.get(None)
+
+
 if TYPE_CHECKING:
     from typing import (
         Any,
@@ -290,6 +297,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
 
         watched_span.span.__enter__()
+
+        agent_name = _get_current_langchain_agent_name()
+        if agent_name:
+            watched_span.span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+
         self.span_map[run_id] = watched_span
         self.gc_span_map()
         return watched_span
@@ -933,9 +945,10 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             return f(self, *args, **kwargs)
 
         agent_name, tools = _get_request_data(self, args, kwargs)
+        token = CURRENT_LANGCHAIN_AGENT_NAME.set(agent_name)
         start_span_function = get_start_span_function()
 
-        with start_span_function(
+        try:
             op=OP.GEN_AI_INVOKE_AGENT,
             name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
@@ -980,6 +993,8 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 return result
             finally:
                 # Ensure agent is popped even if an exception occurs
+        finally:
+            CURRENT_LANGCHAIN_AGENT_NAME.reset(token)
 
     return new_invoke
 
@@ -992,6 +1007,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             return f(self, *args, **kwargs)
 
         agent_name, tools = _get_request_data(self, args, kwargs)
+        token = CURRENT_LANGCHAIN_AGENT_NAME.set(agent_name)
         start_span_function = get_start_span_function()
 
         span = start_span_function(
@@ -1055,6 +1071,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
                 span.__exit__(*exc_info)
+                CURRENT_LANGCHAIN_AGENT_NAME.reset(token)
 
         async def new_iterator_async() -> "AsyncIterator[Any]":
             exc_info: "tuple[Any, Any, Any]" = (None, None, None)
@@ -1080,6 +1097,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
                 span.__exit__(*exc_info)
+                CURRENT_LANGCHAIN_AGENT_NAME.reset(token)
 
         if str(type(result)) == "<class 'async_generator'>":
             result = new_iterator_async()
