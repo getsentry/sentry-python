@@ -1028,24 +1028,27 @@ async def test_async_transport_background_thread_capture(
     client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
     assert isinstance(client.transport, AsyncHttpTransport)
     sentry_sdk.get_global_scope().set_client(client)
-    captured_from_thread = []
-    exception_from_thread = []
+    try:
+        captured_from_thread = []
+        exception_from_thread = []
 
-    def background_thread_work():
-        try:
-            # This should use run_coroutine_threadsafe path
-            capture_message("from background thread")
-            captured_from_thread.append(True)
-        except Exception as e:
-            exception_from_thread.append(e)
+        def background_thread_work():
+            try:
+                # This should use run_coroutine_threadsafe path
+                capture_message("from background thread")
+                captured_from_thread.append(True)
+            except Exception as e:
+                exception_from_thread.append(e)
 
-    thread = threading.Thread(target=background_thread_work)
-    thread.start()
-    thread.join()
-    assert not exception_from_thread
-    assert captured_from_thread
-    await client.close_async(timeout=2.0)
-    assert capturing_server.captured
+        thread = threading.Thread(target=background_thread_work)
+        thread.start()
+        thread.join()
+        assert not exception_from_thread
+        assert captured_from_thread
+        await client.close_async(timeout=2.0)
+        assert capturing_server.captured
+    finally:
+        sentry_sdk.get_global_scope().set_client(None)
 
 
 @skip_under_gevent
@@ -1276,18 +1279,20 @@ def test_async_worker_start_no_running_loop():
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
-async def test_async_worker_start_reuses_existing_queue():
-    """Test start() reuses existing queue if already created."""
+async def test_async_worker_start_creates_fresh_queue_after_kill():
+    """Test start() creates a fresh queue after kill() resets it."""
     from sentry_sdk.worker import AsyncWorker
 
     worker = AsyncWorker(queue_size=10)
     worker.start()
-    queue_ref = worker._queue
-    # Kill and restart — queue should be reused
+    assert worker._queue is not None
+    # Kill resets queue to None to avoid stale terminators
     worker.kill()
     await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
+    assert worker._queue is None
+    # Restart creates a fresh queue
     worker.start()
-    assert worker._queue is queue_ref
+    assert worker._queue is not None
     worker.kill()
     await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 

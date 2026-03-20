@@ -213,17 +213,14 @@ class AsyncWorker(Worker):
         if self._task:
             # Cancel the main consumer task to prevent duplicate consumers
             self._task.cancel()
-            if self._queue is not None:
-                try:
-                    self._queue.put_nowait(_TERMINATOR)
-                except asyncio.QueueFull:
-                    logger.debug("async worker queue full, kill failed")
             # Also cancel any active callback tasks
             # Avoid modifying the set while cancelling tasks
             tasks_to_cancel = set(self._active_tasks)
             for task in tasks_to_cancel:
                 task.cancel()
             self._active_tasks.clear()
+            # Reset queue to avoid stale terminators on restart
+            self._queue = None
             self._loop = None
             self._task = None
             self._task_for_pid = None

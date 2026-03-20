@@ -1045,6 +1045,7 @@ class _Client(BaseClient):
                     "Prefer close_async() for graceful async shutdown. "
                     "Performing synchronous best-effort cleanup."
                 )
+                self._flush_components()
             else:
                 self.flush(timeout=timeout, callback=callback)
             self._close_components()
