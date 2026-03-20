@@ -21,6 +21,14 @@ from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
 try:
+    from anthropic.types import ErrorResponse, OverloadedError
+    from anthropic import APIStatusError
+except ImportError:
+    ErrorResponse = None
+    OverloadedError = None
+    APIStatusError = None
+
+try:
     from anthropic.types import InputJSONDelta
 except ImportError:
     try:
@@ -434,6 +442,108 @@ def test_streaming_create_message_close(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
+def test_streaming_create_message_api_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ErrorResponse(
+                    type="error",
+                    error=OverloadedError(
+                        message="Overloaded", type="overloaded_error"
+                    ),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            for _ in message:
+                pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+    assert span["status"] == "internal_error"
+    assert span["tags"]["status"] == "internal_error"
+    assert event["contexts"]["trace"]["status"] == "internal_error"
+
+
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -655,6 +765,109 @@ def test_stream_messages_close(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
+def test_stream_messages_api_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ErrorResponse(
+                    type="error",
+                    error=OverloadedError(
+                        message="Overloaded", type="overloaded_error"
+                    ),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+    assert span["status"] == "internal_error"
+    assert span["tags"]["status"] == "internal_error"
+    assert event["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -883,6 +1096,112 @@ async def test_streaming_create_message_async_close(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
+@pytest.mark.asyncio
+async def test_streaming_create_message_async_api_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ErrorResponse(
+                        type="error",
+                        error=OverloadedError(
+                            message="Overloaded", type="overloaded_error"
+                        ),
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = await client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            async for _ in message:
+                pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+    assert span["status"] == "internal_error"
+    assert span["tags"]["status"] == "internal_error"
+    assert event["contexts"]["trace"]["status"] == "internal_error"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -1002,6 +1321,113 @@ async def test_stream_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
+@pytest.mark.asyncio
+async def test_stream_messages_async_api_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ErrorResponse(
+                        type="error",
+                        error=OverloadedError(
+                            message="Overloaded", type="overloaded_error"
+                        ),
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                async for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+    assert span["status"] == "internal_error"
+    assert span["tags"]["status"] == "internal_error"
+    assert event["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio

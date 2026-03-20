@@ -89,6 +89,55 @@ class _RecordedUsage:
     cache_read_input_tokens: "Optional[int]" = 0
 
 
+class _StreamSpanContext:
+    """
+    Sets accumulated data on the stream's span and finishes the span on exit.
+    Is a no-op if the stream has no span set, i.e., when the span has already been finished.
+    """
+
+    def __init__(
+        self,
+        stream: "Union[Stream, MessageStream, AsyncStream, AsyncMessageStream]",
+        # Flag to avoid unreachable branches when the stream state is known to be initialized (stream._model, etc. are set).
+        guaranteed_streaming_state: bool = False,
+    ) -> None:
+        self._stream = stream
+        self._guaranteed_streaming_state = guaranteed_streaming_state
+
+    def __enter__(self) -> "_StreamSpanContext":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: "Optional[type[BaseException]]",
+        exc_val: "Optional[BaseException]",
+        exc_tb: "Optional[Any]",
+    ) -> None:
+        with capture_internal_exceptions():
+            if not hasattr(self._stream, "_span"):
+                return
+
+            if not self._guaranteed_streaming_state and not hasattr(
+                self._stream, "_model"
+            ):
+                self._stream._span.__exit__(exc_type, exc_val, exc_tb)
+                del self._stream._span
+                return
+
+            _set_streaming_output_data(
+                span=self._stream._span,
+                integration=self._stream._integration,
+                model=self._stream._model,
+                usage=self._stream._usage,
+                content_blocks=self._stream._content_blocks,
+                response_id=self._stream._response_id,
+                finish_reason=self._stream._finish_reason,
+            )
+
+            self._stream._span.__exit__(exc_type, exc_val, exc_tb)
+            del self._stream._span
+
+
 class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
@@ -446,7 +495,7 @@ def _wrap_synchronous_message_iterator(
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
-    try:
+    with _StreamSpanContext(stream, guaranteed_streaming_state=True):
         for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
             # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
@@ -466,19 +515,6 @@ def _wrap_synchronous_message_iterator(
 
             _accumulate_event_data(stream, event)
             yield event
-    finally:
-        with capture_internal_exceptions():
-            if hasattr(stream, "_span"):
-                _finish_streaming_span(
-                    span=stream._span,
-                    integration=stream._integration,
-                    model=stream._model,
-                    usage=stream._usage,
-                    content_blocks=stream._content_blocks,
-                    response_id=stream._response_id,
-                    finish_reason=stream._finish_reason,
-                )
-                del stream._span
 
 
 async def _wrap_asynchronous_message_iterator(
@@ -489,7 +525,7 @@ async def _wrap_asynchronous_message_iterator(
     Sets information received while iterating the response stream on the AI Client Span.
     Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
-    try:
+    with _StreamSpanContext(stream, guaranteed_streaming_state=True):
         async for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
             # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
@@ -509,19 +545,6 @@ async def _wrap_asynchronous_message_iterator(
 
             _accumulate_event_data(stream, event)
             yield event
-    finally:
-        with capture_internal_exceptions():
-            if hasattr(stream, "_span"):
-                _finish_streaming_span(
-                    span=stream._span,
-                    integration=stream._integration,
-                    model=stream._model,
-                    usage=stream._usage,
-                    content_blocks=stream._content_blocks,
-                    response_id=stream._response_id,
-                    finish_reason=stream._finish_reason,
-                )
-                del stream._span
 
 
 def _set_output_data(
@@ -533,7 +556,6 @@ def _set_output_data(
     cache_read_input_tokens: "int | None",
     cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
-    finish_span: bool = False,
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
 ) -> None:
@@ -576,9 +598,6 @@ def _set_output_data(
         input_tokens_cached=cache_read_input_tokens,
         input_tokens_cache_write=cache_write_input_tokens,
     )
-
-    if finish_span:
-        span.__exit__(None, None, None)
 
 
 def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
@@ -658,10 +677,10 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 cache_read_input_tokens=cache_read_input_tokens,
                 cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
-                finish_span=True,
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
+            span.__exit__(None, None, None)
         else:
             span.set_data("unknown_response", True)
             span.__exit__(None, None, None)
@@ -742,7 +761,7 @@ def _accumulate_event_data(
     stream._finish_reason = finish_reason
 
 
-def _finish_streaming_span(
+def _set_streaming_output_data(
     span: "Span",
     integration: "AnthropicIntegration",
     model: "Optional[str]",
@@ -752,7 +771,7 @@ def _finish_streaming_span(
     finish_reason: "Optional[str]",
 ) -> None:
     """
-    Set output attributes on the AI Client Span and end the span.
+    Set output attributes on the AI Client Span.
     """
     # Anthropic's input_tokens excludes cached/cache_write tokens.
     # Normalize to total input tokens for correct cost calculations.
@@ -771,7 +790,6 @@ def _finish_streaming_span(
         cache_read_input_tokens=usage.cache_read_input_tokens,
         cache_write_input_tokens=usage.cache_write_input_tokens,
         content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-        finish_span=True,
         response_id=response_id,
         finish_reason=finish_reason,
     )
@@ -785,26 +803,8 @@ def _wrap_close(
     """
 
     def close(self: "Union[Stream, MessageStream]") -> None:
-        if not hasattr(self, "_span"):
+        with _StreamSpanContext(self):
             return f(self)
-
-        if not hasattr(self, "_model"):
-            self._span.__exit__(None, None, None)
-            del self._span
-            return f(self)
-
-        _finish_streaming_span(
-            span=self._span,
-            integration=self._integration,
-            model=self._model,
-            usage=self._usage,
-            content_blocks=self._content_blocks,
-            response_id=self._response_id,
-            finish_reason=self._finish_reason,
-        )
-        del self._span
-
-        return f(self)
 
     return close
 
@@ -855,26 +855,8 @@ def _wrap_async_close(
     """
 
     async def close(self: "AsyncStream") -> None:
-        if not hasattr(self, "_span"):
+        with _StreamSpanContext(self):
             return await f(self)
-
-        if not hasattr(self, "_model"):
-            self._span.__exit__(None, None, None)
-            del self._span
-            return await f(self)
-
-        _finish_streaming_span(
-            span=self._span,
-            integration=self._integration,
-            model=self._model,
-            usage=self._usage,
-            content_blocks=self._content_blocks,
-            response_id=self._response_id,
-            finish_reason=self._finish_reason,
-        )
-        del self._span
-
-        return await f(self)
 
     return close
 
