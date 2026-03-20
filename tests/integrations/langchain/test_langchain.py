@@ -27,8 +27,6 @@ from sentry_sdk.integrations.langchain import (
     SentryLangchainCallback,
     _transform_langchain_content_block,
     _transform_langchain_message_content,
-    _push_agent,
-    _pop_agent,
 )
 
 try:
@@ -870,110 +868,6 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
         assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
         assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
         assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
-
-
-def test_langchain_llm_span_includes_agent_name(sentry_init, capture_events):
-    from langchain_core.outputs import LLMResult, Generation
-
-    with patch("sentry_sdk.integrations.langchain.AgentExecutor", None):
-        from sentry_sdk.integrations.langchain import (
-            LangchainIntegration,
-            SentryLangchainCallback,
-        )
-
-        sentry_init(
-            integrations=[LangchainIntegration(include_prompts=True)],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
-        events = capture_events()
-
-        callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
-
-        run_id = "12345678-1234-1234-1234-123456789abc"
-        serialized = {"_type": "openai", "model_name": "gpt-3.5-turbo"}
-        prompts = ["Hello"]
-
-        with start_transaction():
-            _push_agent("test-agent")
-            try:
-                callback.on_llm_start(
-                    serialized=serialized,
-                    prompts=prompts,
-                    run_id=run_id,
-                    invocation_params={"model": "gpt-3.5-turbo"},
-                )
-
-                response = LLMResult(
-                    generations=[[Generation(text="Hi")]],
-                    llm_output={},
-                )
-                callback.on_llm_end(response=response, run_id=run_id)
-            finally:
-                _pop_agent()
-
-        assert len(events) > 0
-        tx = events[0]
-
-        llm_spans = [
-            span
-            for span in tx.get("spans", [])
-            if span.get("op") == "gen_ai.generate_text"
-        ]
-        assert len(llm_spans) == 1
-
-        llm_span = llm_spans[0]
-        assert llm_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "test-agent"
-
-
-def test_langchain_llm_span_no_agent_name_when_no_agent(sentry_init, capture_events):
-    from langchain_core.outputs import LLMResult, Generation
-
-    with patch("sentry_sdk.integrations.langchain.AgentExecutor", None):
-        from sentry_sdk.integrations.langchain import (
-            LangchainIntegration,
-            SentryLangchainCallback,
-        )
-
-        sentry_init(
-            integrations=[LangchainIntegration(include_prompts=True)],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
-        events = capture_events()
-
-        callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
-
-        run_id = "12345678-1234-1234-1234-123456789def"
-        serialized = {"_type": "openai", "model_name": "gpt-3.5-turbo"}
-        prompts = ["Hello"]
-
-        with start_transaction():
-            callback.on_llm_start(
-                serialized=serialized,
-                prompts=prompts,
-                run_id=run_id,
-                invocation_params={"model": "gpt-3.5-turbo"},
-            )
-
-            response = LLMResult(
-                generations=[[Generation(text="Hi")]],
-                llm_output={},
-            )
-            callback.on_llm_end(response=response, run_id=run_id)
-
-        assert len(events) > 0
-        tx = events[0]
-
-        llm_spans = [
-            span
-            for span in tx.get("spans", [])
-            if span.get("op") == "gen_ai.generate_text"
-        ]
-        assert len(llm_spans) == 1
-
-        llm_span = llm_spans[0]
-        assert SPANDATA.GEN_AI_AGENT_NAME not in llm_span["data"]
 
 
 def test_langchain_message_role_mapping(sentry_init, capture_events):
