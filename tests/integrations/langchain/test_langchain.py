@@ -259,92 +259,6 @@ def test_langchain_agent(
                 },
             ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
 
-
-def test_langchain_agent_name_propagation(sentry_init, capture_events, monkeypatch):
-    monkeypatch.setattr(
-        "sentry_sdk.integrations.langchain._get_request_data",
-        lambda obj, args, kwargs: ("test_agent_name", None),
-    )
-
-    sentry_init(
-        integrations=[LangchainIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    global llm_type, stream_result_mock
-    llm_type = "openai-chat"
-    stream_result_mock = Mock(
-        side_effect=[
-            [
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": "call_BbeyNhCKa6kYLYzrD40NGm3b",
-                                    "function": {"arguments": "", "name": "get_word_length"},
-                                    "type": "function",
-                                }
-                            ]
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="5",
-                        usage_metadata={
-                            "input_tokens": 142,
-                            "output_tokens": 50,
-                            "total_tokens": 192,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
-                    ),
-                    generation_info={"finish_reason": "function_call"},
-                ),
-            ],
-            [
-                ChatGenerationChunk(
-                    text="The word eudca has 5 letters.",
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="The word eudca has 5 letters.",
-                        usage_metadata={
-                            "input_tokens": 89,
-                            "output_tokens": 28,
-                            "total_tokens": 117,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    generation_info={"finish_reason": "stop"},
-                    message=AIMessageChunk(content=""),
-                ),
-            ],
-        ]
-    )
-
-    llm = MockOpenAI(model_name="gpt-3.5-turbo", temperature=0, openai_api_key="badkey")
-    agent = create_openai_tools_agent(llm, [get_word_length], prompt=None)
-    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-
-    with start_transaction():
-        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
-
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    for span in tx["spans"]:
-        assert span["data"].get(SPANDATA.GEN_AI_AGENT_NAME) == "test_agent_name"
-
         assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
         # Verify tool calls are recorded when PII is enabled
@@ -397,6 +311,46 @@ def test_langchain_agent_name_propagation(sentry_init, capture_events, monkeypat
             assert tools_data is not None, (
                 "Available tools should always be recorded regardless of PII settings"
             )
+
+
+def test_langchain_agent_name_propagation(sentry_init, capture_events, monkeypatch):
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are very powerful assistant, but don't know current events",
+            ),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    llm = MockOpenAI(model_name="gpt-3.5-turbo", temperature=0, openai_api_key="badkey")
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    # Mock _get_request_data to return a test agent name
+    def mock_get_request_data(self, args, kwargs):
+        return "test_agent_name", [get_word_length]
+
+    monkeypatch.setattr(
+        "sentry_sdk.integrations.langchain._get_request_data", mock_get_request_data
+    )
+
+    with start_transaction():
+        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    for span in tx["spans"]:
+        assert span["data"].get(SPANDATA.GEN_AI_AGENT_NAME) == "test_agent_name"
 
 
 def test_langchain_error(sentry_init, capture_events):
