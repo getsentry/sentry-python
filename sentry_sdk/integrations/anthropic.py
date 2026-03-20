@@ -633,6 +633,7 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
+            span.__exit__(None, None, None)
         reraise(*exc_info)
 
     if isinstance(result, Stream):
@@ -720,6 +721,7 @@ async def _sentry_patched_create_async(
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
+            span.__exit__(None, None, None)
         reraise(*exc_info)
 
     if isinstance(result, AsyncStream):
@@ -778,13 +780,7 @@ def _wrap_message_create(f: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
         kwargs["integration"] = integration
 
-        try:
-            return _sentry_patched_create_sync(f, *args, **kwargs)
-        finally:
-            span = sentry_sdk.get_current_span()
-            if span is not None and span.status == SPANSTATUS.INTERNAL_ERROR:
-                with capture_internal_exceptions():
-                    span.__exit__(None, None, None)
+        return _sentry_patched_create_sync(f, *args, **kwargs)
 
     return _sentry_wrapped_create_sync
 
