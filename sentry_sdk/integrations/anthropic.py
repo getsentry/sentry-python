@@ -14,7 +14,7 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     transform_anthropic_content_part,
 )
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import set_span_errored
@@ -874,13 +874,7 @@ def _wrap_message_create_async(f: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
         kwargs["integration"] = integration
 
-        try:
-            return await _sentry_patched_create_async(f, *args, **kwargs)
-        finally:
-            span = sentry_sdk.get_current_span()
-            if span is not None and span.status == SPANSTATUS.INTERNAL_ERROR:
-                with capture_internal_exceptions():
-                    span.__exit__(None, None, None)
+        return await _sentry_patched_create_async(f, *args, **kwargs)
 
     return _sentry_wrapped_create_async
 
