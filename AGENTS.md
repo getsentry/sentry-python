@@ -11,6 +11,8 @@ Use **tox** for testing (not pytest directly):
 - Test matrix configuration is in `tox.ini`
 - Integration tests: `tox -e py3.14-{integration}-v{version}`
 - Common tests: `tox -e py3.14-common`
+- Run specific test file: `TESTPATH=tests/integrations/logging/test_logging.py tox -e py3.14-common`
+- Run single test: `TESTPATH=tests/path/to/test_file.py tox -e py3.14-common -- -k "test_name"`
 
 ## Type Checking
 

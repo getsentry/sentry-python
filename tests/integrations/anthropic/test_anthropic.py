@@ -11,7 +11,7 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
-from anthropic import Anthropic, AnthropicError, AsyncAnthropic, AsyncStream, Stream
+from anthropic import Anthropic, AnthropicError, AsyncAnthropic
 from anthropic.types import MessageDeltaUsage, TextDelta, Usage
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
@@ -21,12 +21,25 @@ from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
 try:
+    from anthropic.types import ErrorResponse, OverloadedError
+    from anthropic import APIStatusError
+except ImportError:
+    ErrorResponse = None
+    OverloadedError = None
+    APIStatusError = None
+
+try:
     from anthropic.types import InputJSONDelta
 except ImportError:
     try:
         from anthropic.types import InputJsonDelta as InputJSONDelta
     except ImportError:
         pass
+
+try:
+    from anthropic.lib.streaming import TextEvent
+except ImportError:
+    TextEvent = None
 
 try:
     # 0.27+
@@ -58,11 +71,12 @@ from sentry_sdk.utils import package_version
 ANTHROPIC_VERSION = package_version("anthropic")
 
 EXAMPLE_MESSAGE = Message(
-    id="id",
+    id="msg_01XFDUDYJgAACzvnptvVoYEL",
     model="model",
     role="assistant",
     content=[TextBlock(type="text", text="Hi, I'm Claude.")],
     type="message",
+    stop_reason="end_turn",
     usage=Usage(input_tokens=10, output_tokens=20),
 )
 
@@ -117,6 +131,7 @@ def test_nonstreaming_create_message(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -134,6 +149,8 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.asyncio
@@ -187,6 +204,7 @@ async def test_nonstreaming_create_message_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -204,6 +222,7 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.parametrize(
@@ -216,42 +235,51 @@ async def test_nonstreaming_create_message_async(
     ],
 )
 def test_streaming_create_message(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
 ):
     client = Anthropic(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        MessageStartEvent(
-            message=EXAMPLE_MESSAGE,
-            type="message_start",
-        ),
-        ContentBlockStartEvent(
-            type="content_block_start",
-            index=0,
-            content_block=TextBlock(type="text", text=""),
-        ),
-        ContentBlockDeltaEvent(
-            delta=TextDelta(text="Hi", type="text_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=TextDelta(text="!", type="text_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockStopEvent(type="content_block_stop", index=0),
-        MessageDeltaEvent(
-            delta=Delta(),
-            usage=MessageDeltaUsage(output_tokens=10),
-            type="message_delta",
-        ),
-    ]
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
 
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -259,7 +287,6 @@ def test_streaming_create_message(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
     messages = [
         {
@@ -268,26 +295,30 @@ def test_streaming_create_message(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        message = client.messages.create(
-            max_tokens=1024, messages=messages, model="model", stream=True
-        )
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
 
-        for _ in message:
-            pass
+            for _ in message:
+                pass
 
-    assert message == returned_stream
     assert len(events) == 1
     (event,) = events
 
     assert event["type"] == "transaction"
     assert event["transaction"] == "anthropic"
 
-    assert len(event["spans"]) == 1
-    (span,) = event["spans"]
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -306,6 +337,537 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+
+
+def test_streaming_create_message_close(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            messages = client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            for _ in range(4):
+                next(messages)
+
+            messages.close()
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
+def test_streaming_create_message_api_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ErrorResponse(
+                    type="error",
+                    error=OverloadedError(
+                        message="Overloaded", type="overloaded_error"
+                    ),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            for _ in message:
+                pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+    assert span["status"] == "internal_error"
+    assert span["tags"]["status"] == "internal_error"
+    assert event["contexts"]["trace"]["status"] == "internal_error"
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_stream_messages(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+
+
+def test_stream_messages_close(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for _ in range(4):
+                    next(stream)
+
+                # New versions add TextEvent, so consume one more event.
+                if TextEvent is not None and isinstance(next(stream), TextEvent):
+                    next(stream)
+
+                stream.close()
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
+def test_stream_messages_api_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ErrorResponse(
+                    type="error",
+                    error=OverloadedError(
+                        message="Overloaded", type="overloaded_error"
+                    ),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+    assert span["status"] == "internal_error"
+    assert span["tags"]["status"] == "internal_error"
+    assert event["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -319,52 +881,62 @@ def test_streaming_create_message(
     ],
 )
 async def test_streaming_create_message_async(
-    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(
-        [
-            MessageStartEvent(
-                message=EXAMPLE_MESSAGE,
-                type="message_start",
-            ),
-            ContentBlockStartEvent(
-                type="content_block_start",
-                index=0,
-                content_block=TextBlock(type="text", text=""),
-            ),
-            ContentBlockDeltaEvent(
-                delta=TextDelta(text="Hi", type="text_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=TextDelta(text="!", type="text_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockStopEvent(type="content_block_stop", index=0),
-            MessageDeltaEvent(
-                delta=Delta(),
-                usage=MessageDeltaUsage(output_tokens=10),
-                type="message_delta",
-            ),
-        ]
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(stop_reason="max_tokens"),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        ),
     )
 
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
+        default_integrations=False,
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = AsyncMock(return_value=returned_stream)
 
     messages = [
         {
@@ -373,15 +945,19 @@ async def test_streaming_create_message_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        message = await client.messages.create(
-            max_tokens=1024, messages=messages, model="model", stream=True
-        )
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = await client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
 
-        async for _ in message:
-            pass
+            async for _ in message:
+                pass
 
-    assert message == returned_stream
     assert len(events) == 1
     (event,) = events
 
@@ -393,6 +969,7 @@ async def test_streaming_create_message_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -411,6 +988,558 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+
+
+@pytest.mark.asyncio
+async def test_streaming_create_message_async_close(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(stop_reason="max_tokens"),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            messages = await client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            for _ in range(4):
+                await messages.__anext__()
+            await messages.close()
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
+@pytest.mark.asyncio
+async def test_streaming_create_message_async_api_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ErrorResponse(
+                        type="error",
+                        error=OverloadedError(
+                            message="Overloaded", type="overloaded_error"
+                        ),
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = await client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
+
+            async for _ in message:
+                pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+    assert span["status"] == "internal_error"
+    assert span["tags"]["status"] == "internal_error"
+    assert event["contexts"]["trace"]["status"] == "internal_error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_stream_message_async(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        ),
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                async for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    assert len(event["spans"]) == 1
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 41),
+    reason="Error classes moved in https://github.com/anthropics/anthropic-sdk-python/commit/4e0b15e22fe40e9aa513459564f641bf97c90954.",
+)
+@pytest.mark.asyncio
+async def test_stream_messages_async_api_error(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ErrorResponse(
+                        type="error",
+                        error=OverloadedError(
+                            message="Overloaded", type="overloaded_error"
+                        ),
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with pytest.raises(APIStatusError), mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                async for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+
+    assert span["status"] == "internal_error"
+    assert span["tags"]["status"] == "internal_error"
+    assert event["contexts"]["trace"]["status"] == "internal_error"
+
+
+@pytest.mark.asyncio
+async def test_stream_messages_async_close(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(stop_reason="max_tokens"),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for _ in range(4):
+                    await stream.__anext__()
+
+                # New versions add TextEvent, so consume one more event.
+                if TextEvent is not None and isinstance(
+                    await stream.__anext__(), TextEvent
+                ):
+                    await stream.__anext__()
+
+                await stream.close()
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    span = next(span for span in event["spans"] if span["op"] == OP.GEN_AI_CHAT)
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    assert (
+        span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        == '[{"role": "user", "content": "Hello, Claude"}]'
+    )
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi!"
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
 
 
 @pytest.mark.skipif(
@@ -427,68 +1556,81 @@ async def test_streaming_create_message_async(
     ],
 )
 def test_streaming_create_message_with_input_json_delta(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
 ):
     client = Anthropic(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        MessageStartEvent(
-            message=Message(
-                id="msg_0",
-                content=[],
-                model="claude-3-5-sonnet-20240620",
-                role="assistant",
-                stop_reason=None,
-                stop_sequence=None,
-                type="message",
-                usage=Usage(input_tokens=366, output_tokens=10),
-            ),
-            type="message_start",
-        ),
-        ContentBlockStartEvent(
-            type="content_block_start",
-            index=0,
-            content_block=ToolUseBlock(
-                id="toolu_0", input={}, name="get_weather", type="tool_use"
-            ),
-        ),
-        ContentBlockDeltaEvent(
-            delta=InputJSONDelta(partial_json="", type="input_json_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=InputJSONDelta(partial_json="{'location':", type="input_json_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=InputJSONDelta(partial_json=" 'S", type="input_json_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=InputJSONDelta(partial_json="an ", type="input_json_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=InputJSONDelta(partial_json="Francisco, C", type="input_json_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=InputJSONDelta(partial_json="A'}", type="input_json_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockStopEvent(type="content_block_stop", index=0),
-        MessageDeltaEvent(
-            delta=Delta(stop_reason="tool_use", stop_sequence=None),
-            usage=MessageDeltaUsage(output_tokens=41),
-            type="message_delta",
-        ),
-    ]
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=Message(
+                        id="msg_0",
+                        content=[],
+                        model="claude-3-5-sonnet-20240620",
+                        role="assistant",
+                        stop_reason=None,
+                        stop_sequence=None,
+                        type="message",
+                        usage=Usage(input_tokens=366, output_tokens=10),
+                    ),
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=ToolUseBlock(
+                        id="toolu_0", input={}, name="get_weather", type="tool_use"
+                    ),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(partial_json="", type="input_json_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(
+                        partial_json='{"location": "', type="input_json_delta"
+                    ),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(partial_json="S", type="input_json_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(partial_json="an ", type="input_json_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(
+                        partial_json="Francisco, C", type="input_json_delta"
+                    ),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(partial_json='A"}', type="input_json_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="tool_use", stop_sequence=None),
+                    usage=MessageDeltaUsage(output_tokens=41),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
 
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -496,7 +1638,6 @@ def test_streaming_create_message_with_input_json_delta(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
     messages = [
         {
@@ -505,15 +1646,19 @@ def test_streaming_create_message_with_input_json_delta(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        message = client.messages.create(
-            max_tokens=1024, messages=messages, model="model", stream=True
-        )
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
 
-        for _ in message:
-            pass
+            for _ in message:
+                pass
 
-    assert message == returned_stream
     assert len(events) == 1
     (event,) = events
 
@@ -525,6 +1670,7 @@ def test_streaming_create_message_with_input_json_delta(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -535,7 +1681,159 @@ def test_streaming_create_message_with_input_json_delta(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == "{'location': 'San Francisco, CA'}"
+            == '{"location": "San Francisco, CA"}'
+        )
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
+)
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_stream_messages_with_input_json_delta(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
+):
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=Message(
+                        id="msg_0",
+                        content=[],
+                        model="claude-3-5-sonnet-20240620",
+                        role="assistant",
+                        stop_reason=None,
+                        stop_sequence=None,
+                        type="message",
+                        usage=Usage(input_tokens=366, output_tokens=10),
+                    ),
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=ToolUseBlock(
+                        id="toolu_0", input={}, name="get_weather", type="tool_use"
+                    ),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(partial_json="", type="input_json_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(
+                        partial_json='{"location": "', type="input_json_delta"
+                    ),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(partial_json="S", type="input_json_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(partial_json="an ", type="input_json_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(
+                        partial_json="Francisco, C", type="input_json_delta"
+                    ),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=InputJSONDelta(partial_json='A"}', type="input_json_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="tool_use", stop_sequence=None),
+                    usage=MessageDeltaUsage(output_tokens=41),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "What is the weather like in San Francisco?",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    assert len(event["spans"]) == 1
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '{"location": "San Francisco, CA"}'
         )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -562,73 +1860,86 @@ def test_streaming_create_message_with_input_json_delta(
     ],
 )
 async def test_streaming_create_message_with_input_json_delta_async(
-    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     client = AsyncAnthropic(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(
-        [
-            MessageStartEvent(
-                message=Message(
-                    id="msg_0",
-                    content=[],
-                    model="claude-3-5-sonnet-20240620",
-                    role="assistant",
-                    stop_reason=None,
-                    stop_sequence=None,
-                    type="message",
-                    usage=Usage(input_tokens=366, output_tokens=10),
-                ),
-                type="message_start",
-            ),
-            ContentBlockStartEvent(
-                type="content_block_start",
-                index=0,
-                content_block=ToolUseBlock(
-                    id="toolu_0", input={}, name="get_weather", type="tool_use"
-                ),
-            ),
-            ContentBlockDeltaEvent(
-                delta=InputJSONDelta(partial_json="", type="input_json_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=InputJSONDelta(
-                    partial_json="{'location':", type="input_json_delta"
-                ),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=InputJSONDelta(partial_json=" 'S", type="input_json_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=InputJSONDelta(partial_json="an ", type="input_json_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=InputJSONDelta(
-                    partial_json="Francisco, C", type="input_json_delta"
-                ),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=InputJSONDelta(partial_json="A'}", type="input_json_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockStopEvent(type="content_block_stop", index=0),
-            MessageDeltaEvent(
-                delta=Delta(stop_reason="tool_use", stop_sequence=None),
-                usage=MessageDeltaUsage(output_tokens=41),
-                type="message_delta",
-            ),
-        ]
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=Message(
+                            id="msg_0",
+                            content=[],
+                            model="claude-3-5-sonnet-20240620",
+                            role="assistant",
+                            stop_reason=None,
+                            stop_sequence=None,
+                            type="message",
+                            usage=Usage(input_tokens=366, output_tokens=10),
+                        ),
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=ToolUseBlock(
+                            id="toolu_0", input={}, name="get_weather", type="tool_use"
+                        ),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(partial_json="", type="input_json_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json='{"location": "', type="input_json_delta"
+                        ),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(partial_json="S", type="input_json_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json="an ", type="input_json_delta"
+                        ),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json="Francisco, C", type="input_json_delta"
+                        ),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json='A"}', type="input_json_delta"
+                        ),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(stop_reason="tool_use", stop_sequence=None),
+                        usage=MessageDeltaUsage(output_tokens=41),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
     )
 
     sentry_init(
@@ -637,7 +1948,6 @@ async def test_streaming_create_message_with_input_json_delta_async(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = AsyncMock(return_value=returned_stream)
 
     messages = [
         {
@@ -646,15 +1956,19 @@ async def test_streaming_create_message_with_input_json_delta_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        message = await client.messages.create(
-            max_tokens=1024, messages=messages, model="model", stream=True
-        )
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = await client.messages.create(
+                max_tokens=1024, messages=messages, model="model", stream=True
+            )
 
-        async for _ in message:
-            pass
+            async for _ in message:
+                pass
 
-    assert message == returned_stream
     assert len(events) == 1
     (event,) = events
 
@@ -666,6 +1980,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -676,7 +1991,167 @@ async def test_streaming_create_message_with_input_json_delta_async(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == "{'location': 'San Francisco, CA'}"
+            == '{"location": "San Francisco, CA"}'
+        )
+
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 41
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 407
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
+)
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_stream_message_with_input_json_delta_async(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    client = AsyncAnthropic(api_key="z")
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=Message(
+                            id="msg_0",
+                            content=[],
+                            model="claude-3-5-sonnet-20240620",
+                            role="assistant",
+                            stop_reason=None,
+                            stop_sequence=None,
+                            type="message",
+                            usage=Usage(input_tokens=366, output_tokens=10),
+                        ),
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=ToolUseBlock(
+                            id="toolu_0", input={}, name="get_weather", type="tool_use"
+                        ),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(partial_json="", type="input_json_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json='{"location": "', type="input_json_delta"
+                        ),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(partial_json="S", type="input_json_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json="an ", type="input_json_delta"
+                        ),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json="Francisco, C", type="input_json_delta"
+                        ),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=InputJSONDelta(
+                            partial_json='A"}', type="input_json_delta"
+                        ),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(stop_reason="tool_use", stop_sequence=None),
+                        usage=MessageDeltaUsage(output_tokens=41),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "What is the weather like in San Francisco?",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+            ) as stream:
+                async for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    assert len(event["spans"]) == 1
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '{"location": "San Francisco, CA"}'
         )
 
     else:
@@ -730,6 +2205,7 @@ def test_span_status_error(sentry_init, capture_events):
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -755,6 +2231,7 @@ async def test_span_status_error_async(sentry_init, capture_events):
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -803,6 +2280,7 @@ def test_span_origin(sentry_init, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.ai.anthropic"
+    assert event["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert event["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -831,6 +2309,7 @@ async def test_span_origin_async(sentry_init, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.ai.anthropic"
+    assert event["spans"][0]["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert event["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -852,13 +2331,15 @@ def test_collect_ai_data_with_input_json_delta():
 
     content_blocks = []
 
-    model, new_usage, new_content_blocks = _collect_ai_data(
+    model, new_usage, new_content_blocks, response_id, finish_reason = _collect_ai_data(
         event, model, usage, content_blocks
     )
     assert model is None
     assert new_usage.input_tokens == usage.input_tokens
     assert new_usage.output_tokens == usage.output_tokens
     assert new_content_blocks == ["test"]
+    assert response_id is None
+    assert finish_reason is None
 
 
 @pytest.mark.skipif(
@@ -951,6 +2432,7 @@ def test_anthropic_message_role_mapping(
 
     # Verify that the span was created correctly
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
@@ -996,6 +2478,7 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
     assert len(chat_spans) > 0
 
     chat_span = chat_spans[0]
+    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
@@ -1047,6 +2530,7 @@ async def test_anthropic_message_truncation_async(sentry_init, capture_events):
     assert len(chat_spans) > 0
 
     chat_span = chat_spans[0]
+    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
@@ -1115,6 +2599,7 @@ def test_nonstreaming_create_message_with_system_prompt(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1142,6 +2627,7 @@ def test_nonstreaming_create_message_with_system_prompt(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.asyncio
@@ -1199,6 +2685,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1226,6 +2713,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
 @pytest.mark.parametrize(
@@ -1238,43 +2726,52 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     ],
 )
 def test_streaming_create_message_with_system_prompt(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        MessageStartEvent(
-            message=EXAMPLE_MESSAGE,
-            type="message_start",
-        ),
-        ContentBlockStartEvent(
-            type="content_block_start",
-            index=0,
-            content_block=TextBlock(type="text", text=""),
-        ),
-        ContentBlockDeltaEvent(
-            delta=TextDelta(text="Hi", type="text_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=TextDelta(text="!", type="text_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockDeltaEvent(
-            delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-            index=0,
-            type="content_block_delta",
-        ),
-        ContentBlockStopEvent(type="content_block_stop", index=0),
-        MessageDeltaEvent(
-            delta=Delta(),
-            usage=MessageDeltaUsage(output_tokens=10),
-            type="message_delta",
-        ),
-    ]
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
 
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
@@ -1282,7 +2779,6 @@ def test_streaming_create_message_with_system_prompt(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
     messages = [
         {
@@ -1291,19 +2787,23 @@ def test_streaming_create_message_with_system_prompt(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        message = client.messages.create(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            stream=True,
-            system="You are a helpful assistant.",
-        )
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = client.messages.create(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                stream=True,
+                system="You are a helpful assistant.",
+            )
 
-        for _ in message:
-            pass
+            for _ in message:
+                pass
 
-    assert message == returned_stream
     assert len(events) == 1
     (event,) = events
 
@@ -1315,6 +2815,267 @@ def test_streaming_create_message_with_system_prompt(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
+
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_stream_messages_with_system_prompt(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
+):
+    """Test that system prompts are properly captured in streaming mode."""
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            ) as stream:
+                for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    assert len(event["spans"]) == 1
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
+        system_instructions = json.loads(
+            span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+        assert system_instructions == [
+            {"type": "text", "content": "You are a helpful assistant."}
+        ]
+
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        assert len(stored_messages) == 1
+        assert stored_messages[0]["role"] == "user"
+        assert stored_messages[0]["content"] == "Hello, Claude"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_stream_message_with_system_prompt_async(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    """Test that system prompts are properly captured in streaming mode (async)."""
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
+    )
+
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    messages = [
+        {
+            "role": "user",
+            "content": "Hello, Claude",
+        }
+    ]
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            ) as stream:
+                async for event in stream:
+                    pass
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "anthropic"
+
+    assert len(event["spans"]) == 1
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1356,44 +3117,54 @@ def test_streaming_create_message_with_system_prompt(
     ],
 )
 async def test_streaming_create_message_with_system_prompt_async(
-    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(
-        [
-            MessageStartEvent(
-                message=EXAMPLE_MESSAGE,
-                type="message_start",
-            ),
-            ContentBlockStartEvent(
-                type="content_block_start",
-                index=0,
-                content_block=TextBlock(type="text", text=""),
-            ),
-            ContentBlockDeltaEvent(
-                delta=TextDelta(text="Hi", type="text_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=TextDelta(text="!", type="text_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockDeltaEvent(
-                delta=TextDelta(text=" I'm Claude!", type="text_delta"),
-                index=0,
-                type="content_block_delta",
-            ),
-            ContentBlockStopEvent(type="content_block_stop", index=0),
-            MessageDeltaEvent(
-                delta=Delta(),
-                usage=MessageDeltaUsage(output_tokens=10),
-                type="message_delta",
-            ),
-        ]
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text=" I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        )
     )
 
     sentry_init(
@@ -1402,7 +3173,6 @@ async def test_streaming_create_message_with_system_prompt_async(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = AsyncMock(return_value=returned_stream)
 
     messages = [
         {
@@ -1411,19 +3181,23 @@ async def test_streaming_create_message_with_system_prompt_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
-        message = await client.messages.create(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            stream=True,
-            system="You are a helpful assistant.",
-        )
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            message = await client.messages.create(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                stream=True,
+                system="You are a helpful assistant.",
+            )
 
-        async for _ in message:
-            pass
+            async for _ in message:
+                pass
 
-    assert message == returned_stream
     assert len(events) == 1
     (event,) = events
 
@@ -1435,6 +3209,7 @@ async def test_streaming_create_message_with_system_prompt_async(
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -1501,6 +3276,7 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_events):
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS in span["data"]
@@ -2360,50 +4136,129 @@ def test_input_tokens_include_cache_read_nonstreaming(sentry_init, capture_event
     assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
 
 
-def test_input_tokens_include_cache_read_streaming(sentry_init, capture_events):
+def test_input_tokens_include_cache_read_streaming(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
 
     Same cache-hit scenario as non-streaming, using realistic streaming events.
     """
     client = Anthropic(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        MessageStartEvent(
-            type="message_start",
-            message=Message(
-                id="id",
-                model="claude-sonnet-4-20250514",
-                role="assistant",
-                content=[],
-                type="message",
-                usage=Usage(
-                    input_tokens=19,
-                    output_tokens=0,
-                    cache_read_input_tokens=2846,
-                    cache_creation_input_tokens=0,
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    type="message_start",
+                    message=Message(
+                        id="id",
+                        model="claude-sonnet-4-20250514",
+                        role="assistant",
+                        content=[],
+                        type="message",
+                        usage=Usage(
+                            input_tokens=19,
+                            output_tokens=0,
+                            cache_read_input_tokens=2846,
+                            cache_creation_input_tokens=0,
+                        ),
+                    ),
                 ),
-            ),
-        ),
-        MessageDeltaEvent(
-            type="message_delta",
-            delta=Delta(stop_reason="end_turn"),
-            usage=MessageDeltaUsage(output_tokens=14),
-        ),
-    ]
+                MessageDeltaEvent(
+                    type="message_delta",
+                    delta=Delta(stop_reason="end_turn"),
+                    usage=MessageDeltaUsage(output_tokens=14),
+                ),
+            ]
+        )
+    )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
-    with start_transaction(name="anthropic"):
-        for _ in client.messages.create(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "What is 5+5?"}],
-            model="claude-sonnet-4-20250514",
-            stream=True,
-        ):
-            pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            for _ in client.messages.create(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "What is 5+5?"}],
+                model="claude-sonnet-4-20250514",
+                stream=True,
+            ):
+                pass
+
+    (span,) = events[0]["spans"]
+
+    # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 2879  # 2865 + 14
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 2846
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
+
+
+def test_stream_messages_input_tokens_include_cache_read_streaming(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    """
+    Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
+
+    Same cache-hit scenario as non-streaming, using realistic streaming events.
+    """
+    client = Anthropic(api_key="z")
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    type="message_start",
+                    message=Message(
+                        id="id",
+                        model="claude-sonnet-4-20250514",
+                        role="assistant",
+                        content=[],
+                        type="message",
+                        usage=Usage(
+                            input_tokens=19,
+                            output_tokens=0,
+                            cache_read_input_tokens=2846,
+                            cache_creation_input_tokens=0,
+                        ),
+                    ),
+                ),
+                MessageDeltaEvent(
+                    type="message_delta",
+                    delta=Delta(stop_reason="end_turn"),
+                    usage=MessageDeltaUsage(output_tokens=14),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "What is 5+5?"}],
+                model="claude-sonnet-4-20250514",
+            ) as stream:
+                for event in stream:
+                    pass
 
     (span,) = events[0]["spans"]
 
@@ -2452,46 +4307,119 @@ def test_input_tokens_unchanged_without_caching(sentry_init, capture_events):
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
 
 
-def test_cache_tokens_streaming(sentry_init, capture_events):
+def test_cache_tokens_streaming(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
     """Test cache tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        MessageStartEvent(
-            type="message_start",
-            message=Message(
-                id="id",
-                model="claude-3-5-sonnet-20241022",
-                role="assistant",
-                content=[],
-                type="message",
-                usage=Usage(
-                    input_tokens=100,
-                    output_tokens=0,
-                    cache_read_input_tokens=80,
-                    cache_creation_input_tokens=20,
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    type="message_start",
+                    message=Message(
+                        id="id",
+                        model="claude-3-5-sonnet-20241022",
+                        role="assistant",
+                        content=[],
+                        type="message",
+                        usage=Usage(
+                            input_tokens=100,
+                            output_tokens=0,
+                            cache_read_input_tokens=80,
+                            cache_creation_input_tokens=20,
+                        ),
+                    ),
                 ),
-            ),
-        ),
-        MessageDeltaEvent(
-            type="message_delta",
-            delta=Delta(stop_reason="end_turn"),
-            usage=MessageDeltaUsage(output_tokens=10),
-        ),
-    ]
+                MessageDeltaEvent(
+                    type="message_delta",
+                    delta=Delta(stop_reason="end_turn"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                ),
+            ]
+        )
+    )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
-    client.messages._post = mock.Mock(return_value=returned_stream)
 
-    with start_transaction(name="anthropic"):
-        for _ in client.messages.create(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "Hello"}],
-            model="claude-3-5-sonnet-20241022",
-            stream=True,
-        ):
-            pass
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            for _ in client.messages.create(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-3-5-sonnet-20241022",
+                stream=True,
+            ):
+                pass
+
+    (span,) = events[0]["spans"]
+    # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 210
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+def test_stream_messages_cache_tokens(
+    sentry_init, capture_events, get_model_response, server_side_event_chunks
+):
+    """Test cache tokens are tracked for streaming responses."""
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    type="message_start",
+                    message=Message(
+                        id="id",
+                        model="claude-3-5-sonnet-20241022",
+                        role="assistant",
+                        content=[],
+                        type="message",
+                        usage=Usage(
+                            input_tokens=100,
+                            output_tokens=0,
+                            cache_read_input_tokens=80,
+                            cache_creation_input_tokens=20,
+                        ),
+                    ),
+                ),
+                MessageDeltaEvent(
+                    type="message_delta",
+                    delta=Delta(stop_reason="end_turn"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                ),
+            ]
+        )
+    )
+
+    sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    with mock.patch.object(
+        client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        with start_transaction(name="anthropic"):
+            with client.messages.stream(
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Hello"}],
+                model="claude-3-5-sonnet-20241022",
+            ) as stream:
+                for event in stream:
+                    pass
 
     (span,) = events[0]["spans"]
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200

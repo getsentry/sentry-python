@@ -54,7 +54,6 @@ if TYPE_CHECKING:
         Hint,
         IgnoreSpansConfig,
         Log,
-        MeasurementUnit,
         Metric,
         ProfilerMode,
         TracesSampler,
@@ -86,6 +85,7 @@ if TYPE_CHECKING:
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
             "ignore_spans": Optional[IgnoreSpansConfig],
+            "suppress_asgi_chained_exceptions": Optional[bool],
         },
         total=False,
     )
@@ -1493,4 +1493,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.54.0"
+VERSION = "2.55.0"

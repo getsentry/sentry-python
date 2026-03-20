@@ -1,8 +1,6 @@
 import inspect
 import json
-from collections import deque
 from copy import deepcopy
-from sys import getsizeof
 from typing import TYPE_CHECKING
 
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -14,6 +12,8 @@ if TYPE_CHECKING:
 
 import sentry_sdk
 from sentry_sdk.utils import logger
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 # Maximum characters when only a single message is left after bytes truncation
@@ -525,7 +525,14 @@ def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str,
 
 
 def get_start_span_function() -> "Callable[..., Any]":
+    if has_span_streaming_enabled(sentry_sdk.get_client().options):
+        return sentry_sdk.traces.start_span
+
     current_span = sentry_sdk.get_current_span()
+    if isinstance(current_span, StreamedSpan):
+        # mypy
+        return sentry_sdk.traces.start_span
+
     transaction_exists = (
         current_span is not None and current_span.containing_transaction is not None
     )
@@ -543,10 +550,25 @@ def _truncate_single_message_content_if_present(
         return message
     content = message["content"]
 
-    if not isinstance(content, str) or len(content) <= max_chars:
+    if isinstance(content, str):
+        if len(content) <= max_chars:
+            return message
+        message["content"] = content[:max_chars] + "..."
         return message
 
-    message["content"] = content[:max_chars] + "..."
+    if isinstance(content, list):
+        remaining = max_chars
+        for item in content:
+            if isinstance(item, dict) and "text" in item:
+                text = item["text"]
+                if isinstance(text, str):
+                    if len(text) > remaining:
+                        item["text"] = text[:remaining] + "..."
+                        remaining = 0
+                    else:
+                        remaining -= len(text)
+        return message
+
     return message
 
 

@@ -1,5 +1,82 @@
 # Changelog
 
+## 2.55.0
+
+### New Features ✨
+
+#### Anthropic
+
+- Record finish reasons in AI monitoring spans by @ericapisani in [#5678](https://github.com/getsentry/sentry-python/pull/5678)
+- Emit `gen_ai.chat` spans for asynchronous `messages.stream()` by @alexander-alderman-webb in [#5572](https://github.com/getsentry/sentry-python/pull/5572)
+- Emit AI Client Spans for synchronous `messages.stream()` by @alexander-alderman-webb in [#5565](https://github.com/getsentry/sentry-python/pull/5565)
+- Set gen_ai.response.id span attribute by @ericapisani in [#5662](https://github.com/getsentry/sentry-python/pull/5662)
+- Add `gen_ai.system` attribute to spans by @ericapisani in [#5661](https://github.com/getsentry/sentry-python/pull/5661)
+
+#### Pydantic Ai
+
+- Support ImageUrl content type in span instrumentation by @ericapisani in [#5629](https://github.com/getsentry/sentry-python/pull/5629)
+- Add tool description to execute_tool spans by @ericapisani in [#5596](https://github.com/getsentry/sentry-python/pull/5596)
+
+#### Other
+
+- (crons) Add owner field to MonitorConfig by @julwhitney13 in [#5610](https://github.com/getsentry/sentry-python/pull/5610)
+- (otlp) Add collector_url option to OTLPIntegration by @sl0thentr0py in [#5603](https://github.com/getsentry/sentry-python/pull/5603)
+
+### Bug Fixes 🐛
+
+- (ai) Truncate list-based message content in AI monitoring by @ericapisani in [#5631](https://github.com/getsentry/sentry-python/pull/5631)
+- (anthropic) Close span on `GeneratorExit` by @alexander-alderman-webb in [#5643](https://github.com/getsentry/sentry-python/pull/5643)
+- (celery) Propagate user-set headers by @sentrivana in [#5581](https://github.com/getsentry/sentry-python/pull/5581)
+- (langchain) Wrap finish_reason in array for gen_ai span attribute by @ericapisani in [#5666](https://github.com/getsentry/sentry-python/pull/5666)
+- (logging) Fix deadlock in log batcher by @sentrivana in [#5684](https://github.com/getsentry/sentry-python/pull/5684)
+- (profiler) Prevent buffer race condition during rapid start/stop cycles by @ericapisani in [#5622](https://github.com/getsentry/sentry-python/pull/5622)
+- (utils) Avoid double serialization of strings in safe_serialize by @ericapisani in [#5587](https://github.com/getsentry/sentry-python/pull/5587)
+- Enable unused import ruff check and fix unused imports by @sentrivana in [#5652](https://github.com/getsentry/sentry-python/pull/5652)
+
+### Documentation 📚
+
+- (openai-agents) Remove inapplicable comment by @alexander-alderman-webb in [#5495](https://github.com/getsentry/sentry-python/pull/5495)
+- Add AGENTS.md by @sentrivana in [#5579](https://github.com/getsentry/sentry-python/pull/5579)
+- Add `set_attribute` example to changelog by @sentrivana in [#5578](https://github.com/getsentry/sentry-python/pull/5578)
+
+### Internal Changes 🔧
+
+#### Anthropic
+
+- Check system and response ID attributes on spans created by `stream()` by @alexander-alderman-webb in [#5665](https://github.com/getsentry/sentry-python/pull/5665)
+- Skip accumulation logic for unexpected types in streamed response by @alexander-alderman-webb in [#5564](https://github.com/getsentry/sentry-python/pull/5564)
+- Factor out streamed result handling by @alexander-alderman-webb in [#5563](https://github.com/getsentry/sentry-python/pull/5563)
+- Stream valid JSON by @alexander-alderman-webb in [#5641](https://github.com/getsentry/sentry-python/pull/5641)
+- Stop mocking response iterator by @alexander-alderman-webb in [#5573](https://github.com/getsentry/sentry-python/pull/5573)
+
+#### Openai Agents
+
+- Do not fail on new tool fields by @alexander-alderman-webb in [#5625](https://github.com/getsentry/sentry-python/pull/5625)
+- Stop expecting a specific function name by @alexander-alderman-webb in [#5623](https://github.com/getsentry/sentry-python/pull/5623)
+- Set streaming header when library uses `with_streaming_response()` by @alexander-alderman-webb in [#5583](https://github.com/getsentry/sentry-python/pull/5583)
+- Replace mocks with `httpx` for streamed responses by @alexander-alderman-webb in [#5580](https://github.com/getsentry/sentry-python/pull/5580)
+- Replace mocks with `httpx` in non-MCP tool tests by @alexander-alderman-webb in [#5602](https://github.com/getsentry/sentry-python/pull/5602)
+- Replace mocks with `httpx` in MCP tool tests by @alexander-alderman-webb in [#5605](https://github.com/getsentry/sentry-python/pull/5605)
+- Replace mocks with `httpx` in handoff tests by @alexander-alderman-webb in [#5604](https://github.com/getsentry/sentry-python/pull/5604)
+- Replace mocks with `httpx` in API error test by @alexander-alderman-webb in [#5601](https://github.com/getsentry/sentry-python/pull/5601)
+- Replace mocks with `httpx` in non-error single-response tests by @alexander-alderman-webb in [#5600](https://github.com/getsentry/sentry-python/pull/5600)
+- Remove test for unreachable state by @alexander-alderman-webb in [#5584](https://github.com/getsentry/sentry-python/pull/5584)
+- Expect `namespace` tool field for new `openai` versions by @alexander-alderman-webb in [#5599](https://github.com/getsentry/sentry-python/pull/5599)
+
+#### Other
+
+- (graphene) Simplify span creation by @sentrivana in [#5648](https://github.com/getsentry/sentry-python/pull/5648)
+- (httpx) Resolve type checking failures by @alexander-alderman-webb in [#5626](https://github.com/getsentry/sentry-python/pull/5626)
+- (pyramid) Support alpha suffixes in version parsing by @alexander-alderman-webb in [#5618](https://github.com/getsentry/sentry-python/pull/5618)
+- (rust) Don't implement separate scope management by @sentrivana in [#5639](https://github.com/getsentry/sentry-python/pull/5639)
+- (strawberry) Simplify span creation by @sentrivana in [#5647](https://github.com/getsentry/sentry-python/pull/5647)
+- 🤖 Update test matrix with new releases (03/16) by @github-actions in [#5671](https://github.com/getsentry/sentry-python/pull/5671)
+- Remove custom warden action by @sentrivana in [#5653](https://github.com/getsentry/sentry-python/pull/5653)
+- Add `httpx` to linting requirements by @alexander-alderman-webb in [#5644](https://github.com/getsentry/sentry-python/pull/5644)
+- Remove CodeQL action by @sentrivana in [#5616](https://github.com/getsentry/sentry-python/pull/5616)
+- Normalize dots in package names in `populate_tox.py` by @alexander-alderman-webb in [#5574](https://github.com/getsentry/sentry-python/pull/5574)
+- Do not run actions on `potel-base` by @sentrivana in [#5614](https://github.com/getsentry/sentry-python/pull/5614)
+
 ## 2.54.0
 
 ### New Features ✨

@@ -46,8 +46,6 @@ from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
 )
-from sentry_sdk._types import AnnotatedValue
-from sentry_sdk.serializer import serialize
 from sentry_sdk.utils import safe_serialize
 
 from unittest import mock  # python 3.3 and above
