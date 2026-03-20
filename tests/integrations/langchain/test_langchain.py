@@ -566,6 +566,9 @@ def test_langchain_openai_tools_agent(
 
 
 def test_langchain_error(sentry_init, capture_events):
+    global llm_type
+    llm_type = "acme-llm"
+
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
