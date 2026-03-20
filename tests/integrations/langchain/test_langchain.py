@@ -329,7 +329,7 @@ def test_langchain_agent(
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
     with patch.object(
-        llm.root_client._client,
+        llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
     ) as _:
