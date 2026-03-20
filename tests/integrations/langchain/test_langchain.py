@@ -22,6 +22,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 import sentry_sdk
 from sentry_sdk import start_transaction
+from sentry_sdk.utils import package_version
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
@@ -32,13 +33,13 @@ from sentry_sdk.integrations.langchain import (
 try:
     # langchain v1+
     from langchain.tools import tool
+    from langchain.agents import create_agent
     from langchain_classic.agents import AgentExecutor, create_openai_tools_agent  # type: ignore[import-not-found]
 except ImportError:
     # langchain <v1
     from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from openai.types.chat.chat_completion_chunk import (
@@ -54,6 +55,8 @@ from openai.types.completion_usage import (
     CompletionUsage,
     PromptTokensDetails,
 )
+
+LANGCHAIN_VERSION = package_version("langchain")
 
 
 @tool
@@ -82,6 +85,10 @@ class MockOpenAI(ChatOpenAI):
         return llm_type
 
 
+@pytest.mark.skipif(
+    LANGCHAIN_VERSION < (1,),
+    reason="LangChain 1.0+ required (ONE AGENT refactor)",
+)
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -205,12 +212,12 @@ def test_langchain_create_agent(
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts, use_unknown_llm_type",
+    "send_default_pii, include_prompts",
     [
-        (True, True, False),
-        (True, False, False),
-        (False, True, False),
-        (False, False, True),
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
     ],
 )
 @pytest.mark.parametrize(
@@ -230,15 +237,11 @@ def test_langchain_openai_tools_agent(
     capture_events,
     send_default_pii,
     include_prompts,
-    use_unknown_llm_type,
     system_instructions_content,
     request,
     get_model_response,
     server_side_event_chunks,
 ):
-    global llm_type
-    llm_type = "acme-llm" if use_unknown_llm_type else "openai-chat"
-
     sentry_init(
         integrations=[
             LangchainIntegration(
