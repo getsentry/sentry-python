@@ -2693,7 +2693,9 @@ async def test_binary_content_encoding_mixed_content(sentry_init, capture_events
     await agent.run(["Here is an image:", binary_content, "What do you see?"])
 
     (event,) = events
-    span_data = event["spans"][0]["data"]
+    chat_spans = [s for s in event.get("spans", []) if s.get("op") == "gen_ai.chat"]
+    assert chat_spans, "Sentry should have captured a gen_ai.chat span"
+    span_data = chat_spans[0].get("data", {})
     messages_data = _get_messages_from_span(span_data)
 
     # Verify both text and binary content are present
