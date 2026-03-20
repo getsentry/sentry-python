@@ -310,29 +310,9 @@ def test_langchain_agent(
     assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
 
     # Verify that available tools are always recorded regardless of PII settings
-    tools_found = False
     for chat_span in chat_spans:
-        span_data = chat_span.get("data", {})
-        if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
-            tools_found = True
-            tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-            assert tools_data is not None, (
-                "Available tools should always be recorded regardless of PII settings"
-            )
-
-            if isinstance(tools_data, str):
-                # If serialized as string, should contain tool name
-                assert "get_word_length" in tools_data
-            else:
-                # If still a list, verify structure
-                assert len(tools_data) >= 1
-                names = [
-                    tool.get("name") for tool in tools_data if isinstance(tool, dict)
-                ]
-                assert "get_word_length" in names
-
-    # Ensure we found at least one span with tools data
-    assert tools_found, "No spans found with tools data"
+        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+        assert "get_word_length" in tools_data
 
 
 def test_langchain_error(sentry_init, capture_events):
