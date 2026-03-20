@@ -16,6 +16,40 @@ from .patches import (
 
 
 class PydanticAIIntegration(Integration):
+    """
+    Integration for Pydantic AI.
+
+    This integration instruments Pydantic AI agents to capture traces and errors.
+
+    Example:
+        Install the integration:
+
+        .. code-block:: bash
+
+            pip install sentry-sdk[pydantic_ai]
+
+        Configure the integration:
+
+        .. code-block:: python
+
+            import sentry_sdk
+            from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+
+            sentry_sdk.init(
+                dsn="your-dsn",
+                integrations=[PydanticAIIntegration()],
+            )
+
+        Use Pydantic AI:
+
+        .. code-block:: python
+
+            from pydantic_ai import Agent
+
+            agent = Agent("test", output_type=SupportResponse)
+            result = await agent.run("Hello")
+            print(result.output)
+    """
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
 
