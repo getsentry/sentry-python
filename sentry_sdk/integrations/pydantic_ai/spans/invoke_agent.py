@@ -18,6 +18,7 @@ from .utils import (
     _serialize_binary_content_item,
     _serialize_image_url_item,
     _set_usage_data,
+    _format_messages,
 )
 
 from typing import TYPE_CHECKING
@@ -142,10 +143,33 @@ def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> 
     output = getattr(result, "output", None)
 
     # Set response text if prompts are enabled
-    if _should_send_prompts() and output:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
-        )
+    if _should_send_prompts():
+        messages = None
+        if hasattr(result, "new_messages") and callable(result.new_messages):
+            try:
+                messages = result.new_messages()
+            except Exception:
+                pass
+        elif hasattr(result, "all_messages") and callable(result.all_messages):
+            try:
+                messages = result.all_messages()
+            except Exception:
+                pass
+
+        if messages:
+            formatted_messages = _format_messages(messages)
+            if formatted_messages:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, formatted_messages, unpack=False
+                )
+            elif output:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
+                )
+        elif output:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
+            )
 
     # Set token usage data if available
     if hasattr(result, "usage") and callable(result.usage):

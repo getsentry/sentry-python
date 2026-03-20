@@ -650,6 +650,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
             span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
+            span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
 
             tool_description = serialized.get("description")
             if tool_description is not None:

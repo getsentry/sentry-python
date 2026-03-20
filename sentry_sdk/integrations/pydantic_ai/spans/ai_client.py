@@ -23,6 +23,7 @@ from .utils import (
     _serialize_binary_content_item,
     _serialize_image_url_item,
     _set_usage_data,
+    _format_messages,
 )
 
 from typing import TYPE_CHECKING
@@ -116,70 +117,7 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
         )
 
     try:
-        formatted_messages = []
-
-        for msg in messages:
-            if hasattr(msg, "parts"):
-                for part in msg.parts:
-                    role = "user"
-                    # Use isinstance checks with proper base classes
-                    if SystemPromptPart and isinstance(part, SystemPromptPart):
-                        continue
-                    elif (
-                        (TextPart and isinstance(part, TextPart))
-                        or (ThinkingPart and isinstance(part, ThinkingPart))
-                        or (BaseToolCallPart and isinstance(part, BaseToolCallPart))
-                    ):
-                        role = "assistant"
-                    elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
-                        role = "tool"
-
-                    content: "List[Dict[str, Any] | str]" = []
-                    tool_calls = None
-                    tool_call_id = None
-
-                    # Handle ToolCallPart (assistant requesting tool use)
-                    if BaseToolCallPart and isinstance(part, BaseToolCallPart):
-                        tool_call_data = {}
-                        if hasattr(part, "tool_name"):
-                            tool_call_data["name"] = part.tool_name
-                        if hasattr(part, "args"):
-                            tool_call_data["arguments"] = safe_serialize(part.args)
-                        if tool_call_data:
-                            tool_calls = [tool_call_data]
-                    # Handle ToolReturnPart (tool result)
-                    elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
-                        if hasattr(part, "tool_name"):
-                            tool_call_id = part.tool_name
-                        if hasattr(part, "content"):
-                            content.append({"type": "text", "text": str(part.content)})
-                    # Handle regular content
-                    elif hasattr(part, "content"):
-                        if isinstance(part.content, str):
-                            content.append({"type": "text", "text": part.content})
-                        elif isinstance(part.content, list):
-                            for item in part.content:
-                                if isinstance(item, str):
-                                    content.append({"type": "text", "text": item})
-                                elif ImageUrl and isinstance(item, ImageUrl):
-                                    content.append(_serialize_image_url_item(item))
-                                elif BinaryContent and isinstance(item, BinaryContent):
-                                    content.append(_serialize_binary_content_item(item))
-                                else:
-                                    content.append(safe_serialize(item))
-                        else:
-                            content.append({"type": "text", "text": str(part.content)})
-                    # Add message if we have content or tool calls
-                    if content or tool_calls:
-                        message: "Dict[str, Any]" = {"role": role}
-                        if content:
-                            message["content"] = content
-                        if tool_calls:
-                            message["tool_calls"] = tool_calls
-                        if tool_call_id:
-                            message["tool_call_id"] = tool_call_id
-                        formatted_messages.append(message)
-
+        formatted_messages = _format_messages(messages)
         if formatted_messages:
             normalized_messages = normalize_message_roles(formatted_messages)
             scope = sentry_sdk.get_current_scope()

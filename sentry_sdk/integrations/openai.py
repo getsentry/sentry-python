@@ -12,6 +12,7 @@ from sentry_sdk.ai.utils import (
     normalize_message_roles,
     truncate_and_annotate_messages,
     truncate_and_annotate_embedding_inputs,
+    get_current_agent_name,
 )
 from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
@@ -225,6 +226,10 @@ def _commmon_set_input_data(
 ) -> None:
     # Input attributes: Common
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
+
+    agent_name = get_current_agent_name()
+    if agent_name:
+        span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
     # Input attributes: Optional
     kwargs_keys_to_attributes = {

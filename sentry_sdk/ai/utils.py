@@ -747,3 +747,40 @@ def set_conversation_id(conversation_id: str) -> None:
     """
     scope = sentry_sdk.get_current_scope()
     scope.set_conversation_id(conversation_id)
+
+
+import contextvars
+
+_gen_ai_agent_stack: "contextvars.ContextVar[Optional[list[Optional[str]]]]" = (
+    contextvars.ContextVar("gen_ai_agent_stack", default=None)
+)
+
+
+def push_agent_name(agent_name: "Optional[str]") -> None:
+    """Push an agent name onto the stack."""
+    stack = _gen_ai_agent_stack.get()
+    if stack is None:
+        stack = []
+    else:
+        stack = stack.copy()
+    stack.append(agent_name)
+    _gen_ai_agent_stack.set(stack)
+
+
+def pop_agent_name() -> "Optional[str]":
+    """Pop an agent name from the stack and return it."""
+    stack = _gen_ai_agent_stack.get()
+    if stack:
+        stack = stack.copy()
+        agent_name = stack.pop()
+        _gen_ai_agent_stack.set(stack)
+        return agent_name
+    return None
+
+
+def get_current_agent_name() -> "Optional[str]":
+    """Get the current agent name (top of stack) without removing it."""
+    stack = _gen_ai_agent_stack.get()
+    if stack:
+        return stack[-1]
+    return None

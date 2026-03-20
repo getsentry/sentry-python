@@ -6,6 +6,8 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     normalize_message_roles,
     truncate_and_annotate_messages,
+    push_agent_name,
+    pop_agent_name,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -168,6 +170,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if graph_name:
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
+                push_agent_name(graph_name)
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
@@ -193,11 +196,13 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             unpack=False,
                         )
 
-            result = f(self, *args, **kwargs)
-
-            _set_response_attributes(span, input_messages, result, integration)
-
-            return result
+            try:
+                result = f(self, *args, **kwargs)
+                _set_response_attributes(span, input_messages, result, integration)
+                return result
+            finally:
+                if graph_name:
+                    pop_agent_name()
 
     return new_invoke
 
@@ -222,6 +227,8 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             if graph_name:
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
+                push_agent_name(graph_name)
+                push_agent_name(graph_name)
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
@@ -246,11 +253,13 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             unpack=False,
                         )
 
-            result = await f(self, *args, **kwargs)
-
-            _set_response_attributes(span, input_messages, result, integration)
-
-            return result
+            try:
+                result = await f(self, *args, **kwargs)
+                _set_response_attributes(span, input_messages, result, integration)
+                return result
+            finally:
+                if graph_name:
+                    pop_agent_name()
 
     return new_ainvoke
 
