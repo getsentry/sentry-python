@@ -95,6 +95,7 @@ class SentryAsgiMiddleware:
         "mechanism_type",
         "span_origin",
         "http_methods_to_capture",
+        "suppress_chained_exceptions",
     )
 
     def __init__(
