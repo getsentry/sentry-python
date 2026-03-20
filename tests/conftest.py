@@ -1018,10 +1018,14 @@ def async_iterator():
 
 @pytest.fixture
 def server_side_event_chunks():
-    def inner(events):
+    def inner(events, include_event_type=True):
         for event in events:
             payload = event.model_dump()
-            chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+            chunk = (
+                f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+                if include_event_type
+                else f"data: {json.dumps(payload)}\n\n"
+            )
             yield chunk.encode("utf-8")
 
     return inner
