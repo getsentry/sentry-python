@@ -4,6 +4,7 @@ An ASGI middleware.
 Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 """
 
+import sys
 import asyncio
 import inspect
 from copy import deepcopy
@@ -37,6 +38,8 @@ from sentry_sdk.utils import (
     logger,
     transaction_from_function,
     _get_installed_modules,
+    reraise,
+    capture_internal_exceptions,
 )
 
 from typing import TYPE_CHECKING
@@ -103,6 +106,7 @@ class SentryAsgiMiddleware:
         span_origin: str = "manual",
         http_methods_to_capture: "Tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
         asgi_version: "Optional[int]" = None,
+        suppress_chained_exceptions: "Optional[bool]" = None,
     ) -> None:
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
@@ -139,6 +143,7 @@ class SentryAsgiMiddleware:
         self.span_origin = span_origin
         self.app = app
         self.http_methods_to_capture = http_methods_to_capture
+        self.suppress_chained_exceptions = suppress_chained_exceptions
 
         if asgi_version is None:
             if _looks_like_asgi3(app):
@@ -187,8 +192,17 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                self._capture_lifespan_exception(exc)
-                raise exc from None
+                if (
+                    self.suppress_chained_exceptions is None
+                    or self.suppress_chained_exceptions
+                ):
+                    self._capture_lifespan_exception(exc)
+                    raise exc from None
+
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    self._capture_request_exception(exc)
+                reraise(*exc_info)
 
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
@@ -323,8 +337,17 @@ class SentryAsgiMiddleware:
                                     scope, receive, _sentry_wrapped_send
                                 )
                         except Exception as exc:
-                            self._capture_request_exception(exc)
-                            raise exc from None
+                            if (
+                                self.suppress_chained_exceptions is None
+                                or self.suppress_chained_exceptions
+                            ):
+                                self._capture_lifespan_exception(exc)
+                                raise exc from None
+
+                            exc_info = sys.exc_info()
+                            with capture_internal_exceptions():
+                                self._capture_request_exception(exc)
+                            reraise(*exc_info)
         finally:
             _asgi_middleware_applied.set(False)
 
