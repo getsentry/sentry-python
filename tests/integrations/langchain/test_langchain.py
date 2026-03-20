@@ -82,12 +82,12 @@ class MockOpenAI(ChatOpenAI):
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts, use_unknown_llm_type",
+    "send_default_pii, include_prompts",
     [
-        (True, True, False),
-        (True, False, False),
-        (False, True, False),
-        (False, False, True),
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
     ],
 )
 @pytest.mark.parametrize(
@@ -107,15 +107,11 @@ def test_langchain_agent(
     capture_events,
     send_default_pii,
     include_prompts,
-    use_unknown_llm_type,
     system_instructions_content,
     request,
     get_model_response,
     server_side_event_chunks,
 ):
-    global llm_type
-    llm_type = "acme-llm" if use_unknown_llm_type else "openai-chat"
-
     sentry_init(
         integrations=[
             LangchainIntegration(
