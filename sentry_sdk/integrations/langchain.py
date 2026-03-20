@@ -108,29 +108,13 @@ except ImportError:
     OllamaEmbeddings = None
 
 
-_NON_PROVIDER_PARTS = frozenset({"azure", "aws", "gcp", "vertex", "chat", "llm"})
-
-
 def _get_ai_system(all_params: "Dict[str, Any]") -> "Optional[str]":
-    """Extract the AI provider from the ``_type`` field in LangChain params.
-
-    Splits on ``-`` and skips generic segments (cloud prefixes and model-type
-    descriptors like ``chat`` / ``llm``) to return the actual provider name.
-    """
     ai_type = all_params.get("_type")
 
     if not ai_type or not isinstance(ai_type, str):
         return None
 
-    parts = [p.strip().lower() for p in ai_type.split("-") if p.strip()]
-    if not parts:
-        return None
-
-    for part in parts:
-        if part not in _NON_PROVIDER_PARTS:
-            return part
-
-    return parts[0]
+    return ai_type
 
 
 DATA_FIELDS = {

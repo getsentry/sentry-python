@@ -2005,40 +2005,40 @@ class TestTransformLangchainContentBlock:
     [
         # Real LangChain _type values (from _llm_type properties)
         # OpenAI
-        ("openai-chat", "openai"),
+        ("openai-chat", "openai-chat"),
         ("openai", "openai"),
         # Azure OpenAI
-        ("azure-openai-chat", "openai"),
+        ("azure-openai-chat", "azure-openai-chat"),
         ("azure", "azure"),
         # Anthropic
-        ("anthropic-chat", "anthropic"),
+        ("anthropic-chat", "anthropic-chat"),
         # Google
         ("vertexai", "vertexai"),
-        ("chat-google-generative-ai", "google"),
+        ("chat-google-generative-ai", "chat-google-generative-ai"),
         ("google_gemini", "google_gemini"),
-        # AWS Bedrock (underscore-separated, no split)
+        # AWS Bedrock
         ("amazon_bedrock_chat", "amazon_bedrock_chat"),
         ("amazon_bedrock", "amazon_bedrock"),
         # Cohere
-        ("cohere-chat", "cohere"),
+        ("cohere-chat", "cohere-chat"),
         # Ollama
-        ("chat-ollama", "ollama"),
-        ("ollama-llm", "ollama"),
+        ("chat-ollama", "chat-ollama"),
+        ("ollama-llm", "ollama-llm"),
         # Mistral
-        ("mistralai-chat", "mistralai"),
+        ("mistralai-chat", "mistralai-chat"),
         # Fireworks
-        ("fireworks-chat", "fireworks"),
+        ("fireworks-chat", "fireworks-chat"),
         ("fireworks", "fireworks"),
         # HuggingFace
-        ("huggingface-chat-wrapper", "huggingface"),
+        ("huggingface-chat-wrapper", "huggingface-chat-wrapper"),
         # Groq
-        ("groq-chat", "groq"),
+        ("groq-chat", "groq-chat"),
         # NVIDIA
-        ("chat-nvidia-ai-playground", "nvidia"),
+        ("chat-nvidia-ai-playground", "chat-nvidia-ai-playground"),
         # xAI
-        ("xai-chat", "xai"),
+        ("xai-chat", "xai-chat"),
         # DeepSeek
-        ("chat-deepseek", "deepseek"),
+        ("chat-deepseek", "chat-deepseek"),
         # Edge cases
         ("", None),
         (None, None),
