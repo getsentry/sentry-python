@@ -20,8 +20,6 @@ from ..utils import (
     get_is_streaming,
 )
 from .utils import (
-    _serialize_binary_content_item,
-    _serialize_image_url_item,
     _set_usage_data,
     _format_messages,
 )
@@ -36,24 +34,16 @@ if TYPE_CHECKING:
 try:
     from pydantic_ai.messages import (
         BaseToolCallPart,
-        BaseToolReturnPart,
         SystemPromptPart,
         UserPromptPart,
         TextPart,
-        ThinkingPart,
-        BinaryContent,
-        ImageUrl,
     )
 except ImportError:
     # Fallback if these classes are not available
     BaseToolCallPart = None
-    BaseToolReturnPart = None
     SystemPromptPart = None
     UserPromptPart = None
     TextPart = None
-    ThinkingPart = None
-    BinaryContent = None
-    ImageUrl = None
 
 
 def _transform_system_instructions(
