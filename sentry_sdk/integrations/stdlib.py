@@ -7,7 +7,7 @@ from http.client import HTTPConnection
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.scope import add_global_event_processor, global_enrichers
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     should_propagate_trace,
@@ -60,6 +60,22 @@ class StdlibIntegration(Integration):
                     contexts["runtime"] = _RUNTIME_CONTEXT
 
             return event
+
+        def add_python_runtime_context_enricher(telemetry):
+            if sentry_sdk.get_client().get_integration(StdlibIntegration) is not None:
+                telemetry.set_attribute(
+                    "process.runtime.name", _RUNTIME_CONTEXT["name"]
+                )
+                telemetry.set_attribute(
+                    "process.runtime.version", _RUNTIME_CONTEXT["version"]
+                )
+                telemetry.set_attribute(
+                    "process.runtime.description", _RUNTIME_CONTEXT["build"]
+                )
+
+            return telemetry
+
+        global_enrichers.append(add_python_runtime_context_enricher)
 
 
 def _install_httplib() -> None:

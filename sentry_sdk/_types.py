@@ -112,6 +112,8 @@ if TYPE_CHECKING:
     from typing import Type
     from typing_extensions import Literal, TypedDict
 
+    from sentry_sdk.traces import StreamedSpan
+
     class SDKInfo(TypedDict):
         name: str
         version: str
@@ -293,11 +295,15 @@ if TYPE_CHECKING:
     # TODO: Make a proper type definition for this (PRs welcome!)
     SamplingContext = Dict[str, Any]
 
+    # New-style, attribute-based telemetry
+    Telemetry = Union[Metric, Log, StreamedSpan]
+
     EventProcessor = Callable[[Event, Hint], Optional[Event]]
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
     TransactionProcessor = Callable[[Event, Hint], Optional[Event]]
     LogProcessor = Callable[[Log, Hint], Optional[Log]]
+    Enricher = Callable[[Telemetry], Telemetry]
 
     TracesSampler = Callable[[SamplingContext], Union[float, int, bool]]
 
