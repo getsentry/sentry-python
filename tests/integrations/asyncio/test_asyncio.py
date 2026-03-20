@@ -896,3 +896,105 @@ def test_mark_sentry_task_internal_exception_cleanup():
     except ValueError:
         pass
     assert is_internal_task() is False
+
+
+# ===== Sync wrapper tests for better coverage collection =====
+
+
+@minimum_python_38
+def test_patch_loop_close_sets_flag_sync():
+    """Test patch_loop_close using asyncio.run() for coverage."""
+    from sentry_sdk.integrations.asyncio import patch_loop_close
+
+    async def _inner():
+        loop = asyncio.get_running_loop()
+        if hasattr(loop, "_sentry_flush_patched"):
+            delattr(loop, "_sentry_flush_patched")
+        patch_loop_close()
+        assert getattr(loop, "_sentry_flush_patched", False) is True
+
+    asyncio.run(_inner())
+
+
+@minimum_python_38
+def test_create_task_with_factory_sync():
+    """Test _create_task_with_factory using asyncio.run() for coverage."""
+    from sentry_sdk.integrations.asyncio import _create_task_with_factory
+
+    async def _inner():
+        loop = asyncio.get_running_loop()
+
+        async def dummy():
+            return "hello"
+
+        # No factory — should use Task() fallback
+        task = _create_task_with_factory(None, loop, dummy())
+        assert await task == "hello"
+
+        # With factory
+        def factory(loop, coro, **kw):
+            return asyncio.ensure_future(coro, loop=loop)
+
+        task2 = _create_task_with_factory(factory, loop, dummy())
+        assert await task2 == "hello"
+
+        # Factory returns None — should fall back to Task()
+        def none_factory(lp, coro, **kw):
+            return None
+
+        task3 = _create_task_with_factory(none_factory, loop, dummy())
+        assert await task3 == "hello"
+
+    asyncio.run(_inner())
+
+
+@minimum_python_38
+def test_internal_task_marking_sync():
+    """Test is_internal_task / mark_sentry_task_internal using asyncio.run()."""
+    from sentry_sdk.utils import is_internal_task, mark_sentry_task_internal
+
+    async def _inner():
+        assert is_internal_task() is False
+        with mark_sentry_task_internal():
+            assert is_internal_task() is True
+            # Nested
+            with mark_sentry_task_internal():
+                assert is_internal_task() is True
+            assert is_internal_task() is True
+        assert is_internal_task() is False
+
+    asyncio.run(_inner())
+
+
+@minimum_python_38
+def test_sentry_task_factory_integration_sync():
+    """Test the full task factory integration using asyncio.run()."""
+    from sentry_sdk.utils import mark_sentry_task_internal
+
+    async def _inner():
+        sentry_sdk.init(
+            integrations=[AsyncioIntegration()],
+            traces_sample_rate=1.0,
+        )
+
+        results = []
+
+        async def user_coro():
+            results.append("user")
+
+        async def internal_coro():
+            results.append("internal")
+
+        # Create user task (should be wrapped)
+        t1 = asyncio.create_task(user_coro())
+        await t1
+
+        # Create internal task (should skip wrapping)
+        with mark_sentry_task_internal():
+            t2 = asyncio.create_task(internal_coro())
+        await t2
+
+        assert "user" in results
+        assert "internal" in results
+
+    asyncio.run(_inner())

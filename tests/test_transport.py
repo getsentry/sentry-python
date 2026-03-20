@@ -2219,3 +2219,342 @@ async def test_async_transport_flush_returns_none_zero_timeout():
     result = client.transport.flush(timeout=0)
     assert result is None
     await client.close_async()
+
+
+# ===== Sync wrapper tests for better coverage collection =====
+# These use asyncio.run() instead of @pytest.mark.asyncio to ensure
+# coverage is tracked in the main thread.
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_async_worker_lifecycle_sync():
+    """Test AsyncWorker lifecycle using asyncio.run() for coverage."""
+    from sentry_sdk.worker import AsyncWorker
+
+    async def _test():
+        worker = AsyncWorker(queue_size=5)
+        assert worker.full() is True  # queue not yet created
+        worker.start()
+        assert worker.is_alive is True
+        assert worker.full() is False
+
+        results = []
+
+        async def callback():
+            results.append("done")
+
+        assert worker.submit(callback) is True
+        await asyncio.sleep(0.1)
+        assert results == ["done"]
+
+        flush_task = worker.flush(timeout=1.0)
+        assert flush_task is not None
+        await flush_task
+
+        worker.kill()
+        await asyncio.sleep(0)
+        assert worker.is_alive is False
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_async_worker_kill_and_restart_sync():
+    """Test AsyncWorker kill and restart using asyncio.run()."""
+    from sentry_sdk.worker import AsyncWorker
+
+    async def _test():
+        worker = AsyncWorker(queue_size=5)
+        worker.start()
+        assert worker.is_alive
+
+        worker.kill()
+        await asyncio.sleep(0)
+        assert not worker.is_alive
+
+        # Restart
+        worker.start()
+        assert worker.is_alive
+
+        worker.kill()
+        await asyncio.sleep(0)
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_async_transport_creation_sync():
+    """Test AsyncHttpTransport creation and pool using asyncio.run()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    async def _test():
+        client = Client(
+            "https://foo@sentry.io/123",
+            _experiments={"transport_async": True},
+            integrations=[AsyncioIntegration()],
+        )
+        assert isinstance(client.transport, AsyncHttpTransport)
+        assert client.transport.loop is not None
+        assert hasattr(client.transport, "_pool")
+
+        # Test _get_pool_options
+        opts = client.transport._get_pool_options()
+        assert "ssl_context" in opts
+        assert "socket_options" in opts
+        assert opts["http2"] is False
+
+        # Test _get_header_value
+        class FakeResponse:
+            headers = [(b"x-sentry-rate-limits", b"60:error:organization")]
+
+        val = client.transport._get_header_value(FakeResponse(), "x-sentry-rate-limits")
+        assert val == "60:error:organization"
+
+        # Test case-insensitive header lookup
+        val2 = client.transport._get_header_value(
+            FakeResponse(), "X-Sentry-Rate-Limits"
+        )
+        assert val2 == "60:error:organization"
+
+        await client.close_async()
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_async_transport_capture_envelope_sync():
+    """Test AsyncHttpTransport.capture_envelope using asyncio.run()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    async def _test():
+        client = Client(
+            "https://foo@sentry.io/123",
+            _experiments={"transport_async": True},
+            integrations=[AsyncioIntegration()],
+        )
+        assert isinstance(client.transport, AsyncHttpTransport)
+
+        # Capture envelope should use loop.call_soon_threadsafe
+        envelope = Envelope()
+        envelope.add_event({"type": "error", "message": "test"})
+
+        # This should not raise
+        client.transport.capture_envelope(envelope)
+        await asyncio.sleep(0.1)
+
+        await client.close_async()
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_async_transport_flush_sync():
+    """Test AsyncHttpTransport.flush using asyncio.run()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    async def _test():
+        client = Client(
+            "https://foo@sentry.io/123",
+            _experiments={"transport_async": True},
+            integrations=[AsyncioIntegration()],
+        )
+        assert isinstance(client.transport, AsyncHttpTransport)
+
+        # flush with timeout > 0 should return a task
+        result = client.transport.flush(timeout=1.0)
+        assert result is not None
+        await result
+
+        # flush with timeout 0 should return None
+        result = client.transport.flush(timeout=0)
+        assert result is None
+
+        await client.close_async()
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_async_transport_kill_sync():
+    """Test AsyncHttpTransport.kill using asyncio.run()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    async def _test():
+        client = Client(
+            "https://foo@sentry.io/123",
+            _experiments={"transport_async": True},
+            integrations=[AsyncioIntegration()],
+        )
+        assert isinstance(client.transport, AsyncHttpTransport)
+
+        kill_task = client.transport.kill()
+        assert kill_task is not None
+        await kill_task
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async client requires Python 3.8+")
+def test_client_close_async_sync():
+    """Test client close_async using asyncio.run()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    async def _test():
+        client = Client(
+            "https://foo@sentry.io/123",
+            _experiments={"transport_async": True},
+            integrations=[AsyncioIntegration()],
+        )
+        assert isinstance(client.transport, AsyncHttpTransport)
+        await client.close_async(timeout=1.0)
+        assert client.transport is None
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async client requires Python 3.8+")
+def test_client_flush_async_sync():
+    """Test client flush_async using asyncio.run()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    async def _test():
+        client = Client(
+            "https://foo@sentry.io/123",
+            _experiments={"transport_async": True},
+            integrations=[AsyncioIntegration()],
+        )
+        assert isinstance(client.transport, AsyncHttpTransport)
+        await client.flush_async(timeout=1.0)
+        # Transport should still be set after flush
+        assert client.transport is not None
+        await client.close_async()
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async client requires Python 3.8+")
+def test_client_async_context_manager_sync():
+    """Test async with Client() using asyncio.run()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    async def _test():
+        async with Client(
+            "https://foo@sentry.io/123",
+            _experiments={"transport_async": True},
+            integrations=[AsyncioIntegration()],
+        ) as client:
+            assert isinstance(client.transport, AsyncHttpTransport)
+        # After __aexit__, transport should be None
+        assert client.transport is None
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_make_transport_async_detection_sync():
+    """Test make_transport async detection using asyncio.run()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED, make_transport
+    from sentry_sdk.consts import DEFAULT_OPTIONS
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    async def _test():
+        # With transport_async=True and AsyncioIntegration, should get AsyncHttpTransport
+        options = dict(DEFAULT_OPTIONS)
+        options["dsn"] = "https://foo@sentry.io/123"
+        options["_experiments"] = {"transport_async": True}
+        options["integrations"] = [AsyncioIntegration()]
+        options["transport"] = None
+
+        transport = make_transport(options)
+        assert isinstance(transport, AsyncHttpTransport)
+        transport.kill()
+        await asyncio.sleep(0)
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async requires Python 3.8+")
+def test_asyncio_patch_loop_close_sync():
+    """Test patch_loop_close using asyncio.run()."""
+    from sentry_sdk.integrations.asyncio import patch_loop_close
+
+    async def _test():
+        loop = asyncio.get_running_loop()
+        # Clear any existing patch
+        if hasattr(loop, "_sentry_flush_patched"):
+            delattr(loop, "_sentry_flush_patched")
+
+        patch_loop_close()
+        assert loop._sentry_flush_patched is True
+
+        # Calling again should be a no-op (already patched)
+        patch_loop_close()
+        assert loop._sentry_flush_patched is True
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async requires Python 3.8+")
+def test_asyncio_create_task_with_factory_sync():
+    """Test _create_task_with_factory using asyncio.run()."""
+    from sentry_sdk.integrations.asyncio import _create_task_with_factory
+
+    async def _test():
+        loop = asyncio.get_running_loop()
+
+        async def dummy():
+            return 42
+
+        # Without factory
+        task = _create_task_with_factory(None, loop, dummy())
+        result = await task
+        assert result == 42
+
+        # With factory that returns a task
+        def my_factory(loop, coro, **kwargs):
+            return asyncio.ensure_future(coro, loop=loop)
+
+        task2 = _create_task_with_factory(my_factory, loop, dummy())
+        result2 = await task2
+        assert result2 == 42
+
+    asyncio.run(_test())
+
+
+@pytest.mark.skipif(not PY38, reason="Async requires Python 3.8+")
+def test_asyncio_internal_task_detection_sync():
+    """Test is_internal_task / mark_sentry_task_internal using asyncio.run()."""
+    from sentry_sdk.utils import is_internal_task, mark_sentry_task_internal
+
+    async def _test():
+        assert is_internal_task() is False
+
+        with mark_sentry_task_internal():
+            assert is_internal_task() is True
+
+        assert is_internal_task() is False
+
+    asyncio.run(_test())
