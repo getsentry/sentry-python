@@ -336,7 +336,7 @@ class SentryAsgiMiddleware:
                                 )
                         except Exception as exc:
                             if self.suppress_chained_exceptions:
-                                self._capture_lifespan_exception(exc)
+                                self._capture_request_exception(exc)
                                 raise exc from None
 
                             exc_info = sys.exc_info()
