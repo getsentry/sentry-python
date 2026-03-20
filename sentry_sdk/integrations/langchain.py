@@ -23,6 +23,13 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import _get_value, set_span_errored
 from sentry_sdk.utils import capture_internal_exceptions, logger
 
+CURRENT_LANGCHAIN_AGENT_NAME = contextvars.ContextVar("CURRENT_LANGCHAIN_AGENT_NAME", default=None)
+
+
+def _get_current_langchain_agent_name() -> "Optional[str]":
+    return CURRENT_LANGCHAIN_AGENT_NAME.get(None)
+
+
 if TYPE_CHECKING:
     from typing import (
         Any,
@@ -290,6 +297,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
 
         watched_span.span.__enter__()
+
+        agent_name = _get_current_langchain_agent_name()
+        if agent_name:
+            watched_span.span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+
         self.span_map[run_id] = watched_span
         self.gc_span_map()
         return watched_span
@@ -933,53 +945,60 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             return f(self, *args, **kwargs)
 
         agent_name, tools = _get_request_data(self, args, kwargs)
+        token = CURRENT_LANGCHAIN_AGENT_NAME.set(agent_name)
         start_span_function = get_start_span_function()
 
-        with start_span_function(
-            op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
-            origin=LangchainIntegration.origin,
-        ) as span:
-            try:
+        try:
+            with start_span_function(
+                op=OP.GEN_AI_INVOKE_AGENT,
+                name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
+                origin=LangchainIntegration.origin,
+            ) as span:
+                try:
+                    if agent_name:
+                        span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
-                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+                    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-                _set_tools_on_span(span, tools)
+                    _set_tools_on_span(span, tools)
 
-                # Run the agent
-                result = f(self, *args, **kwargs)
+                    # Run the agent
+                    result = f(self, *args, **kwargs)
 
-                input = result.get("input")
-                if (
-                    input is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
-                    normalized_messages = normalize_message_roles([input])
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        normalized_messages, span, scope
-                    )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
+                    input = result.get("input")
+                    if (
+                        input is not None
+                        and should_send_default_pii()
+                        and integration.include_prompts
+                    ):
+                        normalized_messages = normalize_message_roles([input])
+                        scope = sentry_sdk.get_current_scope()
+                        messages_data = truncate_and_annotate_messages(
+                            normalized_messages, span, scope
                         )
+                        if messages_data is not None:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                                messages_data,
+                                unpack=False,
+                            )
 
-                output = result.get("output")
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                    output = result.get("output")
+                    if (
+                        output is not None
+                        and should_send_default_pii()
+                        and integration.include_prompts
+                    ):
+                        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-                return result
-            finally:
-                # Ensure agent is popped even if an exception occurs
+                    return result
+                finally:
+                    # Ensure agent is popped even if an exception occurs
+                    pass
+        finally:
+            CURRENT_LANGCHAIN_AGENT_NAME.reset(token)
 
     return new_invoke
 
@@ -992,6 +1011,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             return f(self, *args, **kwargs)
 
         agent_name, tools = _get_request_data(self, args, kwargs)
+        token = CURRENT_LANGCHAIN_AGENT_NAME.set(agent_name)
         start_span_function = get_start_span_function()
 
         span = start_span_function(
@@ -1001,6 +1021,8 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         )
         span.__enter__()
 
+        if agent_name:
+            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
@@ -1055,6 +1077,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
                 span.__exit__(*exc_info)
+                CURRENT_LANGCHAIN_AGENT_NAME.reset(token)
 
         async def new_iterator_async() -> "AsyncIterator[Any]":
             exc_info: "tuple[Any, Any, Any]" = (None, None, None)
@@ -1080,6 +1103,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
                 span.__exit__(*exc_info)
+                CURRENT_LANGCHAIN_AGENT_NAME.reset(token)
 
         if str(type(result)) == "<class 'async_generator'>":
             result = new_iterator_async()
