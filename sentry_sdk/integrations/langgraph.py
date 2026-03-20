@@ -228,7 +228,6 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
                 push_agent_name(graph_name)
-                push_agent_name(graph_name)
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
