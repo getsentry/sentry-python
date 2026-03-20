@@ -11,7 +11,6 @@ try:
         BaseToolCallPart,
         BaseToolReturnPart,
         SystemPromptPart,
-        UserPromptPart,
         TextPart,
         ThinkingPart,
         BinaryContent,
@@ -21,7 +20,6 @@ except ImportError:
     BaseToolCallPart = None
     BaseToolReturnPart = None
     SystemPromptPart = None
-    UserPromptPart = None
     TextPart = None
     ThinkingPart = None
     BinaryContent = None

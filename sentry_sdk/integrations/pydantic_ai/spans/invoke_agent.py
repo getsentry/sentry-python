@@ -156,7 +156,7 @@ def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> 
             except Exception:
                 pass
 
-        formatted_messages = _format_messages(messages) if "messages" in locals() and messages else []
+        formatted_messages = _format_messages(messages) if messages else []
 
         if formatted_messages:
             set_data_normalized(
