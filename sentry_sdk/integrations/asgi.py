@@ -106,7 +106,7 @@ class SentryAsgiMiddleware:
         span_origin: str = "manual",
         http_methods_to_capture: "Tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
         asgi_version: "Optional[int]" = None,
-        suppress_chained_exceptions: "Optional[bool]" = None,
+        suppress_chained_exceptions: "bool" = True,
     ) -> None:
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
@@ -192,10 +192,7 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                if (
-                    self.suppress_chained_exceptions is None
-                    or self.suppress_chained_exceptions
-                ):
+                if self.suppress_chained_exceptions:
                     self._capture_lifespan_exception(exc)
                     raise exc from None
 
@@ -337,10 +334,7 @@ class SentryAsgiMiddleware:
                                     scope, receive, _sentry_wrapped_send
                                 )
                         except Exception as exc:
-                            if (
-                                self.suppress_chained_exceptions is None
-                                or self.suppress_chained_exceptions
-                            ):
+                            if self.suppress_chained_exceptions:
                                 self._capture_lifespan_exception(exc)
                                 raise exc from None
 
