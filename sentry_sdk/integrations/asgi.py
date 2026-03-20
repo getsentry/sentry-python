@@ -193,7 +193,7 @@ class SentryAsgiMiddleware:
                 suppress_chained_exceptions = (
                     sentry_sdk.get_client()
                     .options.get("_experiments", {})
-                    .get("suppress_asgi_chained_exceptions", False)
+                    .get("suppress_asgi_chained_exceptions", True)
                 )
                 if suppress_chained_exceptions:
                     self._capture_lifespan_exception(exc)
@@ -340,7 +340,7 @@ class SentryAsgiMiddleware:
                             suppress_chained_exceptions = (
                                 sentry_sdk.get_client()
                                 .options.get("_experiments", {})
-                                .get("suppress_asgi_chained_exceptions", False)
+                                .get("suppress_asgi_chained_exceptions", True)
                             )
                             if suppress_chained_exceptions:
                                 self._capture_request_exception(exc)
