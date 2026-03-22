@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import functools
 import warnings
 from collections.abc import Set
@@ -75,6 +76,12 @@ except ImportError:
 
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
+
+# ContextVar-based recursion guard: prevents Sentry from re-entering its own
+# exception handler when an exception is raised inside it (fixes infinite loop).
+_sentry_exception_handling = contextvars.ContextVar(
+    "_sentry_exception_handling", default=False
+)
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
@@ -216,13 +223,23 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
 
 @ensure_integration_enabled(StarletteIntegration)
 def _capture_exception(exception: BaseException, handled: "Any" = False) -> None:
-    event, hint = event_from_exception(
-        exception,
-        client_options=sentry_sdk.get_client().options,
-        mechanism={"type": StarletteIntegration.identifier, "handled": handled},
-    )
+    # Recursion guard: if we are already inside Sentry's exception handler
+    # (e.g. because the user's handler raised another exception), bail out
+    # immediately to avoid an infinite capture loop (see issue #5025).
+    if _sentry_exception_handling.get():
+        return
 
-    sentry_sdk.capture_event(event, hint=hint)
+    token = _sentry_exception_handling.set(True)
+    try:
+        event, hint = event_from_exception(
+            exception,
+            client_options=sentry_sdk.get_client().options,
+            mechanism={"type": StarletteIntegration.identifier, "handled": handled},
+        )
+
+        sentry_sdk.capture_event(event, hint=hint)
+    finally:
+        _sentry_exception_handling.reset(token)
 
 
 def patch_exception_middleware(middleware_class: "Any") -> None:

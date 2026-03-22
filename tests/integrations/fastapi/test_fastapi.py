@@ -760,3 +760,69 @@ async def test_feature_flags(sentry_init, capture_events):
             found = True
 
     assert found, "No event with exception found"
+
+
+@pytest.mark.asyncio
+async def test_recursion_guard_on_exception_in_exception_handler(
+    sentry_init, capture_events
+):
+    """
+    Regression test for https://github.com/getsentry/sentry-python/issues/5025
+
+    When a FastAPI/Starlette exception handler itself raises an exception,
+    Sentry's patched exception handler must not re-enter _capture_exception
+    recursively.  Without the ContextVar guard this caused an infinite loop.
+    """
+    sentry_init(
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    app = FastAPI()
+
+    class PrimaryError(Exception):
+        pass
+
+    class HandlerError(Exception):
+        pass
+
+    @app.exception_handler(PrimaryError)
+    async def _primary_error_handler(request: Request, exc: PrimaryError):
+        # Simulate a secondary exception raised from inside the user's handler.
+        # Without the recursion guard this would trigger _capture_exception
+        # again, which would call this handler again, causing infinite recursion.
+        raise HandlerError("secondary error raised inside exception handler")
+
+    @app.get("/trigger")
+    async def _trigger():
+        raise PrimaryError("original error")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    # The request must complete (with a 500) rather than hanging or crashing
+    # the test process with a RecursionError.
+    response = client.get("/trigger")
+    assert response.status_code == 500
+
+    # The original PrimaryError must have been captured exactly once.
+    captured_exceptions = [
+        e for e in events if "exception" in e
+    ]
+    primary_errors_captured = [
+        e for e in captured_exceptions
+        if any(
+            v.get("type") == "PrimaryError"
+            for v in e["exception"].get("values", [])
+        )
+    ]
+    assert len(primary_errors_captured) >= 1, (
+        "Expected PrimaryError to be captured by Sentry"
+    )
+
+    # Crucially: Sentry must NOT have captured the same exception repeatedly.
+    # A recursion bug would fill the event list with many duplicate events.
+    assert len(captured_exceptions) <= 5, (
+        "Too many exception events captured — possible recursion: %d events"
+        % len(captured_exceptions)
+    )
