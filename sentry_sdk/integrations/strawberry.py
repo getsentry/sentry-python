@@ -202,7 +202,12 @@ class SentryAsyncExtension(SchemaExtension):
         self.graphql_span.__exit__(None, None, None)
 
     def on_validate(self) -> "Generator[None, None, None]":
-        self.validation_span = self.graphql_span.start_child(
+        graphql_span = getattr(self, "graphql_span", None)
+        if not graphql_span:
+            yield
+            return
+
+        self.validation_span = graphql_span.start_child(
             op=OP.GRAPHQL_VALIDATE,
             name="validation",
             origin=StrawberryIntegration.origin,
@@ -213,7 +218,12 @@ class SentryAsyncExtension(SchemaExtension):
         self.validation_span.finish()
 
     def on_parse(self) -> "Generator[None, None, None]":
-        self.parsing_span = self.graphql_span.start_child(
+        graphql_span = getattr(self, "graphql_span", None)
+        if not graphql_span:
+            yield
+            return
+
+        self.parsing_span = graphql_span.start_child(
             op=OP.GRAPHQL_PARSE,
             name="parsing",
             origin=StrawberryIntegration.origin,
@@ -256,9 +266,13 @@ class SentryAsyncExtension(SchemaExtension):
         if self.should_skip_tracing(_next, info):
             return await self._resolve(_next, root, info, *args, **kwargs)
 
+        graphql_span = getattr(self, "graphql_span", None)
+        if not graphql_span:
+            return await self._resolve(_next, root, info, *args, **kwargs)
+
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        with self.graphql_span.start_child(
+        with graphql_span.start_child(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
@@ -283,9 +297,13 @@ class SentrySyncExtension(SentryAsyncExtension):
         if self.should_skip_tracing(_next, info):
             return _next(root, info, *args, **kwargs)
 
+        graphql_span = getattr(self, "graphql_span", None)
+        if not graphql_span:
+            return _next(root, info, *args, **kwargs)
+
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        with self.graphql_span.start_child(
+        with graphql_span.start_child(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
