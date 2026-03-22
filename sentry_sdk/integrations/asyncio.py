@@ -65,8 +65,11 @@ def patch_asyncio() -> None:
                     AsyncioIntegration
                 )
                 task_spans = integration.task_spans if integration else False
+                task_isolation = integration.task_isolation if integration else True
 
-                with sentry_sdk.isolation_scope():
+                context = sentry_sdk.isolation_scope() if task_isolation else nullcontext()
+
+                with context:
                     with (
                         sentry_sdk.start_span(
                             op=OP.FUNCTION,
@@ -150,8 +153,9 @@ class AsyncioIntegration(Integration):
     identifier = "asyncio"
     origin = f"auto.function.{identifier}"
 
-    def __init__(self, task_spans: bool = True) -> None:
+    def __init__(self, task_spans: bool = True, task_isolation: bool = True) -> None:
         self.task_spans = task_spans
+        self.task_isolation = task_isolation
 
     @staticmethod
     def setup_once() -> None:
