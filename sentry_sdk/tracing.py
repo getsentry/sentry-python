@@ -743,6 +743,7 @@ class Span:
             )
 
         data = {}
+        data.update(self._flags)
 
         thread_id = self._data.get(SPANDATA.THREAD_ID)
         if thread_id is not None:
@@ -1132,7 +1133,7 @@ class Transaction(Span):
         trace_context = super().get_trace_context()
 
         if self._data:
-            trace_context["data"] = self._data
+            trace_context.setdefault("data", {}).update(self._data)
 
         return trace_context
 
