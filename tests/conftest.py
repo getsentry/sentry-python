@@ -1039,7 +1039,10 @@ def server_side_event_chunks():
 
 @pytest.fixture
 def get_model_response():
-    def inner(response_content, serialize_pydantic=False, request_headers={}):
+    def inner(response_content, serialize_pydantic=False, request_headers=None):
+        if request_headers is None:
+            request_headers = {}
+
         model_request = HttpxRequest(
             "POST",
             "/responses",
