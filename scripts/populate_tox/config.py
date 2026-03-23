@@ -123,6 +123,7 @@ TEST_SUITE_CONFIG = {
                 "python-multipart",
                 "requests",
                 "anyio>=3,<5",
+                "jinja2",
             ],
             # There's an incompatibility between FastAPI's TestClient, which is
             # actually Starlette's TestClient, which is actually httpx's Client.
