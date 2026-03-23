@@ -12,7 +12,8 @@ try:
     from langchain_openai import ChatOpenAI, OpenAI
 except ImportError:
     # Langchain < 0.2
-    from langchain_community.chat_models import ChatOpenAI, OpenAI
+    from langchain_community.llms import OpenAI
+    from langchain_community.chat_models import ChatOpenAI
 
 from langchain_core.callbacks import BaseCallbackManager, CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessageChunk
