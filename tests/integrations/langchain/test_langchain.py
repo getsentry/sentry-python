@@ -333,17 +333,13 @@ def test_tool_execution_span(
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
 
-    # Token usage is only available in newer versions of langchain (v0.2+)
-    # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
-        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+    assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+    assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+    assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
 
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
-        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+    assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+    assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+    assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
     if send_default_pii and include_prompts:
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
