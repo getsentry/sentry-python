@@ -219,8 +219,6 @@ class AsyncWorker(Worker):
             for task in tasks_to_cancel:
                 task.cancel()
             self._active_tasks.clear()
-            # Reset queue to avoid stale terminators on restart
-            self._queue = None
             self._loop = None
             self._task = None
             self._task_for_pid = None
@@ -229,8 +227,8 @@ class AsyncWorker(Worker):
         if not self.is_alive:
             try:
                 self._loop = asyncio.get_running_loop()
-                if self._queue is None:
-                    self._queue = asyncio.Queue(maxsize=self._queue_size)
+                # Always create a fresh queue on start to avoid stale items
+                self._queue = asyncio.Queue(maxsize=self._queue_size)
                 with mark_sentry_task_internal():
                     self._task = self._loop.create_task(self._target())
                 self._task_for_pid = os.getpid()

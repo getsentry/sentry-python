@@ -1279,20 +1279,20 @@ def test_async_worker_start_no_running_loop():
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
-async def test_async_worker_start_creates_fresh_queue_after_kill():
-    """Test start() creates a fresh queue after kill() resets it."""
+async def test_async_worker_start_creates_fresh_queue_on_restart():
+    """Test start() creates a fresh queue on each restart."""
     from sentry_sdk.worker import AsyncWorker
 
     worker = AsyncWorker(queue_size=10)
     worker.start()
-    assert worker._queue is not None
-    # Kill resets queue to None to avoid stale terminators
+    old_queue = worker._queue
+    assert old_queue is not None
     worker.kill()
     await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
-    assert worker._queue is None
-    # Restart creates a fresh queue
+    # Restart creates a fresh queue (avoids stale items)
     worker.start()
     assert worker._queue is not None
+    assert worker._queue is not old_queue
     worker.kill()
     await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
