@@ -325,9 +325,11 @@ def test_tool_execution_span(
     assert tx["contexts"]["trace"]["origin"] == "manual"
 
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
-
     assert len(chat_spans) == 2
+
+    tool_exec_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
+    assert len(tool_exec_spans) == 1
+    tool_exec_span = tool_exec_spans[0]
 
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
