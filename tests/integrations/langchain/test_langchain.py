@@ -400,9 +400,11 @@ def test_tool_execution_span(
     assert tx["contexts"]["trace"]["origin"] == "manual"
 
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
-
     assert len(chat_spans) == 2
+
+    tool_exec_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
+    assert len(tool_exec_spans) == 1
+    tool_exec_span = tool_exec_spans[0]
 
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
@@ -426,13 +428,8 @@ def test_tool_execution_span(
             "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
         )
         tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
-        if isinstance(tool_calls_data, str):
-            assert "get_word_length" in tool_calls_data
-        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
-            # Check if tool calls contain expected function name
-            tool_call_str = str(tool_calls_data)
-            assert "get_word_length" in tool_call_str
+        assert isinstance(tool_calls_data, str)
+        assert "get_word_length" in tool_calls_data
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
