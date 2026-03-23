@@ -173,6 +173,7 @@ TEST_SUITE_CONFIG = {
         "package": "httpx",
         "deps": {
             "*": ["anyio>=3,<5"],
+            "<0.24": ["anyio<4"],
             ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
             ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
             ">=0.19,<0.21": ["pytest-httpx==0.14.0"],

@@ -2563,3 +2563,1493 @@ def test_asyncio_internal_task_detection_sync():
         assert is_internal_task() is False
 
     asyncio.run(_test())
+
+
+# ============================================================================
+# Pure-sync mock-based tests for async code coverage
+# ============================================================================
+# These tests are pure synchronous (no asyncio.run, no event loop).
+# They use mocks to simulate the async environment and call real methods
+# directly so that coverage is tracked in the main thread.
+#
+# See AGENTS.md pattern: "Sync wrapper tests for async code coverage tracking"
+
+
+# --- AsyncWorker (sentry_sdk/worker.py lines 193-330) ---
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_init():
+    """Cover AsyncWorker.__init__ default state."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker(queue_size=42)
+    assert worker._queue is None
+    assert worker._queue_size == 42
+    assert worker._task is None
+    assert worker._task_for_pid is None
+    assert worker._loop is None
+    assert worker._active_tasks == set()
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_init_default_queue_size():
+    """Cover AsyncWorker.__init__ with default queue_size."""
+    from sentry_sdk.worker import AsyncWorker
+    from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
+
+    worker = AsyncWorker()
+    assert worker._queue_size == DEFAULT_QUEUE_SIZE
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_is_alive_no_pid_match():
+    """Cover is_alive when _task_for_pid doesn't match os.getpid()."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._task_for_pid = -999  # Will never match current pid
+    assert worker.is_alive is False
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_is_alive_no_task():
+    """Cover is_alive when _task is None."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._task_for_pid = os.getpid()
+    worker._task = None
+    worker._loop = mock.MagicMock()
+    assert worker.is_alive is False
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_is_alive_no_loop():
+    """Cover is_alive when _loop is None."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._task_for_pid = os.getpid()
+    worker._task = mock.MagicMock()
+    worker._loop = None
+    assert worker.is_alive is False
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_is_alive_task_done():
+    """Cover is_alive when task.done() is True."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._task_for_pid = os.getpid()
+    mock_task = mock.MagicMock()
+    mock_task.done.return_value = True
+    worker._task = mock_task
+    mock_loop = mock.MagicMock()
+    mock_loop.is_running.return_value = True
+    worker._loop = mock_loop
+    assert worker.is_alive is False
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_is_alive_loop_not_running():
+    """Cover is_alive when loop.is_running() is False."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._task_for_pid = os.getpid()
+    mock_task = mock.MagicMock()
+    mock_task.done.return_value = False
+    worker._task = mock_task
+    mock_loop = mock.MagicMock()
+    mock_loop.is_running.return_value = False
+    worker._loop = mock_loop
+    assert worker.is_alive is False
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_is_alive_true():
+    """Cover is_alive returns True with correct pid, running loop, active task."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._task_for_pid = os.getpid()
+    mock_task = mock.MagicMock()
+    mock_task.done.return_value = False
+    worker._task = mock_task
+    mock_loop = mock.MagicMock()
+    mock_loop.is_running.return_value = True
+    worker._loop = mock_loop
+    assert worker.is_alive is True
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_kill_with_active_tasks():
+    """Cover kill() when there are active callback tasks to cancel."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    mock_main_task = mock.MagicMock()
+    worker._task = mock_main_task
+    worker._task_for_pid = os.getpid()
+    mock_loop = mock.MagicMock()
+    worker._loop = mock_loop
+
+    # Add some active tasks
+    mock_cb_task1 = mock.MagicMock()
+    mock_cb_task2 = mock.MagicMock()
+    worker._active_tasks = {mock_cb_task1, mock_cb_task2}
+
+    worker.kill()
+
+    mock_main_task.cancel.assert_called_once()
+    mock_cb_task1.cancel.assert_called_once()
+    mock_cb_task2.cancel.assert_called_once()
+    assert worker._active_tasks == set()
+    assert worker._task is None
+    assert worker._loop is None
+    assert worker._task_for_pid is None
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_kill_no_task():
+    """Cover kill() when _task is None (no-op branch)."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._task = None
+    # Should not raise
+    worker.kill()
+    assert worker._task is None
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_full_none_queue():
+    """Cover full() when _queue is None."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    assert worker._queue is None
+    assert worker.full() is True
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_full_not_full():
+    """Cover full() when queue exists and is not full."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    mock_queue = mock.MagicMock()
+    mock_queue.full.return_value = False
+    worker._queue = mock_queue
+    assert worker.full() is False
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_full_when_full():
+    """Cover full() when queue exists and is full."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    mock_queue = mock.MagicMock()
+    mock_queue.full.return_value = True
+    worker._queue = mock_queue
+    assert worker.full() is True
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_submit_none_queue():
+    """Cover submit() when _queue is None after _ensure_task."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    # Mock start() to keep _queue as None (simulates no running loop)
+    with mock.patch.object(worker, "start"):
+        result = worker.submit(lambda: None)
+    assert result is False
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_submit_queue_full():
+    """Cover submit() when queue raises QueueFull."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    mock_queue = mock.MagicMock()
+    mock_queue.put_nowait.side_effect = asyncio.QueueFull()
+    worker._queue = mock_queue
+    # Mock _ensure_task to prevent start()
+    with mock.patch.object(worker, "_ensure_task"):
+        result = worker.submit(lambda: None)
+    assert result is False
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_submit_success():
+    """Cover submit() successful put_nowait."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    mock_queue = mock.MagicMock()
+    mock_queue.put_nowait.return_value = None
+    worker._queue = mock_queue
+    with mock.patch.object(worker, "_ensure_task"):
+        result = worker.submit(lambda: None)
+    assert result is True
+    mock_queue.put_nowait.assert_called_once()
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_flush_not_alive():
+    """Cover flush() returning None when worker is not alive."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    # Not alive because no task/loop
+    result = worker.flush(timeout=1.0)
+    assert result is None
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_flush_zero_timeout():
+    """Cover flush() returning None when timeout is 0."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    # Even if we fake is_alive to True, timeout=0 should return None
+    worker._task_for_pid = os.getpid()
+    mock_task = mock.MagicMock()
+    mock_task.done.return_value = False
+    worker._task = mock_task
+    mock_loop = mock.MagicMock()
+    mock_loop.is_running.return_value = True
+    worker._loop = mock_loop
+
+    result = worker.flush(timeout=0.0)
+    assert result is None
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_flush_alive_positive_timeout():
+    """Cover flush() creating a task when alive with positive timeout."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._task_for_pid = os.getpid()
+    mock_task = mock.MagicMock()
+    mock_task.done.return_value = False
+    worker._task = mock_task
+    mock_loop = mock.MagicMock()
+    mock_loop.is_running.return_value = True
+    mock_created_task = mock.MagicMock()
+    mock_loop.create_task.return_value = mock_created_task
+    worker._loop = mock_loop
+
+    result = worker.flush(timeout=1.0)
+    assert result is mock_created_task
+    mock_loop.create_task.assert_called_once()
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_on_task_complete_success():
+    """Cover _on_task_complete when task.result() returns normally."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    mock_queue = mock.MagicMock()
+    worker._queue = mock_queue
+
+    mock_task = mock.MagicMock()
+    mock_task.result.return_value = None
+    worker._active_tasks.add(mock_task)
+
+    worker._on_task_complete(mock_task)
+
+    mock_task.result.assert_called_once()
+    mock_queue.task_done.assert_called_once()
+    assert mock_task not in worker._active_tasks
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_on_task_complete_cancelled():
+    """Cover _on_task_complete when task.result() raises CancelledError."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    mock_queue = mock.MagicMock()
+    worker._queue = mock_queue
+
+    mock_task = mock.MagicMock()
+    mock_task.result.side_effect = asyncio.CancelledError()
+    worker._active_tasks.add(mock_task)
+
+    with mock.patch("sentry_sdk.worker.logger") as mock_logger:
+        worker._on_task_complete(mock_task)
+        # CancelledError should NOT trigger error logging
+        mock_logger.error.assert_not_called()
+
+    mock_queue.task_done.assert_called_once()
+    assert mock_task not in worker._active_tasks
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_on_task_complete_exception():
+    """Cover _on_task_complete when task.result() raises a regular Exception."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    mock_queue = mock.MagicMock()
+    worker._queue = mock_queue
+
+    mock_task = mock.MagicMock()
+    mock_task.result.side_effect = ValueError("something broke")
+    worker._active_tasks.add(mock_task)
+
+    with mock.patch("sentry_sdk.worker.logger") as mock_logger:
+        worker._on_task_complete(mock_task)
+        mock_logger.error.assert_called_once_with(
+            "Failed processing job", exc_info=True
+        )
+
+    mock_queue.task_done.assert_called_once()
+    assert mock_task not in worker._active_tasks
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_on_task_complete_queue_none():
+    """Cover _on_task_complete when _queue is None (shutdown scenario)."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    worker._queue = None  # Simulates post-kill state
+
+    mock_task = mock.MagicMock()
+    mock_task.result.return_value = None
+    worker._active_tasks.add(mock_task)
+
+    # Should not raise despite queue being None
+    worker._on_task_complete(mock_task)
+    assert mock_task not in worker._active_tasks
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_start_no_running_loop():
+    """Cover start() handling RuntimeError from get_running_loop."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    # In a sync test there is no running loop, so start() hits RuntimeError path
+    worker.start()
+    assert worker._loop is None
+    assert worker._task is None
+    assert worker._task_for_pid is None
+
+
+@pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
+def test_sync_cov_async_worker_ensure_task_calls_start():
+    """Cover _ensure_task calling start() when not alive."""
+    from sentry_sdk.worker import AsyncWorker
+
+    worker = AsyncWorker()
+    with mock.patch.object(worker, "start") as mock_start:
+        worker._ensure_task()
+        mock_start.assert_called_once()
+
+
+# --- AsyncHttpTransport (sentry_sdk/transport.py lines 760-972) ---
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_capture_envelope_loop_not_running():
+    """Cover capture_envelope when loop.is_running() is False."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    # Construct AsyncHttpTransport with a mocked running loop at init time
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    # Now set loop to not running
+    transport.loop = mock.MagicMock()
+    transport.loop.is_running.return_value = False
+
+    envelope = Envelope()
+    envelope.add_event({"type": "error", "message": "test"})
+
+    with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+        transport.capture_envelope(envelope)
+        mock_logger.warning.assert_called_with(
+            "Async Transport is not running in an event loop."
+        )
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_capture_envelope_loop_none():
+    """Cover capture_envelope when loop is falsy (None)."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    transport.loop = None
+
+    envelope = Envelope()
+    envelope.add_event({"type": "error", "message": "test"})
+
+    with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+        transport.capture_envelope(envelope)
+        mock_logger.warning.assert_called_with(
+            "Async Transport is not running in an event loop."
+        )
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_capture_envelope_loop_running():
+    """Cover capture_envelope when loop is running → calls call_soon_threadsafe."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    mock_loop.is_running.return_value = True
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    # Ensure loop mock is set correctly
+    transport.loop = mock_loop
+
+    envelope = Envelope()
+    envelope.add_event({"type": "error", "message": "test"})
+
+    transport.capture_envelope(envelope)
+    mock_loop.call_soon_threadsafe.assert_called_once()
+    args = mock_loop.call_soon_threadsafe.call_args
+    assert args[0][0] == transport._capture_envelope
+    assert args[0][1] is envelope
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_get_header_value():
+    """Cover AsyncHttpTransport._get_header_value (httpcore-style headers)."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    class MockResponse:
+        headers = [
+            (b"content-type", b"application/json"),
+            (b"x-sentry-rate-limits", b"60:error:organization"),
+        ]
+
+    # Case-insensitive match
+    assert (
+        transport._get_header_value(MockResponse(), "X-Sentry-Rate-Limits")
+        == "60:error:organization"
+    )
+    assert (
+        transport._get_header_value(MockResponse(), "x-sentry-rate-limits")
+        == "60:error:organization"
+    )
+    assert (
+        transport._get_header_value(MockResponse(), "Content-Type")
+        == "application/json"
+    )
+    # Missing header
+    assert transport._get_header_value(MockResponse(), "Nonexistent") is None
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_get_pool_options():
+    """Cover AsyncHttpTransport._get_pool_options."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    opts = transport._get_pool_options()
+    assert opts["http2"] is False
+    assert opts["retries"] == 3
+    assert "ssl_context" in opts
+    assert "socket_options" in opts
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_get_pool_options_keep_alive():
+    """Cover _get_pool_options with keep_alive=True merges KEEP_ALIVE_SOCKET_OPTIONS."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": True,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    opts = transport._get_pool_options()
+    # Should include keep-alive socket options
+    assert len(opts["socket_options"]) > 0
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_flush_zero_timeout():
+    """Cover flush() returning None when timeout is 0."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    result = transport.flush(timeout=0)
+    assert result is None
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_flush_positive_timeout():
+    """Cover flush() with timeout > 0 delegates to worker.flush()."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    mock_flush_result = mock.MagicMock()
+    transport._worker = mock.MagicMock()
+    transport._worker.submit.return_value = True
+    transport._worker.flush.return_value = mock_flush_result
+
+    result = transport.flush(timeout=1.0)
+    assert result is mock_flush_result
+    transport._worker.submit.assert_called_once()
+    transport._worker.flush.assert_called_once_with(1.0, None)
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_kill_runtime_error():
+    """Cover kill() when loop.create_task raises RuntimeError."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    transport.loop = mock.MagicMock()
+    transport.loop.create_task.side_effect = RuntimeError("no loop")
+    transport._worker = mock.MagicMock()
+
+    with mock.patch("sentry_sdk.transport.logger"):
+        result = transport.kill()
+    assert result is None
+    transport._worker.kill.assert_called_once()
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_kill_success():
+    """Cover kill() returning pool cleanup task."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    mock_cleanup_task = mock.MagicMock()
+    transport.loop = mock.MagicMock()
+    transport.loop.create_task.return_value = mock_cleanup_task
+    transport._worker = mock.MagicMock()
+    transport._pool = mock.MagicMock()
+
+    result = transport.kill()
+    assert result is mock_cleanup_task
+    transport._worker.kill.assert_called_once()
+    transport.loop.create_task.assert_called_once()
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_async_transport_capture_envelope_worker_full():
+    """Cover _capture_envelope when worker.submit returns False (full queue)."""
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    mock_loop = mock.MagicMock()
+    with mock.patch("asyncio.get_running_loop", return_value=mock_loop):
+        transport = AsyncHttpTransport(
+            {
+                "dsn": "https://foo@sentry.io/123",
+                "send_client_reports": True,
+                "transport_queue_size": 100,
+                "keep_alive": False,
+                "socket_options": None,
+                "ca_certs": None,
+                "cert_file": None,
+                "key_file": None,
+                "http_proxy": None,
+                "https_proxy": None,
+                "proxy_headers": None,
+                "_experiments": {},
+            }
+        )
+
+    transport._worker = mock.MagicMock()
+    transport._worker.submit.return_value = False
+
+    dropped_reasons = []
+    transport.on_dropped_event = lambda reason: dropped_reasons.append(reason)
+    lost_events = []
+    transport.record_lost_event = lambda reason, data_category=None, item=None: (
+        lost_events.append((reason, data_category, item))
+    )
+
+    envelope = Envelope()
+    item = Item(payload=b'{"message":"test"}', type="event")
+    envelope.add_item(item)
+
+    transport._capture_envelope(envelope)
+
+    assert dropped_reasons == ["full_queue"]
+    assert len(lost_events) == 1
+    assert lost_events[0][0] == "queue_overflow"
+
+
+# --- HttpTransportCore shared methods (sentry_sdk/transport.py lines 336-500) ---
+
+
+def test_sync_cov_handle_request_error_none_envelope(make_client, monkeypatch):
+    """Cover _handle_request_error with envelope=None and custom record_reason."""
+    client = make_client()
+    transport = client.transport
+
+    calls = []
+    monkeypatch.setattr(
+        transport, "on_dropped_event", lambda reason: calls.append(("dropped", reason))
+    )
+    monkeypatch.setattr(
+        transport,
+        "record_lost_event",
+        lambda reason, data_category=None, item=None: calls.append(
+            ("lost", reason, data_category)
+        ),
+    )
+
+    transport._handle_request_error(
+        envelope=None, loss_reason="status_413", record_reason="send_error"
+    )
+    assert calls == [
+        ("dropped", "status_413"),
+        ("lost", "send_error", "error"),
+    ]
+
+
+def test_sync_cov_handle_request_error_with_envelope(make_client, monkeypatch):
+    """Cover _handle_request_error with envelope containing items."""
+    client = make_client()
+    transport = client.transport
+
+    calls = []
+    monkeypatch.setattr(
+        transport, "on_dropped_event", lambda reason: calls.append(("dropped", reason))
+    )
+    monkeypatch.setattr(
+        transport,
+        "record_lost_event",
+        lambda reason, data_category=None, item=None: calls.append(
+            ("lost", reason, item)
+        ),
+    )
+
+    envelope = Envelope()
+    item1 = Item(payload=b'{"message":"a"}', type="event")
+    item2 = Item(payload=b'{"type":"transaction"}', type="transaction")
+    envelope.add_item(item1)
+    envelope.add_item(item2)
+
+    transport._handle_request_error(envelope=envelope, loss_reason="network")
+    assert calls[0] == ("dropped", "network")
+    # Two items → two record_lost_event calls with those items
+    assert calls[1][0] == "lost"
+    assert calls[1][1] == "network_error"
+    assert calls[2][0] == "lost"
+    assert calls[2][1] == "network_error"
+
+
+def test_sync_cov_handle_response_200(make_client, monkeypatch):
+    """Cover _handle_response for 200 status — no error handling triggered."""
+    client = make_client()
+    transport = client.transport
+
+    error_calls = []
+    monkeypatch.setattr(
+        transport,
+        "_handle_request_error",
+        lambda envelope, loss_reason, record_reason="network_error": error_calls.append(
+            loss_reason
+        ),
+    )
+
+    class MockResponse:
+        status = 200
+        headers = {}
+
+    transport._handle_response(MockResponse(), envelope=None)
+    assert error_calls == []
+
+
+def test_sync_cov_handle_response_413_with_body(make_client, monkeypatch):
+    """Cover _handle_response for 413 including data body in message."""
+    client = make_client()
+    transport = client.transport
+
+    error_calls = []
+    monkeypatch.setattr(
+        transport,
+        "_handle_request_error",
+        lambda envelope, loss_reason, record_reason="network_error": error_calls.append(
+            (loss_reason, record_reason)
+        ),
+    )
+
+    class MockResponse:
+        status = 413
+        headers = {}
+        data = b"Payload Too Large"
+
+    transport._handle_response(MockResponse(), envelope=None)
+    assert error_calls == [("status_413", "send_error")]
+
+
+def test_sync_cov_handle_response_429(make_client, monkeypatch):
+    """Cover _handle_response for 429 — calls on_dropped_event."""
+    client = make_client()
+    transport = client.transport
+
+    dropped = []
+    monkeypatch.setattr(
+        transport, "on_dropped_event", lambda reason: dropped.append(reason)
+    )
+
+    class MockResponse:
+        status = 429
+        headers = {"Retry-After": "120"}
+
+    transport._handle_response(MockResponse(), envelope=None)
+    assert dropped == ["status_429"]
+    # Should also have updated _disabled_until
+    assert None in transport._disabled_until
+
+
+def test_sync_cov_handle_response_500(make_client, monkeypatch):
+    """Cover _handle_response for 500 — triggers _handle_request_error."""
+    client = make_client()
+    transport = client.transport
+
+    error_calls = []
+    monkeypatch.setattr(
+        transport,
+        "_handle_request_error",
+        lambda envelope, loss_reason, record_reason="network_error": error_calls.append(
+            loss_reason
+        ),
+    )
+
+    class MockResponse:
+        status = 500
+        headers = {}
+        data = b"Internal Server Error"
+
+    transport._handle_response(MockResponse(), envelope=None)
+    assert error_calls == ["status_500"]
+
+
+def test_sync_cov_handle_response_302(make_client, monkeypatch):
+    """Cover _handle_response for redirect status (>= 300, < 400)."""
+    client = make_client()
+    transport = client.transport
+
+    error_calls = []
+    monkeypatch.setattr(
+        transport,
+        "_handle_request_error",
+        lambda envelope, loss_reason, record_reason="network_error": error_calls.append(
+            loss_reason
+        ),
+    )
+
+    class MockResponse:
+        status = 302
+        headers = {}
+        data = b"Found"
+
+    transport._handle_response(MockResponse(), envelope=None)
+    assert error_calls == ["status_302"]
+
+
+def test_sync_cov_update_headers(make_client):
+    """Cover _update_headers sets User-Agent and X-Sentry-Auth."""
+    client = make_client()
+    transport = client.transport
+
+    headers = {"Content-Type": "application/x-sentry-envelope"}
+    transport._update_headers(headers)
+
+    assert "User-Agent" in headers
+    assert "X-Sentry-Auth" in headers
+    assert "sentry.python" in headers["User-Agent"]
+    # Original header preserved
+    assert headers["Content-Type"] == "application/x-sentry-envelope"
+
+
+def test_sync_cov_prepare_envelope_all_rate_limited(make_client):
+    """Cover _prepare_envelope when all items are rate-limited → returns None."""
+    client = make_client()
+    transport = client.transport
+
+    transport._disabled_until["error"] = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    envelope = Envelope()
+    envelope.add_event({"type": "error", "message": "blocked"})
+
+    assert transport._prepare_envelope(envelope) is None
+
+
+def test_sync_cov_prepare_envelope_mixed_items(make_client):
+    """Cover _prepare_envelope with mix of rate-limited and allowed items."""
+    client = make_client()
+    transport = client.transport
+
+    # Rate-limit transactions but not errors
+    transport._disabled_until["transaction"] = datetime.now(timezone.utc) + timedelta(
+        hours=1
+    )
+
+    envelope = Envelope()
+    envelope.add_event({"type": "error", "message": "allowed"})
+    envelope.add_item(Item(payload=b'{"type":"transaction"}', type="transaction"))
+
+    result = transport._prepare_envelope(envelope)
+    assert result is not None
+    env, body, headers = result
+    # Only the error item should remain (plus possible client report)
+    item_types = [item.type for item in env.items]
+    assert "event" in item_types
+    assert "transaction" not in item_types
+
+
+def test_sync_cov_prepare_envelope_empty_after_filtering(make_client):
+    """Cover _prepare_envelope returning None when empty after rate-limit filtering."""
+    client = make_client()
+    transport = client.transport
+
+    transport._disabled_until["transaction"] = datetime.now(timezone.utc) + timedelta(
+        hours=1
+    )
+
+    envelope = Envelope()
+    envelope.add_item(Item(payload=b'{"type":"transaction"}', type="transaction"))
+
+    assert transport._prepare_envelope(envelope) is None
+
+
+def test_sync_cov_prepare_envelope_with_client_report(make_client):
+    """Cover _prepare_envelope attaching pending client report."""
+    client = make_client()
+    transport = client.transport
+
+    # Seed a discarded event and force report fetch
+    transport._discarded_events[("error", "network_error")] = 3
+    transport._last_client_report_sent = 0
+
+    envelope = Envelope()
+    envelope.add_event({"type": "error", "message": "test"})
+
+    result = transport._prepare_envelope(envelope)
+    assert result is not None
+    env, body, headers = result
+    item_types = [item.type for item in env.items]
+    assert "client_report" in item_types
+
+
+def test_sync_cov_check_disabled(make_client):
+    """Cover _check_disabled for specific and global rate limits."""
+    client = make_client()
+    transport = client.transport
+
+    # No limits → not disabled
+    assert transport._check_disabled("error") is False
+
+    # Specific limit
+    transport._disabled_until["error"] = datetime.now(timezone.utc) + timedelta(hours=1)
+    assert transport._check_disabled("error") is True
+    assert transport._check_disabled("transaction") is False
+
+    # Global limit (None key)
+    transport._disabled_until[None] = datetime.now(timezone.utc) + timedelta(hours=1)
+    assert transport._check_disabled("transaction") is True
+
+    # Expired limit
+    transport._disabled_until["error"] = datetime.now(timezone.utc) - timedelta(hours=1)
+    transport._disabled_until[None] = datetime.now(timezone.utc) - timedelta(hours=1)
+    assert transport._check_disabled("error") is False
+
+
+def test_sync_cov_is_rate_limited(make_client):
+    """Cover _is_rate_limited."""
+    client = make_client()
+    transport = client.transport
+
+    assert transport._is_rate_limited() is False
+
+    transport._disabled_until["error"] = datetime.now(timezone.utc) + timedelta(hours=1)
+    assert transport._is_rate_limited() is True
+
+
+def test_sync_cov_is_worker_full(make_client):
+    """Cover _is_worker_full delegates to worker.full()."""
+    client = make_client()
+    transport = client.transport
+
+    # BackgroundWorker starts with an empty queue
+    assert transport._is_worker_full() is False
+
+
+def test_sync_cov_is_healthy(make_client):
+    """Cover is_healthy checks both worker full and rate limited."""
+    client = make_client()
+    transport = client.transport
+
+    assert transport.is_healthy() is True
+
+    # Rate-limit makes unhealthy
+    transport._disabled_until["error"] = datetime.now(timezone.utc) + timedelta(hours=1)
+    assert transport.is_healthy() is False
+
+
+# --- asyncio integration sync paths (sentry_sdk/integrations/asyncio.py) ---
+
+
+@pytest.mark.skipif(not PY38, reason="asyncio integration requires Python 3.8+")
+def test_sync_cov_patch_loop_close_no_running_loop():
+    """Cover patch_loop_close when there is no running loop (RuntimeError)."""
+    from sentry_sdk.integrations.asyncio import patch_loop_close
+
+    # In a sync test, get_running_loop raises RuntimeError
+    # patch_loop_close should return without error
+    patch_loop_close()  # No exception = success
+
+
+@pytest.mark.skipif(not PY38, reason="asyncio integration requires Python 3.8+")
+def test_sync_cov_create_task_with_factory_no_factory():
+    """Cover _create_task_with_factory with orig_task_factory=None."""
+    from sentry_sdk.integrations.asyncio import _create_task_with_factory
+
+    mock_loop = mock.MagicMock()
+    mock_coro = mock.MagicMock()
+
+    with mock.patch("sentry_sdk.integrations.asyncio.Task") as MockTask:
+        mock_task_instance = mock.MagicMock()
+        mock_task_instance._source_traceback = None
+        MockTask.return_value = mock_task_instance
+
+        task = _create_task_with_factory(None, mock_loop, mock_coro)
+        MockTask.assert_called_once_with(mock_coro, loop=mock_loop)
+        assert task is mock_task_instance
+
+
+@pytest.mark.skipif(not PY38, reason="asyncio integration requires Python 3.8+")
+def test_sync_cov_create_task_with_factory_with_factory():
+    """Cover _create_task_with_factory when orig_task_factory is provided."""
+    from sentry_sdk.integrations.asyncio import _create_task_with_factory
+
+    mock_loop = mock.MagicMock()
+    mock_coro = mock.MagicMock()
+    mock_task = mock.MagicMock()
+
+    def factory(loop, coro, **kwargs):
+        return mock_task
+
+    result = _create_task_with_factory(factory, mock_loop, mock_coro)
+    assert result is mock_task
+
+
+@pytest.mark.skipif(not PY38, reason="asyncio integration requires Python 3.8+")
+def test_sync_cov_create_task_with_factory_factory_returns_none():
+    """Cover _create_task_with_factory when factory returns None (fallback to Task)."""
+    from sentry_sdk.integrations.asyncio import _create_task_with_factory
+
+    mock_loop = mock.MagicMock()
+    mock_coro = mock.MagicMock()
+
+    def factory(loop, coro, **kwargs):
+        return None  # Factory declines to create task
+
+    with mock.patch("sentry_sdk.integrations.asyncio.Task") as MockTask:
+        mock_task_instance = mock.MagicMock()
+        mock_task_instance._source_traceback = None
+        MockTask.return_value = mock_task_instance
+
+        task = _create_task_with_factory(factory, mock_loop, mock_coro)
+        MockTask.assert_called_once_with(mock_coro, loop=mock_loop)
+        assert task is mock_task_instance
+
+
+@pytest.mark.skipif(not PY38, reason="asyncio integration requires Python 3.8+")
+def test_sync_cov_create_task_with_factory_source_traceback():
+    """Cover _create_task_with_factory trimming _source_traceback."""
+    from sentry_sdk.integrations.asyncio import _create_task_with_factory
+
+    mock_loop = mock.MagicMock()
+    mock_coro = mock.MagicMock()
+
+    with mock.patch("sentry_sdk.integrations.asyncio.Task") as MockTask:
+        mock_task_instance = mock.MagicMock()
+        # Simulate _source_traceback being a truthy list
+        mock_task_instance._source_traceback = ["frame1", "frame2", "frame3"]
+        MockTask.return_value = mock_task_instance
+
+        task = _create_task_with_factory(None, mock_loop, mock_coro)
+        # Should have removed the last frame
+        assert mock_task_instance._source_traceback == ["frame1", "frame2"]
+        assert task is mock_task_instance
+
+
+# --- make_transport() async paths (sentry_sdk/transport.py lines 1140-1175) ---
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_make_transport_async_not_enabled():
+    """Cover make_transport with transport_async=True but ASYNC_TRANSPORT_ENABLED=False."""
+    from sentry_sdk.transport import make_transport
+
+    options = {
+        "dsn": "https://foo@sentry.io/123",
+        "transport": None,
+        "_experiments": {"transport_async": True},
+        "integrations": [AsyncioIntegration()],
+        "send_client_reports": True,
+        "transport_queue_size": 100,
+        "keep_alive": False,
+        "socket_options": None,
+        "ca_certs": None,
+        "cert_file": None,
+        "key_file": None,
+        "http_proxy": None,
+        "https_proxy": None,
+        "proxy_headers": None,
+    }
+    with mock.patch("sentry_sdk.transport.ASYNC_TRANSPORT_ENABLED", False):
+        with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+            transport = make_transport(options)
+    assert isinstance(transport, HttpTransport)
+    mock_logger.warning.assert_any_call(
+        "You tried to use AsyncHttpTransport but don't have httpcore[asyncio] installed. Falling back to sync transport."
+    )
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_make_transport_async_no_running_loop():
+    """Cover make_transport falling back when no running loop."""
+    from sentry_sdk.transport import make_transport, ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    options = {
+        "dsn": "https://foo@sentry.io/123",
+        "transport": None,
+        "_experiments": {"transport_async": True},
+        "integrations": [AsyncioIntegration()],
+        "send_client_reports": True,
+        "transport_queue_size": 100,
+        "keep_alive": False,
+        "socket_options": None,
+        "ca_certs": None,
+        "cert_file": None,
+        "key_file": None,
+        "http_proxy": None,
+        "https_proxy": None,
+        "proxy_headers": None,
+    }
+    # In sync context, get_running_loop raises RuntimeError
+    with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+        transport = make_transport(options)
+    assert isinstance(transport, HttpTransport)
+    mock_logger.warning.assert_any_call(
+        "No event loop running, falling back to sync transport."
+    )
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_make_transport_async_no_integration():
+    """Cover make_transport with async enabled but no AsyncioIntegration."""
+    from sentry_sdk.transport import make_transport, ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    options = {
+        "dsn": "https://foo@sentry.io/123",
+        "transport": None,
+        "_experiments": {"transport_async": True},
+        "integrations": [],  # No AsyncioIntegration
+        "send_client_reports": True,
+        "transport_queue_size": 100,
+        "keep_alive": False,
+        "socket_options": None,
+        "ca_certs": None,
+        "cert_file": None,
+        "key_file": None,
+        "http_proxy": None,
+        "https_proxy": None,
+        "proxy_headers": None,
+    }
+    mock_loop = mock.MagicMock()
+    with mock.patch(
+        "sentry_sdk.transport.asyncio.get_running_loop", return_value=mock_loop
+    ):
+        with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+            transport = make_transport(options)
+    assert isinstance(transport, HttpTransport)
+    mock_logger.warning.assert_any_call(
+        "You tried to use AsyncHttpTransport but the AsyncioIntegration is not enabled. Falling back to sync transport."
+    )
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_make_transport_async_with_http2():
+    """Cover make_transport with both transport_async and transport_http2."""
+    from sentry_sdk.transport import make_transport, ASYNC_TRANSPORT_ENABLED
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    options = {
+        "dsn": "https://foo@sentry.io/123",
+        "transport": None,
+        "_experiments": {"transport_async": True, "transport_http2": True},
+        "integrations": [AsyncioIntegration()],
+        "send_client_reports": True,
+        "transport_queue_size": 100,
+        "keep_alive": False,
+        "socket_options": None,
+        "ca_certs": None,
+        "cert_file": None,
+        "key_file": None,
+        "http_proxy": None,
+        "https_proxy": None,
+        "proxy_headers": None,
+    }
+    mock_loop = mock.MagicMock()
+    with mock.patch(
+        "sentry_sdk.transport.asyncio.get_running_loop", return_value=mock_loop
+    ):
+        with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+            transport = make_transport(options)
+    assert isinstance(transport, AsyncHttpTransport)
+    mock_logger.warning.assert_any_call(
+        "HTTP/2 transport is not supported with async transport. "
+        "Ignoring transport_http2 experiment."
+    )
+
+
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+def test_sync_cov_make_transport_no_async_flag():
+    """Cover make_transport without transport_async (default sync path)."""
+    from sentry_sdk.transport import make_transport
+
+    options = {
+        "dsn": "https://foo@sentry.io/123",
+        "transport": None,
+        "_experiments": {},
+        "integrations": [],
+        "send_client_reports": True,
+        "transport_queue_size": 100,
+        "keep_alive": False,
+        "socket_options": None,
+        "ca_certs": None,
+        "cert_file": None,
+        "key_file": None,
+        "http_proxy": None,
+        "https_proxy": None,
+        "proxy_headers": None,
+    }
+    transport = make_transport(options)
+    assert isinstance(transport, HttpTransport)
+
+
+# --- Additional edge cases for on_dropped_event and update_rate_limits ---
+
+
+def test_sync_cov_on_dropped_event_is_noop(make_client):
+    """Cover on_dropped_event default implementation (returns None)."""
+    client = make_client()
+    transport = client.transport
+    result = transport.on_dropped_event("some_reason")
+    assert result is None
+
+
+def test_sync_cov_update_rate_limits_x_sentry_header(make_client):
+    """Cover _update_rate_limits parsing x-sentry-rate-limits header."""
+    client = make_client()
+    transport = client.transport
+
+    class MockResponse:
+        status = 200
+        headers = {"x-sentry-rate-limits": "60:error:organization"}
+
+    transport._update_rate_limits(MockResponse())
+    assert "error" in transport._disabled_until
+
+
+def test_sync_cov_update_rate_limits_429_retry_after(make_client):
+    """Cover _update_rate_limits with 429 and Retry-After header (no x-sentry header)."""
+    client = make_client()
+    transport = client.transport
+
+    class MockResponse:
+        status = 429
+        headers = {"Retry-After": "120"}
+
+    transport._update_rate_limits(MockResponse())
+    assert None in transport._disabled_until
+
+
+def test_sync_cov_update_rate_limits_429_no_retry_after(make_client):
+    """Cover _update_rate_limits with 429 but no Retry-After header → defaults to 60s."""
+    client = make_client()
+    transport = client.transport
+
+    class MockResponse:
+        status = 429
+        headers = {}
+
+    transport._update_rate_limits(MockResponse())
+    assert None in transport._disabled_until
+
+
+def test_sync_cov_fetch_pending_client_report_disabled(make_client):
+    """Cover _fetch_pending_client_report when send_client_reports is False."""
+    client = make_client(send_client_reports=False)
+    transport = client.transport
+
+    result = transport._fetch_pending_client_report(force=True)
+    assert result is None
+
+
+def test_sync_cov_fetch_pending_client_report_no_discarded(make_client):
+    """Cover _fetch_pending_client_report when no discarded events."""
+    client = make_client()
+    transport = client.transport
+
+    # Force fetch but no discarded events
+    result = transport._fetch_pending_client_report(force=True)
+    assert result is None
+
+
+def test_sync_cov_fetch_pending_client_report_with_discarded(make_client):
+    """Cover _fetch_pending_client_report returning an Item when events are discarded."""
+    client = make_client()
+    transport = client.transport
+
+    transport._discarded_events[("error", "network_error")] = 5
+    transport._discarded_events[("transaction", "ratelimit_backoff")] = 2
+    transport._last_client_report_sent = 0  # Force fetch
+
+    result = transport._fetch_pending_client_report(force=True)
+    assert result is not None
+    assert result.type == "client_report"
+    payload = parse_json(result.get_bytes())
+    assert len(payload["discarded_events"]) == 2
+
+
+def test_sync_cov_fetch_pending_client_report_not_forced_recent(make_client):
+    """Cover _fetch_pending_client_report not returning when interval hasn't elapsed."""
+    import time as time_mod
+
+    client = make_client()
+    transport = client.transport
+
+    transport._discarded_events[("error", "network_error")] = 1
+    transport._last_client_report_sent = time_mod.time()  # Just sent
+
+    # Not forced, interval not elapsed → should return None
+    result = transport._fetch_pending_client_report(force=False, interval=60)
+    assert result is None
