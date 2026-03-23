@@ -49,9 +49,7 @@ from openai.types.chat.chat_completion_chunk import (
 )
 
 from openai.types.completion_usage import (
-    CompletionTokensDetails,
     CompletionUsage,
-    PromptTokensDetails,
 )
 
 
@@ -233,14 +231,6 @@ def test_langchain_agent(
                         prompt_tokens=142,
                         completion_tokens=50,
                         total_tokens=192,
-                        prompt_tokens_details=PromptTokensDetails(
-                            audio_tokens=0,
-                            cached_tokens=0,
-                        ),
-                        completion_tokens_details=CompletionTokensDetails(
-                            audio_tokens=0,
-                            reasoning_tokens=0,
-                        ),
                     ),
                 ),
             ],
@@ -300,14 +290,6 @@ def test_langchain_agent(
                         prompt_tokens=89,
                         completion_tokens=28,
                         total_tokens=117,
-                        prompt_tokens_details=PromptTokensDetails(
-                            audio_tokens=0,
-                            cached_tokens=0,
-                        ),
-                        completion_tokens_details=CompletionTokensDetails(
-                            audio_tokens=0,
-                            reasoning_tokens=0,
-                        ),
                     ),
                 ),
             ],
