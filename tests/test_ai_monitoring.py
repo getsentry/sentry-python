@@ -403,6 +403,27 @@ class TestTruncateMessagesBySize:
         # Second part gets truncated to 0 chars + ellipsis
         assert parts[1]["text"] == "..."
 
+    def test_truncate_handles_pydantic_like_objects(self):
+        """Pydantic-like SDK objects should be normalized before JSON sizing."""
+
+        class PydanticLike:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def model_dump(self):
+                return self.payload
+
+        messages = [
+            {"role": "user", "content": "hello"},
+            PydanticLike({"type": "function_call", "name": "notify"}),
+        ]
+
+        result, truncation_index = truncate_messages_by_size(messages, max_bytes=10_000)
+
+        assert truncation_index == 0
+        assert len(result) == 2
+        assert result[1] == {"type": "function_call", "name": "notify"}
+
     @pytest.mark.parametrize("content", [None, 42, 3.14, True])
     def test_single_message_truncation_non_str_non_list_content(self, content):
         messages = [{"role": "user", "content": content}]

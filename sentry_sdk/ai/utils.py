@@ -572,7 +572,7 @@ def _truncate_single_message_content_if_present(
     return message
 
 
-def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> int:
+def _find_truncation_index(messages: "List[Any]", max_bytes: int) -> int:
     """
     Find the index of the first message that would exceed the max bytes limit.
     Compute the individual message sizes, and return the index of the first message from the back
@@ -668,10 +668,10 @@ def redact_blob_message_parts(
 
 
 def truncate_messages_by_size(
-    messages: "List[Dict[str, Any]]",
+    messages: "List[Any]",
     max_bytes: int = MAX_GEN_AI_MESSAGE_BYTES,
     max_single_message_chars: int = MAX_SINGLE_MESSAGE_CONTENT_CHARS,
-) -> "Tuple[List[Dict[str, Any]], int]":
+) -> "Tuple[List[Any], int]":
     """
     Returns a truncated messages list, consisting of
     - the last message, with its content truncated to `max_single_message_chars` characters,
@@ -682,18 +682,22 @@ def truncate_messages_by_size(
     In the single message case, the serialized message size may exceed `max_bytes`, because
     truncation is based only on character count in that case.
     """
-    serialized_json = json.dumps(messages, separators=(",", ":"))
+    normalized_messages = _normalize_data(messages, unpack=False)
+    if not isinstance(normalized_messages, list):
+        normalized_messages = [normalized_messages]
+
+    serialized_json = json.dumps(normalized_messages, separators=(",", ":"))
     current_size = len(serialized_json.encode("utf-8"))
 
     if current_size <= max_bytes:
-        return messages, 0
+        return normalized_messages, 0
 
-    truncation_index = _find_truncation_index(messages, max_bytes)
-    if truncation_index < len(messages):
-        truncated_messages = messages[truncation_index:]
+    truncation_index = _find_truncation_index(normalized_messages, max_bytes)
+    if truncation_index < len(normalized_messages):
+        truncated_messages = normalized_messages[truncation_index:]
     else:
-        truncation_index = len(messages) - 1
-        truncated_messages = messages[-1:]
+        truncation_index = len(normalized_messages) - 1
+        truncated_messages = normalized_messages[-1:]
 
     if len(truncated_messages) == 1:
         truncated_messages[0] = _truncate_single_message_content_if_present(
