@@ -217,12 +217,14 @@ def test_langchain_agent(
     assert tx["contexts"]["trace"]["origin"] == "manual"
 
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
     tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
 
     assert len(chat_spans) == 2
 
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
+    assert invoke_agent_span["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
