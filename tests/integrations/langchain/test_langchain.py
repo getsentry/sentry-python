@@ -448,11 +448,13 @@ def test_langchain_openai_tools_agent(
     assert tx["type"] == "transaction"
     assert tx["contexts"]["trace"]["origin"] == "manual"
 
+    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
     tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
 
     assert len(chat_spans) == 2
 
+    assert invoke_agent_span["origin"] == "auto.ai.langchain"
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
