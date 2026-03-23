@@ -1656,7 +1656,7 @@ async def test_async_worker_on_task_complete_cancelled_error():
 
     # _on_task_complete should handle CancelledError without logging error
     with mock.patch("sentry_sdk.worker.logger") as mock_logger:
-        worker._on_task_complete(task)
+        worker._on_task_complete(task, worker._queue)
         mock_logger.error.assert_not_called()
 
     # Verify task was discarded from active_tasks
@@ -1716,7 +1716,7 @@ async def test_async_worker_on_task_complete_queue_none():
     mock_task.result.return_value = None
     worker._active_tasks.add(mock_task)
 
-    worker._on_task_complete(mock_task)
+    worker._on_task_complete(mock_task, worker._queue)
     assert mock_task not in worker._active_tasks
     worker.kill()
     await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
@@ -2864,7 +2864,7 @@ def test_sync_cov_async_worker_on_task_complete_success():
     mock_task.result.return_value = None
     worker._active_tasks.add(mock_task)
 
-    worker._on_task_complete(mock_task)
+    worker._on_task_complete(mock_task, worker._queue)
 
     mock_task.result.assert_called_once()
     mock_queue.task_done.assert_called_once()
@@ -2885,7 +2885,7 @@ def test_sync_cov_async_worker_on_task_complete_cancelled():
     worker._active_tasks.add(mock_task)
 
     with mock.patch("sentry_sdk.worker.logger") as mock_logger:
-        worker._on_task_complete(mock_task)
+        worker._on_task_complete(mock_task, worker._queue)
         # CancelledError should NOT trigger error logging
         mock_logger.error.assert_not_called()
 
@@ -2907,7 +2907,7 @@ def test_sync_cov_async_worker_on_task_complete_exception():
     worker._active_tasks.add(mock_task)
 
     with mock.patch("sentry_sdk.worker.logger") as mock_logger:
-        worker._on_task_complete(mock_task)
+        worker._on_task_complete(mock_task, worker._queue)
         mock_logger.error.assert_called_once_with(
             "Failed processing job", exc_info=True
         )
@@ -2929,7 +2929,7 @@ def test_sync_cov_async_worker_on_task_complete_queue_none():
     worker._active_tasks.add(mock_task)
 
     # Should not raise despite queue being None
-    worker._on_task_complete(mock_task)
+    worker._on_task_complete(mock_task, worker._queue)
     assert mock_task not in worker._active_tasks
 
 

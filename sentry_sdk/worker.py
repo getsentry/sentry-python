@@ -305,7 +305,10 @@ class AsyncWorker(Worker):
                 # Create a strong reference to the task so it can be cancelled on kill
                 # and does not get garbage collected while running
                 self._active_tasks.add(task)
-                task.add_done_callback(self._on_task_complete)
+                # Capture queue ref at dispatch time so done callbacks use the
+                # correct queue even if kill()/start() replace self._queue.
+                queue_ref = self._queue
+                task.add_done_callback(lambda t: self._on_task_complete(t, queue_ref))
                 # Yield to let the event loop run other tasks
                 await asyncio.sleep(0)
         except asyncio.CancelledError:
@@ -315,7 +318,11 @@ class AsyncWorker(Worker):
         # Callback is an async coroutine, need to await it
         await callback()
 
-    def _on_task_complete(self, task: "asyncio.Task[None]") -> None:
+    def _on_task_complete(
+        self,
+        task: "asyncio.Task[None]",
+        queue: "Optional[asyncio.Queue[Any]]" = None,
+    ) -> None:
         try:
             task.result()
         except asyncio.CancelledError:
@@ -324,7 +331,8 @@ class AsyncWorker(Worker):
             logger.error("Failed processing job", exc_info=True)
         finally:
             # Mark the task as done and remove it from the active tasks set
-            # This happens only after the task has completed
-            if self._queue is not None:
-                self._queue.task_done()
+            # Use the queue reference captured at dispatch time, not self._queue,
+            # to avoid calling task_done() on a different queue after kill()/start().
+            if queue is not None:
+                queue.task_done()
             self._active_tasks.discard(task)
