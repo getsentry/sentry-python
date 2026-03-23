@@ -411,9 +411,6 @@ def test_tool_execution_span(
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
 
-    # We can't guarantee anything about the "shape" of the langchain execution graph
-    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
-
     # Token usage is only available in newer versions of langchain (v0.2+)
     # where usage_metadata is supported on AIMessageChunk
     if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
@@ -808,6 +805,9 @@ def test_langchain_openai_tools_agent(
     # Verify that available tools are always recorded regardless of PII settings
     for chat_span in chat_spans:
         tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+        assert tools_data is not None, (
+            "Available tools should always be recorded regardless of PII settings"
+        )
         assert "get_word_length" in tools_data
 
 
