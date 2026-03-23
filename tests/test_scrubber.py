@@ -3,7 +3,7 @@ import logging
 
 from sentry_sdk import capture_exception, capture_event, start_transaction, start_span
 from sentry_sdk.utils import event_from_exception
-from sentry_sdk.scrubber import EventScrubber
+from sentry_sdk.scrubber import EventScrubber, DEFAULT_REMOVE_LIST
 from tests.conftest import ApproxDict
 
 
@@ -46,17 +46,19 @@ def test_request_scrubbing(sentry_init, capture_events):
             "COOKIE": "[Filtered]",
             "authorization": "[Filtered]",
             "ORIGIN": "google.com",
-            "ip_address": "[Filtered]",
         },
         "cookies": {"sessionid": "[Filtered]", "foo": "bar"},
         "data": {"token": "[Filtered]", "foo": "bar"},
     }
 
+    # ip_address is removed entirely (not replaced with [Filtered]) to avoid
+    # a protocol violation, so it should not appear in the headers or _meta.
+    assert "ip_address" not in event["request"]["headers"]
+
     assert event["_meta"]["request"] == {
         "headers": {
             "COOKIE": {"": {"rem": [["!config", "s"]]}},
             "authorization": {"": {"rem": [["!config", "s"]]}},
-            "ip_address": {"": {"rem": [["!config", "s"]]}},
         },
         "cookies": {"sessionid": {"": {"rem": [["!config", "s"]]}}},
         "data": {"token": {"": {"rem": [["!config", "s"]]}}},
@@ -248,3 +250,77 @@ def test_recursive_scrubber_does_not_override_original(sentry_init, capture_even
     (frame,) = frames
     assert data["csrf"] == "secret"
     assert frame["vars"]["data"]["csrf"] == "[Filtered]"
+
+
+def test_user_ip_address_removed(sentry_init, capture_events):
+    """ip_address in user dict must be removed entirely, not replaced with
+    [Filtered], because [Filtered] is not a valid IP and causes a protocol
+    violation on the server side.  See GH-5701."""
+    sentry_init()
+    events = capture_events()
+
+    capture_event(
+        {
+            "message": "hi",
+            "user": {"id": "1", "ip_address": "127.0.0.1"},
+        }
+    )
+
+    (event,) = events
+    assert "ip_address" not in event["user"]
+    assert event["user"]["id"] == "1"
+
+
+def test_user_ip_address_not_removed_when_pii_enabled(sentry_init, capture_events):
+    """When send_default_pii=True, ip_address should not be scrubbed at all."""
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    capture_event(
+        {
+            "message": "hi",
+            "user": {"id": "1", "ip_address": "127.0.0.1"},
+        }
+    )
+
+    (event,) = events
+    assert event["user"]["ip_address"] == "127.0.0.1"
+
+
+def test_custom_remove_list(sentry_init, capture_events):
+    """Users can configure which keys are removed rather than replaced."""
+    sentry_init(
+        event_scrubber=EventScrubber(remove_list=["token"]),
+    )
+    events = capture_events()
+
+    capture_event(
+        {
+            "message": "hi",
+            "extra": {"token": "secret", "safe": "keep"},
+        }
+    )
+
+    (event,) = events
+    # "token" is in the denylist AND the remove_list, so it gets deleted
+    assert "token" not in event["extra"]
+    assert event["extra"]["safe"] == "keep"
+
+
+def test_empty_remove_list_replaces_ip_address(sentry_init, capture_events):
+    """Setting remove_list=[] restores the old replace-with-[Filtered] behavior."""
+    sentry_init(
+        event_scrubber=EventScrubber(remove_list=[]),
+    )
+    events = capture_events()
+
+    capture_event(
+        {
+            "message": "hi",
+            "user": {"id": "1", "ip_address": "127.0.0.1"},
+        }
+    )
+
+    (event,) = events
+    # With an empty remove_list, ip_address is replaced, not removed
+    assert event["user"]["ip_address"] == "[Filtered]"

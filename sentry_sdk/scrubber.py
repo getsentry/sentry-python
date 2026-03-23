@@ -57,6 +57,13 @@ DEFAULT_PII_DENYLIST = [
     "remote_addr",
 ]
 
+# Fields that must be removed entirely rather than replaced with [Filtered],
+# because their value must conform to a specific format (e.g. a valid IP address)
+# and [Filtered] would be a protocol violation.
+DEFAULT_REMOVE_LIST = [
+    "ip_address",
+]
+
 
 class EventScrubber:
     def __init__(
@@ -65,6 +72,7 @@ class EventScrubber:
         recursive: bool = False,
         send_default_pii: bool = False,
         pii_denylist: "Optional[List[str]]" = None,
+        remove_list: "Optional[List[str]]" = None,
     ) -> None:
         """
         A scrubber that goes through the event payload and removes sensitive data configured through denylists.
@@ -73,6 +81,10 @@ class EventScrubber:
         :param recursive: Whether to scrub the event payload recursively, default False.
         :param send_default_pii: Whether pii is sending is on, pii fields are not scrubbed.
         :param pii_denylist: The denylist to use for scrubbing when pii is not sent, defaults to DEFAULT_PII_DENYLIST.
+        :param remove_list: Keys that should be removed entirely instead of being replaced
+            with ``[Filtered]``. This is necessary for fields like ``ip_address`` whose
+            values must conform to a specific format; replacing them with ``[Filtered]``
+            would be a protocol violation. Defaults to DEFAULT_REMOVE_LIST.
         """
         self.denylist = DEFAULT_DENYLIST.copy() if denylist is None else denylist
 
@@ -84,6 +96,11 @@ class EventScrubber:
 
         self.denylist = [x.lower() for x in self.denylist]
         self.recursive = recursive
+
+        self.remove_list = (
+            DEFAULT_REMOVE_LIST.copy() if remove_list is None else remove_list
+        )
+        self.remove_list = [x.lower() for x in self.remove_list]
 
     def scrub_list(self, lst: object) -> None:
         """
@@ -109,14 +126,21 @@ class EventScrubber:
         if not isinstance(d, dict):
             return
 
+        keys_to_remove = []
         for k, v in d.items():
             # The cast is needed because mypy is not smart enough to figure out that k must be a
             # string after the isinstance check.
             if isinstance(k, str) and k.lower() in self.denylist:
-                d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
+                if k.lower() in self.remove_list:
+                    keys_to_remove.append(k)
+                else:
+                    d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
             elif self.recursive:
                 self.scrub_dict(v)  # no-op unless v is a dict
                 self.scrub_list(v)  # no-op unless v is a list
+
+        for k in keys_to_remove:
+            del d[k]
 
     def scrub_request(self, event: "Event") -> None:
         with capture_internal_exceptions():
