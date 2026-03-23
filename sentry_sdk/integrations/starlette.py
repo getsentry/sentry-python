@@ -552,7 +552,11 @@ def patch_templates() -> None:
     except ImportError:
         return  # Nothing to do
 
-    from starlette.templating import Jinja2Templates  # type: ignore
+    # https://github.com/Kludex/starlette/commit/96479daca2e4bd8157f68d914fd162aa94eff73a
+    try:
+        from starlette.templating import Jinja2Templates  # type: ignore
+    except ImportError:
+        return
 
     old_jinja2templates_init = Jinja2Templates.__init__
 
