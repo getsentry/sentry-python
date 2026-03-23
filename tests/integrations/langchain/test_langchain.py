@@ -336,9 +336,6 @@ def test_tool_execution_span(
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
 
-    # We can't guarantee anything about the "shape" of the langchain execution graph
-    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
-
     # Token usage is only available in newer versions of langchain (v0.2+)
     # where usage_metadata is supported on AIMessageChunk
     if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
