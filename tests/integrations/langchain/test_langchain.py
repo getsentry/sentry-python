@@ -54,6 +54,14 @@ from openai.types.completion_usage import (
     CompletionUsage,
 )
 
+from openai.types.responses import (
+    ResponseUsage,
+)
+from openai.types.responses.response_usage import (
+    InputTokensDetails,
+    OutputTokensDetails,
+)
+
 LANGCHAIN_VERSION = package_version("langchain")
 
 
@@ -207,6 +215,185 @@ def test_langchain_create_agent(
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+
+
+@pytest.mark.skipif(
+    LANGCHAIN_VERSION < (1,),
+    reason="LangChain 1.0+ required (ONE AGENT refactor)",
+)
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_tool_execution_span(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    responses_tool_call_model_responses,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=include_prompts,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    responses = responses_tool_call_model_responses(
+        tool_name="get_word_length",
+        arguments='{"word": "eudca"}',
+        response_model="gpt-4-0613",
+        response_text="The word eudca has 5 letters.",
+        response_ids=iter(["resp_1", "resp_2"]),
+        usages=iter(
+            [
+                ResponseUsage(
+                    input_tokens=142,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=50,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=192,
+                ),
+                ResponseUsage(
+                    input_tokens=89,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=28,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=117,
+                ),
+            ]
+        ),
+    )
+    tool_response = get_model_response(
+        next(responses),
+        serialize_pydantic=True,
+        request_headers={
+            "X-Stainless-Raw-Response": "True",
+        },
+    )
+    final_response = get_model_response(
+        next(responses),
+        serialize_pydantic=True,
+        request_headers={
+            "X-Stainless-Raw-Response": "True",
+        },
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-4",
+        temperature=0,
+        openai_api_key="badkey",
+        use_responses_api=True,
+    )
+    agent = create_agent(
+        model=llm,
+        tools=[get_word_length],
+        name="word_length_agent",
+    )
+
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        with start_transaction():
+            agent.invoke(
+                {
+                    "messages": [
+                        HumanMessage(content="How many letters in the word eudca"),
+                    ],
+                },
+            )
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    assert tx["contexts"]["trace"]["origin"] == "manual"
+
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
+
+    assert len(chat_spans) == 2
+
+    assert chat_spans[0]["origin"] == "auto.ai.langchain"
+    assert chat_spans[1]["origin"] == "auto.ai.langchain"
+    assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+    # We can't guarantee anything about the "shape" of the langchain execution graph
+    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
+
+    # Token usage is only available in newer versions of langchain (v0.2+)
+    # where usage_metadata is supported on AIMessageChunk
+    if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+
+    if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
+        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+        assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+
+    if send_default_pii and include_prompts:
+        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
+
+        assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        # Verify tool calls are recorded when PII is enabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
+            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        )
+        tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+        if isinstance(tool_calls_data, str):
+            assert "get_word_length" in tool_calls_data
+        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+            # Check if tool calls contain expected function name
+            tool_call_str = str(tool_calls_data)
+            assert "get_word_length" in tool_call_str
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
+        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
+
+        # Verify tool calls are NOT recorded when PII is disabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+
+    # Verify that available tools are always recorded regardless of PII settings
+    for chat_span in chat_spans:
+        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+        assert "get_word_length" in tools_data
 
 
 @pytest.mark.parametrize(
