@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.56.0
+
+### New Features ✨
+
+- (asgi) Add option to disable suppressing chained exceptions by @alexander-alderman-webb in [#5714](https://github.com/getsentry/sentry-python/pull/5714)
+- (logging) Separate ignore lists for events/breadcrumbs and sentry logs by @sl0thentr0py in [#5698](https://github.com/getsentry/sentry-python/pull/5698)
+
+### Bug Fixes 🐛
+
+#### Anthropic
+
+- Set exception info on streaming span when applicable by @alexander-alderman-webb in [#5683](https://github.com/getsentry/sentry-python/pull/5683)
+- Patch `AsyncStream.close()` and `AsyncMessageStream.close()` to finish spans by @alexander-alderman-webb in [#5675](https://github.com/getsentry/sentry-python/pull/5675)
+- Patch `Stream.close()` and `MessageStream.close()` to finish spans by @alexander-alderman-webb in [#5674](https://github.com/getsentry/sentry-python/pull/5674)
+
+#### Other
+
+- (starlette) Catch Jinja2Templates ImportError by @alexander-alderman-webb in [#5741](https://github.com/getsentry/sentry-python/pull/5741)
+
+### Documentation 📚
+
+- Add note on AI PRs to CONTRIBUTING.md by @sentrivana in [#5696](https://github.com/getsentry/sentry-python/pull/5696)
+
+### Internal Changes 🔧
+
+- Pin GitHub Actions to full-length commit SHAs by @joshuarli in [#5781](https://github.com/getsentry/sentry-python/pull/5781)
+- Add `-latest` alias for each integration test suite by @sentrivana in [#5706](https://github.com/getsentry/sentry-python/pull/5706)
+- Use date-based branch names for toxgen PRs by @sentrivana in [#5704](https://github.com/getsentry/sentry-python/pull/5704)
+- 🤖 Update test matrix with new releases (03/19) by @github-actions in [#5703](https://github.com/getsentry/sentry-python/pull/5703)
+- Add client report tests for span streaming by @sentrivana in [#5677](https://github.com/getsentry/sentry-python/pull/5677)
+
+### Other
+
+- Update CHANGELOG.md by @sentrivana in [#5685](https://github.com/getsentry/sentry-python/pull/5685)
+
 ## 2.55.0
 
 ### New Features ✨
