@@ -240,6 +240,11 @@ def parse_tox():
             raw_python_versions = groups["py_versions"]
             framework = groups["framework"]
 
+            # The -latest env is an alias for the highest version of the
+            # same framework, so merge it with the base framework.
+            if framework.endswith("-latest"):
+                framework = framework[: -len("-latest")]
+
             # collect python versions to test the framework in
             raw_python_versions = set(raw_python_versions.split(","))
             py_versions[framework] |= raw_python_versions
