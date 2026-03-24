@@ -111,7 +111,7 @@ def test_langchain_text_completion(
     )
     events = capture_events()
 
-    model_repsonse = get_model_response(
+    model_response = get_model_response(
         Completion(
             id="completion-id",
             object="text_completion",
@@ -143,7 +143,7 @@ def test_langchain_text_completion(
     with patch.object(
         model.client._client._client,
         "send",
-        return_value=model_repsonse,
+        return_value=model_response,
     ) as _:
         with start_transaction():
             input_text = "What is the capital of France?"
