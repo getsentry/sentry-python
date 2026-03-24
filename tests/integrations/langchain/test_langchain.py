@@ -214,10 +214,18 @@ def test_langchain_agent(
 
     tx = events[0]
     assert tx["type"] == "transaction"
+    assert tx["contexts"]["trace"]["origin"] == "manual"
+
+    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
     tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
 
     assert len(chat_spans) == 2
+
+    assert invoke_agent_span["origin"] == "auto.ai.langchain"
+    assert chat_spans[0]["origin"] == "auto.ai.langchain"
+    assert chat_spans[1]["origin"] == "auto.ai.langchain"
+    assert tool_exec_span["origin"] == "auto.ai.langchain"
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
@@ -390,122 +398,6 @@ def test_span_status_error(sentry_init, capture_events):
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
-
-
-def test_span_origin(sentry_init, capture_events):
-    sentry_init(
-        integrations=[LangchainIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "You are very powerful assistant, but don't know current events",
-            ),
-            ("user", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ]
-    )
-    global stream_result_mock
-    stream_result_mock = Mock(
-        side_effect=[
-            [
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": "call_BbeyNhCKa6kYLYzrD40NGm3b",
-                                    "function": {
-                                        "arguments": "",
-                                        "name": "get_word_length",
-                                    },
-                                    "type": "function",
-                                }
-                            ]
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": None,
-                                    "function": {
-                                        "arguments": '{"word": "eudca"}',
-                                        "name": None,
-                                    },
-                                    "type": None,
-                                }
-                            ]
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="5",
-                        usage_metadata={
-                            "input_tokens": 142,
-                            "output_tokens": 50,
-                            "total_tokens": 192,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
-                    ),
-                    generation_info={"finish_reason": "function_call"},
-                ),
-            ],
-            [
-                ChatGenerationChunk(
-                    text="The word eudca has 5 letters.",
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="The word eudca has 5 letters.",
-                        usage_metadata={
-                            "input_tokens": 89,
-                            "output_tokens": 28,
-                            "total_tokens": 117,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    generation_info={"finish_reason": "stop"},
-                    message=AIMessageChunk(content=""),
-                ),
-            ],
-        ]
-    )
-    llm = MockOpenAI(
-        model_name="gpt-3.5-turbo",
-        temperature=0,
-        openai_api_key="badkey",
-    )
-    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
-
-    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-
-    with start_transaction():
-        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
-
-    (event,) = events
-
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    for span in event["spans"]:
-        assert span["origin"] == "auto.ai.langchain"
 
 
 def test_manual_callback_no_duplication(sentry_init):
