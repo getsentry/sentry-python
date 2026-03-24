@@ -9,9 +9,10 @@ from sentry_sdk.consts import SPANDATA
 
 try:
     # Langchain >= 0.2
-    from langchain_openai import ChatOpenAI
+    from langchain_openai import ChatOpenAI, OpenAI
 except ImportError:
     # Langchain < 0.2
+    from langchain_community.llms import OpenAI
     from langchain_community.chat_models import ChatOpenAI
 
 from langchain_core.callbacks import BaseCallbackManager, CallbackManagerForLLMRun
@@ -49,6 +50,9 @@ from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaToolCall,
     ChoiceDeltaToolCallFunction,
 )
+
+from openai.types.completion import Completion
+from openai.types.completion_choice import CompletionChoice
 
 from openai.types.completion_usage import (
     CompletionUsage,
@@ -89,6 +93,77 @@ class MockOpenAI(ChatOpenAI):
     @property
     def _llm_type(self) -> str:
         return llm_type
+
+
+def test_langchain_text_completion(
+    sentry_init,
+    capture_events,
+    get_model_response,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    model_response = get_model_response(
+        Completion(
+            id="completion-id",
+            object="text_completion",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                CompletionChoice(
+                    index=0,
+                    finish_reason="stop",
+                    text="The capital of France is Paris.",
+                )
+            ],
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=15,
+                total_tokens=25,
+            ),
+        ),
+        serialize_pydantic=True,
+    )
+
+    model = OpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0.7,
+        max_tokens=100,
+        openai_api_key="badkey",
+    )
+
+    with patch.object(
+        model.client._client._client,
+        "send",
+        return_value=model_response,
+    ) as _:
+        with start_transaction():
+            input_text = "What is the capital of France?"
+            model.invoke(input_text)
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+    assert llm_span["description"] == "generate_text gpt-3.5-turbo"
+    assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
+    assert llm_span["data"]["gen_ai.response.text"] == "The capital of France is Paris."
+    assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
+    assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
 
 
 @pytest.mark.skipif(
@@ -1016,84 +1091,6 @@ def test_langchain_callback_list_existing_callback(sentry_init):
 
         [handler] = passed_callbacks
         assert handler is sentry_callback
-
-
-def test_langchain_integration_with_langchain_core_only(sentry_init, capture_events):
-    """Test that the langchain integration works when langchain.agents.AgentExecutor
-    is not available or langchain is not installed, but langchain-core is.
-    """
-
-    from langchain_core.outputs import LLMResult, Generation
-
-    with patch("sentry_sdk.integrations.langchain.AgentExecutor", None):
-        from sentry_sdk.integrations.langchain import (
-            LangchainIntegration,
-            SentryLangchainCallback,
-        )
-
-        sentry_init(
-            integrations=[LangchainIntegration(include_prompts=True)],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
-        events = capture_events()
-
-        try:
-            LangchainIntegration.setup_once()
-        except Exception as e:
-            pytest.fail(f"setup_once() failed when AgentExecutor is None: {e}")
-
-        callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
-
-        run_id = "12345678-1234-1234-1234-123456789012"
-        serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
-        prompts = ["What is the capital of France?"]
-
-        with start_transaction():
-            callback.on_llm_start(
-                serialized=serialized,
-                prompts=prompts,
-                run_id=run_id,
-                invocation_params={
-                    "temperature": 0.7,
-                    "max_tokens": 100,
-                    "model": "gpt-3.5-turbo",
-                },
-            )
-
-            response = LLMResult(
-                generations=[[Generation(text="The capital of France is Paris.")]],
-                llm_output={
-                    "token_usage": {
-                        "total_tokens": 25,
-                        "prompt_tokens": 10,
-                        "completion_tokens": 15,
-                    }
-                },
-            )
-            callback.on_llm_end(response=response, run_id=run_id)
-
-        assert len(events) > 0
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        llm_spans = [
-            span
-            for span in tx.get("spans", [])
-            if span.get("op") == "gen_ai.generate_text"
-        ]
-        assert len(llm_spans) > 0
-
-        llm_span = llm_spans[0]
-        assert llm_span["description"] == "generate_text gpt-3.5-turbo"
-        assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
-        assert (
-            llm_span["data"]["gen_ai.response.text"]
-            == "The capital of France is Paris."
-        )
-        assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
-        assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
-        assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
 
 
 def test_langchain_message_role_mapping(sentry_init, capture_events):
