@@ -163,17 +163,21 @@ def _calculate_token_usage(
 
     if hasattr(response, "usage"):
         input_tokens = _get_usage(response.usage, ["input_tokens", "prompt_tokens"])
-        if hasattr(response.usage, "input_tokens_details"):
-            input_tokens_cached = _get_usage(
-                response.usage.input_tokens_details, ["cached_tokens"]
-            )
+        input_tokens_details = getattr(
+            response.usage, "input_tokens_details", None
+        ) or getattr(response.usage, "prompt_tokens_details", None)
+        if input_tokens_details is not None:
+            input_tokens_cached = _get_usage(input_tokens_details, ["cached_tokens"])
 
         output_tokens = _get_usage(
             response.usage, ["output_tokens", "completion_tokens"]
         )
-        if hasattr(response.usage, "output_tokens_details"):
+        output_tokens_details = getattr(
+            response.usage, "output_tokens_details", None
+        ) or getattr(response.usage, "completion_tokens_details", None)
+        if output_tokens_details is not None:
             output_tokens_reasoning = _get_usage(
-                response.usage.output_tokens_details, ["reasoning_tokens"]
+                output_tokens_details, ["reasoning_tokens"]
             )
 
         total_tokens = _get_usage(response.usage, ["total_tokens"])
@@ -610,10 +614,14 @@ def _set_streaming_completions_api_output_data(
 
     def new_iterator() -> "Iterator[ChatCompletionChunk]":
         nonlocal ttft
+        usage_chunk = None
         for x in old_iterator:
             span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
             with capture_internal_exceptions():
+                if hasattr(x, "usage") and x.usage is not None:
+                    usage_chunk = x
+
                 if hasattr(x, "choices"):
                     choice_index = 0
                     for choice in x.choices:
@@ -643,7 +651,7 @@ def _set_streaming_completions_api_output_data(
                     )
                 _calculate_token_usage(
                     messages,
-                    response,
+                    usage_chunk if usage_chunk is not None else response,
                     span,
                     all_responses,
                     integration.count_tokens,
@@ -654,10 +662,14 @@ def _set_streaming_completions_api_output_data(
 
     async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
         nonlocal ttft
+        usage_chunk = None
         async for x in old_iterator:
             span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
             with capture_internal_exceptions():
+                if hasattr(x, "usage") and x.usage is not None:
+                    usage_chunk = x
+
                 if hasattr(x, "choices"):
                     choice_index = 0
                     for choice in x.choices:
@@ -687,7 +699,7 @@ def _set_streaming_completions_api_output_data(
                     )
                 _calculate_token_usage(
                     messages,
-                    response,
+                    usage_chunk if usage_chunk is not None else response,
                     span,
                     all_responses,
                     integration.count_tokens,
