@@ -563,6 +563,12 @@ class SPANDATA:
     Example: [{"type": "text", "text": "You are a helpful assistant."},{"type": "text", "text": "Be concise and clear."}]
     """
 
+    GEN_AI_TOOL_DEFINITIONS = "gen_ai.tool.definitions"
+    """
+    The definitions of the tools available to the model.
+    Example: [{"name": "get_weather", "description": "Get the weather for a given location", "type": "function", "parameters": {"location": "string"}}]
+    """
+
     GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
     """
     The messages passed to the model. The "content" can be a string or an array of objects.

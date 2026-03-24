@@ -13,6 +13,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     get_start_span_function,
     transform_anthropic_content_part,
+    _normalize_data,
 )
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
@@ -368,6 +369,29 @@ def _transform_system_instructions(
     ]
 
 
+def _transform_anthropic_tools(
+    tools: "Iterable[ToolUnionParam]",
+) -> "list[dict[str, Any]]":
+    transformed_tools = []
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+
+        transformed_tool = {
+            "name": tool.get("name"),
+            "description": tool.get("description"),
+            "type": "function",
+        }
+
+        input_schema = tool.get("input_schema")
+        if input_schema:
+            transformed_tool["parameters"] = _normalize_data(input_schema, unpack=False)
+
+        transformed_tools.append(transformed_tool)
+
+    return transformed_tools
+
+
 def _set_common_input_data(
     span: "Span",
     integration: "AnthropicIntegration",
@@ -463,6 +487,13 @@ def _set_common_input_data(
 
     if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
         span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
+        if should_send_default_pii() and integration.include_prompts:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                _transform_anthropic_tools(tools),
+                unpack=False,
+            )
 
 
 def _set_create_input_data(
