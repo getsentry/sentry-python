@@ -1062,7 +1062,11 @@ async def test_max_turns_before_handoff_span(
 
 @pytest.mark.asyncio
 async def test_tool_execution_span(
-    sentry_init, capture_events, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    get_model_response,
+    responses_tool_call_model_responses,
 ):
     """
     Test tool execution span creation.
@@ -1078,75 +1082,45 @@ async def test_tool_execution_span(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
 
-    tool_response = get_model_response(
-        Response(
-            id="resp_tool_123",
-            output=[
-                ResponseFunctionToolCall(
-                    id="call_123",
-                    call_id="call_123",
-                    name="simple_test_tool",
-                    type="function_call",
-                    arguments='{"message": "hello"}',
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
+    responses = responses_tool_call_model_responses(
+        tool_name="simple_test_tool",
+        arguments='{"message": "hello"}',
+        response_model="gpt-4",
+        response_text="Task completed using the tool",
+        response_ids=iter(["resp_tool_123", "resp_final_123"]),
+        usages=iter(
+            [
+                ResponseUsage(
+                    input_tokens=10,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=5,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=15,
                 ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                ResponseUsage(
+                    input_tokens=15,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=10,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=25,
                 ),
-                total_tokens=15,
-            ),
+            ]
         ),
+    )
+    tool_response = get_model_response(
+        next(responses),
         serialize_pydantic=True,
     )
-
     final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Task completed using the tool",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=25,
-            ),
-        ),
+        next(responses),
         serialize_pydantic=True,
     )
 
@@ -2298,7 +2272,11 @@ def test_openai_agents_message_role_mapping(
 
 @pytest.mark.asyncio
 async def test_tool_execution_error_tracing(
-    sentry_init, capture_events, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    get_model_response,
+    responses_tool_call_model_responses,
 ):
     """
     Test that tool execution errors are properly tracked via error tracing patch.
@@ -2321,75 +2299,45 @@ async def test_tool_execution_error_tracing(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[failing_tool], model=model)
 
-    tool_response = get_model_response(
-        Response(
-            id="resp_1",
-            output=[
-                ResponseFunctionToolCall(
-                    id="call_123",
-                    call_id="call_123",
-                    name="failing_tool",
-                    type="function_call",
-                    arguments='{"message": "test"}',
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
+    responses = responses_tool_call_model_responses(
+        tool_name="failing_tool",
+        arguments='{"message": "test"}',
+        response_model="gpt-4-0613",
+        response_text="An error occurred while running the tool",
+        response_ids=iter(["resp_1", "resp_2"]),
+        usages=iter(
+            [
+                ResponseUsage(
+                    input_tokens=10,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=5,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=15,
                 ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                ResponseUsage(
+                    input_tokens=15,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=10,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=25,
                 ),
-                total_tokens=15,
-            ),
+            ]
         ),
+    )
+    tool_response = get_model_response(
+        next(responses),
         serialize_pydantic=True,
     )
-
     final_response = get_model_response(
-        Response(
-            id="resp_2",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="An error occurred while running the tool",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4-0613",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=25,
-            ),
-        ),
+        next(responses),
         serialize_pydantic=True,
     )
 
@@ -2420,7 +2368,10 @@ async def test_tool_execution_error_tracing(
     # Find the execute_tool span
     execute_tool_span = None
     for span in spans:
-        if span.get("description", "").startswith("execute_tool failing_tool"):
+        description = span.get("description", "")
+        if description is not None and description.startswith(
+            "execute_tool failing_tool"
+        ):
             execute_tool_span = span
             break
 
