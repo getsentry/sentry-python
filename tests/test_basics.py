@@ -185,6 +185,85 @@ def test_option_before_send_transaction(sentry_init, capture_events):
     assert event["extra"] == {"before_send_transaction_called": True}
 
 
+def test_before_send_transaction_span_description_contains_newlines(
+    sentry_init, capture_events
+):
+    def before_send_transaction(event, hint):
+        for span in event.get("spans", []):
+            if (
+                span.get("description", "")
+                == "SELECT u.id, u.name, u.email FROM users;"
+            ):
+                span["description"] = "filtered"
+        return event
+
+    sentry_init(
+        before_send_transaction=before_send_transaction,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    description = "SELECT u.id,\n    u.name,\n    u.email\n    FROM users;"
+
+    with start_transaction(name="test_transaction"):
+        with sentry_sdk.start_span(op="db", description=description):
+            pass
+
+    (event,) = events
+    assert event["transaction"] == "test_transaction"
+
+    spans = event["spans"]
+    assert len(spans) == 1
+    assert spans[0]["description"] == "filtered"
+    assert spans[0]["op"] == "db"
+
+
+def test_before_send_transaction_span_description_contains_multiple_lines(
+    sentry_init, capture_events
+):
+    def before_send_transaction(event, hint):
+        for span in event.get("spans", []):
+            if (
+                span.get("description", "")
+                == "SELECT u.id, u.name, u.email, p.title AS post_title, p.created_at AS post_date FROM users u JOIN posts p ON u.id = p.user_id WHERE u.active = true ORDER BY p.created_at DESC"
+            ):
+                span["description"] = "no bueno"
+        return event
+
+    sentry_init(
+        before_send_transaction=before_send_transaction,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    description = """SELECT
+    u.id,
+    u.name,
+    u.email,
+    p.title AS post_title,
+    p.created_at AS post_date
+FROM
+    users u
+JOIN
+    posts p ON u.id = p.user_id
+WHERE
+    u.active = true
+ORDER BY
+    p.created_at DESC"""
+
+    with start_transaction(name="test_transaction"):
+        with sentry_sdk.start_span(op="db", description=description):
+            pass
+
+    (event,) = events
+    assert event["transaction"] == "test_transaction"
+
+    spans = event["spans"]
+    assert len(spans) == 1
+    assert spans[0]["description"] == "no bueno"
+    assert spans[0]["op"] == "db"
+
+
 def test_option_before_send_transaction_discard(sentry_init, capture_events):
     def before_send_transaction_discard(event, hint):
         return None
