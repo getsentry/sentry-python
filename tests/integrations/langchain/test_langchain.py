@@ -40,6 +40,19 @@ except ImportError:
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
+from openai.types.chat.chat_completion_chunk import (
+    ChatCompletionChunk,
+    Choice,
+    ChoiceDelta,
+    ChoiceDeltaToolCall,
+    ChoiceDeltaToolCallFunction,
+)
+
+from openai.types.completion_usage import (
+    CompletionUsage,
+)
+
+
 @tool
 def get_word_length(word: str) -> int:
     """Returns the length of a word."""
@@ -67,12 +80,12 @@ class MockOpenAI(ChatOpenAI):
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts, use_unknown_llm_type",
+    "send_default_pii, include_prompts",
     [
-        (True, True, False),
-        (True, False, False),
-        (False, True, False),
-        (False, False, True),
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
     ],
 )
 @pytest.mark.parametrize(
@@ -92,13 +105,11 @@ def test_langchain_agent(
     capture_events,
     send_default_pii,
     include_prompts,
-    use_unknown_llm_type,
     system_instructions_content,
     request,
+    get_model_response,
+    server_side_event_chunks,
 ):
-    global llm_type
-    llm_type = "acme-llm" if use_unknown_llm_type else "openai-chat"
-
     sentry_init(
         integrations=[
             LangchainIntegration(
@@ -120,87 +131,173 @@ def test_langchain_agent(
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-    global stream_result_mock
-    stream_result_mock = Mock(
-        side_effect=[
+
+    tool_response = get_model_response(
+        server_side_event_chunks(
             [
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": "call_BbeyNhCKa6kYLYzrD40NGm3b",
-                                    "function": {
-                                        "arguments": "",
-                                        "name": "get_word_length",
-                                    },
-                                    "type": "function",
-                                }
-                            ]
-                        },
-                    ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(role="assistant"),
+                            finish_reason=None,
+                        ),
+                    ],
                 ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": None,
-                                    "function": {
-                                        "arguments": '{"word": "eudca"}',
-                                        "name": None,
-                                    },
-                                    "type": None,
-                                }
-                            ]
-                        },
-                    ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(
+                                tool_calls=[
+                                    ChoiceDeltaToolCall(
+                                        index=0,
+                                        id="call_BbeyNhCKa6kYLYzrD40NGm3b",
+                                        type="function",
+                                        function=ChoiceDeltaToolCallFunction(
+                                            name="get_word_length",
+                                            arguments="",
+                                        ),
+                                    ),
+                                ],
+                            ),
+                            finish_reason=None,
+                        ),
+                    ],
                 ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="5",
-                        usage_metadata={
-                            "input_tokens": 142,
-                            "output_tokens": 50,
-                            "total_tokens": 192,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(
+                                tool_calls=[
+                                    ChoiceDeltaToolCall(
+                                        index=0,
+                                        function=ChoiceDeltaToolCallFunction(
+                                            arguments='{"word": "eudca"}',
+                                        ),
+                                    ),
+                                ],
+                            ),
+                            finish_reason=None,
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(content="5"),
+                            finish_reason=None,
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(),
+                            finish_reason="function_call",
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[],
+                    usage=CompletionUsage(
+                        prompt_tokens=142,
+                        completion_tokens=50,
+                        total_tokens=192,
                     ),
-                    generation_info={"finish_reason": "function_call"},
                 ),
             ],
-            [
-                ChatGenerationChunk(
-                    text="The word eudca has 5 letters.",
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="The word eudca has 5 letters.",
-                        usage_metadata={
-                            "input_tokens": 89,
-                            "output_tokens": 28,
-                            "total_tokens": 117,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    generation_info={"finish_reason": "stop"},
-                    message=AIMessageChunk(content=""),
-                ),
-            ],
-        ]
+            include_event_type=False,
+        )
     )
-    llm = MockOpenAI(
+
+    final_response = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-2",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(role="assistant"),
+                            finish_reason=None,
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-2",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(content="The word eudca has 5 letters."),
+                            finish_reason=None,
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-2",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(),
+                            finish_reason="stop",
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-2",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[],
+                    usage=CompletionUsage(
+                        prompt_tokens=89,
+                        completion_tokens=28,
+                        total_tokens=117,
+                    ),
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    llm = ChatOpenAI(
         model_name="gpt-3.5-turbo",
         temperature=0,
         openai_api_key="badkey",
@@ -209,8 +306,13 @@ def test_langchain_agent(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction():
-        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        with start_transaction():
+            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     tx = events[0]
     assert tx["type"] == "transaction"
@@ -321,6 +423,9 @@ def test_langchain_agent(
 
 
 def test_langchain_error(sentry_init, capture_events):
+    global llm_type
+    llm_type = "acme-llm"
+
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
