@@ -1040,6 +1040,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
             serialized=serialized,
             prompts=prompts,
             run_id=run_id,
+            name="my_pipeline",
             invocation_params={
                 "temperature": 0.7,
                 "max_tokens": 100,
@@ -1069,8 +1070,10 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
+    assert llm_span["data"]["gen_ai.operation.name"] == "generate_text"
+    assert llm_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "my_pipeline"
 
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
     messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
@@ -1783,6 +1786,7 @@ def test_langchain_response_model_extraction(
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
+    assert llm_span["data"]["gen_ai.operation.name"] == "generate_text"
 
     if expected_model is not None:
         assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["data"]
