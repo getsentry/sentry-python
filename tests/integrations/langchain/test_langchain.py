@@ -1288,7 +1288,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
     ]
     assert len(llm_spans) > 0
 
@@ -2002,7 +2002,7 @@ def test_langchain_response_model_extraction(
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
     ]
     assert len(llm_spans) > 0
 
