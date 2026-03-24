@@ -351,7 +351,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         metadata: "Optional[Dict[str, Any]]" = None,
         **kwargs: "Any",
     ) -> "Any":
-        """Run when LLM starts running."""
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -369,8 +368,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 parent_run_id,
-                op=OP.GEN_AI_PIPELINE,
-                name=kwargs.get("name") or "Langchain LLM call",
+                op=OP.GEN_AI_GENERATE_TEXT,
+                name=f"generate_text {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
