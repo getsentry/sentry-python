@@ -41,7 +41,14 @@ TOOLS = [
             },
             "required": ["location"],
         },
-    }
+    },
+    {
+        "name": "no_description_tool",
+        "input_schema": {
+            "type": "object",
+            "properties": {"arg1": {"type": "string"}},
+        },
+    },
 ]
 
 
@@ -96,7 +103,9 @@ def test_tool_definitions_in_create_message(
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_TOOL_DEFINITIONS in span["data"]
         tool_definitions = json.loads(span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
-        assert len(tool_definitions) == 1
+        assert len(tool_definitions) == 2
+
+        # Check tool with description
         assert tool_definitions[0]["name"] == "get_weather"
         assert (
             tool_definitions[0]["description"]
@@ -104,5 +113,11 @@ def test_tool_definitions_in_create_message(
         )
         assert tool_definitions[0]["type"] == "function"
         assert tool_definitions[0]["parameters"] == TOOLS[0]["input_schema"]
+
+        # Check tool without description
+        assert tool_definitions[1]["name"] == "no_description_tool"
+        assert "description" not in tool_definitions[1]
+        assert tool_definitions[1]["type"] == "function"
+        assert tool_definitions[1]["parameters"] == TOOLS[1]["input_schema"]
     else:
         assert SPANDATA.GEN_AI_TOOL_DEFINITIONS not in span["data"]

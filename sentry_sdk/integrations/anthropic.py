@@ -13,7 +13,6 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     get_start_span_function,
     transform_anthropic_content_part,
-    _normalize_data,
 )
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
@@ -379,13 +378,16 @@ def _transform_anthropic_tools(
 
         transformed_tool = {
             "name": tool.get("name"),
-            "description": tool.get("description"),
             "type": "function",
         }
 
+        description = tool.get("description")
+        if description is not None:
+            transformed_tool["description"] = description
+
         input_schema = tool.get("input_schema")
-        if input_schema:
-            transformed_tool["parameters"] = _normalize_data(input_schema, unpack=False)
+        if input_schema is not None:
+            transformed_tool["parameters"] = input_schema
 
         transformed_tools.append(transformed_tool)
 
