@@ -153,7 +153,7 @@ def test_langchain_text_completion(
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
     ]
     assert len(llm_spans) > 0
 
