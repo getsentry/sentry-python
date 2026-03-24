@@ -158,7 +158,7 @@ def test_langchain_text_completion(
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
-    assert llm_span["description"] == "Langchain LLM call"
+    assert llm_span["description"] == "generate_text gpt-3.5-turbo"
     assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
     assert llm_span["data"]["gen_ai.response.text"] == "The capital of France is Paris."
     assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
