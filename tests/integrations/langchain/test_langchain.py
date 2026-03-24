@@ -851,12 +851,14 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
         assert tx["type"] == "transaction"
 
         llm_spans = [
-            span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.generate_text"
         ]
         assert len(llm_spans) > 0
 
         llm_span = llm_spans[0]
-        assert llm_span["description"] == "Langchain LLM call"
+        assert llm_span["description"] == "generate_text gpt-3.5-turbo"
         assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
         assert (
             llm_span["data"]["gen_ai.response.text"]
@@ -1062,7 +1064,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
     ]
     assert len(llm_spans) > 0
 
@@ -1776,7 +1778,7 @@ def test_langchain_response_model_extraction(
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
     ]
     assert len(llm_spans) > 0
 
