@@ -22,6 +22,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 import sentry_sdk
 from sentry_sdk import start_transaction
+from sentry_sdk.utils import package_version
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
@@ -32,13 +33,14 @@ from sentry_sdk.integrations.langchain import (
 try:
     # langchain v1+
     from langchain.tools import tool
+    from langchain.agents import create_agent
     from langchain_classic.agents import AgentExecutor, create_openai_tools_agent  # type: ignore[import-not-found]
 except ImportError:
     # langchain <v1
     from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from openai.types.chat.chat_completion_chunk import (
     ChatCompletionChunk,
@@ -51,6 +53,8 @@ from openai.types.chat.chat_completion_chunk import (
 from openai.types.completion_usage import (
     CompletionUsage,
 )
+
+LANGCHAIN_VERSION = package_version("langchain")
 
 
 @tool
@@ -79,6 +83,129 @@ class MockOpenAI(ChatOpenAI):
         return llm_type
 
 
+@pytest.mark.skipif(
+    LANGCHAIN_VERSION < (1,),
+    reason="LangChain 1.0+ required (ONE AGENT refactor)",
+)
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+@pytest.mark.parametrize(
+    "system_instructions_content",
+    [
+        "You are very powerful assistant, but don't know current events",
+        [
+            {"type": "text", "text": "You are a helpful assistant."},
+            {"type": "text", "text": "Be concise and clear."},
+        ],
+    ],
+    ids=["string", "blocks"],
+)
+def test_langchain_create_agent(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    system_instructions_content,
+    request,
+    get_model_response,
+    nonstreaming_responses_model_response,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=include_prompts,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    model_response = get_model_response(
+        nonstreaming_responses_model_response,
+        serialize_pydantic=True,
+        request_headers={
+            "X-Stainless-Raw-Response": "True",
+        },
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+        use_responses_api=True,
+    )
+    agent = create_agent(
+        model=llm,
+        tools=[get_word_length],
+        system_prompt=SystemMessage(content=system_instructions_content),
+        name="word_length_agent",
+    )
+
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        return_value=model_response,
+    ) as _:
+        with start_transaction():
+            agent.invoke(
+                {
+                    "messages": [
+                        HumanMessage(content="How many letters in the word eudca"),
+                    ],
+                },
+            )
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    assert tx["contexts"]["trace"]["origin"] == "manual"
+
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    assert len(chat_spans) == 1
+    assert chat_spans[0]["origin"] == "auto.ai.langchain"
+
+    assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
+    assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
+    assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
+
+    if send_default_pii and include_prompts:
+        assert (
+            chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == "Hello, how can I help you?"
+        )
+
+        param_id = request.node.callspec.id
+        if "string" in param_id:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        else:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+
+
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -100,7 +227,7 @@ class MockOpenAI(ChatOpenAI):
     ],
     ids=["string", "list", "blocks"],
 )
-def test_langchain_agent(
+def test_langchain_openai_tools_agent(
     sentry_init,
     capture_events,
     send_default_pii,
