@@ -2005,13 +2005,13 @@ class TestTransformLangchainContentBlock:
     [
         # Real LangChain _type values (from _llm_type properties)
         # OpenAI
-        ("openai-chat", "openai-chat"),
+        ("openai-chat", "openai"),
         ("openai", "openai"),
         # Azure OpenAI
-        ("azure-openai-chat", "azure-openai-chat"),
+        ("azure-openai-chat", "openai"),
         ("azure", "azure"),
         # Anthropic
-        ("anthropic-chat", "anthropic-chat"),
+        ("anthropic-chat", "anthropic"),
         # Google
         ("vertexai", "vertexai"),
         ("chat-google-generative-ai", "chat-google-generative-ai"),

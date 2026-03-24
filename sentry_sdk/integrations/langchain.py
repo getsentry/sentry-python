@@ -114,6 +114,11 @@ def _get_ai_system(all_params: "Dict[str, Any]") -> "Optional[str]":
     if not ai_type or not isinstance(ai_type, str):
         return None
 
+    if "anthropic" in ai_type:
+        return "anthropic"
+    elif "openai" in ai_type:
+        return "openai"
+
     return ai_type
 
 
