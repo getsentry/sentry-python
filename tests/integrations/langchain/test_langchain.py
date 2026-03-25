@@ -159,6 +159,7 @@ def test_langchain_text_completion(
 
     llm_span = llm_spans[0]
     assert llm_span["description"] == "generate_text gpt-3.5-turbo"
+    assert llm_span["data"]["gen_ai.system"] == "openai"
     assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
     assert llm_span["data"]["gen_ai.response.text"] == "The capital of France is Paris."
     assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
@@ -254,6 +255,7 @@ def test_langchain_create_agent(
     assert len(chat_spans) == 1
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
 
+    assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
     assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
     assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
     assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
@@ -413,10 +415,12 @@ def test_tool_execution_span(
     assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
     assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
     assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+    assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
 
     assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
     assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
     assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+    assert chat_spans[1]["data"]["gen_ai.system"] == "openai-chat"
 
     if send_default_pii and include_prompts:
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
