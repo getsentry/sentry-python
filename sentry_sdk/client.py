@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
 import warnings
-import re
+
 from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk._span_batcher import SpanBatcher
@@ -688,7 +688,6 @@ class _Client(BaseClient):
         ):
             new_event = None
             spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
-            self._clean_span_descriptions(event)
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
@@ -712,12 +711,6 @@ class _Client(BaseClient):
             event = new_event
 
         return event
-
-    def _clean_span_descriptions(self, event: "Event") -> None:
-        for s in event.get("spans", []):
-            if "description" in s:
-                cleaned_description = re.sub(r"\s+", " ", s["description"]).strip()
-                s["description"] = cleaned_description
 
     def _is_ignored_error(self, event: "Event", hint: "Hint") -> bool:
         exc_info = hint.get("exc_info")
