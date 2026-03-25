@@ -2107,3 +2107,47 @@ def test_extract_contents_messages_object_with_text_attribute():
     assert len(result) == 1
     assert result[0]["role"] == "user"
     assert result[0]["content"] == [{"text": "Object text", "type": "text"}]
+
+
+def test_response_with_none_content_parts(sentry_init, capture_events, mock_genai_client):
+    """Test that _extract_response_text does not raise TypeError when
+    candidate.content.parts is explicitly set to None (attribute exists but is None).
+    See https://github.com/getsentry/sentry-python/issues/5854
+    """
+    sentry_init(
+        integrations=[GoogleGenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    # Response where parts is present but explicitly None
+    response_json = {
+        "candidates": [
+            {
+                "content": {
+                    "role": "model",
+                    "parts": None,
+                },
+                "finishReason": "STOP",
+            }
+        ],
+    }
+
+    mock_http_response = create_mock_http_response(response_json)
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            # Should not raise TypeError: 'NoneType' object is not iterable
+            response = mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents="Test",
+                config=create_test_config(),
+            )
+
+    assert response is not None
+    (event,) = events
+    chat_span = event["spans"][0]
+    # No response text should be recorded
+    assert chat_span["data"].get(SPANDATA.GEN_AI_RESPONSE_TEXT) is None
