@@ -38,6 +38,13 @@ jobs:
               return;
             }
 
+            // Label the PR so maintainers can filter/track violations
+            await github.rest.issues.addLabels({
+              ...repo,
+              issue_number: pullRequest.number,
+              labels: ['converted-to-draft'],
+            });
+
             // Check for existing bot comment to avoid duplicates on reopen
             const comments = await github.rest.issues.listComments({
               ...repo,
