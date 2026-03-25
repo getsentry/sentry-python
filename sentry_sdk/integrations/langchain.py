@@ -17,10 +17,10 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
     transform_content_part,
 )
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import _get_value, set_span_errored
+from sentry_sdk.tracing_utils import _get_value
 from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
@@ -296,7 +296,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span_data = self.span_map[run_id]
             span = span_data.span
-            set_span_errored(span)
+            # Only mark this AI span as errored; do not propagate to the
+            # containing HTTP transaction.  (fixes #5791)
+            span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
             sentry_sdk.capture_exception(error, span.scope)
 
@@ -1102,7 +1104,9 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
             except Exception:
                 exc_info = sys.exc_info()
-                set_span_errored(span)
+                # Only mark this AI span as errored; do not touch the transaction.
+                # (fixes #5791)
+                span.set_status(SPANSTATUS.INTERNAL_ERROR)
                 raise
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
@@ -1128,7 +1132,9 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
             except Exception:
                 exc_info = sys.exc_info()
-                set_span_errored(span)
+                # Only mark this AI span as errored; do not touch the transaction.
+                # (fixes #5791)
+                span.set_status(SPANSTATUS.INTERNAL_ERROR)
                 raise
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
