@@ -1,4 +1,3 @@
-import contextvars
 import itertools
 import sys
 import json
@@ -151,44 +150,6 @@ def _transform_langchain_message_content(content: "Any") -> "Any":
         return transformed
 
     return content
-
-
-# Contextvar to track agent names in a stack for re-entrant agent support
-_agent_stack: "contextvars.ContextVar[Optional[List[Optional[str]]]]" = (
-    contextvars.ContextVar("langchain_agent_stack", default=None)
-)
-
-
-def _push_agent(agent_name: "Optional[str]") -> None:
-    """Push an agent name onto the stack."""
-    stack = _agent_stack.get()
-    if stack is None:
-        stack = []
-    else:
-        # Copy the list to maintain contextvar isolation across async contexts
-        stack = stack.copy()
-    stack.append(agent_name)
-    _agent_stack.set(stack)
-
-
-def _pop_agent() -> "Optional[str]":
-    """Pop an agent name from the stack and return it."""
-    stack = _agent_stack.get()
-    if stack:
-        # Copy the list to maintain contextvar isolation across async contexts
-        stack = stack.copy()
-        agent_name = stack.pop()
-        _agent_stack.set(stack)
-        return agent_name
-    return None
-
-
-def _get_current_agent() -> "Optional[str]":
-    """Get the current agent name (top of stack) without removing it."""
-    stack = _agent_stack.get()
-    if stack:
-        return stack[-1]
-    return None
 
 
 def _get_system_instructions(messages: "List[List[BaseMessage]]") -> "List[str]":
@@ -454,8 +415,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             elif "openai" in ai_type:
                 span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
 
-            agent_name = _get_current_agent()
-            if agent_name:
+            agent_name = kwargs.get("metadata", {}).get("lc_agent_name")
+            if agent_name is not None:
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
             for key, attribute in DATA_FIELDS.items():
@@ -654,8 +615,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if tool_description is not None:
                 span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
 
-            agent_name = _get_current_agent()
-            if agent_name:
+            agent_name = kwargs.get("metadata", {}).get("lc_agent_name")
+            if agent_name is not None:
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
             if should_send_default_pii() and self.include_prompts:
@@ -782,9 +743,7 @@ def _record_token_usage(span: "Span", response: "Any") -> None:
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
-def _get_request_data(
-    obj: "Any", args: "Any", kwargs: "Any"
-) -> "tuple[Optional[str], Optional[List[Any]]]":
+def _get_available_tools(obj: "Any") -> "tuple[Optional[str], Optional[List[Any]]]":
     """
     Get the agent name and available tools for the agent.
     """
@@ -799,6 +758,13 @@ def _get_request_data(
     )
     tools = tools if tools and len(tools) > 0 else None
 
+    return tools
+
+
+def _get_run_name(obj: "Any", args: "Any"):
+    agent = getattr(obj, "agent", None)
+    runnable = getattr(agent, "runnable", None)
+    runnable_config = getattr(runnable, "config", {})
     try:
         agent_name = None
         if len(args) > 1:
@@ -808,7 +774,7 @@ def _get_request_data(
     except Exception:
         pass
 
-    return (agent_name, tools)
+    return agent_name
 
 
 def _simplify_langchain_tools(tools: "Any") -> "Optional[List[Any]]":
@@ -976,58 +942,53 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
         if integration is None:
             return f(self, *args, **kwargs)
 
-        agent_name, tools = _get_request_data(self, args, kwargs)
         start_span_function = get_start_span_function()
-
+        run_name = _get_run_name(self, args)
         with start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
+            name=run_name,
             origin=LangchainIntegration.origin,
         ) as span:
-            _push_agent(agent_name)
-            try:
-                if agent_name:
-                    span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+            if run_name:
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, run_name)
 
-                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-                _set_tools_on_span(span, tools)
+            tools = _get_available_tools(self)
+            _set_tools_on_span(span, tools)
 
-                # Run the agent
-                result = f(self, *args, **kwargs)
+            # Run the agent
+            result = f(self, *args, **kwargs)
 
-                input = result.get("input")
-                if (
-                    input is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
-                    normalized_messages = normalize_message_roles([input])
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        normalized_messages, span, scope
+            input = result.get("input")
+            if (
+                input is not None
+                and should_send_default_pii()
+                and integration.include_prompts
+            ):
+                normalized_messages = normalize_message_roles([input])
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    normalized_messages, span, scope
+                )
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
                     )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
 
-                output = result.get("output")
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+            output = result.get("output")
+            if (
+                output is not None
+                and should_send_default_pii()
+                and integration.include_prompts
+            ):
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
-                return result
-            finally:
-                # Ensure agent is popped even if an exception occurs
-                _pop_agent()
+            return result
 
     return new_invoke
 
@@ -1039,24 +1000,31 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         if integration is None:
             return f(self, *args, **kwargs)
 
-        agent_name, tools = _get_request_data(self, args, kwargs)
         start_span_function = get_start_span_function()
+
+        agent_name = kwargs.get("metadata", {}).get("lc_agent_name")
+        run_name = _get_run_name(self, args)
+
+        span_name = "invoke_agent"
+        if agent_name is not None:
+            span_name = f"invoke_agent {agent_name}"
+        elif run_name:
+            span_name = f"invoke_agent {run_name}"
 
         span = start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
+            name=span_name,
             origin=LangchainIntegration.origin,
         )
         span.__enter__()
 
-        _push_agent(agent_name)
-
-        if agent_name:
+        if agent_name is not None:
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
+        tools = _get_available_tools(self)
         _set_tools_on_span(span, tools)
 
         input = args[0].get("input") if len(args) >= 1 else None
@@ -1106,7 +1074,6 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 raise
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
-                _pop_agent()
                 span.__exit__(*exc_info)
 
         async def new_iterator_async() -> "AsyncIterator[Any]":
@@ -1132,7 +1099,6 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 raise
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
-                _pop_agent()
                 span.__exit__(*exc_info)
 
         if str(type(result)) == "<class 'async_generator'>":
