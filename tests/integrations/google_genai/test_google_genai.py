@@ -525,6 +525,11 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
     # Verify model name
     assert chat_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
 
+    # Verify response_id and model_version are captured from the first chunk
+    # that contains them (fixes: streaming always returns null for these fields)
+    assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "response-id-stream-123"
+    assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gemini-1.5-flash"
+
 
 def test_span_origin(sentry_init, capture_events, mock_genai_client):
     sentry_init(
