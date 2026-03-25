@@ -1,8 +1,8 @@
 import sentry_sdk
 from contextvars import ContextVar
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.tracing_utils import get_current_span
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 from typing import TYPE_CHECKING
@@ -207,7 +207,11 @@ def _set_available_tools(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
 
 
 def _capture_exception(exc: "Any", handled: bool = False) -> None:
-    set_span_errored()
+    # Only mark the current AI span as errored; do not propagate to the
+    # containing HTTP transaction.  (fixes #5795)
+    span = get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     event, hint = event_from_exception(
         exc,
