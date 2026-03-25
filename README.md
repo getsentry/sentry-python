@@ -12,8 +12,6 @@ _Bad software is everywhere, and we're tired of it. Sentry is on a mission to he
 <img src="https://img.shields.io/badge/python-3.7 | 3.8 | 3.9 | 3.10 | 3.11 | 3.12 | 3.13 | 3.14-blue.svg" alt="python">
 [![Build Status](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml/badge.svg)](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml)
 
-<br/>
-
 </div>
 
 
