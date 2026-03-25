@@ -9,7 +9,11 @@ from pyreqwest.simple.sync_request import pyreqwest_get as sync_pyreqwest_get
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.pyreqwest import PyreqwestIntegration
+from sentry_sdk.integrations.pyreqwest import (
+    PyreqwestIntegration,
+    _patch_builder_method,
+    sentry_sync_middleware,
+)
 from tests.conftest import get_free_port
 
 
@@ -53,6 +57,64 @@ def server_port():
 @pytest.fixture(autouse=True)
 def clear_captured_requests():
     PyreqwestMockHandler.captured_requests.clear()
+
+
+def test_patch_builder_method_only_adds_middleware_once(monkeypatch):
+    class DummyClient:
+        @staticmethod
+        def get_integration(_integration):
+            return object()
+
+    monkeypatch.setattr(
+        "sentry_sdk.integrations.pyreqwest.sentry_sdk.get_client", lambda: DummyClient()
+    )
+
+    class Builder:
+        def __init__(self):
+            self.middleware_count = 0
+
+        def with_middleware(self, _middleware):
+            self.middleware_count += 1
+            return self
+
+        def send(self):
+            return self.middleware_count
+
+    _patch_builder_method(Builder, "send", sentry_sync_middleware)
+
+    builder = Builder()
+    assert builder.send() == 1
+    assert builder.send() == 1
+
+
+def test_patch_builder_method_instruments_immutable_builder_once(monkeypatch):
+    class DummyClient:
+        @staticmethod
+        def get_integration(_integration):
+            return object()
+
+    monkeypatch.setattr(
+        "sentry_sdk.integrations.pyreqwest.sentry_sdk.get_client", lambda: DummyClient()
+    )
+
+    class ImmutableBuilder:
+        __slots__ = ("middleware_count",)
+
+        def __init__(self):
+            self.middleware_count = 0
+
+        def with_middleware(self, _middleware):
+            self.middleware_count += 1
+            return self
+
+        def send(self):
+            return self.middleware_count
+
+    _patch_builder_method(ImmutableBuilder, "send", sentry_sync_middleware)
+
+    builder = ImmutableBuilder()
+    assert builder.send() == 1
+    assert builder.send() == 1
 
 
 @pytest.mark.skipif(pyreqwest is None, reason="pyreqwest not installed")
