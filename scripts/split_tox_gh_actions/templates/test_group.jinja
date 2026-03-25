@@ -42,8 +42,8 @@
     # Use Docker container only for Python 3.6
     {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         {% raw %}if: ${{ matrix.python-version != '3.6' }}{% endraw %}
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
@@ -51,17 +51,17 @@
 
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.7
+        uses: getsentry/action-clickhouse-in-ci@5dc8a6a50d689bd6051db0241f34849e5a36490b # v1.7
       {% endif %}
 
       {% if needs_redis %}
       - name: Start Redis
-        uses: supercharge/redis-github-action@v2
+        uses: supercharge/redis-github-action@87f27ff1ab2d9e62db54b11ee5e7f78ff18f8933 # v2
       {% endif %}
 
       {% if needs_java %}
       - name: Install Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -96,7 +96,7 @@
 
       - name: Parse and Upload Coverage
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        uses: getsentry/codecov-action@main
+        uses: getsentry/codecov-action@fda17cfc37e16a0cc23f61685813390bfee7daf3 # main
         with:
           token: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
           files: coverage.xml

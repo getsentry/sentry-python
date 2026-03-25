@@ -48,6 +48,12 @@ from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise
 
+try:
+    import openai
+except ImportError:
+    openai = None
+
+
 from tests import _warning_recorder, _warning_recorder_mgr
 
 from typing import TYPE_CHECKING
@@ -1018,10 +1024,14 @@ def async_iterator():
 
 @pytest.fixture
 def server_side_event_chunks():
-    def inner(events):
+    def inner(events, include_event_type=True):
         for event in events:
             payload = event.model_dump()
-            chunk = f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+            chunk = (
+                f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n"
+                if include_event_type
+                else f"data: {json.dumps(payload)}\n\n"
+            )
             yield chunk.encode("utf-8")
 
     return inner
@@ -1029,10 +1039,14 @@ def server_side_event_chunks():
 
 @pytest.fixture
 def get_model_response():
-    def inner(response_content, serialize_pydantic=False):
+    def inner(response_content, serialize_pydantic=False, request_headers=None):
+        if request_headers is None:
+            request_headers = {}
+
         model_request = HttpxRequest(
             "POST",
             "/responses",
+            headers=request_headers,
         )
 
         if serialize_pydantic:
@@ -1045,6 +1059,104 @@ def get_model_response():
         )
 
         return response
+
+    return inner
+
+
+@pytest.fixture
+def nonstreaming_responses_model_response():
+    return openai.types.responses.Response(
+        id="resp_123",
+        output=[
+            openai.types.responses.ResponseOutputMessage(
+                id="msg_123",
+                type="message",
+                status="completed",
+                content=[
+                    openai.types.responses.ResponseOutputText(
+                        text="Hello, how can I help you?",
+                        type="output_text",
+                        annotations=[],
+                    )
+                ],
+                role="assistant",
+            )
+        ],
+        parallel_tool_calls=False,
+        tool_choice="none",
+        tools=[],
+        created_at=10000000,
+        model="gpt-4",
+        object="response",
+        usage=openai.types.responses.ResponseUsage(
+            input_tokens=10,
+            input_tokens_details=openai.types.responses.response_usage.InputTokensDetails(
+                cached_tokens=0,
+            ),
+            output_tokens=20,
+            output_tokens_details=openai.types.responses.response_usage.OutputTokensDetails(
+                reasoning_tokens=5,
+            ),
+            total_tokens=30,
+        ),
+    )
+
+
+@pytest.fixture
+def responses_tool_call_model_responses():
+    def inner(
+        tool_name: str,
+        arguments: str,
+        response_model: str,
+        response_text: str,
+        response_ids: "Iterator[str]",
+        usages: "Iterator[openai.types.responses.ResponseUsage]",
+    ):
+        yield openai.types.responses.Response(
+            id=next(response_ids),
+            output=[
+                openai.types.responses.ResponseFunctionToolCall(
+                    id="call_123",
+                    call_id="call_123",
+                    name=tool_name,
+                    type="function_call",
+                    arguments=arguments,
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model=response_model,
+            object="response",
+            usage=next(usages),
+        )
+
+        yield openai.types.responses.Response(
+            id=next(response_ids),
+            output=[
+                openai.types.responses.ResponseOutputMessage(
+                    id="msg_final",
+                    type="message",
+                    status="completed",
+                    content=[
+                        openai.types.responses.ResponseOutputText(
+                            text=response_text,
+                            type="output_text",
+                            annotations=[],
+                        )
+                    ],
+                    role="assistant",
+                )
+            ],
+            parallel_tool_calls=False,
+            tool_choice="none",
+            tools=[],
+            created_at=10000000,
+            model=response_model,
+            object="response",
+            usage=next(usages),
+        )
 
     return inner
 

@@ -227,7 +227,6 @@ def _set_responses_api_input_data(
     explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
     messages: "Optional[Union[str, ResponseInputParam]]" = kwargs.get("input")
 
-    # Input attributes: Tools
     tools = kwargs.get("tools")
     if tools is not None and _is_given(tools) and len(tools) > 0:
         set_data_normalized(
@@ -350,7 +349,6 @@ def _set_completions_api_input_data(
         "messages"
     )
 
-    # Input attributes: Tools
     tools = kwargs.get("tools")
     if tools is not None and _is_given(tools) and len(tools) > 0:
         set_data_normalized(
@@ -444,6 +442,12 @@ def _set_embeddings_input_data(
     messages: "Union[str, SequenceNotStr[str], Iterable[int], Iterable[Iterable[int]]]" = kwargs.get(
         "input"
     )
+
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools) and len(tools) > 0:
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+        )
 
     model = kwargs.get("model")
     if model is not None and _is_given(model):
