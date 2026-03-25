@@ -610,7 +610,7 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     span.__enter__()
 
     span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-    is_streaming_response = kwargs.get("stream", False)
+    is_streaming_response = bool(kwargs.get("stream", False))
     span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
 
     _set_completions_api_input_data(span, kwargs, integration)
