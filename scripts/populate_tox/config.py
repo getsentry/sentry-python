@@ -123,6 +123,7 @@ TEST_SUITE_CONFIG = {
                 "python-multipart",
                 "requests",
                 "anyio<4",
+                "jinja2",
             ],
             # There's an incompatibility between FastAPI's TestClient, which is
             # actually Starlette's TestClient, which is actually httpx's Client.
@@ -228,9 +229,6 @@ TEST_SUITE_CONFIG = {
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
         "num_versions": 2,
-    },
-    "litellm": {
-        "package": "litellm",
     },
     "litestar": {
         "package": "litestar",
