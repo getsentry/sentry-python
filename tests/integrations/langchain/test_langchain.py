@@ -147,7 +147,7 @@ def test_langchain_text_completion(
     ) as _:
         with start_transaction():
             input_text = "What is the capital of France?"
-            model.invoke(input_text)
+            model.invoke(input_text, config={"run_name": "my-snazzy-pipeline"})
 
     tx = events[0]
     assert tx["type"] == "transaction"
@@ -160,6 +160,7 @@ def test_langchain_text_completion(
     llm_span = llm_spans[0]
     assert llm_span["description"] == "generate_text gpt-3.5-turbo"
     assert llm_span["data"]["gen_ai.system"] == "openai"
+    assert llm_span["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
     assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
     assert llm_span["data"]["gen_ai.response.text"] == "The capital of France is Paris."
     assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
@@ -1268,6 +1269,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
             serialized=serialized,
             prompts=prompts,
             run_id=run_id,
+            name="my_pipeline",
             invocation_params={
                 "temperature": 0.7,
                 "max_tokens": 100,
@@ -1297,8 +1299,10 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
+    assert llm_span["data"]["gen_ai.operation.name"] == "generate_text"
+    assert llm_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "my_pipeline"
 
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
     messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
@@ -2011,6 +2015,7 @@ def test_langchain_response_model_extraction(
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
+    assert llm_span["data"]["gen_ai.operation.name"] == "generate_text"
 
     if expected_model is not None:
         assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["data"]
