@@ -147,7 +147,7 @@ def test_langchain_text_completion(
     ) as _:
         with start_transaction():
             input_text = "What is the capital of France?"
-            model.invoke(input_text)
+            model.invoke(input_text, config={"run_name": "my-snazzy-pipeline"})
 
     tx = events[0]
     assert tx["type"] == "transaction"
@@ -159,6 +159,8 @@ def test_langchain_text_completion(
 
     llm_span = llm_spans[0]
     assert llm_span["description"] == "generate_text gpt-3.5-turbo"
+    assert llm_span["data"]["gen_ai.system"] == "openai"
+    assert llm_span["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
     assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
     assert llm_span["data"]["gen_ai.response.text"] == "The capital of France is Paris."
     assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
