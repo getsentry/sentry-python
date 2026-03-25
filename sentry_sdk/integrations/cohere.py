@@ -3,12 +3,12 @@ from functools import wraps
 
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.ai.utils import set_data_normalized
 
 from typing import TYPE_CHECKING
 
-from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.tracing_utils import get_current_span
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
@@ -84,7 +84,11 @@ class CohereIntegration(Integration):
 
 
 def _capture_exception(exc: "Any") -> None:
-    set_span_errored()
+    # Only mark the current AI span as errored; do not propagate to the
+    # containing HTTP transaction.  (fixes #5792)
+    span = get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     event, hint = event_from_exception(
         exc,
