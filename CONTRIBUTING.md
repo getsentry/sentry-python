@@ -17,6 +17,10 @@ Please search the [issue tracker](https://github.com/getsentry/sentry-python/iss
 
 We will review your pull request as soon as possible. Thank you for contributing!
 
+### AI Use
+
+You are welcome to use whatever tools you prefer for making a contribution. However, any changes you propose have to be reviewed and tested by you, a human, first, before you submit a pull request with them for the Sentry team to review. If we feel like that didn't happen, we will close the PR outright. For example, we won't review visibly AI-generated PRs from an agent instructed to look for and "fix" open issues in the repo.
+
 ## Development Environment
 
 ### Set up Python

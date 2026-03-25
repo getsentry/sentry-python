@@ -641,6 +641,59 @@ def test_continue_trace_unsampled(sentry_init, capture_envelopes):
     assert len(spans) == 0
 
 
+def test_unsampled_spans_produce_client_report(
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
+):
+    sentry_init(
+        traces_sample_rate=0.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    envelopes = capture_envelopes()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        with sentry_sdk.traces.start_span(name="child1"):
+            pass
+        with sentry_sdk.traces.start_span(name="child2"):
+            pass
+
+    sentry_sdk.get_client().flush()
+
+    spans = envelopes_to_spans(envelopes)
+    assert not spans
+
+    assert record_lost_event_calls == [
+        ("sample_rate", "span", None, 1),
+        ("sample_rate", "span", None, 1),
+        ("sample_rate", "span", None, 1),
+    ]
+
+
+def test_no_client_reports_if_tracing_is_off(
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
+):
+    sentry_init(
+        traces_sample_rate=None,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    envelopes = capture_envelopes()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        with sentry_sdk.traces.start_span(name="child1"):
+            pass
+        with sentry_sdk.traces.start_span(name="child2"):
+            pass
+
+    sentry_sdk.get_client().flush()
+
+    spans = envelopes_to_spans(envelopes)
+    assert not spans
+    assert not record_lost_event_calls
+
+
 def test_continue_trace_no_sample_rand(sentry_init, capture_envelopes):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
@@ -1322,6 +1375,36 @@ def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
     assert span5["name"] == "child 2"
     assert span3["parent_span_id"] == span1["span_id"]
     assert span5["parent_span_id"] == span3["span_id"]
+
+
+def test_ignored_spans_produce_client_report(
+    sentry_init, capture_envelopes, capture_record_lost_event_calls
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream", "ignore_spans": ["ignored"]},
+    )
+
+    envelopes = capture_envelopes()
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    with sentry_sdk.traces.start_span(name="ignored"):
+        with sentry_sdk.traces.start_span(name="span1"):
+            pass
+        with sentry_sdk.traces.start_span(name="span2"):
+            pass
+
+    sentry_sdk.get_client().flush()
+
+    spans = envelopes_to_spans(envelopes)
+    assert not spans
+
+    # All three spans will be ignored since the segment is ignored
+    assert record_lost_event_calls == [
+        ("ignored", "span", None, 1),
+        ("ignored", "span", None, 1),
+        ("ignored", "span", None, 1),
+    ]
 
 
 @mock.patch("sentry_sdk.profiler.continuous_profiler.DEFAULT_SAMPLING_FREQUENCY", 21)
