@@ -10,6 +10,10 @@ Please search the [issue tracker](https://github.com/getsentry/sentry-python/iss
 
 ## Submitting Changes
 
+Before submitting a pull request, please check whether the issue you're planning to address, if there is one, is assigned to anyone. If you want to help with an issue that already has an assignee, comment on it first to coordinate with the person assigned whether the contribution would make sense before opening a pull request.
+
+To make a contribution:
+
 - Fork the `sentry-python` repo and prepare your changes.
 - Add tests for your changes to `tests/`.
 - Run tests and make sure all of them pass.
