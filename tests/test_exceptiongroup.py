@@ -306,3 +306,118 @@ def test_simple_exception():
 
     exception_values = event["exception"]["values"]
     assert exception_values == expected_exception_values
+
+
+@minimum_python_311
+def test_cyclic_exception_group_cause():
+    """
+    Regression test for https://github.com/getsentry/sentry-python/issues/5025
+
+    When using FastAPI with multiple BaseHTTPMiddleware instances, anyio wraps
+    exceptions in ExceptionGroups.
+
+    When a single exception is unpacked from the ExceptionGroup by Starlette and reraised in the `collapse_excgroups()` method
+    (see https://github.com/Kludex/starlette/blob/0e88e92b592bfa11fd92e331869a8d49ba34b541/starlette/_utils.py#L79-L87)
+    it causes the following situation to happen:
+
+        ExceptionGroup -> .exceptions[0] -> ValueError -> __cause__ -> ExceptionGroup
+
+    when the Sentry SDK attempts to walk through the chain of exceptions via the exceptions_from_error().
+
+    This is because `exceptions_from_error` walks both __cause__/__context__ and
+    ExceptionGroup.exceptions recursively without cycle detection, causing
+    infinite recursion and a silent RecursionError that drops the event.
+    """
+    # Construct the exact cyclic structure that anyio/Starlette creates when
+    # an exception propagates through multiple BaseHTTPMiddleware layers.
+    original = ValueError("original error")
+    group = ExceptionGroup("unhandled errors in a TaskGroup", [original])
+    original.__cause__ = group
+    original.__suppress_context__ = True
+
+    # When the ExceptionGroup is the top-level exception, exceptions_from_error
+    # is called directly (not walk_exception_chain which has cycle detection).
+    (event, _) = event_from_exception(
+        group,
+        client_options={
+            "include_local_variables": True,
+            "include_source_context": True,
+            "max_value_length": 1024,
+        },
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    exception_values = event["exception"]["values"]
+
+    # Must produce a finite list of exceptions without hitting RecursionError.
+    assert len(exception_values) >= 1
+    exc_types = [v["type"] for v in exception_values]
+    assert "ExceptionGroup" in exc_types
+    assert "ValueError" in exc_types
+
+
+@minimum_python_311
+def test_cyclic_exception_group_context():
+    """
+    Same as test_cyclic_exception_group_cause (see above) but the cycle goes through
+    __context__ instead of __cause__ .
+
+    This is the more likely scenario to occur in production because __context__ is set implicitly by
+    Python while __cause__ is set explicitly when "raise X from Y" is written in the code
+    """
+    original = ValueError("original error")
+    group = ExceptionGroup("unhandled errors in a TaskGroup", [original])
+    original.__context__ = group
+    # __suppress_context__ = False so that exceptions_from_error follows __context__
+    original.__suppress_context__ = False
+
+    (event, _) = event_from_exception(
+        group,
+        client_options={
+            "include_local_variables": True,
+            "include_source_context": True,
+            "max_value_length": 1024,
+        },
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    exception_values = event["exception"]["values"]
+    assert len(exception_values) >= 1
+    exc_types = [v["type"] for v in exception_values]
+    assert "ExceptionGroup" in exc_types
+    assert "ValueError" in exc_types
+
+
+@minimum_python_311
+def test_deeply_nested_cyclic_exception_group():
+    """
+    A more complex cycle: ExceptionGroup -> ValueError -> __cause__ ->
+    ExceptionGroup (nested) -> TypeError -> __cause__ -> original ExceptionGroup
+    """
+    inner_error = TypeError("inner")
+    outer_error = ValueError("outer")
+    inner_group = ExceptionGroup("inner group", [inner_error])
+    outer_group = ExceptionGroup("outer group", [outer_error])
+
+    # Create a cycle spanning two ExceptionGroups
+    outer_error.__cause__ = inner_group
+    outer_error.__suppress_context__ = True
+    inner_error.__cause__ = outer_group
+    inner_error.__suppress_context__ = True
+
+    (event, _) = event_from_exception(
+        outer_group,
+        client_options={
+            "include_local_variables": True,
+            "include_source_context": True,
+            "max_value_length": 1024,
+        },
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    exception_values = event["exception"]["values"]
+    assert len(exception_values) >= 1
+    exc_types = [v["type"] for v in exception_values]
+    assert "ExceptionGroup" in exc_types
+    assert "ValueError" in exc_types
+    assert "TypeError" in exc_types
