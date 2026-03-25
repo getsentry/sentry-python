@@ -17,7 +17,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.tracing_utils import get_current_span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -74,7 +74,12 @@ class AnthropicIntegration(Integration):
 
 
 def _capture_exception(exc: "Any") -> None:
-    set_span_errored()
+    # Only mark the current AI span as errored; do not propagate to the
+    # containing HTTP transaction — AI integrations must not interfere with
+    # the transaction status.  See: https://github.com/getsentry/sentry-python/issues/5790
+    span = get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     event, hint = event_from_exception(
         exc,

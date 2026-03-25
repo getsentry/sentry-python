@@ -706,7 +706,10 @@ def test_exception_message_create(sentry_init, capture_events):
 
     (event, transaction) = events
     assert event["level"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    # The Anthropic integration must NOT set the transaction status to
+    # internal_error — only its own span should be marked errored so that
+    # HTTP transactions are left intact.  (fixes #5790)
+    assert transaction["contexts"]["trace"]["status"] != "internal_error"
 
 
 def test_span_status_error(sentry_init, capture_events):
@@ -729,7 +732,9 @@ def test_span_status_error(sentry_init, capture_events):
     assert error["level"] == "error"
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    # The transaction itself must NOT be marked internal_error by the AI
+    # integration — only the inner span should be errored.  (fixes #5790)
+    assert transaction["contexts"]["trace"]["status"] != "internal_error"
     assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -754,7 +759,9 @@ async def test_span_status_error_async(sentry_init, capture_events):
     assert error["level"] == "error"
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    # The transaction itself must NOT be marked internal_error by the AI
+    # integration — only the inner span should be errored.  (fixes #5790)
+    assert transaction["contexts"]["trace"]["status"] != "internal_error"
     assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
@@ -776,7 +783,10 @@ async def test_exception_message_create_async(sentry_init, capture_events):
 
     (event, transaction) = events
     assert event["level"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    # The Anthropic integration must NOT set the transaction status to
+    # internal_error — only its own span should be marked errored so that
+    # HTTP transactions are left intact.  (fixes #5790)
+    assert transaction["contexts"]["trace"]["status"] != "internal_error"
 
 
 def test_span_origin(sentry_init, capture_events):
