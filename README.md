@@ -70,7 +70,7 @@ raise ValueError("Oops, something went wrong!")  # This will create an error eve
 
 ## 📚 Documentation
 
-For more details on advanced usage, integrations, and customization, check out the full documentation on [https://docs.sentry.io](https://docs.sentry.io/).
+For more details on advanced usage, integrations, and customization, check out the full documentation on [https://docs.sentry.io](https://docs.sentry.io/platforms/python/).
 
 
 ## 🧩 Integrations
