@@ -693,7 +693,7 @@ def _extract_response_text(
 
     texts = []
     for candidate in response.candidates:
-        if not hasattr(candidate, "content") or not hasattr(candidate.content, "parts"):
+        if not hasattr(candidate, "content") or not candidate.content.parts:
             continue
 
         for part in candidate.content.parts:

@@ -729,6 +729,39 @@ def test_empty_response(sentry_init, capture_events, mock_genai_client):
     assert len(event["spans"]) == 1
 
 
+def test_response_with_none_parts(sentry_init, capture_events, mock_genai_client):
+    """Test handling of candidates where content.parts is explicitly None.
+
+    Regression test for https://github.com/getsentry/sentry-python/issues/5854
+    """
+    sentry_init(
+        integrations=[GoogleGenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    # Candidate with content present but parts set to None
+    minimal_response_json = {
+        "candidates": [{"content": {"role": "model", "parts": None}}]
+    }
+    mock_http_response = create_mock_http_response(minimal_response_json)
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ):
+        with start_transaction(name="google_genai"):
+            response = mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test", config=create_test_config()
+            )
+
+    assert response is not None
+    assert response.candidates[0].content.parts is None
+
+    (event,) = events
+    # Should not raise TypeError: 'NoneType' object is not iterable
+    assert len(event["spans"]) == 1
+
+
 def test_response_with_different_id_fields(
     sentry_init, capture_events, mock_genai_client
 ):
