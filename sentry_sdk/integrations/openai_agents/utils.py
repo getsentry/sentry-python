@@ -11,7 +11,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.tracing_utils import get_current_span
 from sentry_sdk.utils import event_from_exception, safe_serialize
 from sentry_sdk.ai._openai_completions_api import _transform_system_instructions
 from sentry_sdk.ai._openai_responses_api import (
@@ -36,7 +36,12 @@ except ImportError:
 
 
 def _capture_exception(exc: "Any") -> None:
-    set_span_errored()
+    # Only mark the current AI span as errored; do not propagate to the
+    # containing HTTP transaction — AI integrations must not interfere with
+    # the transaction status.  See: https://github.com/getsentry/sentry-python/issues/5794
+    span = get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     event, hint = event_from_exception(
         exc,
@@ -47,7 +52,9 @@ def _capture_exception(exc: "Any") -> None:
 
 
 def _record_exception_on_span(span: "Span", error: Exception) -> "Any":
-    set_span_errored(span)
+    # Only mark this specific span as errored; do not touch the transaction.
+    # See: https://github.com/getsentry/sentry-python/issues/5794
+    span.set_status(SPANSTATUS.INTERNAL_ERROR)
     span.set_data("span.status", "error")
 
     # Optionally capture the error details if we have them
