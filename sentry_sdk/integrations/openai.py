@@ -1093,7 +1093,9 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
     span.__enter__()
 
     span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-    is_streaming_response = kwargs.get("stream", False)
+
+    # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
+    is_streaming_response = kwargs.get("stream", False) or False
     span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
 
     _set_responses_api_input_data(span, kwargs, integration)
