@@ -9,9 +9,10 @@ from sentry_sdk.consts import SPANDATA
 
 try:
     # Langchain >= 0.2
-    from langchain_openai import ChatOpenAI
+    from langchain_openai import ChatOpenAI, OpenAI
 except ImportError:
     # Langchain < 0.2
+    from langchain_community.llms import OpenAI
     from langchain_community.chat_models import ChatOpenAI
 
 from langchain_core.callbacks import BaseCallbackManager, CallbackManagerForLLMRun
@@ -22,6 +23,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 import sentry_sdk
 from sentry_sdk import start_transaction
+from sentry_sdk.utils import package_version
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
@@ -32,12 +34,39 @@ from sentry_sdk.integrations.langchain import (
 try:
     # langchain v1+
     from langchain.tools import tool
+    from langchain.agents import create_agent
     from langchain_classic.agents import AgentExecutor, create_openai_tools_agent  # type: ignore[import-not-found]
 except ImportError:
     # langchain <v1
     from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, SystemMessage
+
+from openai.types.chat.chat_completion_chunk import (
+    ChatCompletionChunk,
+    Choice,
+    ChoiceDelta,
+    ChoiceDeltaToolCall,
+    ChoiceDeltaToolCallFunction,
+)
+
+from openai.types.completion import Completion
+from openai.types.completion_choice import CompletionChoice
+
+from openai.types.completion_usage import (
+    CompletionUsage,
+)
+
+from openai.types.responses import (
+    ResponseUsage,
+)
+from openai.types.responses.response_usage import (
+    InputTokensDetails,
+    OutputTokensDetails,
+)
+
+LANGCHAIN_VERSION = package_version("langchain")
 
 
 @tool
@@ -66,13 +95,376 @@ class MockOpenAI(ChatOpenAI):
         return llm_type
 
 
+def test_langchain_text_completion(
+    sentry_init,
+    capture_events,
+    get_model_response,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    model_response = get_model_response(
+        Completion(
+            id="completion-id",
+            object="text_completion",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                CompletionChoice(
+                    index=0,
+                    finish_reason="stop",
+                    text="The capital of France is Paris.",
+                )
+            ],
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=15,
+                total_tokens=25,
+            ),
+        ),
+        serialize_pydantic=True,
+    )
+
+    model = OpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0.7,
+        max_tokens=100,
+        openai_api_key="badkey",
+    )
+
+    with patch.object(
+        model.client._client._client,
+        "send",
+        return_value=model_response,
+    ) as _:
+        with start_transaction():
+            input_text = "What is the capital of France?"
+            model.invoke(input_text)
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+    assert llm_span["description"] == "generate_text gpt-3.5-turbo"
+    assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
+    assert llm_span["data"]["gen_ai.response.text"] == "The capital of France is Paris."
+    assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
+    assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
+
+
+@pytest.mark.skipif(
+    LANGCHAIN_VERSION < (1,),
+    reason="LangChain 1.0+ required (ONE AGENT refactor)",
+)
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts, use_unknown_llm_type",
+    "send_default_pii, include_prompts",
     [
-        (True, True, False),
-        (True, False, False),
-        (False, True, False),
-        (False, False, True),
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+@pytest.mark.parametrize(
+    "system_instructions_content",
+    [
+        "You are very powerful assistant, but don't know current events",
+        [
+            {"type": "text", "text": "You are a helpful assistant."},
+            {"type": "text", "text": "Be concise and clear."},
+        ],
+    ],
+    ids=["string", "blocks"],
+)
+def test_langchain_create_agent(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    system_instructions_content,
+    request,
+    get_model_response,
+    nonstreaming_responses_model_response,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=include_prompts,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    model_response = get_model_response(
+        nonstreaming_responses_model_response,
+        serialize_pydantic=True,
+        request_headers={
+            "X-Stainless-Raw-Response": "True",
+        },
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+        use_responses_api=True,
+    )
+    agent = create_agent(
+        model=llm,
+        tools=[get_word_length],
+        system_prompt=SystemMessage(content=system_instructions_content),
+        name="word_length_agent",
+    )
+
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        return_value=model_response,
+    ) as _:
+        with start_transaction():
+            agent.invoke(
+                {
+                    "messages": [
+                        HumanMessage(content="How many letters in the word eudca"),
+                    ],
+                },
+            )
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    assert tx["contexts"]["trace"]["origin"] == "manual"
+
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    assert len(chat_spans) == 1
+    assert chat_spans[0]["origin"] == "auto.ai.langchain"
+
+    assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
+    assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
+    assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
+
+    if send_default_pii and include_prompts:
+        assert (
+            chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == "Hello, how can I help you?"
+        )
+
+        param_id = request.node.callspec.id
+        if "string" in param_id:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        else:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+
+
+@pytest.mark.skipif(
+    LANGCHAIN_VERSION < (1,),
+    reason="LangChain 1.0+ required (ONE AGENT refactor)",
+)
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_tool_execution_span(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    responses_tool_call_model_responses,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=include_prompts,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    responses = responses_tool_call_model_responses(
+        tool_name="get_word_length",
+        arguments='{"word": "eudca"}',
+        response_model="gpt-4-0613",
+        response_text="The word eudca has 5 letters.",
+        response_ids=iter(["resp_1", "resp_2"]),
+        usages=iter(
+            [
+                ResponseUsage(
+                    input_tokens=142,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=50,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=192,
+                ),
+                ResponseUsage(
+                    input_tokens=89,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=28,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=117,
+                ),
+            ]
+        ),
+    )
+    tool_response = get_model_response(
+        next(responses),
+        serialize_pydantic=True,
+        request_headers={
+            "X-Stainless-Raw-Response": "True",
+        },
+    )
+    final_response = get_model_response(
+        next(responses),
+        serialize_pydantic=True,
+        request_headers={
+            "X-Stainless-Raw-Response": "True",
+        },
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-4",
+        temperature=0,
+        openai_api_key="badkey",
+        use_responses_api=True,
+    )
+    agent = create_agent(
+        model=llm,
+        tools=[get_word_length],
+        name="word_length_agent",
+    )
+
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        with start_transaction():
+            agent.invoke(
+                {
+                    "messages": [
+                        HumanMessage(content="How many letters in the word eudca"),
+                    ],
+                },
+            )
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    assert tx["contexts"]["trace"]["origin"] == "manual"
+
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    assert len(chat_spans) == 2
+
+    tool_exec_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
+    assert len(tool_exec_spans) == 1
+    tool_exec_span = tool_exec_spans[0]
+
+    assert chat_spans[0]["origin"] == "auto.ai.langchain"
+    assert chat_spans[1]["origin"] == "auto.ai.langchain"
+    assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+    assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+    assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+    assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+
+    assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+    assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+    assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+
+    if send_default_pii and include_prompts:
+        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
+
+        assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        # Verify tool calls are recorded when PII is enabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
+            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        )
+        tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        assert isinstance(tool_calls_data, str)
+        assert "get_word_length" in tool_calls_data
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
+        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
+
+        # Verify tool calls are NOT recorded when PII is disabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+
+    # Verify that available tools are always recorded regardless of PII settings
+    for chat_span in chat_spans:
+        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+        assert "get_word_length" in tools_data
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
     ],
 )
 @pytest.mark.parametrize(
@@ -87,18 +479,16 @@ class MockOpenAI(ChatOpenAI):
     ],
     ids=["string", "list", "blocks"],
 )
-def test_langchain_agent(
+def test_langchain_openai_tools_agent(
     sentry_init,
     capture_events,
     send_default_pii,
     include_prompts,
-    use_unknown_llm_type,
     system_instructions_content,
     request,
+    get_model_response,
+    server_side_event_chunks,
 ):
-    global llm_type
-    llm_type = "acme-llm" if use_unknown_llm_type else "openai-chat"
-
     sentry_init(
         integrations=[
             LangchainIntegration(
@@ -120,87 +510,173 @@ def test_langchain_agent(
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-    global stream_result_mock
-    stream_result_mock = Mock(
-        side_effect=[
+
+    tool_response = get_model_response(
+        server_side_event_chunks(
             [
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": "call_BbeyNhCKa6kYLYzrD40NGm3b",
-                                    "function": {
-                                        "arguments": "",
-                                        "name": "get_word_length",
-                                    },
-                                    "type": "function",
-                                }
-                            ]
-                        },
-                    ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(role="assistant"),
+                            finish_reason=None,
+                        ),
+                    ],
                 ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": None,
-                                    "function": {
-                                        "arguments": '{"word": "eudca"}',
-                                        "name": None,
-                                    },
-                                    "type": None,
-                                }
-                            ]
-                        },
-                    ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(
+                                tool_calls=[
+                                    ChoiceDeltaToolCall(
+                                        index=0,
+                                        id="call_BbeyNhCKa6kYLYzrD40NGm3b",
+                                        type="function",
+                                        function=ChoiceDeltaToolCallFunction(
+                                            name="get_word_length",
+                                            arguments="",
+                                        ),
+                                    ),
+                                ],
+                            ),
+                            finish_reason=None,
+                        ),
+                    ],
                 ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="5",
-                        usage_metadata={
-                            "input_tokens": 142,
-                            "output_tokens": 50,
-                            "total_tokens": 192,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(
+                                tool_calls=[
+                                    ChoiceDeltaToolCall(
+                                        index=0,
+                                        function=ChoiceDeltaToolCallFunction(
+                                            arguments='{"word": "eudca"}',
+                                        ),
+                                    ),
+                                ],
+                            ),
+                            finish_reason=None,
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(content="5"),
+                            finish_reason=None,
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(),
+                            finish_reason="function_call",
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-1",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[],
+                    usage=CompletionUsage(
+                        prompt_tokens=142,
+                        completion_tokens=50,
+                        total_tokens=192,
                     ),
-                    generation_info={"finish_reason": "function_call"},
                 ),
             ],
-            [
-                ChatGenerationChunk(
-                    text="The word eudca has 5 letters.",
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="The word eudca has 5 letters.",
-                        usage_metadata={
-                            "input_tokens": 89,
-                            "output_tokens": 28,
-                            "total_tokens": 117,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    generation_info={"finish_reason": "stop"},
-                    message=AIMessageChunk(content=""),
-                ),
-            ],
-        ]
+            include_event_type=False,
+        )
     )
-    llm = MockOpenAI(
+
+    final_response = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-2",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(role="assistant"),
+                            finish_reason=None,
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-2",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(content="The word eudca has 5 letters."),
+                            finish_reason=None,
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-2",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[
+                        Choice(
+                            index=0,
+                            delta=ChoiceDelta(),
+                            finish_reason="stop",
+                        ),
+                    ],
+                ),
+                ChatCompletionChunk(
+                    id="chatcmpl-turn-2",
+                    object="chat.completion.chunk",
+                    created=10000000,
+                    model="gpt-3.5-turbo",
+                    choices=[],
+                    usage=CompletionUsage(
+                        prompt_tokens=89,
+                        completion_tokens=28,
+                        total_tokens=117,
+                    ),
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    llm = ChatOpenAI(
         model_name="gpt-3.5-turbo",
         temperature=0,
         openai_api_key="badkey",
@@ -209,15 +685,28 @@ def test_langchain_agent(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction():
-        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        with start_transaction():
+            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     tx = events[0]
     assert tx["type"] == "transaction"
+    assert tx["contexts"]["trace"]["origin"] == "manual"
+
+    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
     tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
 
     assert len(chat_spans) == 2
+
+    assert invoke_agent_span["origin"] == "auto.ai.langchain"
+    assert chat_spans[0]["origin"] == "auto.ai.langchain"
+    assert chat_spans[1]["origin"] == "auto.ai.langchain"
+    assert tool_exec_span["origin"] == "auto.ai.langchain"
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
@@ -305,15 +794,17 @@ def test_langchain_agent(
 
     # Verify that available tools are always recorded regardless of PII settings
     for chat_span in chat_spans:
-        span_data = chat_span.get("data", {})
-        if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
-            tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-            assert tools_data is not None, (
-                "Available tools should always be recorded regardless of PII settings"
-            )
+        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+        assert tools_data is not None, (
+            "Available tools should always be recorded regardless of PII settings"
+        )
+        assert "get_word_length" in tools_data
 
 
 def test_langchain_error(sentry_init, capture_events):
+    global llm_type
+    llm_type = "acme-llm"
+
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -391,122 +882,6 @@ def test_span_status_error(sentry_init, capture_events):
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
-
-
-def test_span_origin(sentry_init, capture_events):
-    sentry_init(
-        integrations=[LangchainIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "You are very powerful assistant, but don't know current events",
-            ),
-            ("user", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ]
-    )
-    global stream_result_mock
-    stream_result_mock = Mock(
-        side_effect=[
-            [
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": "call_BbeyNhCKa6kYLYzrD40NGm3b",
-                                    "function": {
-                                        "arguments": "",
-                                        "name": "get_word_length",
-                                    },
-                                    "type": "function",
-                                }
-                            ]
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="",
-                        additional_kwargs={
-                            "tool_calls": [
-                                {
-                                    "index": 0,
-                                    "id": None,
-                                    "function": {
-                                        "arguments": '{"word": "eudca"}',
-                                        "name": None,
-                                    },
-                                    "type": None,
-                                }
-                            ]
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="5",
-                        usage_metadata={
-                            "input_tokens": 142,
-                            "output_tokens": 50,
-                            "total_tokens": 192,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
-                    ),
-                    generation_info={"finish_reason": "function_call"},
-                ),
-            ],
-            [
-                ChatGenerationChunk(
-                    text="The word eudca has 5 letters.",
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(
-                        content="The word eudca has 5 letters.",
-                        usage_metadata={
-                            "input_tokens": 89,
-                            "output_tokens": 28,
-                            "total_tokens": 117,
-                            "input_token_details": {"audio": 0, "cache_read": 0},
-                            "output_token_details": {"audio": 0, "reasoning": 0},
-                        },
-                    ),
-                ),
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    generation_info={"finish_reason": "stop"},
-                    message=AIMessageChunk(content=""),
-                ),
-            ],
-        ]
-    )
-    llm = MockOpenAI(
-        model_name="gpt-3.5-turbo",
-        temperature=0,
-        openai_api_key="badkey",
-    )
-    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
-
-    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-
-    with start_transaction():
-        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
-
-    (event,) = events
-
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    for span in event["spans"]:
-        assert span["origin"] == "auto.ai.langchain"
 
 
 def test_manual_callback_no_duplication(sentry_init):
@@ -718,155 +1093,6 @@ def test_langchain_callback_list_existing_callback(sentry_init):
         assert handler is sentry_callback
 
 
-def test_tools_integration_in_spans(sentry_init, capture_events):
-    """Test that tools are properly set on spans in actual LangChain integration."""
-    global llm_type
-    llm_type = "openai-chat"
-
-    sentry_init(
-        integrations=[LangchainIntegration(include_prompts=False)],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful assistant"),
-            ("user", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ]
-    )
-
-    global stream_result_mock
-    stream_result_mock = Mock(
-        side_effect=[
-            [
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(content="Simple response"),
-                ),
-            ]
-        ]
-    )
-
-    llm = MockOpenAI(
-        model_name="gpt-3.5-turbo",
-        temperature=0,
-        openai_api_key="badkey",
-    )
-    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-
-    with start_transaction():
-        list(agent_executor.stream({"input": "Hello"}))
-
-    # Check that events were captured and contain tools data
-    if events:
-        tx = events[0]
-        spans = tx.get("spans", [])
-
-        # Look for spans that should have tools data
-        tools_found = False
-        for span in spans:
-            span_data = span.get("data", {})
-            if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
-                tools_found = True
-                tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-                # Verify tools are in the expected format
-                assert isinstance(tools_data, (str, list))  # Could be serialized
-                if isinstance(tools_data, str):
-                    # If serialized as string, should contain tool name
-                    assert "get_word_length" in tools_data
-                else:
-                    # If still a list, verify structure
-                    assert len(tools_data) >= 1
-                    names = [
-                        tool.get("name")
-                        for tool in tools_data
-                        if isinstance(tool, dict)
-                    ]
-                    assert "get_word_length" in names
-
-        # Ensure we found at least one span with tools data
-        assert tools_found, "No spans found with tools data"
-
-
-def test_langchain_integration_with_langchain_core_only(sentry_init, capture_events):
-    """Test that the langchain integration works when langchain.agents.AgentExecutor
-    is not available or langchain is not installed, but langchain-core is.
-    """
-
-    from langchain_core.outputs import LLMResult, Generation
-
-    with patch("sentry_sdk.integrations.langchain.AgentExecutor", None):
-        from sentry_sdk.integrations.langchain import (
-            LangchainIntegration,
-            SentryLangchainCallback,
-        )
-
-        sentry_init(
-            integrations=[LangchainIntegration(include_prompts=True)],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
-        events = capture_events()
-
-        try:
-            LangchainIntegration.setup_once()
-        except Exception as e:
-            pytest.fail(f"setup_once() failed when AgentExecutor is None: {e}")
-
-        callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
-
-        run_id = "12345678-1234-1234-1234-123456789012"
-        serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
-        prompts = ["What is the capital of France?"]
-
-        with start_transaction():
-            callback.on_llm_start(
-                serialized=serialized,
-                prompts=prompts,
-                run_id=run_id,
-                invocation_params={
-                    "temperature": 0.7,
-                    "max_tokens": 100,
-                    "model": "gpt-3.5-turbo",
-                },
-            )
-
-            response = LLMResult(
-                generations=[[Generation(text="The capital of France is Paris.")]],
-                llm_output={
-                    "token_usage": {
-                        "total_tokens": 25,
-                        "prompt_tokens": 10,
-                        "completion_tokens": 15,
-                    }
-                },
-            )
-            callback.on_llm_end(response=response, run_id=run_id)
-
-        assert len(events) > 0
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        llm_spans = [
-            span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
-        ]
-        assert len(llm_spans) > 0
-
-        llm_span = llm_spans[0]
-        assert llm_span["description"] == "Langchain LLM call"
-        assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
-        assert (
-            llm_span["data"]["gen_ai.response.text"]
-            == "The capital of France is Paris."
-        )
-        assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
-        assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
-        assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
-
-
 def test_langchain_message_role_mapping(sentry_init, capture_events):
     """Test that message roles are properly normalized in langchain integration."""
     global llm_type
@@ -1062,7 +1288,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
     ]
     assert len(llm_spans) > 0
 
@@ -1776,7 +2002,7 @@ def test_langchain_response_model_extraction(
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
     ]
     assert len(llm_spans) > 0
 
