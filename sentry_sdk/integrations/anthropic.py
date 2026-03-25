@@ -39,7 +39,12 @@ try:
 
     from anthropic import Stream, AsyncStream
     from anthropic.resources import AsyncMessages, Messages
-    from anthropic.lib.streaming import MessageStreamManager, AsyncMessageStreamManager
+    from anthropic.lib.streaming import (
+        MessageStreamManager,
+        MessageStream,
+        AsyncMessageStreamManager,
+        AsyncMessageStream,
+    )
 
     from anthropic.types import (
         MessageStartEvent,
@@ -56,7 +61,15 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, AsyncIterator, Iterator, Optional, Union
+    from typing import (
+        Any,
+        AsyncIterator,
+        Iterator,
+        Optional,
+        Union,
+        Callable,
+        Awaitable,
+    )
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
@@ -67,7 +80,6 @@ if TYPE_CHECKING:
         TextBlockParam,
         ToolUnionParam,
     )
-    from anthropic.lib.streaming import MessageStream, AsyncMessageStream
 
 
 class _RecordedUsage:
@@ -75,6 +87,55 @@ class _RecordedUsage:
     input_tokens: int = 0
     cache_write_input_tokens: "Optional[int]" = 0
     cache_read_input_tokens: "Optional[int]" = 0
+
+
+class _StreamSpanContext:
+    """
+    Sets accumulated data on the stream's span and finishes the span on exit.
+    Is a no-op if the stream has no span set, i.e., when the span has already been finished.
+    """
+
+    def __init__(
+        self,
+        stream: "Union[Stream, MessageStream, AsyncStream, AsyncMessageStream]",
+        # Flag to avoid unreachable branches when the stream state is known to be initialized (stream._model, etc. are set).
+        guaranteed_streaming_state: bool = False,
+    ) -> None:
+        self._stream = stream
+        self._guaranteed_streaming_state = guaranteed_streaming_state
+
+    def __enter__(self) -> "_StreamSpanContext":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: "Optional[type[BaseException]]",
+        exc_val: "Optional[BaseException]",
+        exc_tb: "Optional[Any]",
+    ) -> None:
+        with capture_internal_exceptions():
+            if not hasattr(self._stream, "_span"):
+                return
+
+            if not self._guaranteed_streaming_state and not hasattr(
+                self._stream, "_model"
+            ):
+                self._stream._span.__exit__(exc_type, exc_val, exc_tb)
+                del self._stream._span
+                return
+
+            _set_streaming_output_data(
+                span=self._stream._span,
+                integration=self._stream._integration,
+                model=self._stream._model,
+                usage=self._stream._usage,
+                content_blocks=self._stream._content_blocks,
+                response_id=self._stream._response_id,
+                finish_reason=self._stream._finish_reason,
+            )
+
+            self._stream._span.__exit__(exc_type, exc_val, exc_tb)
+            del self._stream._span
 
 
 class AnthropicIntegration(Integration):
@@ -89,13 +150,36 @@ class AnthropicIntegration(Integration):
         version = package_version("anthropic")
         _check_minimum_version(AnthropicIntegration, version)
 
-        Messages.create = _wrap_message_create(Messages.create)
-        AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
+        """
+        client.messages.create(stream=True) can return an instance of the Stream class, which implements the iterator protocol.
+        Analogously, the function can return an AsyncStream, which implements the asynchronous iterator protocol.
+        The private _iterator variable and the close() method are patched. During iteration over the _iterator generator,
+        information from intercepted events is accumulated and used to populate output attributes on the AI Client Span.
 
+        The span can be finished in two places:
+        - When the user exits the context manager or directly calls close(), the patched close() finishes the span.
+        - When iteration ends, the finally block in the _iterator wrapper finishes the span.
+
+        Both paths may run. For example, the context manager exit can follow iterator exhaustion.
+        """
+        Messages.create = _wrap_message_create(Messages.create)
+        Stream.close = _wrap_close(Stream.close)
+
+        AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
+        AsyncStream.close = _wrap_async_close(AsyncStream.close)
+
+        """
+        client.messages.stream() patches are analogous to the patches for client.messages.create(stream=True) described above.
+        """
         Messages.stream = _wrap_message_stream(Messages.stream)
         MessageStreamManager.__enter__ = _wrap_message_stream_manager_enter(
             MessageStreamManager.__enter__
         )
+
+        # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
+        # MessageStream inherits from Stream, so patching Stream is sufficient on these versions.
+        if not issubclass(MessageStream, Stream):
+            MessageStream.close = _wrap_close(MessageStream.close)
 
         AsyncMessages.stream = _wrap_async_message_stream(AsyncMessages.stream)
         AsyncMessageStreamManager.__aenter__ = (
@@ -103,6 +187,11 @@ class AnthropicIntegration(Integration):
                 AsyncMessageStreamManager.__aenter__
             )
         )
+
+        # Before https://github.com/anthropics/anthropic-sdk-python/commit/b1a1c0354a9aca450a7d512fdbdeb59c0ead688a
+        # AsyncMessageStream inherits from AsyncStream, so patching Stream is sufficient on these versions.
+        if not issubclass(AsyncMessageStream, AsyncStream):
+            AsyncMessageStream.close = _wrap_async_close(AsyncMessageStream.close)
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -399,22 +488,14 @@ def _set_create_input_data(
 
 
 def _wrap_synchronous_message_iterator(
+    stream: "Union[Stream, MessageStream]",
     iterator: "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
-    span: "Span",
-    integration: "AnthropicIntegration",
 ) -> "Iterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
-    Responsible for closing the AI Client Span.
+    Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
-
-    model = None
-    usage = _RecordedUsage()
-    content_blocks: "list[str]" = []
-    response_id = None
-    finish_reason = None
-
-    try:
+    with _StreamSpanContext(stream, guaranteed_streaming_state=True):
         for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
             # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
@@ -432,58 +513,19 @@ def _wrap_synchronous_message_iterator(
                 yield event
                 continue
 
-            (model, usage, content_blocks, response_id, finish_reason) = (
-                _collect_ai_data(
-                    event,
-                    model,
-                    usage,
-                    content_blocks,
-                    response_id,
-                    finish_reason,
-                )
-            )
+            _accumulate_event_data(stream, event)
             yield event
-    finally:
-        with capture_internal_exceptions():
-            # Anthropic's input_tokens excludes cached/cache_write tokens.
-            # Normalize to total input tokens for correct cost calculations.
-            total_input = (
-                usage.input_tokens
-                + (usage.cache_read_input_tokens or 0)
-                + (usage.cache_write_input_tokens or 0)
-            )
-
-            _set_output_data(
-                span=span,
-                integration=integration,
-                model=model,
-                input_tokens=total_input,
-                output_tokens=usage.output_tokens,
-                cache_read_input_tokens=usage.cache_read_input_tokens,
-                cache_write_input_tokens=usage.cache_write_input_tokens,
-                content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-                finish_span=True,
-                response_id=response_id,
-                finish_reason=finish_reason,
-            )
 
 
 async def _wrap_asynchronous_message_iterator(
+    stream: "Union[AsyncStream, AsyncMessageStream]",
     iterator: "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]",
-    span: "Span",
-    integration: "AnthropicIntegration",
 ) -> "AsyncIterator[Union[RawMessageStreamEvent, MessageStreamEvent]]":
     """
     Sets information received while iterating the response stream on the AI Client Span.
-    Responsible for closing the AI Client Span.
+    Responsible for closing the AI Client Span unless the span has already been closed in the close() patch.
     """
-    model = None
-    usage = _RecordedUsage()
-    content_blocks: "list[str]" = []
-    response_id = None
-    finish_reason = None
-
-    try:
+    with _StreamSpanContext(stream, guaranteed_streaming_state=True):
         async for event in iterator:
             # Message and content types are aliases for corresponding Raw* types, introduced in
             # https://github.com/anthropics/anthropic-sdk-python/commit/bc9d11cd2addec6976c46db10b7c89a8c276101a
@@ -501,44 +543,8 @@ async def _wrap_asynchronous_message_iterator(
                 yield event
                 continue
 
-            (
-                model,
-                usage,
-                content_blocks,
-                response_id,
-                finish_reason,
-            ) = _collect_ai_data(
-                event,
-                model,
-                usage,
-                content_blocks,
-                response_id,
-                finish_reason,
-            )
+            _accumulate_event_data(stream, event)
             yield event
-    finally:
-        with capture_internal_exceptions():
-            # Anthropic's input_tokens excludes cached/cache_write tokens.
-            # Normalize to total input tokens for correct cost calculations.
-            total_input = (
-                usage.input_tokens
-                + (usage.cache_read_input_tokens or 0)
-                + (usage.cache_write_input_tokens or 0)
-            )
-
-            _set_output_data(
-                span=span,
-                integration=integration,
-                model=model,
-                input_tokens=total_input,
-                output_tokens=usage.output_tokens,
-                cache_read_input_tokens=usage.cache_read_input_tokens,
-                cache_write_input_tokens=usage.cache_write_input_tokens,
-                content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
-                finish_span=True,
-                response_id=response_id,
-                finish_reason=finish_reason,
-            )
 
 
 def _set_output_data(
@@ -550,7 +556,6 @@ def _set_output_data(
     cache_read_input_tokens: "int | None",
     cache_write_input_tokens: "int | None",
     content_blocks: "list[Any]",
-    finish_span: bool = False,
     response_id: "str | None" = None,
     finish_reason: "str | None" = None,
 ) -> None:
@@ -594,9 +599,6 @@ def _set_output_data(
         input_tokens_cache_write=cache_write_input_tokens,
     )
 
-    if finish_span:
-        span.__exit__(None, None, None)
-
 
 def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = kwargs.pop("integration")
@@ -625,15 +627,27 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
     result = yield f, args, kwargs
 
     if isinstance(result, Stream):
+        result._span = span
+        result._integration = integration
+
+        _initialize_data_accumulation_state(result)
         result._iterator = _wrap_synchronous_message_iterator(
-            result._iterator, span, integration
+            result,
+            result._iterator,
         )
+
         return result
 
     if isinstance(result, AsyncStream):
+        result._span = span
+        result._integration = integration
+
+        _initialize_data_accumulation_state(result)
         result._iterator = _wrap_asynchronous_message_iterator(
-            result._iterator, span, integration
+            result,
+            result._iterator,
         )
+
         return result
 
     with capture_internal_exceptions():
@@ -663,10 +677,10 @@ def _sentry_patched_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
                 cache_read_input_tokens=cache_read_input_tokens,
                 cache_write_input_tokens=cache_write_input_tokens,
                 content_blocks=content_blocks,
-                finish_span=True,
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
+            span.__exit__(None, None, None)
         else:
             span.set_data("unknown_response", True)
             span.__exit__(None, None, None)
@@ -712,6 +726,89 @@ def _wrap_message_create(f: "Any") -> "Any":
     return _sentry_patched_create_sync
 
 
+def _initialize_data_accumulation_state(stream: "Union[Stream, MessageStream]") -> None:
+    """
+    Initialize fields for accumulating output on the Stream instance.
+    """
+    if not hasattr(stream, "_model"):
+        stream._model = None
+        stream._usage = _RecordedUsage()
+        stream._content_blocks = []
+        stream._response_id = None
+        stream._finish_reason = None
+
+
+def _accumulate_event_data(
+    stream: "Union[Stream, MessageStream]",
+    event: "Union[RawMessageStreamEvent, MessageStreamEvent]",
+) -> None:
+    """
+    Update accumulated output from a single stream event.
+    """
+    (model, usage, content_blocks, response_id, finish_reason) = _collect_ai_data(
+        event,
+        stream._model,
+        stream._usage,
+        stream._content_blocks,
+        stream._response_id,
+        stream._finish_reason,
+    )
+
+    stream._model = model
+    stream._usage = usage
+    stream._content_blocks = content_blocks
+    stream._response_id = response_id
+    stream._finish_reason = finish_reason
+
+
+def _set_streaming_output_data(
+    span: "Span",
+    integration: "AnthropicIntegration",
+    model: "Optional[str]",
+    usage: "_RecordedUsage",
+    content_blocks: "list[str]",
+    response_id: "Optional[str]",
+    finish_reason: "Optional[str]",
+) -> None:
+    """
+    Set output attributes on the AI Client Span.
+    """
+    # Anthropic's input_tokens excludes cached/cache_write tokens.
+    # Normalize to total input tokens for correct cost calculations.
+    total_input = (
+        usage.input_tokens
+        + (usage.cache_read_input_tokens or 0)
+        + (usage.cache_write_input_tokens or 0)
+    )
+
+    _set_output_data(
+        span=span,
+        integration=integration,
+        model=model,
+        input_tokens=total_input,
+        output_tokens=usage.output_tokens,
+        cache_read_input_tokens=usage.cache_read_input_tokens,
+        cache_write_input_tokens=usage.cache_write_input_tokens,
+        content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+        response_id=response_id,
+        finish_reason=finish_reason,
+    )
+
+
+def _wrap_close(
+    f: "Callable[..., None]",
+) -> "Callable[..., None]":
+    """
+    Closes the AI Client Span unless the finally block in `_wrap_synchronous_message_iterator()` runs first.
+    """
+
+    def close(self: "Union[Stream, MessageStream]") -> None:
+        with _StreamSpanContext(self):
+            return f(self)
+
+    return close
+
+
 def _wrap_message_create_async(f: "Any") -> "Any":
     async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _sentry_patched_create_common(f, *args, **kwargs)
@@ -748,6 +845,20 @@ def _wrap_message_create_async(f: "Any") -> "Any":
                     span.__exit__(None, None, None)
 
     return _sentry_patched_create_async
+
+
+def _wrap_async_close(
+    f: "Callable[..., Awaitable[None]]",
+) -> "Callable[..., Awaitable[None]]":
+    """
+    Closes the AI Client Span unless the finally block in `_wrap_asynchronous_message_iterator()` runs first.
+    """
+
+    async def close(self: "AsyncStream") -> None:
+        with _StreamSpanContext(self):
+            return await f(self)
+
+    return close
 
 
 def _wrap_message_stream(f: "Any") -> "Any":
@@ -819,10 +930,13 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
             tools=self._tools,
         )
 
+        stream._span = span
+        stream._integration = integration
+
+        _initialize_data_accumulation_state(stream)
         stream._iterator = _wrap_synchronous_message_iterator(
-            iterator=stream._iterator,
-            span=span,
-            integration=integration,
+            stream,
+            stream._iterator,
         )
 
         return stream
@@ -903,10 +1017,13 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
             tools=self._tools,
         )
 
+        stream._span = span
+        stream._integration = integration
+
+        _initialize_data_accumulation_state(stream)
         stream._iterator = _wrap_asynchronous_message_iterator(
-            iterator=stream._iterator,
-            span=span,
-            integration=integration,
+            stream,
+            stream._iterator,
         )
 
         return stream
