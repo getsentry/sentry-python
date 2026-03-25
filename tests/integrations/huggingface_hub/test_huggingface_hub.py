@@ -835,7 +835,9 @@ def test_span_status_error(
     assert span["status"] == "internal_error"
     assert span["tags"]["status"] == "internal_error"
 
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    # The huggingface_hub integration must NOT set the transaction status to
+    # internal_error — only the inner span should be errored.  (fixes #5793)
+    assert transaction["contexts"]["trace"]["status"] != "internal_error"
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
