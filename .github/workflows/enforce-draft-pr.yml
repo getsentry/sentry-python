@@ -18,30 +18,19 @@ jobs:
           private-key: ${{ secrets.SDK_MAINTAINER_BOT_PRIVATE_KEY }}
 
       - name: Convert PR to draft
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr ready "$PR_URL" --undo
+
+      - name: Label and comment
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const pullRequest = context.payload.pull_request;
             const repo = context.repo;
-
-            // Convert to draft via GraphQL (REST API doesn't support this)
-            try {
-              await github.graphql(`
-                mutation($pullRequestId: ID!) {
-                  convertPullRequestToDraft(input: { pullRequestId: $pullRequestId }) {
-                    pullRequest {
-                      isDraft
-                    }
-                  }
-                }
-              `, {
-                pullRequestId: pullRequest.node_id
-              });
-            } catch (error) {
-              core.warning(`Failed to convert PR to draft: ${error.message}`);
-              return;
-            }
 
             // Label the PR so maintainers can filter/track violations
             await github.rest.issues.addLabels({
