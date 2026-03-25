@@ -5,7 +5,13 @@ import pytest
 
 from sentry_sdk import get_client
 from sentry_sdk.consts import VERSION
-from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
+from sentry_sdk.integrations.logging import (
+    LoggingIntegration,
+    ignore_logger,
+    ignore_logger_for_sentry_logs,
+    unignore_logger,
+    unignore_logger_for_sentry_logs,
+)
 from tests.test_logs import envelopes_to_logs
 
 other_logger = logging.getLogger("testfoo")
@@ -222,34 +228,37 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
     assert str(recwarn[0].message) == "third"
 
 
-def test_ignore_logger(sentry_init, capture_events):
+def test_ignore_logger(sentry_init, capture_events, request):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
 
     ignore_logger("testfoo")
+    request.addfinalizer(lambda: unignore_logger("testfoo"))
 
     other_logger.error("hi")
 
     assert not events
 
 
-def test_ignore_logger_whitespace_padding(sentry_init, capture_events):
+def test_ignore_logger_whitespace_padding(sentry_init, capture_events, request):
     """Here we test insensitivity to whitespace padding of ignored loggers"""
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
 
     ignore_logger("testfoo")
+    request.addfinalizer(lambda: unignore_logger("testfoo"))
 
     padded_logger = logging.getLogger("       testfoo   ")
     padded_logger.error("hi")
     assert not events
 
 
-def test_ignore_logger_wildcard(sentry_init, capture_events):
+def test_ignore_logger_wildcard(sentry_init, capture_events, request):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
 
     ignore_logger("testfoo.*")
+    request.addfinalizer(lambda: unignore_logger("testfoo.*"))
 
     nested_logger = logging.getLogger("testfoo.submodule")
 
@@ -260,6 +269,44 @@ def test_ignore_logger_wildcard(sentry_init, capture_events):
     (event,) = events
     assert event["logentry"]["message"] == "hi"
     assert event["logentry"]["formatted"] == "hi"
+
+
+def test_ignore_logger_does_not_affect_sentry_logs(
+    sentry_init, capture_envelopes, request
+):
+    """ignore_logger should suppress events/breadcrumbs but not Sentry Logs."""
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    ignore_logger("testfoo")
+    request.addfinalizer(lambda: unignore_logger("testfoo"))
+
+    other_logger.error("hi")
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 1
+    assert logs[0]["body"] == "hi"
+
+
+def test_ignore_logger_for_sentry_logs(sentry_init, capture_envelopes, request):
+    """ignore_logger_for_sentry_logs should suppress Sentry Logs but not events."""
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    ignore_logger_for_sentry_logs("testfoo")
+    request.addfinalizer(lambda: unignore_logger_for_sentry_logs("testfoo"))
+
+    other_logger.error("hi")
+    get_client().flush()
+
+    # Event should still be captured
+    event_envelopes = [e for e in envelopes if e.items[0].type == "event"]
+    assert len(event_envelopes) == 1
+
+    # But no Sentry Logs
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 0
 
 
 def test_logging_dictionary_interpolation(sentry_init, capture_events):
