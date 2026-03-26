@@ -52,6 +52,27 @@ from sentry_sdk.integrations.asyncio import AsyncioIntegration
 server = None
 
 
+def _make_async_transport_options(**overrides):
+    defaults = {
+        "dsn": "https://foo@sentry.io/123",
+        "transport": None,
+        "_experiments": {"transport_async": True},
+        "integrations": [AsyncioIntegration()],
+        "send_client_reports": True,
+        "transport_queue_size": 100,
+        "keep_alive": False,
+        "socket_options": None,
+        "ca_certs": None,
+        "cert_file": None,
+        "key_file": None,
+        "http_proxy": None,
+        "https_proxy": None,
+        "proxy_headers": None,
+    }
+    defaults.update(overrides)
+    return defaults
+
+
 @pytest.fixture(scope="module", autouse=True)
 def make_capturing_server(request):
     global server
@@ -1159,11 +1180,6 @@ async def test_async_two_way_ssl_authentication():
     await client.close_async()
 
 
-# ============================================================================
-# AsyncWorker unit tests
-# ============================================================================
-
-
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="AsyncWorker requires Python 3.8+")
@@ -1738,11 +1754,6 @@ async def test_async_worker_ensure_task_calls_start():
     await asyncio.sleep(0)  # Allow cancelled tasks to be cleaned up
 
 
-# ============================================================================
-# make_transport() async detection logic tests
-# ============================================================================
-
-
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
@@ -1753,22 +1764,7 @@ async def test_make_transport_async_with_loop_and_integration():
     if not ASYNC_TRANSPORT_ENABLED:
         pytest.skip("httpcore[asyncio] not installed")
 
-    options = {
-        "dsn": "https://foo@sentry.io/123",
-        "transport": None,
-        "_experiments": {"transport_async": True},
-        "integrations": [AsyncioIntegration()],
-        "send_client_reports": True,
-        "transport_queue_size": 100,
-        "keep_alive": False,
-        "socket_options": None,
-        "ca_certs": None,
-        "cert_file": None,
-        "key_file": None,
-        "http_proxy": None,
-        "https_proxy": None,
-        "proxy_headers": None,
-    }
+    options = _make_async_transport_options()
     transport = make_transport(options)
     assert isinstance(transport, AsyncHttpTransport)
     await transport._pool.aclose()
@@ -1784,22 +1780,7 @@ async def test_make_transport_async_without_integration_falls_back():
     if not ASYNC_TRANSPORT_ENABLED:
         pytest.skip("httpcore[asyncio] not installed")
 
-    options = {
-        "dsn": "https://foo@sentry.io/123",
-        "transport": None,
-        "_experiments": {"transport_async": True},
-        "integrations": [],  # No AsyncioIntegration
-        "send_client_reports": True,
-        "transport_queue_size": 100,
-        "keep_alive": False,
-        "socket_options": None,
-        "ca_certs": None,
-        "cert_file": None,
-        "key_file": None,
-        "http_proxy": None,
-        "https_proxy": None,
-        "proxy_headers": None,
-    }
+    options = _make_async_transport_options(integrations=[])
     with mock.patch("sentry_sdk.transport.logger") as mock_logger:
         transport = make_transport(options)
     assert isinstance(transport, HttpTransport)
@@ -1817,22 +1798,7 @@ def test_make_transport_async_no_running_loop():
     if not ASYNC_TRANSPORT_ENABLED:
         pytest.skip("httpcore[asyncio] not installed")
 
-    options = {
-        "dsn": "https://foo@sentry.io/123",
-        "transport": None,
-        "_experiments": {"transport_async": True},
-        "integrations": [AsyncioIntegration()],
-        "send_client_reports": True,
-        "transport_queue_size": 100,
-        "keep_alive": False,
-        "socket_options": None,
-        "ca_certs": None,
-        "cert_file": None,
-        "key_file": None,
-        "http_proxy": None,
-        "https_proxy": None,
-        "proxy_headers": None,
-    }
+    options = _make_async_transport_options()
     with mock.patch("sentry_sdk.transport.logger") as mock_logger:
         transport = make_transport(options)
     assert isinstance(transport, HttpTransport)
@@ -1851,22 +1817,9 @@ async def test_make_transport_async_with_http2_logs_warning():
     if not ASYNC_TRANSPORT_ENABLED:
         pytest.skip("httpcore[asyncio] not installed")
 
-    options = {
-        "dsn": "https://foo@sentry.io/123",
-        "transport": None,
-        "_experiments": {"transport_async": True, "transport_http2": True},
-        "integrations": [AsyncioIntegration()],
-        "send_client_reports": True,
-        "transport_queue_size": 100,
-        "keep_alive": False,
-        "socket_options": None,
-        "ca_certs": None,
-        "cert_file": None,
-        "key_file": None,
-        "http_proxy": None,
-        "https_proxy": None,
-        "proxy_headers": None,
-    }
+    options = _make_async_transport_options(
+        _experiments={"transport_async": True, "transport_http2": True}
+    )
     with mock.patch("sentry_sdk.transport.logger") as mock_logger:
         transport = make_transport(options)
     assert isinstance(transport, AsyncHttpTransport)
@@ -1883,22 +1836,7 @@ def test_make_transport_async_not_enabled():
     """Test make_transport falls back when ASYNC_TRANSPORT_ENABLED is False."""
     from sentry_sdk.transport import make_transport
 
-    options = {
-        "dsn": "https://foo@sentry.io/123",
-        "transport": None,
-        "_experiments": {"transport_async": True},
-        "integrations": [AsyncioIntegration()],
-        "send_client_reports": True,
-        "transport_queue_size": 100,
-        "keep_alive": False,
-        "socket_options": None,
-        "ca_certs": None,
-        "cert_file": None,
-        "key_file": None,
-        "http_proxy": None,
-        "https_proxy": None,
-        "proxy_headers": None,
-    }
+    options = _make_async_transport_options()
     with mock.patch("sentry_sdk.transport.ASYNC_TRANSPORT_ENABLED", False):
         with mock.patch("sentry_sdk.transport.logger") as mock_logger:
             transport = make_transport(options)
@@ -1906,11 +1844,6 @@ def test_make_transport_async_not_enabled():
         mock_logger.warning.assert_any_call(
             "You tried to use AsyncHttpTransport but don't have httpcore[asyncio] installed. Falling back to sync transport."
         )
-
-
-# ============================================================================
-# HttpTransportCore shared method tests
-# ============================================================================
 
 
 def test_handle_request_error_with_custom_record_reason(make_client, monkeypatch):
@@ -2087,11 +2020,6 @@ def test_prepare_envelope_attaches_client_report(make_client, monkeypatch):
     # Should have the original item + client report
     types = [item.type for item in env.items]
     assert "client_report" in types
-
-
-# ============================================================================
-# AsyncHttpTransport-specific tests
-# ============================================================================
 
 
 @skip_under_gevent

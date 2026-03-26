@@ -11,7 +11,7 @@ from sentry_sdk.utils import (
     reraise,
     is_internal_task,
 )
-from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED, AsyncHttpTransport
+from sentry_sdk.transport import AsyncHttpTransport
 
 try:
     import asyncio
@@ -68,10 +68,7 @@ def patch_loop_close() -> None:
             return
 
         try:
-            if not (
-                ASYNC_TRANSPORT_ENABLED
-                and isinstance(client.transport, AsyncHttpTransport)
-            ):
+            if not isinstance(client.transport, AsyncHttpTransport):
                 return
 
             await client.close_async()

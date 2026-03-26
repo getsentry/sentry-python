@@ -20,60 +20,33 @@ _TERMINATOR = object()
 
 
 class Worker(ABC):
-    """
-    Base class for all workers.
-
-    A worker is used to process events in the background and send them to Sentry.
-    """
+    """Base class for all workers."""
 
     @property
     @abstractmethod
     def is_alive(self) -> bool:
-        """
-        Checks whether the worker is alive and running.
-
-        Returns True if the worker is alive, False otherwise.
-        """
+        """Whether the worker is alive and running."""
         pass
 
     @abstractmethod
     def kill(self) -> None:
-        """
-        Kills the worker.
-
-        This method is used to kill the worker. The queue will be drained up to the point where the worker is killed.
-        The worker will not be able to process any more events.
-        """
+        """Kill the worker. It will not process any more events."""
         pass
 
     def flush(
         self, timeout: float, callback: "Optional[Callable[[int, float], Any]]" = None
     ) -> None:
-        """
-        Flush the worker.
-
-        This method blocks until the worker has flushed all events or the specified timeout is reached.
-        Default implementation is a no-op, since this method may only be relevant to some workers.
-        Subclasses should override this method if necessary.
-        """
+        """Flush the worker, blocking until done or timeout is reached."""
         return None
 
     @abstractmethod
     def full(self) -> bool:
-        """
-        Checks whether the worker's queue is full.
-
-        Returns True if the queue is full, False otherwise.
-        """
+        """Whether the worker's queue is full."""
         pass
 
     @abstractmethod
     def submit(self, callback: "Callable[[], Any]") -> bool:
-        """
-        Schedule a callback to be executed by the worker.
-
-        Returns True if the callback was scheduled, False if the queue is full.
-        """
+        """Schedule a callback. Returns True if queued, False if full."""
         pass
 
 

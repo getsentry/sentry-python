@@ -32,7 +32,6 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import (
-    ASYNC_TRANSPORT_ENABLED,
     HttpTransportCore,
     make_transport,
     AsyncHttpTransport,
@@ -1010,27 +1009,31 @@ class _Client(BaseClient):
 
         return self.integrations.get(integration_name)
 
+    def _is_async_transport(self) -> bool:
+        """Check if the current transport is async."""
+        return isinstance(self.transport, AsyncHttpTransport)
+
+    @property
+    def _batchers(self) -> "tuple[Any, ...]":
+        return tuple(
+            b
+            for b in (self.log_batcher, self.metrics_batcher, self.span_batcher)
+            if b is not None
+        )
+
     def _close_components(self) -> None:
         """Kill all client components in the correct order."""
         self.session_flusher.kill()
-        if self.log_batcher is not None:
-            self.log_batcher.kill()
-        if self.metrics_batcher is not None:
-            self.metrics_batcher.kill()
-        if self.span_batcher is not None:
-            self.span_batcher.kill()
+        for b in self._batchers:
+            b.kill()
         if self.monitor:
             self.monitor.kill()
 
     def _flush_components(self) -> None:
         """Flush all client components."""
         self.session_flusher.flush()
-        if self.log_batcher is not None:
-            self.log_batcher.flush()
-        if self.metrics_batcher is not None:
-            self.metrics_batcher.flush()
-        if self.span_batcher is not None:
-            self.span_batcher.flush()
+        for b in self._batchers:
+            b.flush()
 
     def close(
         self,
@@ -1042,9 +1045,7 @@ class _Client(BaseClient):
         semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
-            if ASYNC_TRANSPORT_ENABLED and isinstance(
-                self.transport, AsyncHttpTransport
-            ):
+            if self._is_async_transport():
                 logger.warning(
                     "close() used with AsyncHttpTransport. "
                     "Prefer close_async() for graceful async shutdown. "
@@ -1067,10 +1068,7 @@ class _Client(BaseClient):
         semantics as :py:meth:`Client.flush_async`.
         """
         if self.transport is not None:
-            if not (
-                ASYNC_TRANSPORT_ENABLED
-                and isinstance(self.transport, AsyncHttpTransport)
-            ):
+            if not self._is_async_transport():
                 logger.debug(
                     "close_async() used with non-async transport, aborting. Please use close() instead."
                 )
@@ -1095,9 +1093,7 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
-            if ASYNC_TRANSPORT_ENABLED and isinstance(
-                self.transport, AsyncHttpTransport
-            ):
+            if self._is_async_transport():
                 logger.warning(
                     "flush() used with AsyncHttpTransport. Please use flush_async() instead."
                 )
@@ -1121,10 +1117,7 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
-            if not (
-                ASYNC_TRANSPORT_ENABLED
-                and isinstance(self.transport, AsyncHttpTransport)
-            ):
+            if not self._is_async_transport():
                 logger.debug(
                     "flush_async() used with non-async transport, aborting. Please use flush() instead."
                 )
