@@ -3269,7 +3269,11 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
 # noinspection PyTypeChecker
 @pytest.mark.asyncio
 async def test_streaming_chat_completion_ttft_async(
-    sentry_init, capture_events, async_iterator
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """
     Test that async streaming chat completions capture time-to-first-token (TTFT).
@@ -3281,47 +3285,56 @@ async def test_streaming_chat_completion_ttft_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(
-        [
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=0, delta=ChoiceDelta(content="Hello"), finish_reason=None
-                    )
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="Hello"),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content=" world"),
+                                finish_reason="stop",
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
                 ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
+                include_event_type=False,
             ),
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=0,
-                        delta=ChoiceDelta(content=" world"),
-                        finish_reason="stop",
-                    )
-                ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
-            ),
-        ]
+        )
     )
 
-    client.chat.completions._post = AsyncMock(return_value=returned_stream)
-
-    with start_transaction(name="openai tx"):
-        response_stream = await client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "Say hello"}],
-            stream=True,
-        )
-        # Consume the stream
-        async for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Say hello"}],
+                stream=True,
+            )
+            # Consume the stream
+            async for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
