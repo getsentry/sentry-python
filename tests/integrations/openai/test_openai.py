@@ -151,6 +151,11 @@ def test_nonstreaming_chat_completion_no_prompts(
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": "hello"},
                 ],
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
             )
             .choices[0]
             .message.content
@@ -161,6 +166,15 @@ def test_nonstreaming_chat_completion_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -230,6 +244,11 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
             client.chat.completions.create(
                 model="some-model",
                 messages=messages,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
             )
             .choices[0]
             .message.content
@@ -240,6 +259,15 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -298,6 +326,11 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "hello"},
             ],
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response = response.choices[0].message.content
 
@@ -306,6 +339,15 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -377,6 +419,11 @@ async def test_nonstreaming_chat_completion_async(
         response = await client.chat.completions.create(
             model="some-model",
             messages=messages,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response = response.choices[0].message.content
 
@@ -385,6 +432,15 @@ async def test_nonstreaming_chat_completion_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -494,6 +550,11 @@ def test_streaming_chat_completion_no_prompts(
                 {"role": "user", "content": "hello"},
             ],
             stream=True,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -503,6 +564,15 @@ def test_streaming_chat_completion_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -621,6 +691,11 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
             model="some-model",
             messages=messages,
             stream=True,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response_string = "".join(
             map(lambda x: x.choices[0].delta.content, response_stream)
@@ -630,6 +705,15 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -747,6 +831,11 @@ async def test_streaming_chat_completion_async_no_prompts(
                 {"role": "user", "content": "hello"},
             ],
             stream=True,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
 
         response_string = ""
@@ -758,6 +847,15 @@ async def test_streaming_chat_completion_async_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -884,6 +982,11 @@ async def test_streaming_chat_completion_async(
             model="some-model",
             messages=messages,
             stream=True,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
 
         response_string = ""
@@ -895,6 +998,15 @@ async def test_streaming_chat_completion_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -1036,6 +1148,8 @@ def test_embeddings_create_no_pii(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
@@ -1116,6 +1230,8 @@ def test_embeddings_create(sentry_init, capture_events, input, request):
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     param_id = request.node.callspec.id
     if param_id == "string":
@@ -1187,6 +1303,8 @@ async def test_embeddings_create_async_no_pii(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
@@ -1270,6 +1388,8 @@ async def test_embeddings_create_async(sentry_init, capture_events, input, reque
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     param_id = request.node.callspec.id
     if param_id == "string":
@@ -1754,6 +1874,9 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
             model="gpt-4o",
             instructions="You are a coding assistant that talks like a pirate.",
             input="How do I check if a Python object is an instance of a class?",
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -1764,6 +1887,9 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.system": "openai",
@@ -1864,6 +1990,9 @@ def test_ai_client_span_responses_api(
             model="gpt-4o",
             instructions=instructions,
             input=input,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -1875,6 +2004,9 @@ def test_ai_client_span_responses_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.system": "openai",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.usage.input_tokens": 20,
@@ -2166,6 +2298,9 @@ async def test_ai_client_span_responses_async_api(
             model="gpt-4o",
             instructions=instructions,
             input=input,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -2177,6 +2312,9 @@ async def test_ai_client_span_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
@@ -2435,6 +2573,9 @@ async def test_ai_client_span_streaming_responses_async_api(
             instructions=instructions,
             input=input,
             stream=True,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
         async for _ in result:
             pass
@@ -2448,6 +2589,9 @@ async def test_ai_client_span_streaming_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
@@ -2760,6 +2904,9 @@ def test_streaming_responses_api(
             model="some-model",
             input="hello",
             stream=True,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
         response_string = ""
@@ -2772,6 +2919,10 @@ def test_streaming_responses_api(
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -2817,6 +2968,9 @@ async def test_streaming_responses_api_async(
             model="some-model",
             input="hello",
             stream=True,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
         response_string = ""
@@ -2829,6 +2983,10 @@ async def test_streaming_responses_api_async(
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 

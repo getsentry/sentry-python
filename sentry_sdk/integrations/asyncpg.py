@@ -1,5 +1,6 @@
 from __future__ import annotations
 import contextlib
+import re
 from typing import Any, TypeVar, Callable, Awaitable, Iterator, Union
 
 import sentry_sdk
@@ -56,6 +57,10 @@ class AsyncPGIntegration(Integration):
 T = TypeVar("T")
 
 
+def _normalize_query(query: str) -> str:
+    return re.sub(r"\s+", " ", query).strip()
+
+
 def _wrap_execute(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[T]]":
     async def _inner(*args: "Any", **kwargs: "Any") -> "T":
         if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
@@ -68,7 +73,7 @@ def _wrap_execute(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[
         if len(args) > 2:
             return await f(*args, **kwargs)
 
-        query = args[1]
+        query = _normalize_query(args[1])
         with record_sql_queries(
             cursor=None,
             query=query,
@@ -104,6 +109,7 @@ def _record(
 
     param_style = "pyformat" if params_list else None
 
+    query = _normalize_query(query)
     with record_sql_queries(
         cursor=cursor,
         query=query,
