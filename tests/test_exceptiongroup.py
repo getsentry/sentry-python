@@ -343,16 +343,6 @@ def test_exceptiongroup_starlette_collapse():
             )
     except ExceptionGroup as exc:
         exception_group = exc
-
-        # Simulate Starlette's collapse_excgroups() as seen here:
-        # https://github.com/Kludex/starlette/blob/0e88e92b592bfa11fd92e331869a8d49ba34b541/starlette/_utils.py#L79-L87
-        #
-        # When an ExceptionGroup contains a single exception, collapse_excgroups
-        # unwraps it and re-raises the inner exception. This causes Python to
-        # implicitly set unwrapped.__context__ = ExceptionGroup (because the
-        # re-raise happens inside the except block handling the ExceptionGroup),
-        # creating a cycle:
-        #   exception_group -> .exceptions[0] -> ValueError -> __context__ -> exception_group
         unwrapped = exc.exceptions[0]
         try:
             raise unwrapped
@@ -422,8 +412,7 @@ def test_cyclic_exception_group_cause():
     Test case related to `test_exceptiongroup_starlette_collapse` above. We want to make sure that
     the same cyclic loop cannot happen via the __cause__ as well as the __context__
     """
-    # Construct the exact cyclic structure that anyio/Starlette creates when
-    # an exception propagates through multiple BaseHTTPMiddleware layers.
+
     original = ValueError("original error")
     group = ExceptionGroup("unhandled errors in a TaskGroup", [original])
     original.__cause__ = group
