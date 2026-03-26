@@ -1630,9 +1630,7 @@ async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_events):
     assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
-def test_span_origin_streaming_chat(
-    sentry_init, capture_events, get_model_response, server_side_event_chunks
-):
+def test_span_origin_streaming_chat(sentry_init, capture_events):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -1640,52 +1638,42 @@ def test_span_origin_streaming_chat(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = get_model_response(
-        server_side_event_chunks(
-            [
-                ChatCompletionChunk(
-                    id="1",
-                    choices=[
-                        DeltaChoice(
-                            index=0,
-                            delta=ChoiceDelta(content="hel"),
-                            finish_reason=None,
-                        )
-                    ],
-                    created=100000,
-                    model="model-id",
-                    object="chat.completion.chunk",
-                ),
-                ChatCompletionChunk(
-                    id="1",
-                    choices=[
-                        DeltaChoice(
-                            index=1,
-                            delta=ChoiceDelta(content="lo "),
-                            finish_reason=None,
-                        )
-                    ],
-                    created=100000,
-                    model="model-id",
-                    object="chat.completion.chunk",
-                ),
-                ChatCompletionChunk(
-                    id="1",
-                    choices=[
-                        DeltaChoice(
-                            index=2,
-                            delta=ChoiceDelta(content="world"),
-                            finish_reason="stop",
-                        )
-                    ],
-                    created=100000,
-                    model="model-id",
-                    object="chat.completion.chunk",
-                ),
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = [
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
+                )
             ],
-            include_event_type=False,
-        )
-    )
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=2, delta=ChoiceDelta(content="world"), finish_reason="stop"
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+    ]
 
     client.chat.completions._post = mock.Mock(return_value=returned_stream)
     with start_transaction(name="openai tx"):
@@ -1703,11 +1691,7 @@ def test_span_origin_streaming_chat(
 
 @pytest.mark.asyncio
 async def test_span_origin_streaming_chat_async(
-    sentry_init,
-    capture_events,
-    get_model_response,
-    async_iterator,
-    server_side_event_chunks,
+    sentry_init, capture_events, async_iterator
 ):
     sentry_init(
         integrations=[OpenAIIntegration()],
@@ -1716,53 +1700,45 @@ async def test_span_origin_streaming_chat_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = get_model_response(
-        async_iterator(
-            server_side_event_chunks(
-                [
-                    ChatCompletionChunk(
-                        id="1",
-                        choices=[
-                            DeltaChoice(
-                                index=0,
-                                delta=ChoiceDelta(content="hel"),
-                                finish_reason=None,
-                            )
-                        ],
-                        created=100000,
-                        model="model-id",
-                        object="chat.completion.chunk",
-                    ),
-                    ChatCompletionChunk(
-                        id="1",
-                        choices=[
-                            DeltaChoice(
-                                index=1,
-                                delta=ChoiceDelta(content="lo "),
-                                finish_reason=None,
-                            )
-                        ],
-                        created=100000,
-                        model="model-id",
-                        object="chat.completion.chunk",
-                    ),
-                    ChatCompletionChunk(
-                        id="1",
-                        choices=[
-                            DeltaChoice(
-                                index=2,
-                                delta=ChoiceDelta(content="world"),
-                                finish_reason="stop",
-                            )
-                        ],
-                        created=100000,
-                        model="model-id",
-                        object="chat.completion.chunk",
-                    ),
+    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = async_iterator(
+        [
+            ChatCompletionChunk(
+                id="1",
+                choices=[
+                    DeltaChoice(
+                        index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
+                    )
                 ],
-                include_event_type=False,
-            )
-        )
+                created=100000,
+                model="model-id",
+                object="chat.completion.chunk",
+            ),
+            ChatCompletionChunk(
+                id="1",
+                choices=[
+                    DeltaChoice(
+                        index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
+                    )
+                ],
+                created=100000,
+                model="model-id",
+                object="chat.completion.chunk",
+            ),
+            ChatCompletionChunk(
+                id="1",
+                choices=[
+                    DeltaChoice(
+                        index=2,
+                        delta=ChoiceDelta(content="world"),
+                        finish_reason="stop",
+                    )
+                ],
+                created=100000,
+                model="model-id",
+                object="chat.completion.chunk",
+            ),
+        ]
     )
 
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
