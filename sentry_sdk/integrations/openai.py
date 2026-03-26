@@ -356,36 +356,28 @@ def _set_completions_api_input_data(
         )
 
     model = kwargs.get("model")
-    if model is not None and _is_given(model):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-
-    stream = kwargs.get("stream")
-    if stream is not None and _is_given(stream):
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
+    if model is not None:
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     max_tokens = kwargs.get("max_tokens")
     if max_tokens is not None and _is_given(max_tokens):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
 
     presence_penalty = kwargs.get("presence_penalty")
     if presence_penalty is not None and _is_given(presence_penalty):
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
-        )
+        span.set_data(SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty)
 
     frequency_penalty = kwargs.get("frequency_penalty")
     if frequency_penalty is not None and _is_given(frequency_penalty):
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
-        )
+        span.set_data(SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty)
 
     temperature = kwargs.get("temperature")
     if temperature is not None and _is_given(temperature):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
 
     top_p = kwargs.get("top_p")
     if top_p is not None and _is_given(top_p):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
     if (
         not should_send_default_pii()
@@ -447,43 +439,9 @@ def _set_embeddings_input_data(
         "input"
     )
 
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
-
     model = kwargs.get("model")
-    if model is not None and _is_given(model):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-
-    stream = kwargs.get("stream")
-    if stream is not None and _is_given(stream):
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_STREAMING, stream)
-
-    max_tokens = kwargs.get("max_tokens")
-    if max_tokens is not None and _is_given(max_tokens):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
-
-    presence_penalty = kwargs.get("presence_penalty")
-    if presence_penalty is not None and _is_given(presence_penalty):
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
-        )
-
-    frequency_penalty = kwargs.get("frequency_penalty")
-    if frequency_penalty is not None and _is_given(frequency_penalty):
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
-        )
-
-    temperature = kwargs.get("temperature")
-    if temperature is not None and _is_given(temperature):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
-
-    top_p = kwargs.get("top_p")
-    if top_p is not None and _is_given(top_p):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+    if model is not None:
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     if (
         not should_send_default_pii()
@@ -622,12 +580,16 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     span.__enter__()
 
     span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+
+    # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/completions.py#L585
+    is_streaming_response = kwargs.get("stream", False) or False
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+
     _set_completions_api_input_data(span, kwargs, integration)
 
     start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    is_streaming_response = kwargs.get("stream", False)
     if is_streaming_response:
         _set_streaming_completions_api_output_data(
             span, response, kwargs, integration, start_time, finish_span=True

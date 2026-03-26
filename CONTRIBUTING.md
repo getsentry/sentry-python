@@ -10,6 +10,10 @@ Please search the [issue tracker](https://github.com/getsentry/sentry-python/iss
 
 ## Submitting Changes
 
+Before submitting a pull request, please check whether the issue you're planning to address, if there is one, is assigned to anyone. If you want to help with an issue that already has an assignee, comment on it first to coordinate with the person assigned whether the contribution would make sense before opening a pull request.
+
+To make a contribution:
+
 - Fork the `sentry-python` repo and prepare your changes.
 - Add tests for your changes to `tests/`.
 - Run tests and make sure all of them pass.
@@ -20,6 +24,18 @@ We will review your pull request as soon as possible. Thank you for contributing
 ### AI Use
 
 You are welcome to use whatever tools you prefer for making a contribution. However, any changes you propose have to be reviewed and tested by you, a human, first, before you submit a pull request with them for the Sentry team to review. If we feel like that didn't happen, we will close the PR outright. For example, we won't review visibly AI-generated PRs from an agent instructed to look for and "fix" open issues in the repo.
+
+## Pull Requests
+
+All PRs must be created as **drafts**. Non-draft PRs will be automatically converted to draft. Mark your PR as "Ready for review" once:
+
+- CI passes
+- The PR description is complete (what, why, and links to relevant issues)
+- You've personally reviewed your own changes
+
+A PR should do one thing well. Don't mix functional changes with unrelated refactors or cleanup. Smaller, focused PRs are easier to review, reason about, and revert if needed.
+
+For the full set of PR standards, see the [code submission standard](https://develop.sentry.dev/sdk/getting-started/standards/code-submission/#pull-requests).
 
 ## Development Environment
 
