@@ -1,5 +1,59 @@
 # Changelog
 
+## 2.52.0a9
+
+### New Features ✨
+
+#### Langchain
+
+- Set gen_ai.operation.name and gen_ai.pipeline.name on LLM spans by @ericapisani in [#5849](https://github.com/getsentry/sentry-python/pull/5849)
+- Broaden AI provider detection beyond OpenAI and Anthropic by @ericapisani in [#5707](https://github.com/getsentry/sentry-python/pull/5707)
+- Update LLM span operation to gen_ai.generate_text by @ericapisani in [#5796](https://github.com/getsentry/sentry-python/pull/5796)
+
+### Bug Fixes 🐛
+
+#### Ci
+
+- Use gh CLI to convert PR to draft by @stephanie-anderson in [#5874](https://github.com/getsentry/sentry-python/pull/5874)
+- Use GitHub App token for draft PR enforcement by @stephanie-anderson in [#5871](https://github.com/getsentry/sentry-python/pull/5871)
+
+#### Openai
+
+- Always set `gen_ai.response.streaming` for Responses by @alexander-alderman-webb in [#5697](https://github.com/getsentry/sentry-python/pull/5697)
+- Simplify Responses input handling by @alexander-alderman-webb in [#5695](https://github.com/getsentry/sentry-python/pull/5695)
+- Use `max_output_tokens` for Responses API by @alexander-alderman-webb in [#5693](https://github.com/getsentry/sentry-python/pull/5693)
+- Always set `gen_ai.response.streaming` for Completions by @alexander-alderman-webb in [#5692](https://github.com/getsentry/sentry-python/pull/5692)
+- Simplify Completions input handling by @alexander-alderman-webb in [#5690](https://github.com/getsentry/sentry-python/pull/5690)
+- Simplify embeddings input handling by @alexander-alderman-webb in [#5688](https://github.com/getsentry/sentry-python/pull/5688)
+
+#### Other
+
+- (google-genai) Guard response extraction by @alexander-alderman-webb in [#5869](https://github.com/getsentry/sentry-python/pull/5869)
+
+### Internal Changes 🔧
+
+#### Langchain
+
+- Add text completion test by @alexander-alderman-webb in [#5740](https://github.com/getsentry/sentry-python/pull/5740)
+- Add tool execution test by @alexander-alderman-webb in [#5739](https://github.com/getsentry/sentry-python/pull/5739)
+- Add basic agent test with Responses call by @alexander-alderman-webb in [#5726](https://github.com/getsentry/sentry-python/pull/5726)
+- Replace mocks with `httpx` types by @alexander-alderman-webb in [#5724](https://github.com/getsentry/sentry-python/pull/5724)
+- Consolidate span origin assertion by @alexander-alderman-webb in [#5723](https://github.com/getsentry/sentry-python/pull/5723)
+- Consolidate available tools assertion by @alexander-alderman-webb in [#5721](https://github.com/getsentry/sentry-python/pull/5721)
+
+#### Other
+
+- (asyncpg) Normalize query whitespace in integration by @ericapisani in [#5855](https://github.com/getsentry/sentry-python/pull/5855)
+- (openai) Move input handling code into API-specific functions by @alexander-alderman-webb in [#5687](https://github.com/getsentry/sentry-python/pull/5687)
+- Exclude compromised litellm versions by @alexander-alderman-webb in [#5876](https://github.com/getsentry/sentry-python/pull/5876)
+- Reactivate `litellm` tests by @alexander-alderman-webb in [#5853](https://github.com/getsentry/sentry-python/pull/5853)
+- Add note to coordinate with assignee before PR submission by @sentrivana in [#5868](https://github.com/getsentry/sentry-python/pull/5868)
+- Temporarily stop running `litellm` tests by @alexander-alderman-webb in [#5851](https://github.com/getsentry/sentry-python/pull/5851)
+
+### Other
+
+- ci+docs: Add draft PR enforcement by @stephanie-anderson in [#5867](https://github.com/getsentry/sentry-python/pull/5867)
+
 ## 2.56.0
 
 ### New Features ✨
