@@ -645,7 +645,10 @@ def test_loop_close_patching(sentry_init):
 
 @minimum_python_38
 def test_loop_close_flushes_async_transport(sentry_init):
-    from sentry_sdk.transport import AsyncHttpTransport
+    from sentry_sdk.transport import ASYNC_TRANSPORT_ENABLED, AsyncHttpTransport
+
+    if not ASYNC_TRANSPORT_ENABLED:
+        pytest.skip("httpcore[asyncio] not installed")
 
     sentry_init(integrations=[AsyncioIntegration()])
 
