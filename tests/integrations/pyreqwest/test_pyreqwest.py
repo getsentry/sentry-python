@@ -2,7 +2,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 import pytest
 
-import pyreqwest
 from pyreqwest.client import ClientBuilder, SyncClientBuilder
 from pyreqwest.simple.request import pyreqwest_get as async_pyreqwest_get
 from pyreqwest.simple.sync_request import pyreqwest_get as sync_pyreqwest_get
@@ -55,7 +54,6 @@ def clear_captured_requests():
     PyreqwestMockHandler.captured_requests.clear()
 
 
-@pytest.mark.skipif(pyreqwest is None, reason="pyreqwest not installed")
 def test_sync_client_spans(sentry_init, capture_events, server_port):
     sentry_init(integrations=[PyreqwestIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -75,7 +73,6 @@ def test_sync_client_spans(sentry_init, capture_events, server_port):
     assert span["origin"] == "auto.http.pyreqwest"
 
 
-@pytest.mark.skipif(pyreqwest is None, reason="pyreqwest not installed")
 @pytest.mark.asyncio
 async def test_async_client_spans(sentry_init, capture_events, server_port):
     sentry_init(integrations=[PyreqwestIntegration()], traces_sample_rate=1.0)
@@ -96,7 +93,6 @@ async def test_async_client_spans(sentry_init, capture_events, server_port):
     assert span["origin"] == "auto.http.pyreqwest"
 
 
-@pytest.mark.skipif(pyreqwest is None, reason="pyreqwest not installed")
 def test_sync_simple_request_spans(sentry_init, capture_events, server_port):
     sentry_init(integrations=[PyreqwestIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -112,7 +108,6 @@ def test_sync_simple_request_spans(sentry_init, capture_events, server_port):
     assert span["description"] == f"GET {url}"
 
 
-@pytest.mark.skipif(pyreqwest is None, reason="pyreqwest not installed")
 @pytest.mark.asyncio
 async def test_async_simple_request_spans(sentry_init, capture_events, server_port):
     sentry_init(integrations=[PyreqwestIntegration()], traces_sample_rate=1.0)
@@ -129,7 +124,6 @@ async def test_async_simple_request_spans(sentry_init, capture_events, server_po
     assert span["description"] == f"GET {url}"
 
 
-@pytest.mark.skipif(pyreqwest is None, reason="pyreqwest not installed")
 def test_outgoing_trace_headers(sentry_init, server_port):
     sentry_init(
         integrations=[PyreqwestIntegration()],

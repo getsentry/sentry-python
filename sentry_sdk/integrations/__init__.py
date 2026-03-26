@@ -94,7 +94,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.openai.OpenAIIntegration",
     "sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration",
     "sentry_sdk.integrations.pydantic_ai.PydanticAIIntegration",
-    "sentry_sdk.integrations.pyreqwest.PyreqwestIntegration",
     "sentry_sdk.integrations.pymongo.PyMongoIntegration",
     "sentry_sdk.integrations.pyramid.PyramidIntegration",
     "sentry_sdk.integrations.quart.QuartIntegration",
