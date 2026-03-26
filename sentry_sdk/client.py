@@ -163,12 +163,7 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     return rv
 
 
-try:
-    # Python 3.6+
-    module_not_found_error = ModuleNotFoundError
-except Exception:
-    # Older Python versions
-    module_not_found_error = ImportError  # type: ignore
+module_not_found_error = ModuleNotFoundError
 
 
 class BaseClient:

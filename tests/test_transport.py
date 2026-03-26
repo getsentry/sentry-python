@@ -24,7 +24,7 @@ from sentry_sdk import (
     get_isolation_scope,
     Hub,
 )
-from sentry_sdk._compat import PY37, PY38
+from sentry_sdk._compat import PY38
 from sentry_sdk.envelope import Envelope, Item, parse_json, PayloadRef
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
@@ -82,7 +82,7 @@ def mock_transaction_envelope(span_count: int) -> "Envelope":
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize(
     "compression_algo",
-    (("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)),
+    ("gzip", "br", "<invalid>", None),
 )
 @pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works(

@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import nullcontext
 import json
 from copy import deepcopy
 
@@ -51,11 +51,6 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "TRACE",
 )
 
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext() -> "Iterator[None]":
-    yield
 
 
 def request_body_within_bounds(

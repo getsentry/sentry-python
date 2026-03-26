@@ -28,7 +28,6 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk._compat import PY37
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE, Annotated, AnnotatedValue
 from sentry_sdk.consts import (
     DEFAULT_ADD_FULL_STACK,
@@ -1302,8 +1301,8 @@ def _is_contextvars_broken() -> bool:
             # that case, check if contextvars are effectively patched.
             if (
                 # Gevent 20.9.0+
-                (sys.version_info >= (3, 7) and version_tuple >= (20, 9))
-                # Gevent 20.5.0+ or Python < 3.7
+                version_tuple >= (20, 9)
+                # Gevent 20.5.0+ with patched contextvars
                 or (is_object_patched("contextvars", "ContextVar"))
             ):
                 return False
@@ -1848,15 +1847,8 @@ def ensure_integration_enabled(
     return patcher
 
 
-if PY37:
-
-    def nanosecond_time() -> int:
-        return time.perf_counter_ns()
-
-else:
-
-    def nanosecond_time() -> int:
-        return int(time.perf_counter() * 1e9)
+def nanosecond_time() -> int:
+    return time.perf_counter_ns()
 
 
 def now() -> float:

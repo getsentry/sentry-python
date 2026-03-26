@@ -1,8 +1,4 @@
-try:
-    from re import Pattern
-except ImportError:
-    # 3.6
-    from typing import Pattern
+from re import Pattern
 
 from typing import TYPE_CHECKING, TypeVar, Union
 
