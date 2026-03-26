@@ -45,6 +45,7 @@ jobs:
               - '**/*.toml'
               - '**/*.ini'
               - 'Makefile'
+              - 'requirements*.txt'
               - '.github/workflows/**'
   test-graphql:
     needs: changes
@@ -119,6 +120,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-graphql.result != 'success' && needs.test-graphql.result != 'skipped'
+        if: |
+          needs.changes.result == 'failure' ||
+          (needs.test-graphql.result != 'success' && needs.test-graphql.result != 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

@@ -37,6 +37,7 @@ jobs:
               - '**/*.toml'
               - '**/*.ini'
               - 'Makefile'
+              - 'requirements*.txt'
               - '.github/workflows/**'
 
   lint:
