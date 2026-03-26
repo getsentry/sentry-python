@@ -1,7 +1,5 @@
 """
-IMPORTANT: The contents of this file are part of a proof of concept and as such
-are experimental and not suitable for production use. They may be changed or
-removed at any time without prior notice.
+OpenTelemetry integration for Sentry.
 """
 
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -32,10 +30,7 @@ class OpenTelemetryIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        logger.warning(
-            "[OTel] Initializing highly experimental OpenTelemetry support. "
-            "Use at your own risk."
-        )
+        logger.debug("[OTel] Initializing OpenTelemetry support.")
 
         _setup_sentry_tracing()
         # _setup_instrumentors()
