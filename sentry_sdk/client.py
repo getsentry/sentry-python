@@ -1037,9 +1037,7 @@ class _Client(BaseClient):
         semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
-            if isinstance(self.transport, AsyncHttpTransport) and hasattr(
-                self.transport, "loop"
-            ):
+            if isinstance(self.transport, AsyncHttpTransport):
                 logger.warning(
                     "close() used with AsyncHttpTransport. "
                     "Prefer close_async() for graceful async shutdown. "
@@ -1062,10 +1060,7 @@ class _Client(BaseClient):
         semantics as :py:meth:`Client.flush_async`.
         """
         if self.transport is not None:
-            if not (
-                isinstance(self.transport, AsyncHttpTransport)
-                and hasattr(self.transport, "loop")
-            ):
+            if not isinstance(self.transport, AsyncHttpTransport):
                 logger.debug(
                     "close_async() used with non-async transport, aborting. Please use close() instead."
                 )
@@ -1090,9 +1085,7 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
-            if isinstance(self.transport, AsyncHttpTransport) and hasattr(
-                self.transport, "loop"
-            ):
+            if isinstance(self.transport, AsyncHttpTransport):
                 logger.warning(
                     "flush() used with AsyncHttpTransport. Please use flush_async() instead."
                 )
@@ -1116,10 +1109,7 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
-            if not (
-                isinstance(self.transport, AsyncHttpTransport)
-                and hasattr(self.transport, "loop")
-            ):
+            if not isinstance(self.transport, AsyncHttpTransport):
                 logger.debug(
                     "flush_async() used with non-async transport, aborting. Please use flush() instead."
                 )
