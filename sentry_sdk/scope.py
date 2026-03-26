@@ -878,20 +878,8 @@ class Scope:
 
     @property
     def span(self) -> "Optional[Union[Span, StreamedSpan]]":
-        """Get/set current tracing span or transaction."""
+        """Get current tracing span or transaction."""
         return self._span
-
-    @span.setter
-    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
-        self._span = span
-        # XXX: this differs from the implementation in JS, there Scope.setSpan
-        # does not set Scope._transactionName.
-        if isinstance(span, Transaction):
-            transaction = span
-            if transaction.name:
-                self._transaction = transaction.name
-                if transaction.source:
-                    self._transaction_info["source"] = transaction.source
 
     @property
     def profile(self) -> "Optional[Profile]":

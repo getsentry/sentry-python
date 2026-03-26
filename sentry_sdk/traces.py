@@ -343,7 +343,7 @@ class StreamedSpan:
     def _start(self) -> None:
         if self._active:
             old_span = self._scope.span
-            self._scope.span = self
+            self._scope._span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -361,7 +361,7 @@ class StreamedSpan:
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.span = old_span
+                self._scope._span = old_span
 
         # Set attributes from the segment. These are set on span end on purpose
         # so that we have the best chance to capture the segment's final name
@@ -591,7 +591,7 @@ class NoOpStreamedSpan(StreamedSpan):
             return
 
         old_span = self._scope.span
-        self._scope.span = self
+        self._scope._span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -614,7 +614,7 @@ class NoOpStreamedSpan(StreamedSpan):
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.span = old_span
+                self._scope._span = old_span
 
         self._finished = True
 

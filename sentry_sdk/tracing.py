@@ -388,7 +388,7 @@ class Span:
     def __enter__(self) -> "Span":
         scope = self.scope or sentry_sdk.get_current_scope()
         old_span = scope.span
-        scope.span = self
+        scope._span = self
         self._context_manager_state = (scope, old_span)
         return self
 
@@ -402,7 +402,7 @@ class Span:
             scope, old_span = self._context_manager_state
             del self._context_manager_state
             self.finish(scope)
-            scope.span = old_span
+            scope._span = old_span
 
     @property
     def containing_transaction(self) -> "Optional[Transaction]":
@@ -873,6 +873,13 @@ class Transaction(Span):
             )
 
         super().__enter__()
+
+        # Propagate transaction name and source to the scope
+        scope = self.scope or sentry_sdk.get_current_scope()
+        if self.name:
+            scope._transaction = self.name
+            if self.source:
+                scope._transaction_info["source"] = self.source
 
         if self._profile is not None:
             self._profile.__enter__()

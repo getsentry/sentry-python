@@ -41,7 +41,7 @@ def test_get_current_span_default_hub(sentry_init):
 
     scope = get_current_scope()
     fake_span = mock.MagicMock()
-    scope.span = fake_span
+    scope._span = fake_span
 
     assert get_current_span() == fake_span
 
