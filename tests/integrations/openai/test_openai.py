@@ -41,7 +41,7 @@ except ImportError:
     SKIP_RESPONSES_TESTS = True
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_token_usage,
@@ -2634,7 +2634,14 @@ async def test_ai_client_span_responses_async_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_ai_client_span_streaming_responses_async_api(
-    sentry_init, capture_events, instructions, input, request, async_iterator
+    sentry_init,
+    capture_events,
+    instructions,
+    input,
+    request,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -2644,28 +2651,32 @@ async def test_ai_client_span_streaming_responses_async_api(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
-    client.responses._post = mock.AsyncMock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
+    )
 
-    with start_transaction(name="openai tx"):
-        result = await client.responses.create(
-            model="gpt-4o",
-            instructions=instructions,
-            input=input,
-            stream=True,
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
-        )
-        async for _ in result:
-            pass
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            result = await client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            async for _ in result:
+                pass
 
     (transaction,) = events
-    spans = transaction["spans"]
+    spans = [span for span in transaction["spans"] if span["op"] == OP.GEN_AI_RESPONSES]
 
     assert len(spans) == 1
-    assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
 
     expected_data = {
@@ -2962,7 +2973,12 @@ else:
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_streaming_responses_api(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[
@@ -2976,24 +2992,31 @@ def test_streaming_responses_api(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = EXAMPLE_RESPONSES_STREAM
-    client.responses._post = mock.Mock(return_value=returned_stream)
-
-    with start_transaction(name="openai tx"):
-        response_stream = client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            EXAMPLE_RESPONSES_STREAM,
         )
+    )
 
-        response_string = ""
-        for item in response_stream:
-            if hasattr(item, "delta"):
-                response_string += item.delta
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+            )
+
+            response_string = ""
+            for item in response_stream:
+                if hasattr(item, "delta"):
+                    response_string += item.delta
 
     assert response_string == "hello world"
 
@@ -3026,7 +3049,13 @@ def test_streaming_responses_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_async(
-    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[
@@ -3040,24 +3069,29 @@ async def test_streaming_responses_api_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
-    client.responses._post = AsyncMock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
+    )
 
-    with start_transaction(name="openai tx"):
-        response_stream = await client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
-        )
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+            )
 
-        response_string = ""
-        async for item in response_stream:
-            if hasattr(item, "delta"):
-                response_string += item.delta
+            response_string = ""
+            async for item in response_stream:
+                if hasattr(item, "delta"):
+                    response_string += item.delta
 
     assert response_string == "hello world"
 
@@ -3365,7 +3399,9 @@ async def test_streaming_chat_completion_ttft_async(
 
 # noinspection PyTypeChecker
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_streaming_responses_api_ttft(sentry_init, capture_events):
+def test_streaming_responses_api_ttft(
+    sentry_init, capture_events, get_model_response, server_side_event_chunks
+):
     """
     Test that streaming responses API captures time-to-first-token (TTFT).
     """
@@ -3376,19 +3412,24 @@ def test_streaming_responses_api_ttft(sentry_init, capture_events):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = EXAMPLE_RESPONSES_STREAM
-    client.responses._post = mock.Mock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        server_side_event_chunks(EXAMPLE_RESPONSES_STREAM)
+    )
 
-    with start_transaction(name="openai tx"):
-        response_stream = client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-        )
-        # Consume the stream
-        for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            # Consume the stream
+            for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
@@ -3405,7 +3446,11 @@ def test_streaming_responses_api_ttft(sentry_init, capture_events):
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_ttft_async(
-    sentry_init, capture_events, async_iterator
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """
     Test that async streaming responses API captures time-to-first-token (TTFT).
@@ -3417,19 +3462,24 @@ async def test_streaming_responses_api_ttft_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
-    client.responses._post = AsyncMock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
+    )
 
-    with start_transaction(name="openai tx"):
-        response_stream = await client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-        )
-        # Consume the stream
-        async for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            # Consume the stream
+            async for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
