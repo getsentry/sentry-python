@@ -309,24 +309,118 @@ def test_simple_exception():
 
 
 @minimum_python_311
-def test_cyclic_exception_group_cause():
+def test_exceptiongroup_starlette_collapse():
     """
-    Regression test for https://github.com/getsentry/sentry-python/issues/5025
+    Simulates the Starlette collapse_excgroups() pattern where a single-exception
+    ExceptionGroup is caught and the inner exception is unwrapped and re-raised.
+
+    See: https://github.com/Kludex/starlette/blob/0e88e92b592bfa11fd92e331869a8d49ba34b541/starlette/_utils.py#L79-L87
 
     When using FastAPI with multiple BaseHTTPMiddleware instances, anyio wraps
-    exceptions in ExceptionGroups.
+    exceptions in ExceptionGroups. Starlette's collapse_excgroups() then unwraps
+    single-exception groups and re-raises the inner exception.
 
-    When a single exception is unpacked from the ExceptionGroup by Starlette and reraised in the `collapse_excgroups()` method
-    (see https://github.com/Kludex/starlette/blob/0e88e92b592bfa11fd92e331869a8d49ba34b541/starlette/_utils.py#L79-L87)
-    it causes the following situation to happen:
+    When re-raising the unwrapped exception, Python implicitly sets __context__
+    on it pointing back to the ExceptionGroup (because the re-raise happens
+    inside the except block that caught the ExceptionGroup), creating a cycle:
 
-        ExceptionGroup -> .exceptions[0] -> ValueError -> __cause__ -> ExceptionGroup
+        ExceptionGroup -> .exceptions[0] -> ValueError -> __context__ -> ExceptionGroup
 
-    when the Sentry SDK attempts to walk through the chain of exceptions via the exceptions_from_error().
+    Without cycle detection in exceptions_from_error(), this causes infinite
+    recursion and a silent RecursionError that drops the event.
+    """
+    exception_group = None
 
-    This is because `exceptions_from_error` walks both __cause__/__context__ and
-    ExceptionGroup.exceptions recursively without cycle detection, causing
-    infinite recursion and a silent RecursionError that drops the event.
+    try:
+        try:
+            raise RuntimeError("something")
+        except RuntimeError:
+            raise ExceptionGroup(
+                "nested",
+                [
+                    ValueError(654),
+                ],
+            )
+    except ExceptionGroup as exc:
+        exception_group = exc
+
+        # Simulate Starlette's collapse_excgroups() as seen here:
+        # https://github.com/Kludex/starlette/blob/0e88e92b592bfa11fd92e331869a8d49ba34b541/starlette/_utils.py#L79-L87
+        #
+        # When an ExceptionGroup contains a single exception, collapse_excgroups
+        # unwraps it and re-raises the inner exception. This causes Python to
+        # implicitly set unwrapped.__context__ = ExceptionGroup (because the
+        # re-raise happens inside the except block handling the ExceptionGroup),
+        # creating a cycle:
+        #   exception_group -> .exceptions[0] -> ValueError -> __context__ -> exception_group
+        unwrapped = exc.exceptions[0]
+        try:
+            raise unwrapped
+        except Exception:
+            pass
+
+    (event, _) = event_from_exception(
+        exception_group,
+        client_options={
+            "include_local_variables": True,
+            "include_source_context": True,
+            "max_value_length": 1024,
+        },
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    values = event["exception"]["values"]
+
+    # For this test the stacktrace and the module is not important
+    for x in values:
+        if "stacktrace" in x:
+            del x["stacktrace"]
+        if "module" in x:
+            del x["module"]
+
+    expected_values = [
+        {
+            "mechanism": {
+                "exception_id": 2,
+                "handled": False,
+                "parent_id": 0,
+                "source": "exceptions[0]",
+                "type": "chained",
+            },
+            "type": "ValueError",
+            "value": "654",
+        },
+        {
+            "mechanism": {
+                "exception_id": 1,
+                "handled": False,
+                "parent_id": 0,
+                "source": "__context__",
+                "type": "chained",
+            },
+            "type": "RuntimeError",
+            "value": "something",
+        },
+        {
+            "mechanism": {
+                "exception_id": 0,
+                "handled": False,
+                "is_exception_group": True,
+                "type": "test_suite",
+            },
+            "type": "ExceptionGroup",
+            "value": "nested",
+        },
+    ]
+
+    assert values == expected_values
+
+
+@minimum_python_311
+def test_cyclic_exception_group_cause():
+    """
+    Test case related to `test_exceptiongroup_starlette_collapse` above. We want to make sure that
+    the same cyclic loop cannot happen via the __cause__ as well as the __context__
     """
     # Construct the exact cyclic structure that anyio/Starlette creates when
     # an exception propagates through multiple BaseHTTPMiddleware layers.
@@ -357,41 +451,11 @@ def test_cyclic_exception_group_cause():
 
 
 @minimum_python_311
-def test_cyclic_exception_group_context():
-    """
-    Same as test_cyclic_exception_group_cause (see above) but the cycle goes through
-    __context__ instead of __cause__ .
-
-    This is the more likely scenario to occur in production because __context__ is set implicitly by
-    Python while __cause__ is set explicitly when "raise X from Y" is written in the code
-    """
-    original = ValueError("original error")
-    group = ExceptionGroup("unhandled errors in a TaskGroup", [original])
-    original.__context__ = group
-    # __suppress_context__ = False so that exceptions_from_error follows __context__
-    original.__suppress_context__ = False
-
-    (event, _) = event_from_exception(
-        group,
-        client_options={
-            "include_local_variables": True,
-            "include_source_context": True,
-            "max_value_length": 1024,
-        },
-        mechanism={"type": "test_suite", "handled": False},
-    )
-
-    exception_values = event["exception"]["values"]
-    assert len(exception_values) >= 1
-    exc_types = [v["type"] for v in exception_values]
-    assert "ExceptionGroup" in exc_types
-    assert "ValueError" in exc_types
-
-
-@minimum_python_311
 def test_deeply_nested_cyclic_exception_group():
     """
-    A more complex cycle: ExceptionGroup -> ValueError -> __cause__ ->
+    Related to the `test_exceptiongroup_starlette_collapse` test above.
+
+    Testing a more complex cycle: ExceptionGroup -> ValueError -> __cause__ ->
     ExceptionGroup (nested) -> TypeError -> __cause__ -> original ExceptionGroup
     """
     inner_error = TypeError("inner")
