@@ -819,7 +819,7 @@ def exceptions_from_error(
     parent_id: int = 0,
     source: "Optional[str]" = None,
     full_stack: "Optional[list[dict[str, Any]]]" = None,
-    seen_exceptions: "Optional[list]" = None,
+    seen_exceptions: "Optional[list[BaseException]]" = None,
     seen_exception_ids: "Optional[Set[int]]" = None,
 ) -> "Tuple[int, List[Dict[str, Any]]]":
     """
@@ -831,8 +831,10 @@ def exceptions_from_error(
     """
 
     if seen_exception_ids is None:
-        seen_exceptions = []
         seen_exception_ids = set()
+
+    if seen_exceptions is None:
+        seen_exceptions = []
 
     if exc_value is not None and id(exc_value) in seen_exception_ids:
         return (exception_id, [])
