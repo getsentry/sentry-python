@@ -229,7 +229,7 @@ def _calculate_streaming_responses_token_usage(
     span: "Span",
     streaming_message_responses: "Optional[List[str]]",
     count_tokens: "Callable[..., Any]",
-):
+) -> None:
     """
     Sets token attribute for streaming Responses calls.
     Sets token usage if available in the response object, or computes the usage for textual input and output with tiktoken.
