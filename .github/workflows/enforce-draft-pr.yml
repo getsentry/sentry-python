@@ -9,6 +9,9 @@ jobs:
     name: Enforce Draft PR
     runs-on: ubuntu-24.04
     if: github.event.pull_request.draft == false
+    permissions:
+      pull-requests: write
+      contents: write
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -19,7 +22,7 @@ jobs:
 
       - name: Convert PR to draft
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{github.token}}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           gh pr ready "$PR_URL" --undo
