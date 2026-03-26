@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
 
+    from sentry_sdk._types import Attributes
+
 
 try:
     from httpx import AsyncClient, Client, Request, Response
@@ -61,7 +63,7 @@ def _install_httpx_client() -> None:
 
         span_ctx: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
-            attributes = {
+            attributes: "Attributes" = {
                 "sentry.op": OP.HTTP_CLIENT,
                 "sentry.origin": HttpxIntegration.origin,
                 SPANDATA.HTTP_METHOD: request.method,
@@ -145,7 +147,7 @@ def _install_httpx_async_client() -> None:
 
         span_ctx: "Optional[Union[Span, StreamedSpan]]" = None
         if span_streaming:
-            attributes = {
+            attributes: "Attributes" = {
                 "sentry.op": OP.HTTP_CLIENT,
                 "sentry.origin": HttpxIntegration.origin,
                 SPANDATA.HTTP_METHOD: request.method,

@@ -32,7 +32,7 @@ Each native extension requires its own integration.
 
 import json
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
@@ -184,7 +184,9 @@ class RustTracingLayer:
         elif event_type == EventTypeMapping.Event:
             process_event(deserialized_event)
 
-    def on_new_span(self, attrs: str, span_id: str) -> "Optional[Span]":
+    def on_new_span(
+        self, attrs: str, span_id: str
+    ) -> "Union[Span, StreamedSpan, None]":
         attrs = json.loads(attrs)
         metadata = attrs.get("metadata", {})
 
@@ -206,6 +208,7 @@ class RustTracingLayer:
 
         client = sentry_sdk.get_client()
 
+        sentry_span: "Union[Span, StreamedSpan]"
         if has_span_streaming_enabled(client.options):
             sentry_span = sentry_sdk.traces.start_span(
                 name=sentry_span_name,

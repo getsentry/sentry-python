@@ -8,7 +8,7 @@ try:
     # django.tasks were added in Django 6.0
     from django.tasks.base import Task
 except ImportError:
-    Task = None
+    Task = None  # type: ignore[misc, assignment]
 
 from typing import TYPE_CHECKING
 
@@ -22,7 +22,7 @@ def patch_tasks() -> None:
 
     old_task_enqueue = Task.enqueue
 
-    @wraps(old_task_enqueue)
+    @wraps(old_task_enqueue)  # type: ignore[arg-type]
     def _sentry_enqueue(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -37,4 +37,4 @@ def patch_tasks() -> None:
         ):
             return old_task_enqueue(self, *args, **kwargs)
 
-    Task.enqueue = _sentry_enqueue
+    Task.enqueue = _sentry_enqueue  # type: ignore[method-assign]
