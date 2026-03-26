@@ -1875,6 +1875,8 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
             instructions="You are a coding assistant that talks like a pirate.",
             input="How do I check if a Python object is an instance of a class?",
             max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -1886,6 +1888,8 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
         "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.system": "openai",
@@ -1987,6 +1991,8 @@ def test_ai_client_span_responses_api(
             instructions=instructions,
             input=input,
             max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -1999,6 +2005,8 @@ def test_ai_client_span_responses_api(
     expected_data = {
         "gen_ai.operation.name": "responses",
         "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.system": "openai",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.usage.input_tokens": 20,
@@ -2291,6 +2299,8 @@ async def test_ai_client_span_responses_async_api(
             instructions=instructions,
             input=input,
             max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -2303,6 +2313,8 @@ async def test_ai_client_span_responses_async_api(
     expected_data = {
         "gen_ai.operation.name": "responses",
         "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
@@ -2562,6 +2574,8 @@ async def test_ai_client_span_streaming_responses_async_api(
             input=input,
             stream=True,
             max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
         async for _ in result:
             pass
@@ -2576,6 +2590,8 @@ async def test_ai_client_span_streaming_responses_async_api(
     expected_data = {
         "gen_ai.operation.name": "responses",
         "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
@@ -2889,6 +2905,8 @@ def test_streaming_responses_api(
             input="hello",
             stream=True,
             max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
         response_string = ""
@@ -2903,6 +2921,8 @@ def test_streaming_responses_api(
     assert span["op"] == "gen_ai.responses"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -2949,6 +2969,8 @@ async def test_streaming_responses_api_async(
             input="hello",
             stream=True,
             max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
         response_string = ""
@@ -2963,6 +2985,8 @@ async def test_streaming_responses_api_async(
     assert span["op"] == "gen_ai.responses"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
