@@ -3340,7 +3340,11 @@ def test_streaming_responses_api_ttft(
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_ttft_async(
-    sentry_init, capture_events, async_iterator
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """
     Test that async streaming responses API captures time-to-first-token (TTFT).
@@ -3352,19 +3356,24 @@ async def test_streaming_responses_api_ttft_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
-    client.responses._post = AsyncMock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
+    )
 
-    with start_transaction(name="openai tx"):
-        response_stream = await client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-        )
-        # Consume the stream
-        async for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            # Consume the stream
+            async for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
