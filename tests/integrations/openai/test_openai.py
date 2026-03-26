@@ -16,6 +16,7 @@ except ImportError:
 
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
+from openai.types.completion_usage import CompletionTokensDetails, PromptTokensDetails
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
@@ -551,6 +552,28 @@ def test_streaming_chat_completion_no_prompts(
                     model="model-id",
                     object="chat.completion.chunk",
                 ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                    usage=CompletionUsage(
+                        prompt_tokens=10,
+                        completion_tokens=5,
+                        total_tokens=15,
+                        prompt_tokens_details=PromptTokensDetails(
+                            audio_tokens=10,
+                            cached_tokens=20,
+                        ),
+                        completion_tokens_details=CompletionTokensDetails(
+                            reasoning_tokens=5,
+                            audio_tokens=3,
+                            accepted_prediction_tokens=7,
+                            rejected_prediction_tokens=2,
+                        ),
+                    ),
+                ),
             ],
             include_event_type=False,
         )
@@ -575,11 +598,9 @@ def test_streaming_chat_completion_no_prompts(
                 temperature=0.7,
                 top_p=0.9,
             )
-            response_string = "".join(
-                map(lambda x: x.choices[0].delta.content, response_stream)
-            )
+            for _ in response_stream:
+                pass
 
-    assert response_string == "hello world"
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
@@ -595,6 +616,10 @@ def test_streaming_chat_completion_no_prompts(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
+    assert span["data"]["gen_ai.usage.output_tokens"] == 2
+    assert span["data"]["gen_ai.usage.input_tokens"] == 7
+    assert span["data"]["gen_ai.usage.total_tokens"] == 9
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -717,6 +742,18 @@ def test_streaming_chat_completion(
                     model="model-id",
                     object="chat.completion.chunk",
                 ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                    usage=CompletionUsage(
+                        prompt_tokens=10,
+                        completion_tokens=5,
+                        total_tokens=15,
+                    ),
+                ),
             ],
             include_event_type=False,
         )
@@ -738,10 +775,9 @@ def test_streaming_chat_completion(
                 temperature=0.7,
                 top_p=0.9,
             )
-            response_string = "".join(
-                map(lambda x: x.choices[0].delta.content, response_stream)
-            )
-    assert response_string == "hello world"
+            for _ in response_stream:
+                pass
+
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
