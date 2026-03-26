@@ -91,9 +91,18 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     @staticmethod
     def _estimate_size(item: "StreamedSpan") -> int:
         # Rough estimate of serialized span size that's quick to compute.
-        # 210 is the rough size of the payload without attributes, and we
-        # estimate additional 70 bytes on top of that per attribute.
-        return 210 + 70 * len(item._attributes)
+        # 210 is the rough size of the payload without attributes, and then we
+        # estimate the attributes separately.
+        estimate = 210
+        for value in item._attributes.values():
+            estimate += 7
+
+            if isinstance(value, str):
+                estimate += len(value)
+            else:
+                estimate += len(str(value))
+
+        return estimate
 
     @staticmethod
     def _to_transport_format(item: "StreamedSpan") -> "Any":

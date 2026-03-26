@@ -13,7 +13,6 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
-    ensure_integration_enabled,
     logger,
     parse_url,
 )
