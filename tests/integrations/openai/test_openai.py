@@ -1045,6 +1045,7 @@ def test_embeddings_create_no_pii(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
@@ -1126,6 +1127,7 @@ def test_embeddings_create(sentry_init, capture_events, input, request):
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     param_id = request.node.callspec.id
     if param_id == "string":
@@ -1198,6 +1200,7 @@ async def test_embeddings_create_async_no_pii(
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
@@ -1282,6 +1285,7 @@ async def test_embeddings_create_async(sentry_init, capture_events, input, reque
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
     assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     param_id = request.node.callspec.id
     if param_id == "string":
