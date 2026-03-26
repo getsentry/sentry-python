@@ -3206,7 +3206,9 @@ def test_openai_message_truncation(sentry_init, capture_events):
 
 
 # noinspection PyTypeChecker
-def test_streaming_chat_completion_ttft(sentry_init, capture_events):
+def test_streaming_chat_completion_ttft(
+    sentry_init, capture_events, get_model_response, server_side_event_chunks
+):
     """
     Test that streaming chat completions capture time-to-first-token (TTFT).
     """
@@ -3217,43 +3219,54 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=0, delta=ChoiceDelta(content="Hello"), finish_reason=None
-                )
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="Hello"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content=" world"),
+                            finish_reason="stop",
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
             ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
+            include_event_type=False,
         ),
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=0, delta=ChoiceDelta(content=" world"), finish_reason="stop"
-                )
-            ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
-        ),
-    ]
+    )
 
-    client.chat.completions._post = mock.Mock(return_value=returned_stream)
-
-    with start_transaction(name="openai tx"):
-        response_stream = client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "Say hello"}],
-            stream=True,
-        )
-        # Consume the stream
-        for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Say hello"}],
+                stream=True,
+            )
+            # Consume the stream
+            for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
