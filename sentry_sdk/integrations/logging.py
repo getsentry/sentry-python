@@ -54,7 +54,15 @@ SEVERITY_TO_OTEL_SEVERITY = {
 #
 # Note: Ignoring by logger name here is better than mucking with thread-locals.
 # We do not necessarily know whether thread-locals work 100% correctly in the user's environment.
+#
+# Events/breadcrumbs and Sentry Logs have separate ignore lists so that
+# framework loggers silenced for events (e.g. django.server) can still be
+# captured as Sentry Logs.
 _IGNORED_LOGGERS = set(
+    ["sentry_sdk.errors", "urllib3.connectionpool", "urllib3.connection"]
+)
+
+_IGNORED_LOGGERS_SENTRY_LOGS = set(
     ["sentry_sdk.errors", "urllib3.connectionpool", "urllib3.connection"]
 )
 
@@ -67,9 +75,45 @@ def ignore_logger(
     use this to prevent their actions being recorded as breadcrumbs. Exposed
     to users as a way to quiet spammy loggers.
 
+    This does **not** affect Sentry Logs — use
+    :py:func:`ignore_logger_for_sentry_logs` for that.
+
     :param name: The name of the logger to ignore (same string you would pass to ``logging.getLogger``).
     """
     _IGNORED_LOGGERS.add(name)
+
+
+def ignore_logger_for_sentry_logs(
+    name: str,
+) -> None:
+    """This disables recording as Sentry Logs calls to a logger of a
+    specific name.
+
+    :param name: The name of the logger to ignore (same string you would pass to ``logging.getLogger``).
+    """
+    _IGNORED_LOGGERS_SENTRY_LOGS.add(name)
+
+
+def unignore_logger(
+    name: str,
+) -> None:
+    """Reverts a previous :py:func:`ignore_logger` call, re-enabling
+    recording of breadcrumbs and events for the named logger.
+
+    :param name: The name of the logger to unignore.
+    """
+    _IGNORED_LOGGERS.discard(name)
+
+
+def unignore_logger_for_sentry_logs(
+    name: str,
+) -> None:
+    """Reverts a previous :py:func:`ignore_logger_for_sentry_logs` call,
+    re-enabling recording of Sentry Logs for the named logger.
+
+    :param name: The name of the logger to unignore.
+    """
+    _IGNORED_LOGGERS_SENTRY_LOGS.discard(name)
 
 
 class LoggingIntegration(Integration):
@@ -104,6 +148,7 @@ class LoggingIntegration(Integration):
         ):
             self._breadcrumb_handler.handle(record)
 
+    def _handle_sentry_logs_record(self, record: "LogRecord") -> None:
         if (
             self._sentry_logs_handler is not None
             and record.levelno >= self._sentry_logs_handler.level
@@ -118,6 +163,7 @@ class LoggingIntegration(Integration):
             # keeping a local reference because the
             # global might be discarded on shutdown
             ignored_loggers = _IGNORED_LOGGERS
+            ignored_loggers_sentry_logs = _IGNORED_LOGGERS_SENTRY_LOGS
 
             try:
                 return old_callhandlers(self, record)
@@ -126,15 +172,25 @@ class LoggingIntegration(Integration):
                 # the integration.  Otherwise we have a high chance of getting
                 # into a recursion error when the integration is resolved
                 # (this also is slower).
-                if (
-                    ignored_loggers is not None
-                    and record.name.strip() not in ignored_loggers
-                ):
+                name = record.name.strip()
+
+                handle_events = (
+                    ignored_loggers is not None and name not in ignored_loggers
+                )
+                handle_sentry_logs = (
+                    ignored_loggers_sentry_logs is not None
+                    and name not in ignored_loggers_sentry_logs
+                )
+
+                if handle_events or handle_sentry_logs:
                     integration = sentry_sdk.get_client().get_integration(
                         LoggingIntegration
                     )
                     if integration is not None:
-                        integration._handle_record(record)
+                        if handle_events:
+                            integration._handle_record(record)
+                        if handle_sentry_logs:
+                            integration._handle_sentry_logs_record(record)
 
         logging.Logger.callHandlers = sentry_patched_callhandlers  # type: ignore
 
@@ -170,13 +226,6 @@ class _BaseHandler(logging.Handler):
         )
     )
 
-    def _can_record(self, record: "LogRecord") -> bool:
-        """Prevents ignored loggers from recording"""
-        for logger in _IGNORED_LOGGERS:
-            if fnmatch(record.name.strip(), logger):
-                return False
-        return True
-
     def _logging_to_event_level(self, record: "LogRecord") -> str:
         return LOGGING_TO_EVENT_LEVEL.get(
             record.levelno, record.levelname.lower() if record.levelname else ""
@@ -197,6 +246,13 @@ class EventHandler(_BaseHandler):
 
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
+
+    def _can_record(self, record: "LogRecord") -> bool:
+        """Prevents ignored loggers from recording"""
+        for logger in _IGNORED_LOGGERS:
+            if fnmatch(record.name.strip(), logger):
+                return False
+        return True
 
     def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
@@ -290,6 +346,13 @@ class BreadcrumbHandler(_BaseHandler):
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
 
+    def _can_record(self, record: "LogRecord") -> bool:
+        """Prevents ignored loggers from recording"""
+        for logger in _IGNORED_LOGGERS:
+            if fnmatch(record.name.strip(), logger):
+                return False
+        return True
+
     def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
             self.format(record)
@@ -320,6 +383,13 @@ class SentryLogsHandler(_BaseHandler):
 
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
+
+    def _can_record(self, record: "LogRecord") -> bool:
+        """Prevents ignored loggers from recording"""
+        for logger in _IGNORED_LOGGERS_SENTRY_LOGS:
+            if fnmatch(record.name.strip(), logger):
+                return False
+        return True
 
     def emit(self, record: "LogRecord") -> "Any":
         with capture_internal_exceptions():
