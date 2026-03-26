@@ -65,7 +65,7 @@ setup(
         "langchain": ["langchain>=0.0.210"],
         "langgraph": ["langgraph>=0.6.6"],
         "launchdarkly": ["launchdarkly-server-sdk>=9.8.0"],
-        "litellm": ["litellm>=1.77.5"],
+        "litellm": ["litellm>=1.77.5,!=1.82.7,!=1.82.8"],
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
         "mcp": ["mcp>=1.15.0"],

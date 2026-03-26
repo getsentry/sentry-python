@@ -87,6 +87,7 @@ GROUPS = {
         "cohere",
         "google_genai",
         "huggingface_hub",
+        "litellm",
         "openai-base",
         "openai-notiktoken",
     ],
