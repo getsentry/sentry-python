@@ -25,7 +25,30 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      has_code_changes: ${{ github.event_name != 'pull_request' || steps.changes.outputs.has_code_changes }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            has_code_changes:
+              - 'sentry_sdk/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - '**/*.py'
+              - '**/*.cfg'
+              - '**/*.toml'
+              - '**/*.ini'
+              - 'Makefile'
+              - '.github/workflows/**'
   test-network:
+    needs: changes
+    if: needs.changes.outputs.has_code_changes == 'true'
     name: Network
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
@@ -86,12 +109,12 @@ jobs:
           verbose: true
   check_required_tests:
     name: All Network tests passed
-    needs: test-network
+    needs: [changes, test-network]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: needs.test-network.result != 'success'
+        if: needs.test-network.result != 'success' && needs.test-network.result != 'skipped'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
