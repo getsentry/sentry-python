@@ -2596,7 +2596,6 @@ async def test_ai_client_span_streaming_responses_async_api(
     spans = [span for span in transaction["spans"] if span["op"] == OP.GEN_AI_RESPONSES]
 
     assert len(spans) == 1
-    assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
 
     expected_data = {
