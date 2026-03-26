@@ -2575,7 +2575,7 @@ async def test_ai_client_span_streaming_responses_async_api(
     )
 
     with mock.patch.object(
-        client.chat._client._client,
+        client.responses._client._client,
         "send",
         return_value=returned_stream,
     ):
@@ -2919,7 +2919,7 @@ def test_streaming_responses_api(
     )
 
     with mock.patch.object(
-        client.chat._client._client,
+        client.responses._client._client,
         "send",
         return_value=returned_stream,
     ):
@@ -2994,7 +2994,7 @@ async def test_streaming_responses_api_async(
     )
 
     with mock.patch.object(
-        client.chat._client._client,
+        client.responses._client._client,
         "send",
         return_value=returned_stream,
     ):
@@ -3311,7 +3311,7 @@ def test_streaming_responses_api_ttft(
     )
 
     with mock.patch.object(
-        client.chat._client._client,
+        client.responses._client._client,
         "send",
         return_value=returned_stream,
     ):
@@ -3361,7 +3361,7 @@ async def test_streaming_responses_api_ttft_async(
     )
 
     with mock.patch.object(
-        client.chat._client._client,
+        client.responses._client._client,
         "send",
         return_value=returned_stream,
     ):
