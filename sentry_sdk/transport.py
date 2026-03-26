@@ -856,7 +856,7 @@ class AsyncHttpTransport(HttpTransportCore):
     ) -> "Optional[str]":
         return _get_httpcore_header_value(response, header)
 
-    async def _send_envelope(self: "Self", envelope: "Envelope") -> None:  # type: ignore[override]
+    async def _send_envelope(self: "Self", envelope: "Envelope") -> None:
         _prepared_envelope = self._prepare_envelope(envelope)
         if _prepared_envelope is not None:
             envelope, body, headers = _prepared_envelope
@@ -868,7 +868,7 @@ class AsyncHttpTransport(HttpTransportCore):
             )
         return None
 
-    async def _send_request(  # type: ignore[override]
+    async def _send_request(
         self: "Self",
         body: bytes,
         headers: "Dict[str, str]",
