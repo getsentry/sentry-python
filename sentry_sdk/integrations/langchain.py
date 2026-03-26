@@ -377,13 +377,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 parent_run_id,
-                op=OP.GEN_AI_GENERATE_TEXT,
-                name=f"generate_text {model}".strip(),
+                op=OP.GEN_AI_TEXT_COMPLETION,
+                name=f"text_completion {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "generate_text")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "text_completion")
 
             pipeline_name = kwargs.get("name")
             if pipeline_name:
