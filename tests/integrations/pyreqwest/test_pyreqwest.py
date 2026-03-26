@@ -65,6 +65,7 @@ def test_sync_client_spans(sentry_init, capture_events, server_port):
         assert response.status == 200
 
     (event,) = events
+    assert len(event["spans"]) == 1
     span = event["spans"][0]
     assert span["op"] == "http.client"
     assert span["description"] == f"GET {url}"
@@ -85,6 +86,7 @@ async def test_async_client_spans(sentry_init, capture_events, server_port):
             assert response.status == 200
 
     (event,) = events
+    assert len(event["spans"]) == 1
     span = event["spans"][0]
     assert span["op"] == "http.client"
     assert span["description"] == f"GET {url}"
@@ -103,6 +105,7 @@ def test_sync_simple_request_spans(sentry_init, capture_events, server_port):
         assert response.status == 200
 
     (event,) = events
+    assert len(event["spans"]) == 1
     span = event["spans"][0]
     assert span["op"] == "http.client"
     assert span["description"] == f"GET {url}"
@@ -119,6 +122,7 @@ async def test_async_simple_request_spans(sentry_init, capture_events, server_po
         assert response.status == 200
 
     (event,) = events
+    assert len(event["spans"]) == 1
     span = event["spans"][0]
     assert span["op"] == "http.client"
     assert span["description"] == f"GET {url}"

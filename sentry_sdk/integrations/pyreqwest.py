@@ -22,8 +22,6 @@ try:
     from pyreqwest.client import ClientBuilder, SyncClientBuilder  # type: ignore[import-not-found]
     from pyreqwest.request import (  # type: ignore[import-not-found]
         Request,
-        RequestBuilder,
-        SyncRequestBuilder,
         OneOffRequestBuilder,
         SyncOneOffRequestBuilder,
     )
@@ -47,11 +45,7 @@ def _patch_pyreqwest() -> None:
     _patch_builder_method(ClientBuilder, "build", sentry_async_middleware)
     _patch_builder_method(SyncClientBuilder, "build", sentry_sync_middleware)
 
-    # Patch Request Builders (for simple requests and manual request building)
-    _patch_builder_method(RequestBuilder, "build", sentry_async_middleware)
-    _patch_builder_method(RequestBuilder, "build_streamed", sentry_async_middleware)
-    _patch_builder_method(SyncRequestBuilder, "build", sentry_sync_middleware)
-    _patch_builder_method(SyncRequestBuilder, "build_streamed", sentry_sync_middleware)
+    # Patch Request Builders
     _patch_builder_method(OneOffRequestBuilder, "send", sentry_async_middleware)
     _patch_builder_method(SyncOneOffRequestBuilder, "send", sentry_sync_middleware)
 
