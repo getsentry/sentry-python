@@ -148,13 +148,17 @@ def _get_usage(usage: "Any", names: "List[str]") -> int:
     return 0
 
 
-def _calculate_token_usage(
+def _calculate_streaming_completions_token_usage(
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
     response: "Any",
     span: "Span",
     streaming_message_responses: "Optional[List[str]]",
     count_tokens: "Callable[..., Any]",
 ) -> None:
+    """
+    Sets token attribute for streaming Completions calls.
+    Sets token usage if available in the response object, or computes the usage for textual input and output with tiktoken.
+    """
     input_tokens: "Optional[int]" = 0
     input_tokens_cached: "Optional[int]" = 0
     output_tokens: "Optional[int]" = 0
@@ -201,6 +205,151 @@ def _calculate_token_usage(
             for choice in response.choices:
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):
                     output_tokens += count_tokens(choice.message.content)
+
+    # Do not set token data if it is 0
+    input_tokens = input_tokens or None
+    input_tokens_cached = input_tokens_cached or None
+    output_tokens = output_tokens or None
+    output_tokens_reasoning = output_tokens_reasoning or None
+    total_tokens = total_tokens or None
+
+    record_token_usage(
+        span,
+        input_tokens=input_tokens,
+        input_tokens_cached=input_tokens_cached,
+        output_tokens=output_tokens,
+        output_tokens_reasoning=output_tokens_reasoning,
+        total_tokens=total_tokens,
+    )
+
+
+def _calculate_streaming_responses_token_usage(
+    messages: "Optional[Optional[Union[str, ResponseInputParam]]]",
+    response: "Any",
+    span: "Span",
+    streaming_message_responses: "Optional[List[str]]",
+    count_tokens: "Callable[..., Any]",
+):
+    """
+    Sets token attribute for streaming Responses calls.
+    Sets token usage if available in the response object, or computes the usage for textual input and output with tiktoken.
+    """
+    input_tokens: "Optional[int]" = 0
+    input_tokens_cached: "Optional[int]" = 0
+    output_tokens: "Optional[int]" = 0
+    output_tokens_reasoning: "Optional[int]" = 0
+    total_tokens: "Optional[int]" = 0
+
+    if hasattr(response, "usage"):
+        input_tokens = _get_usage(response.usage, ["input_tokens", "prompt_tokens"])
+        if hasattr(response.usage, "input_tokens_details"):
+            input_tokens_cached = _get_usage(
+                response.usage.input_tokens_details, ["cached_tokens"]
+            )
+
+        output_tokens = _get_usage(
+            response.usage, ["output_tokens", "completion_tokens"]
+        )
+        if hasattr(response.usage, "output_tokens_details"):
+            output_tokens_reasoning = _get_usage(
+                response.usage.output_tokens_details, ["reasoning_tokens"]
+            )
+
+        total_tokens = _get_usage(response.usage, ["total_tokens"])
+
+    # Manually count tokens
+    if input_tokens == 0:
+        for message in messages or []:
+            if isinstance(message, str):
+                input_tokens += count_tokens(message)
+                continue
+            elif isinstance(message, dict):
+                message_content = message.get("content")
+                if message_content is None:
+                    continue
+                # Deliberate use of Completions function for both Completions and Responses input format.
+                text_items = _get_text_items(message_content)
+                input_tokens += sum(count_tokens(text) for text in text_items)
+                continue
+
+    if output_tokens == 0:
+        if streaming_message_responses is not None:
+            for message in streaming_message_responses:
+                output_tokens += count_tokens(message)
+        elif hasattr(response, "choices"):
+            for choice in response.choices:
+                if hasattr(choice, "message") and hasattr(choice.message, "content"):
+                    output_tokens += count_tokens(choice.message.content)
+
+    # Do not set token data if it is 0
+    input_tokens = input_tokens or None
+    input_tokens_cached = input_tokens_cached or None
+    output_tokens = output_tokens or None
+    output_tokens_reasoning = output_tokens_reasoning or None
+    total_tokens = total_tokens or None
+
+    record_token_usage(
+        span,
+        input_tokens=input_tokens,
+        input_tokens_cached=input_tokens_cached,
+        output_tokens=output_tokens,
+        output_tokens_reasoning=output_tokens_reasoning,
+        total_tokens=total_tokens,
+    )
+
+
+def _calculate_token_usage(
+    messages: "Optional[Iterable[ChatCompletionMessageParam]]",
+    response: "Any",
+    span: "Span",
+    count_tokens: "Callable[..., Any]",
+) -> None:
+    """
+    Sets token attribute for non-streaming Completions and Responses API calls.
+    Sets token usage if available in the response object, or computes the usage for textual input and output with tiktoken.
+    """
+    input_tokens: "Optional[int]" = 0
+    input_tokens_cached: "Optional[int]" = 0
+    output_tokens: "Optional[int]" = 0
+    output_tokens_reasoning: "Optional[int]" = 0
+    total_tokens: "Optional[int]" = 0
+
+    if hasattr(response, "usage"):
+        input_tokens = _get_usage(response.usage, ["input_tokens", "prompt_tokens"])
+        if hasattr(response.usage, "input_tokens_details"):
+            input_tokens_cached = _get_usage(
+                response.usage.input_tokens_details, ["cached_tokens"]
+            )
+
+        output_tokens = _get_usage(
+            response.usage, ["output_tokens", "completion_tokens"]
+        )
+        if hasattr(response.usage, "output_tokens_details"):
+            output_tokens_reasoning = _get_usage(
+                response.usage.output_tokens_details, ["reasoning_tokens"]
+            )
+
+        total_tokens = _get_usage(response.usage, ["total_tokens"])
+
+    # Manually count tokens
+    if input_tokens == 0:
+        for message in messages or []:
+            if isinstance(message, str):
+                input_tokens += count_tokens(message)
+                continue
+            elif isinstance(message, dict):
+                message_content = message.get("content")
+                if message_content is None:
+                    continue
+                # Deliberate use of Completions function for both Completions and Responses input format.
+                text_items = _get_text_items(message_content)
+                input_tokens += sum(count_tokens(text) for text in text_items)
+                continue
+
+    if output_tokens == 0 and hasattr(response, "choices"):
+        for choice in response.choices:
+            if hasattr(choice, "message") and hasattr(choice.message, "content"):
+                output_tokens += count_tokens(choice.message.content)
 
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
@@ -497,7 +646,7 @@ def _set_common_output_data(
             if len(response_text) > 0:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
 
-        _calculate_token_usage(input, response, span, None, integration.count_tokens)
+        _calculate_token_usage(input, response, span, integration.count_tokens)
 
         if finish_span:
             span.__exit__(None, None, None)
@@ -533,12 +682,12 @@ def _set_common_output_data(
                     span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                 )
 
-        _calculate_token_usage(input, response, span, None, integration.count_tokens)
+        _calculate_token_usage(input, response, span, integration.count_tokens)
 
         if finish_span:
             span.__exit__(None, None, None)
     else:
-        _calculate_token_usage(input, response, span, None, integration.count_tokens)
+        _calculate_token_usage(input, response, span, integration.count_tokens)
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -662,7 +811,7 @@ def _set_streaming_completions_api_output_data(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-                _calculate_token_usage(
+                _calculate_streaming_completions_token_usage(
                     messages,
                     response,
                     span,
@@ -706,7 +855,7 @@ def _set_streaming_completions_api_output_data(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
-                _calculate_token_usage(
+                _calculate_streaming_completions_token_usage(
                     messages,
                     response,
                     span,
@@ -781,7 +930,6 @@ def _set_streaming_responses_api_output_data(
                         input,
                         x.response,
                         span,
-                        None,
                         integration.count_tokens,
                     )
                     count_tokens_manually = False
@@ -800,7 +948,7 @@ def _set_streaming_responses_api_output_data(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
                 if count_tokens_manually:
-                    _calculate_token_usage(
+                    _calculate_streaming_responses_token_usage(
                         input,
                         response,
                         span,
@@ -830,7 +978,6 @@ def _set_streaming_responses_api_output_data(
                         input,
                         x.response,
                         span,
-                        None,
                         integration.count_tokens,
                     )
                     count_tokens_manually = False
@@ -849,7 +996,7 @@ def _set_streaming_responses_api_output_data(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                     )
                 if count_tokens_manually:
-                    _calculate_token_usage(
+                    _calculate_streaming_responses_token_usage(
                         input,
                         response,
                         span,
