@@ -1655,11 +1655,9 @@ async def test_async_proxy(monkeypatch, testcase):
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
-async def test_close_with_async_transport_warns(caplog):
-    """Test close() with AsyncHttpTransport logs a warning."""
-    import logging
-
-    caplog.set_level(logging.WARNING)
+async def test_close_with_async_transport_warns():
+    """Test close() with AsyncHttpTransport emits a warning."""
+    import warnings as _warnings
 
     client = Client(
         "https://foo@sentry.io/123",
@@ -1668,13 +1666,10 @@ async def test_close_with_async_transport_warns(caplog):
     )
     assert isinstance(client.transport, AsyncHttpTransport)
 
-    with mock.patch("sentry_sdk.client.logger") as mock_logger:
+    with _warnings.catch_warnings(record=True) as w:
+        _warnings.simplefilter("always")
         client.close()
-        mock_logger.warning.assert_called_with(
-            "close() used with AsyncHttpTransport. "
-            "Prefer close_async() for graceful async shutdown. "
-            "Performing synchronous best-effort cleanup."
-        )
+        assert any("close_async()" in str(warning.message) for warning in w)
 
 
 @skip_under_gevent
@@ -1726,7 +1721,9 @@ async def test_close_async_no_transport():
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
 async def test_flush_with_async_transport_warns():
-    """Test flush() with AsyncHttpTransport logs a warning and returns."""
+    """Test flush() with AsyncHttpTransport emits a warning and returns."""
+    import warnings as _warnings
+
     client = Client(
         "https://foo@sentry.io/123",
         _experiments={"transport_async": True},
@@ -1734,11 +1731,10 @@ async def test_flush_with_async_transport_warns():
     )
     assert isinstance(client.transport, AsyncHttpTransport)
 
-    with mock.patch("sentry_sdk.client.logger") as mock_logger:
+    with _warnings.catch_warnings(record=True) as w:
+        _warnings.simplefilter("always")
         client.flush(timeout=1.0)
-        mock_logger.warning.assert_called_with(
-            "flush() used with AsyncHttpTransport. Please use flush_async() instead."
-        )
+        assert any("flush_async()" in str(warning.message) for warning in w)
     await client.close_async()
 
 

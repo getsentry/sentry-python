@@ -1055,6 +1055,9 @@ async def test_async_two_way_ssl_authentication():
     await client.close_async()
 
 
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
 async def test_async_transport_concurrent_requests(
     capturing_server, make_client, caplog
 ):
