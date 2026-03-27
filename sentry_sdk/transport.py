@@ -31,9 +31,9 @@ except ImportError:
 try:
     import anyio  # noqa: F401
 
-    ASYNC_TRANSPORT_ENABLED = httpcore is not None
+    ASYNC_TRANSPORT_AVAILABLE = httpcore is not None
 except ImportError:
-    ASYNC_TRANSPORT_ENABLED = False
+    ASYNC_TRANSPORT_AVAILABLE = False
 
 import urllib3
 import certifi
@@ -545,18 +545,22 @@ class HttpTransportCore(Transport):
             "retries": 3,
         }
 
-        socket_options = (
-            self.options["socket_options"]
-            if self.options["socket_options"] is not None
-            else []
-        )
+        socket_options: "Optional[List[Tuple[int, int, int | bytes]]]" = None
 
-        used_options = {(o[0], o[1]) for o in socket_options}
-        for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
-            if (default_option[0], default_option[1]) not in used_options:
-                socket_options.append(default_option)
+        if self.options["socket_options"] is not None:
+            socket_options = self.options["socket_options"]
 
-        options["socket_options"] = socket_options
+        if self.options["keep_alive"]:
+            if socket_options is None:
+                socket_options = []
+
+            used_options = {(o[0], o[1]) for o in socket_options}
+            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+                if (default_option[0], default_option[1]) not in used_options:
+                    socket_options.append(default_option)
+
+        if socket_options is not None:
+            options["socket_options"] = socket_options
 
         ssl_context = ssl.create_default_context()
         ssl_context.load_verify_locations(
@@ -838,7 +842,7 @@ class HttpTransport(BaseHttpTransport):
 
 class AsyncHttpTransport(HttpTransportCore):
     def __init__(self: "Self", options: "Dict[str, Any]") -> None:
-        if not ASYNC_TRANSPORT_ENABLED:
+        if not ASYNC_TRANSPORT_AVAILABLE:
             raise RuntimeError(
                 "AsyncHttpTransport requires httpcore[asyncio]. "
                 "Install it with: pip install sentry-sdk[asyncio]"
@@ -1120,7 +1124,7 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
         Http2Transport if use_http2_transport else HttpTransport
     )
 
-    if use_async_transport and ASYNC_TRANSPORT_ENABLED:
+    if use_async_transport and ASYNC_TRANSPORT_AVAILABLE:
         try:
             asyncio.get_running_loop()
             if async_integration:

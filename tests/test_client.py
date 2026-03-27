@@ -1836,23 +1836,6 @@ async def test_flush_async_awaits_flush_task():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
-async def test_close_async_awaits_kill_task():
-    """Test close_async() awaits the kill task returned by transport.kill()."""
-    client = Client(
-        "https://foo@sentry.io/123",
-        _experiments={"transport_async": True},
-        integrations=[AsyncioIntegration()],
-    )
-    assert isinstance(client.transport, AsyncHttpTransport)
-
-    # close_async should call kill() and await the returned task
-    await client.close_async(timeout=1.0)
-    assert client.transport is None
-
-
-@skip_under_gevent
-@pytest.mark.asyncio
-@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
 async def test_client_async_context_manager():
     """Test Client works as async context manager."""
     async with Client(

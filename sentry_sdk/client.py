@@ -1009,7 +1009,7 @@ class _Client(BaseClient):
 
         return self.integrations.get(integration_name)
 
-    def _is_async_transport(self) -> bool:
+    def _has_async_transport(self) -> bool:
         """Check if the current transport is async."""
         return isinstance(self.transport, AsyncHttpTransport)
 
@@ -1045,11 +1045,10 @@ class _Client(BaseClient):
         semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
-            if self._is_async_transport():
-                logger.warning(
-                    "close() used with AsyncHttpTransport. "
-                    "Prefer close_async() for graceful async shutdown. "
-                    "Performing synchronous best-effort cleanup."
+            if self._has_async_transport():
+                warnings.warn(
+                    "close() used with AsyncHttpTransport. Use close_async() instead.",
+                    stacklevel=2,
                 )
                 self._flush_components()
             else:
@@ -1068,7 +1067,7 @@ class _Client(BaseClient):
         semantics as :py:meth:`Client.flush_async`.
         """
         if self.transport is not None:
-            if not self._is_async_transport():
+            if not self._has_async_transport():
                 logger.debug(
                     "close_async() used with non-async transport, aborting. Please use close() instead."
                 )
@@ -1093,9 +1092,10 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
-            if self._is_async_transport():
-                logger.warning(
-                    "flush() used with AsyncHttpTransport. Please use flush_async() instead."
+            if self._has_async_transport():
+                warnings.warn(
+                    "flush() used with AsyncHttpTransport. Use flush_async() instead.",
+                    stacklevel=2,
                 )
                 return
             if timeout is None:
@@ -1117,7 +1117,7 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
-            if not self._is_async_transport():
+            if not self._has_async_transport():
                 logger.debug(
                     "flush_async() used with non-async transport, aborting. Please use flush() instead."
                 )
