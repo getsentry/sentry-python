@@ -4,6 +4,8 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -120,6 +122,8 @@ def _event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
 def graphql_span(
     schema: "GraphQLSchema", source: "Union[str, Source]", kwargs: "Dict[str, Any]"
 ) -> "Generator[None, None, None]":
+    client = sentry_sdk.get_client()
+
     operation_name = kwargs.get("operation_name")
 
     operation_type = "query"
@@ -141,15 +145,30 @@ def graphql_span(
         },
     )
 
-    _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
+    if has_span_streaming_enabled(client.options):
+        attributes = {
+            "graphql.document": source,
+            "graphql.operation.name": operation_name,
+            "graphql.operation.type": operation_type,
+            "sentry.op": op,
+        }
+        _graphql_span = sentry_sdk.traces.start_span(
+            name=operation_name, attributes=attributes
+        )
 
-    _graphql_span.set_data("graphql.document", source)
-    _graphql_span.set_data("graphql.operation.name", operation_name)
-    _graphql_span.set_data("graphql.operation.type", operation_type)
+    else:
+        _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
 
-    _graphql_span.__enter__()
+        _graphql_span.set_data("graphql.document", source)
+        _graphql_span.set_data("graphql.operation.name", operation_name)
+        _graphql_span.set_data("graphql.operation.type", operation_type)
+
+        _graphql_span.__enter__()
 
     try:
         yield
     finally:
-        _graphql_span.__exit__(None, None, None)
+        if isinstance(_graphql_span, StreamedSpan):
+            _graphql_span.end()
+        else:
+            _graphql_span.__exit__(None, None, None)
