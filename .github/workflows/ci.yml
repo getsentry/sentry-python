@@ -110,3 +110,18 @@ jobs:
           path: |
             docs/_build/gh-pages.zip
           if-no-files-found: 'error'
+
+  check_required_ci:
+    name: All CI checks passed
+    needs: [changes, lint, build_lambda_layer, docs]
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check for failures
+        if: |
+          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
+          needs.lint.result == 'failure' || needs.lint.result == 'cancelled' ||
+          needs.build_lambda_layer.result == 'failure' || needs.build_lambda_layer.result == 'cancelled' ||
+          needs.docs.result == 'failure' || needs.docs.result == 'cancelled'
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
