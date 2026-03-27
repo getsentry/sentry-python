@@ -33,6 +33,28 @@ env:
     {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}
 
 jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      has_code_changes: {% raw %}${{ steps.changes.outputs.has_code_changes }}{% endraw %}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes
+        with:
+          filters: |
+            has_code_changes:
+              - 'sentry_sdk/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - '**/*.py'
+              - '**/*.cfg'
+              - '**/*.toml'
+              - '**/*.ini'
+              - 'Makefile'
+              - 'requirements*.txt'
+              - '.github/workflows/**'
+
 {% include "test_group.jinja" %}
 {% include "check_required.jinja" %}
 {% endwith %}
