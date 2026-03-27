@@ -29,24 +29,24 @@ jobs:
             const prAuthor = pullRequest.user.login;
             const contributingUrl = `https://github.com/${repo.owner}/${repo.repo}/blob/master/CONTRIBUTING.md`;
 
-            // --- Helper: check if a user has write+ permission on a repo ---
-            async function hasWriteAccess(owner, repoName, username) {
+            // --- Helper: check if a user has admin or maintain permission on a repo ---
+            async function isMaintainer(owner, repoName, username) {
               try {
                 const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
                   owner,
                   repo: repoName,
                   username,
                 });
-                return ['admin', 'maintain', 'write'].includes(data.permission);
+                return ['admin', 'maintain'].includes(data.permission);
               } catch {
                 return false;
               }
             }
 
-            // --- Step 1: Check if PR author is a maintainer ---
-            const isMaintainer = await hasWriteAccess(repo.owner, repo.repo, prAuthor);
-            if (isMaintainer) {
-              core.info(`PR author ${prAuthor} has write+ access. Skipping.`);
+            // --- Step 1: Check if PR author is a maintainer (admin or maintain role) ---
+            const authorIsMaintainer = await isMaintainer(repo.owner, repo.repo, prAuthor);
+            if (authorIsMaintainer) {
+              core.info(`PR author ${prAuthor} has admin/maintain access. Skipping.`);
               return;
             }
             core.info(`PR author ${prAuthor} is not a maintainer.`);
@@ -187,7 +187,7 @@ jobs:
 
                 for (const user of usersToCheck) {
                   if (user === prAuthor) continue;
-                  if (await hasWriteAccess(ref.owner, ref.repo, user)) {
+                  if (await isMaintainer(ref.owner, ref.repo, user)) {
                     maintainerParticipated = true;
                     core.info(`Maintainer ${user} participated in ${ref.owner}/${ref.repo}#${ref.number}.`);
                     break;
