@@ -120,7 +120,7 @@ jobs:
     steps:
       - name: Check for failures
         if: |
-          needs.changes.result == 'failure' ||
-          (needs.test-flags.result != 'success' && needs.test-flags.result != 'skipped')
+          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
+          needs.test-flags.result == 'failure' || needs.test-flags.result == 'cancelled'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

@@ -120,7 +120,7 @@ jobs:
     steps:
       - name: Check for failures
         if: |
-          needs.changes.result == 'failure' ||
-          (needs.test-graphql.result != 'success' && needs.test-graphql.result != 'skipped')
+          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
+          needs.test-graphql.result == 'failure' || needs.test-graphql.result == 'cancelled'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

@@ -112,7 +112,7 @@ jobs:
     steps:
       - name: Check for failures
         if: |
-          needs.changes.result == 'failure' ||
-          (needs.test-mcp.result != 'success' && needs.test-mcp.result != 'skipped')
+          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
+          needs.test-mcp.result == 'failure' || needs.test-mcp.result == 'cancelled'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
