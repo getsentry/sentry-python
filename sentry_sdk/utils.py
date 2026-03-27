@@ -819,6 +819,8 @@ def exceptions_from_error(
     parent_id: int = 0,
     source: "Optional[str]" = None,
     full_stack: "Optional[list[dict[str, Any]]]" = None,
+    seen_exceptions: "Optional[list[BaseException]]" = None,
+    seen_exception_ids: "Optional[Set[int]]" = None,
 ) -> "Tuple[int, List[Dict[str, Any]]]":
     """
     Creates the list of exceptions.
@@ -827,6 +829,19 @@ def exceptions_from_error(
     See the Exception Interface documentation for more details:
     https://develop.sentry.dev/sdk/event-payloads/exception/
     """
+
+    if seen_exception_ids is None:
+        seen_exception_ids = set()
+
+    if seen_exceptions is None:
+        seen_exceptions = []
+
+    if exc_value is not None and id(exc_value) in seen_exception_ids:
+        return (exception_id, [])
+
+    if exc_value is not None:
+        seen_exceptions.append(exc_value)
+        seen_exception_ids.add(id(exc_value))
 
     parent = single_exception_from_error_tuple(
         exc_type=exc_type,
@@ -866,6 +881,8 @@ def exceptions_from_error(
                 exception_id=exception_id,
                 source="__cause__",
                 full_stack=full_stack,
+                seen_exceptions=seen_exceptions,
+                seen_exception_ids=seen_exception_ids,
             )
             exceptions.extend(child_exceptions)
 
@@ -888,6 +905,8 @@ def exceptions_from_error(
                 exception_id=exception_id,
                 source="__context__",
                 full_stack=full_stack,
+                seen_exceptions=seen_exceptions,
+                seen_exception_ids=seen_exception_ids,
             )
             exceptions.extend(child_exceptions)
 
@@ -905,6 +924,8 @@ def exceptions_from_error(
                 parent_id=parent_id,
                 source="exceptions[%s]" % idx,
                 full_stack=full_stack,
+                seen_exceptions=seen_exceptions,
+                seen_exception_ids=seen_exception_ids,
             )
             exceptions.extend(child_exceptions)
 
