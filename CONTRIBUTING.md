@@ -4,28 +4,39 @@ We welcome contributions to `sentry-python` by the community.
 
 This file outlines the process to contribute to the SDK itself. For contributing to the documentation, please see the [Contributing to Docs](https://docs.sentry.io/contributing/) page.
 
+## Table of Contents
+
+- [How to Report a Problem](#how-to-report-a-problem)
+- [Submitting Changes](#submitting-changes)
+- [Development Environment](#development-environment)
+- [Running Tests](#running-tests)
+- [Debugging](#debugging)
+- [Adding a New Integration](#adding-a-new-integration)
+- [Releasing a New Version](#releasing-a-new-version)
+- [Contributing to Sentry AWS Lambda Layer](#contributing-to-sentry-aws-lambda-layer)
+
 ## How to Report a Problem
 
 Please search the [issue tracker](https://github.com/getsentry/sentry-python/issues) before creating a new issue (a problem or an improvement request). Please also ask in our [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr) before submitting a new issue. There are a ton of great people in our Discord community ready to help you!
 
 ## Submitting Changes
 
-Before submitting a pull request, please check whether the issue you're planning to address, if there is one, is assigned to anyone. If you want to help with an issue that already has an assignee, comment on it first to coordinate with the person assigned whether the contribution would make sense before opening a pull request.
+### Before You Start
 
-To make a contribution:
+1. **Find or create an issue.** Every contribution must be tied to a GitHub issue. If one doesn't exist, open one describing the problem or feature.
+2. **Discuss your approach with a maintainer.** Comment on the issue and wait for a maintainer to respond before you start working. This avoids wasted effort on both sides.
+3. **Check the assignee.** If the issue is already assigned to someone else, coordinate with them in the issue before starting work.
+
+PRs that don't meet these requirements will be automatically closed. See [Automated Checks](#automated-checks) below.
+
+### Making Your Contribution
 
 - Fork the `sentry-python` repo and prepare your changes.
 - Add tests for your changes to `tests/`.
 - Run tests and make sure all of them pass.
-- Submit a pull request, referencing any issues your changes address. Please follow our [commit message format](https://develop.sentry.dev/commit-messages/#commit-message-format) when naming your pull request.
+- Submit a pull request, referencing the issue(s) your changes address. Please follow our [commit message format](https://develop.sentry.dev/commit-messages/#commit-message-format) when naming your pull request.
 
-We will review your pull request as soon as possible. Thank you for contributing!
-
-### AI Use
-
-You are welcome to use whatever tools you prefer for making a contribution. However, any changes you propose have to be reviewed and tested by you, a human, first, before you submit a pull request with them for the Sentry team to review. If we feel like that didn't happen, we will close the PR outright. For example, we won't review visibly AI-generated PRs from an agent instructed to look for and "fix" open issues in the repo.
-
-## Pull Requests
+### Pull Request Requirements
 
 All PRs must be created as **drafts**. Non-draft PRs will be automatically converted to draft. Mark your PR as "Ready for review" once:
 
@@ -36,6 +47,20 @@ All PRs must be created as **drafts**. Non-draft PRs will be automatically conve
 A PR should do one thing well. Don't mix functional changes with unrelated refactors or cleanup. Smaller, focused PRs are easier to review, reason about, and revert if needed.
 
 For the full set of PR standards, see the [code submission standard](https://develop.sentry.dev/sdk/getting-started/standards/code-submission/#pull-requests).
+
+### AI Use
+
+You are welcome to use whatever tools you prefer for making a contribution. However, any changes you propose have to be reviewed and tested by you, a human, first, before you submit a pull request with them for the Sentry team to review. If we feel like that didn't happen, we will close the PR outright. For example, we won't review visibly AI-generated PRs from an agent instructed to look for and "fix" open issues in the repo.
+
+### Automated Checks
+
+To maintain the quality of contributions, we use automated workflows that enforce the following rules for PRs from non-maintainers:
+
+- **Issue reference required.** Your PR body must reference a GitHub issue in the `getsentry` organization (e.g. `#123`, `getsentry/sentry#456`, or a full GitHub issue URL).
+- **Prior discussion required.** The referenced issue must show a conversation between you and a maintainer. Opening the issue counts as participation — but a maintainer must have also responded.
+- **Respect existing assignees.** If the referenced issue is assigned to someone other than you, the PR will be closed. Coordinate in the issue first.
+
+PRs that don't meet these criteria are automatically closed and labeled `violating-contribution-guidelines`. If your PR was closed by mistake, comment on the issue to discuss with a maintainer and then open a new PR.
 
 ## Development Environment
 
