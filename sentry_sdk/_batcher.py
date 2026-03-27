@@ -4,14 +4,6 @@ import threading
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, TypeVar, Generic
 
-from sentry_sdk.utils import format_timestamp
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
-
-if TYPE_CHECKING:
-    from typing import Optional, Callable, Any
-
-T = TypeVar("T")
-
 
 class Batcher(Generic[T]):
     MAX_BEFORE_FLUSH = 100
