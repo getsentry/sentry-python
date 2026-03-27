@@ -29,18 +29,24 @@ jobs:
             const prAuthor = pullRequest.user.login;
             const contributingUrl = `https://github.com/${repo.owner}/${repo.repo}/blob/master/CONTRIBUTING.md`;
 
-            // --- Helper: check if a user has admin or maintain permission on a repo ---
+            // --- Helper: check if a user has admin or maintain permission on a repo (cached) ---
+            const maintainerCache = new Map();
             async function isMaintainer(owner, repoName, username) {
+              const key = `${owner}/${repoName}:${username}`;
+              if (maintainerCache.has(key)) return maintainerCache.get(key);
+              let result = false;
               try {
                 const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
                   owner,
                   repo: repoName,
                   username,
                 });
-                return ['admin', 'maintain'].includes(data.permission);
+                result = ['admin', 'maintain'].includes(data.permission);
               } catch {
-                return false;
+                // noop — result stays false
               }
+              maintainerCache.set(key, result);
+              return result;
             }
 
             // --- Step 1: Check if PR author is a maintainer (admin or maintain role) ---
@@ -170,17 +176,18 @@ jobs:
               });
 
               // Also consider the issue author as a participant (opening the issue is a form of discussion)
+              // Guard against null user (deleted/suspended GitHub accounts)
               const prAuthorParticipated =
-                issue.user.login === prAuthor ||
-                comments.some(c => c.user.login === prAuthor);
+                issue.user?.login === prAuthor ||
+                comments.some(c => c.user?.login === prAuthor);
 
               let maintainerParticipated = false;
               if (prAuthorParticipated) {
-                // Check each commenter (and issue author) for write+ access on the issue's repo
+                // Check each commenter (and issue author) for admin/maintain access on the issue's repo
                 const usersToCheck = new Set();
-                usersToCheck.add(issue.user.login);
+                if (issue.user?.login) usersToCheck.add(issue.user.login);
                 for (const comment of comments) {
-                  if (comment.user.login !== prAuthor) {
+                  if (comment.user?.login && comment.user.login !== prAuthor) {
                     usersToCheck.add(comment.user.login);
                   }
                 }
