@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class LogBatcher(Batcher["Log"]):
-    MAX_BEFORE_FLUSH = 100
+    MAX_BEFORE_FLUSH = 1_000
     MAX_BEFORE_DROP = 1_000
     FLUSH_WAIT_TIME = 5.0
 
