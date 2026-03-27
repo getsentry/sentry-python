@@ -135,13 +135,28 @@ def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling)
     assert not is_profile_session_sampled()
 
 
-def assert_single_transaction_with_profile_chunks(
-    envelopes, thread, max_chunks=None, transactions=1
-):
+def _collect_envelope_items(envelopes):
     items = defaultdict(list)
     for envelope in envelopes:
         for item in envelope.items:
             items[item.type].append(item)
+    return items
+
+
+def assert_single_transaction_with_profile_chunks(
+    envelopes, thread, max_chunks=None, transactions=1, timeout=2.0
+):
+    # Poll for profile_chunk items to arrive, since the profiler thread
+    # may not have flushed yet when this assertion runs (especially under
+    # gevent on slow CI runners).
+    deadline = time.monotonic() + timeout
+    while True:
+        items = _collect_envelope_items(envelopes)
+        if len(items["profile_chunk"]) > 0:
+            break
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.01)
 
     assert len(items["transaction"]) == transactions
     assert len(items["profile_chunk"]) > 0
