@@ -137,6 +137,19 @@ def mylogin(request):
 
 
 @csrf_exempt
+async def async_mylogin(request):
+    user = await User.objects.acreate_user(
+        "john_async", "lennon@thebeatles.com", "johnpassword"
+    )
+    user.backend = "django.contrib.auth.backends.ModelBackend"
+
+    from django.contrib.auth import alogin
+
+    await alogin(request, user)
+    return HttpResponse("ok")
+
+
+@csrf_exempt
 def handler500(request):
     return HttpResponseServerError("Sentry error.")
 
