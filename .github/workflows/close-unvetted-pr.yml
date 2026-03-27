@@ -196,7 +196,7 @@ jobs:
 
                 for (const user of usersToCheck) {
                   if (user === prAuthor) continue;
-                  if (await isMaintainer(ref.owner, ref.repo, user)) {
+                  if (await isMaintainer(repo.owner, repo.repo, user)) {
                     maintainerParticipated = true;
                     core.info(`Maintainer ${user} participated in ${ref.owner}/${ref.repo}#${ref.number}.`);
                     break;
