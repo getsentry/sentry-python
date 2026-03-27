@@ -41,7 +41,9 @@ jobs:
                   repo: repoName,
                   username,
                 });
-                result = ['admin', 'maintain'].includes(data.permission);
+                // permission field uses legacy values (admin/write/read/none) where
+                // maintain maps to write. Use role_name for the actual role.
+                result = ['admin', 'maintain'].includes(data.role_name);
               } catch {
                 // noop — result stays false
               }
