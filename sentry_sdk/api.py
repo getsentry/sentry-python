@@ -60,6 +60,7 @@ __all__ = [
     "configure_scope",
     "continue_trace",
     "flush",
+    "flush_async",
     "get_baggage",
     "get_client",
     "get_global_scope",
@@ -349,6 +350,14 @@ def flush(
     callback: "Optional[Callable[[int, float], None]]" = None,
 ) -> None:
     return get_client().flush(timeout=timeout, callback=callback)
+
+
+@clientmethod
+async def flush_async(
+    timeout: "Optional[float]" = None,
+    callback: "Optional[Callable[[int, float], None]]" = None,
+) -> None:
+    return await get_client().flush_async(timeout=timeout, callback=callback)
 
 
 @scopemethod

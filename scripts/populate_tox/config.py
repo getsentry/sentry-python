@@ -122,7 +122,7 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "python-multipart",
                 "requests",
-                "anyio<4",
+                "anyio>=3,<5",
                 "jinja2",
             ],
             # There's an incompatibility between FastAPI's TestClient, which is
@@ -133,6 +133,7 @@ TEST_SUITE_CONFIG = {
             # FastAPI versions we use older httpx which still supports the
             # deprecated argument.
             "<0.110.1": ["httpx<0.28.0"],
+            "<0.80": ["anyio<4"],
             "py3.6": ["aiocontextvars"],
         },
     },
@@ -171,7 +172,8 @@ TEST_SUITE_CONFIG = {
     "httpx": {
         "package": "httpx",
         "deps": {
-            "*": ["anyio<4.0.0"],
+            "*": ["anyio>=3,<5"],
+            "<0.24": ["anyio<4"],
             ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
             ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
             ">=0.19,<0.21": ["pytest-httpx==0.14.0"],
