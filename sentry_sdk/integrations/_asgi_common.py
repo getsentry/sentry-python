@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import Literal
 
+    from sentry_sdk._types import Attributes
     from sentry_sdk.utils import AnnotatedValue
 
 
@@ -105,3 +106,32 @@ def _get_request_data(asgi_scope: "Any") -> "Dict[str, Any]":
         request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
 
     return request_data
+
+
+def _get_request_attributes(asgi_scope: "Any") -> "Dict[str, Any]":
+    """
+    Return attributes related to the HTTP request from the ASGI scope.
+    """
+    attributes: "Attributes" = {}
+
+    ty = asgi_scope["type"]
+    if ty in ("http", "websocket"):
+        attributes["http.request.method"] = asgi_scope.get("method")
+
+        headers = _filter_headers(_get_headers(asgi_scope))
+        # TODO[span-first]: Correctly merge headers if duplicate
+        for header, value in headers.items():
+            attributes[f"http.request.headers.{header.lower()}"] = [value]
+
+        attributes["http.query"] = _get_query(asgi_scope)
+
+        attributes["url.full"] = _get_url(
+            asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
+        )
+
+    # TODO[span-first]: Figure out where to put REMOTE_ADDR
+    # client = asgi_scope.get("client")
+    # if client and should_send_default_pii():
+    #    request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
+
+    return attributes

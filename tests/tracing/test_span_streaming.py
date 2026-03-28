@@ -1503,6 +1503,42 @@ def test_profile_stops_when_segment_ends(
     assert get_profiler_id() is None, "profiler should have stopped"
 
 
+def test_enrichers(sentry_init, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    envelopes = capture_envelopes()
+
+    def enricher(telemetry):
+        telemetry.set_attribute("enriched", True)
+
+    with sentry_sdk.new_scope() as scope:
+        scope._add_enricher(enricher)
+
+        with sentry_sdk.traces.start_span(name="enriched segment"):
+            pass
+
+    with sentry_sdk.traces.start_span(name="not enriched segment"):
+        pass
+
+    sentry_sdk.get_client().flush()
+
+    spans = envelopes_to_spans(envelopes)
+    assert len(spans) == 2
+    span1, span2 = spans
+
+    assert span1["name"] == "enriched segment"
+    assert "enriched" in span1["attributes"]
+    assert span1["attributes"]["enriched"] is True
+
+    assert span2["name"] == "not enriched segment"
+    assert "enriched" not in span2["attributes"]
+
+
 def test_transport_format(sentry_init, capture_envelopes):
     sentry_init(
         server_name="test-server",
@@ -1539,6 +1575,12 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "start_timestamp": mock.ANY,
                 "end_timestamp": mock.ANY,
                 "attributes": {
+                    "process.runtime.name": {"value": mock.ANY, "type": "string"},
+                    "process.runtime.description": {
+                        "value": mock.ANY,
+                        "type": "string",
+                    },
+                    "process.runtime.version": {"value": mock.ANY, "type": "string"},
                     "sentry.span.source": {"value": "custom", "type": "string"},
                     "thread.id": {"value": mock.ANY, "type": "string"},
                     "thread.name": {"value": "MainThread", "type": "string"},

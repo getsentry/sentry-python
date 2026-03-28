@@ -15,6 +15,7 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
+    _get_request_attributes,
     _get_request_data,
     _get_url,
 )
@@ -23,7 +24,7 @@ from sentry_sdk.integrations._wsgi_common import (
     nullcontext,
 )
 from sentry_sdk.sessions import track_session
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     Transaction,
@@ -52,7 +53,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Union
 
-    from sentry_sdk._types import Attributes, Event, Hint
+    from sentry_sdk._types import Attributes, Event, Hint, Telemetry
     from sentry_sdk.tracing import Span
 
 
@@ -214,7 +215,9 @@ class SentryAsgiMiddleware:
                     sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
                     processor = partial(self.event_processor, asgi_scope=scope)
+                    enricher = partial(self.enricher, asgi_scope=scope)
                     sentry_scope.add_event_processor(processor)
+                    sentry_scope._add_enricher(enricher)
 
                     ty = scope["type"]
                     (
@@ -381,6 +384,32 @@ class SentryAsgiMiddleware:
             event["transaction_info"] = {"source": source}
 
         return event
+
+    def enricher(self, telemetry: "Telemetry", asgi_scope: "Any") -> "Telemetry":
+        request_attributes = _get_request_attributes(asgi_scope)
+        telemetry.set_attributes(request_attributes)
+
+        # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
+        segment = telemetry.segment
+        source = segment.get_attributes.get("sentry.span.source")
+        already_set = (
+            segment is not None
+            and segment.name != _DEFAULT_TRANSACTION_NAME
+            and source
+            in [
+                SegmentSource.COMPONENT,
+                SegmentSource.ROUTE,
+                SegmentSource.CUSTOM,
+            ]
+        )
+        if not already_set:
+            name, source = self._get_transaction_name_and_source(
+                self.transaction_style, asgi_scope
+            )
+            segment.name = name
+            segment.set_attribute("sentry.span.source", source)
+
+        return telemetry
 
     # Helper functions.
     #

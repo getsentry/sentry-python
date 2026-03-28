@@ -81,6 +81,7 @@ if TYPE_CHECKING:
         AttributeValue,
         Breadcrumb,
         BreadcrumbHint,
+        Enricher,
         ErrorProcessor,
         Event,
         EventProcessor,
@@ -121,6 +122,7 @@ _isolation_scope = ContextVar("isolation_scope", default=None)
 _current_scope = ContextVar("current_scope", default=None)
 
 global_event_processors: "List[EventProcessor]" = []
+global_enrichers: "List[Enricher]" = []
 
 # A function returning a (trace_id, span_id) tuple
 # from an external tracing source (such as otel)
@@ -226,6 +228,7 @@ class Scope:
         "_gen_ai_conversation_id",
         "_event_processors",
         "_error_processors",
+        "_enrichers",
         "_should_capture",
         "_span",
         "_session",
@@ -249,6 +252,7 @@ class Scope:
 
         self._event_processors: "List[EventProcessor]" = []
         self._error_processors: "List[ErrorProcessor]" = []
+        self._enrichers: "List[Enricher]" = []
 
         self._name: "Optional[str]" = None
         self._propagation_context: "Optional[PropagationContext]" = None
@@ -289,6 +293,7 @@ class Scope:
         rv._n_breadcrumbs_truncated = self._n_breadcrumbs_truncated
         rv._gen_ai_original_message_count = self._gen_ai_original_message_count.copy()
         rv._event_processors = self._event_processors.copy()
+        rv._enrichers = self._enrichers.copy()
         rv._error_processors = self._error_processors.copy()
         rv._propagation_context = self._propagation_context
 
@@ -1573,6 +1578,20 @@ class Scope:
 
         self._event_processors.append(func)
 
+    def _add_enricher(
+        self,
+        func: "Enricher",
+    ) -> None:
+        """Register a scope local enricher on the scope."""
+        if len(self._enrichers) > 20:
+            logger.warning(
+                "Too many enrichers on scope! Clearing list to free up some memory: %r",
+                self._enrichers,
+            )
+            del self._enrichers[:]
+
+        self._enrichers.append(func)
+
     def add_error_processor(
         self,
         func: "ErrorProcessor",
@@ -1841,6 +1860,38 @@ class Scope:
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
+
+        self._run_enrichers(telemetry)
+
+    def _run_enrichers(
+        self, telemetry: "Union[Log, Metric, StreamedSpan]"
+    ) -> "Union[Log, Metric, StreamedSpan]":
+        """
+        Runs enrichers on the telemetry and returns the modified telemetry.
+        """
+        if not isinstance(telemetry, StreamedSpan):
+            # Currently we don't support enrichers for non-span telemetry
+            return
+
+        # Get scopes without creating them to prevent infinite recursion
+        isolation_scope = _isolation_scope.get()
+        current_scope = _current_scope.get()
+
+        enrichers = chain(
+            global_enrichers,
+            _global_scope and _global_scope._enrichers or [],
+            isolation_scope and isolation_scope._enrichers or [],
+            current_scope and current_scope._enrichers or [],
+        )
+
+        for enricher in enrichers:
+            new_telemetry = telemetry
+            with capture_internal_exceptions():
+                new_telemetry = enricher(telemetry)
+            if new_telemetry is not None:
+                telemetry = new_telemetry
+
+        return telemetry
 
     def update_from_scope(self, scope: "Scope") -> None:
         """Update the scope with another scope's data."""
