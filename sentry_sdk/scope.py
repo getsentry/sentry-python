@@ -1302,9 +1302,10 @@ class Scope:
                 return NoOpStreamedSpan(
                     unsampled_reason="ignored",
                 )
-
             if isinstance(parent_span, NoOpStreamedSpan):
-                return NoOpStreamedSpan(unsampled_reason=parent_span._unsampled_reason)
+                return NoOpStreamedSpan(
+                    unsampled_reason=parent_span._unsampled_reason,
+                )
 
             return StreamedSpan(
                 name=name,
@@ -1358,6 +1359,9 @@ class Scope:
             same_process_as_parent=False,
             **optional_kwargs,
         )
+
+    def set_propagation_context(self, environ_or_headers: "dict[str, Any]") -> None:
+        self.generate_propagation_context(environ_or_headers)
 
     def capture_event(
         self,

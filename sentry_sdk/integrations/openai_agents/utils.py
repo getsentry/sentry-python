@@ -52,19 +52,20 @@ def _record_exception_on_span(
 ) -> "Any":
     set_span_errored(span)
 
-    if not isinstance(span, Span):
-        # TODO[span-first]: make this work with streamedspans
-        return
+    if isinstance(span, Span):
+        set_on_span = span.set_data
+    else:
+        set_on_span = span.set_attribute
 
-    span.set_data("span.status", "error")
+    set_on_span("span.status", "error")
 
     # Optionally capture the error details if we have them
     if hasattr(error, "__class__"):
-        span.set_data("error.type", error.__class__.__name__)
+        set_on_span("error.type", error.__class__.__name__)
     if hasattr(error, "__str__"):
         error_message = str(error)
         if error_message:
-            span.set_data("error.message", error_message)
+            set_on_span("error.message", error_message)
 
 
 def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "agents.Agent") -> None:

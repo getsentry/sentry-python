@@ -41,7 +41,7 @@ else:
 def patch_django_middlewares() -> None:
     from django.core.handlers import base
 
-    old_import_string = base.import_string
+    old_import_string = base.import_string  # type: ignore[attr-defined]
 
     def sentry_patched_import_string(dotted_path: str) -> "Any":
         rv = old_import_string(dotted_path)
@@ -51,7 +51,7 @@ def patch_django_middlewares() -> None:
 
         return rv
 
-    base.import_string = sentry_patched_import_string
+    base.import_string = sentry_patched_import_string  # type: ignore[attr-defined]
 
     old_load_middleware = base.BaseHandler.load_middleware
 
@@ -62,7 +62,7 @@ def patch_django_middlewares() -> None:
         finally:
             _import_string_should_wrap_middleware.set(False)
 
-    base.BaseHandler.load_middleware = sentry_patched_load_middleware
+    base.BaseHandler.load_middleware = sentry_patched_load_middleware  # type: ignore[method-assign]
 
 
 def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":

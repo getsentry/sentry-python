@@ -115,7 +115,7 @@ try:
         for chars in product(*zip(BODY_TAG_NAME.upper(), BODY_TAG_NAME.lower()))
     )
 
-    class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
+    class SpotlightMiddleware(MiddlewareMixin):
         _spotlight_script: "Optional[str]" = None
         _spotlight_url: "Optional[str]" = None
 
@@ -230,7 +230,7 @@ try:
                 )
 
 except ImportError:
-    settings = None
+    settings = None  # type: ignore[assignment]
 
 
 def _resolve_spotlight_url(

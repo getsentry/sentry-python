@@ -4,12 +4,13 @@ import inspect
 import os
 import re
 import sys
+import uuid
 import warnings
 from collections.abc import Mapping, MutableMapping
 from datetime import timedelta
 from random import Random
 from urllib.parse import quote, unquote
-import uuid
+from typing import Pattern
 
 try:
     from re import Pattern
@@ -132,9 +133,10 @@ def record_sql_queries(
     executemany: bool,
     record_cursor_repr: bool = False,
     span_origin: str = "manual",
-) -> "Generator[sentry_sdk.tracing.Span, None, None]":
+) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
     # TODO: Bring back capturing of params by default
-    if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
+    client = sentry_sdk.get_client()
+    if client.options["_experiments"].get("record_sql_params", False):
         if not params_list or params_list == [None]:
             params_list = None
 
@@ -143,6 +145,8 @@ def record_sql_queries(
     else:
         params_list = None
         paramstyle = None
+
+    span_streaming = has_span_streaming_enabled(client.options)
 
     query = _format_sql(cursor, query)
 
@@ -159,13 +163,24 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    with sentry_sdk.start_span(
-        op=OP.DB,
-        name=query,
-        origin=span_origin,
-    ) as span:
+    span: "Optional[Union[Span, StreamedSpan]]" = None
+    if span_streaming:
+        span = sentry_sdk.traces.start_span(name=query or "query")
+        span.set_attribute("sentry.op", OP.DB)
+        span.set_attribute("sentry.origin", span_origin)
+    else:
+        span = sentry_sdk.start_span(
+            op=OP.DB,
+            name=query,
+            origin=span_origin,
+        )
+
+    with span:
         for k, v in data.items():
-            span.set_data(k, v)
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(k, v)
+            else:
+                span.set_data(k, v)
         yield span
 
 
@@ -229,7 +244,7 @@ def _should_be_included(
 
 
 def add_source(
-    span: "sentry_sdk.tracing.Span",
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
     project_root: "Optional[str]",
     in_app_include: "Optional[list[str]]",
     in_app_exclude: "Optional[list[str]]",
@@ -267,20 +282,25 @@ def add_source(
         frame = None
 
     # Set the data
+    if isinstance(span, StreamedSpan):
+        set_on_span = span.set_attribute
+    else:
+        set_on_span = span.set_data
+
     if frame is not None:
         try:
             lineno = frame.f_lineno
         except Exception:
             lineno = None
         if lineno is not None:
-            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+            set_on_span(SPANDATA.CODE_LINENO, frame.f_lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+            set_on_span(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -290,7 +310,8 @@ def add_source(
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
-            span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+            if in_app_path:
+                set_on_span(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -298,10 +319,12 @@ def add_source(
             code_function = None
 
         if code_function is not None:
-            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            set_on_span(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
-def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
+def add_query_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+) -> None:
     """
     Adds OTel compatible source code information to a database query span
     """
@@ -331,7 +354,9 @@ def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
     )
 
 
-def add_http_request_source(span: "sentry_sdk.tracing.Span") -> None:
+def add_http_request_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+) -> None:
     """
     Adds OTel compatible source code information to a span for an outgoing HTTP request
     """
@@ -1105,8 +1130,8 @@ def get_current_span(
 
 def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
     """
-    Set the status of the current or given span to INTERNAL_ERROR.
-    Also sets the status of the transaction (root span) to INTERNAL_ERROR.
+    Set the status of the current or given span to error.
+    Also sets the status of the transaction (root span) to error.
     """
     from sentry_sdk.traces import StreamedSpan, SpanStatus
 
@@ -1616,6 +1641,3 @@ from sentry_sdk.traces import (
     StreamedSpan,
     start_span as start_streaming_span,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
