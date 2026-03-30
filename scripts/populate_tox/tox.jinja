@@ -78,14 +78,17 @@ deps =
 
     linters: -r requirements-linting.txt
     linters: werkzeug<2.3.0
+    linters: httpcore[asyncio]
 
     mypy: -r requirements-linting.txt
     mypy: werkzeug<2.3.0
+    mypy: httpcore[asyncio]
     ruff: -r requirements-linting.txt
 
     # === Common ===
     py3.8-common: hypothesis
     common: pytest-asyncio
+    common: httpcore[asyncio]
     # See https://github.com/pytest-dev/pytest/issues/9621
     # and https://github.com/pytest-dev/pytest-forked/issues/67
     # for justification of the upper bound on pytest
