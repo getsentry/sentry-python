@@ -949,7 +949,9 @@ class AsyncHttpTransport(HttpTransportCore):
 
     def _get_pool_options(self: "Self") -> "Dict[str, Any]":
         return self._get_httpcore_pool_options(
-            http2=self.parsed_dsn is not None and self.parsed_dsn.scheme == "https"
+            http2=HTTP2_ENABLED
+            and self.parsed_dsn is not None
+            and self.parsed_dsn.scheme == "https"
         )
 
     def _make_pool(
