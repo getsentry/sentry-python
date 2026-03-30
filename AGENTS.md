@@ -67,6 +67,3 @@ Do NOT edit these directly — modify source scripts instead:
 | `sentry_sdk/profiler/` | Performance profiling |
 | `tests/integrations/{name}/` | Integration test suites |
 | `scripts/populate_tox/config.py` | Test suite configuration |
-
-<!-- This section is maintained by the coding agent via lore (https://github.com/BYK/opencode-lore) -->
-<!-- End lore-managed section -->
