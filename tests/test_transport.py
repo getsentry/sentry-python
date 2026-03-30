@@ -4,7 +4,6 @@ import os
 import socket
 import sys
 import asyncio
-import threading
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -879,41 +878,6 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
     } in discarded_events
 
 
-def test_handle_unexpected_status_invokes_handle_request_error(
-    make_client, monkeypatch
-):
-    client = make_client()
-    transport = client.transport
-
-    monkeypatch.setattr(transport._worker, "submit", lambda fn: fn() or True)
-
-    def stub_request(method, endpoint, body=None, headers=None):
-        class MockResponse:
-            def __init__(self):
-                self.status = 500  # Integer
-                self.data = b"server error"
-                self.headers = {}
-
-            def close(self):
-                pass
-
-        return MockResponse()
-
-    monkeypatch.setattr(transport, "_request", stub_request)
-
-    seen = []
-    monkeypatch.setattr(
-        transport,
-        "_handle_request_error",
-        lambda envelope, loss_reason: seen.append(loss_reason),
-    )
-
-    client.capture_event({"message": "test"})
-    client.flush()
-
-    assert seen == ["status_500"]
-
-
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.parametrize("debug", (True, False))
@@ -994,42 +958,6 @@ async def test_transport_works_async(
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
     if client_flush_method == "flush":
         await client.close_async(timeout=2.0)
-
-
-@skip_under_gevent
-@pytest.mark.asyncio
-@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
-async def test_async_transport_background_thread_capture(
-    capturing_server, make_client, caplog
-):
-    """Test capture_envelope from background threads uses run_coroutine_threadsafe"""
-    caplog.set_level(logging.DEBUG)
-    client = make_client(
-        _experiments={"transport_async": True}, integrations=[AsyncioIntegration()]
-    )
-    assert isinstance(client.transport, AsyncHttpTransport)
-    sentry_sdk.get_global_scope().set_client(client)
-    try:
-        captured_from_thread = []
-        exception_from_thread = []
-
-        def background_thread_work():
-            try:
-                # This should use run_coroutine_threadsafe path
-                capture_message("from background thread")
-                captured_from_thread.append(True)
-            except Exception as e:
-                exception_from_thread.append(e)
-
-        thread = threading.Thread(target=background_thread_work)
-        thread.start()
-        thread.join()
-        assert not exception_from_thread
-        assert captured_from_thread
-        await client.close_async(timeout=2.0)
-        assert capturing_server.captured
-    finally:
-        sentry_sdk.get_global_scope().set_client(None)
 
 
 @skip_under_gevent

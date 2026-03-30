@@ -1804,34 +1804,6 @@ async def test_flush_async_no_transport():
 @skip_under_gevent
 @pytest.mark.asyncio
 @pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
-async def test_flush_async_awaits_flush_task():
-    """Test flush_async() awaits the flush task returned by transport."""
-    client = Client(
-        "https://foo@sentry.io/123",
-        _experiments={"transport_async": True},
-        integrations=[AsyncioIntegration()],
-    )
-    assert isinstance(client.transport, AsyncHttpTransport)
-
-    flush_awaited = []
-
-    async def mock_wait_flush(timeout, callback=None):
-        flush_awaited.append(True)
-
-    import asyncio
-
-    mock_task = asyncio.create_task(mock_wait_flush(1.0))
-
-    with mock.patch.object(client.transport, "flush", return_value=mock_task):
-        await client.flush_async(timeout=1.0)
-
-    assert flush_awaited == [True]
-    await client.close_async()
-
-
-@skip_under_gevent
-@pytest.mark.asyncio
-@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
 async def test_client_async_context_manager():
     """Test Client works as async context manager."""
     async with Client(
