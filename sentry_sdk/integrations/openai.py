@@ -613,12 +613,17 @@ def _set_completions_api_output_data(
 def _wrap_synchronous_completions_chunk_iterator(
     span: "Span",
     integration: "OpenAIIntegration",
-    start_time: "float",
+    start_time: "Optional[float]",
     messages: "Iterable[ChatCompletionMessageParam]",
     response: "Stream[ChatCompletionChunk]",
     old_iterator: "Iterator[ChatCompletionChunk]",
     finish_span: "bool",
 ):
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Compute token count based on inputs and outputs using tiktoken if token counts are not in the model response.
+    Responsible for closing the AI Client Span if instructed to by the `finish_span` argument.
+    """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
 
@@ -664,13 +669,17 @@ def _wrap_synchronous_completions_chunk_iterator(
 async def _wrap_asynchronous_completions_chunk_iterator(
     span: "Span",
     integration: "OpenAIIntegration",
-    start_time: "float",
+    start_time: "Optional[float]",
     messages: "Iterable[ChatCompletionMessageParam]",
     response: "AsyncStream[ChatCompletionChunk]",
     old_iterator: "AsyncIterator[ChatCompletionChunk]",
     finish_span: "bool",
 ):
-    start_time = time.perf_counter()
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Compute token count based on inputs and outputs using tiktoken if token counts are not in the model response.
+    Responsible for closing the AI Client Span if instructed to by the `finish_span` argument.
+    """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
 
@@ -716,13 +725,17 @@ async def _wrap_asynchronous_completions_chunk_iterator(
 def _wrap_synchronous_responses_event_iterator(
     span: "Span",
     integration: "OpenAIIntegration",
-    start_time: "float",
+    start_time: "Optional[float]",
     input: "Optional[Union[str, ResponseInputParam]]",
     response: "Stream[ResponseStreamEvent]",
     old_iterator: "Iterator[ResponseStreamEvent]",
     finish_span: "bool",
 ):
-    start_time = time.perf_counter()
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Compute token count based on inputs and outputs using tiktoken if token counts are not in the model response.
+    Responsible for closing the AI Client Span if instructed to by the `finish_span` argument.
+    """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
 
@@ -775,12 +788,17 @@ def _wrap_synchronous_responses_event_iterator(
 async def _wrap_asynchronous_responses_event_iterator(
     span: "Span",
     integration: "OpenAIIntegration",
-    start_time: "float",
+    start_time: "Optional[float]",
     input: "Optional[Union[str, ResponseInputParam]]",
     response: "AsyncStream[ResponseStreamEvent]",
     old_iterator: "AsyncIterator[ResponseStreamEvent]",
     finish_span: "bool",
 ):
+    """
+    Sets information received while iterating the response stream on the AI Client Span.
+    Compute token count based on inputs and outputs using tiktoken if token counts are not in the model response.
+    Responsible for closing the AI Client Span if instructed to by the `finish_span` argument.
+    """
     ttft: "Optional[float]" = None
     data_buf: "list[list[str]]" = []  # one for each choice
 
