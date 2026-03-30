@@ -834,7 +834,7 @@ def _set_streaming_completions_api_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-    start_time: "float",
+    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     messages = kwargs.get("messages")
@@ -890,7 +890,7 @@ def _set_streaming_responses_api_output_data(
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
-    start_time: "float",
+    start_time: "Optional[float]" = None,
     finish_span: bool = True,
 ) -> None:
     input = kwargs.get("input")
