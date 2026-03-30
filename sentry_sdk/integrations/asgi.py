@@ -307,7 +307,7 @@ class SentryAsgiMiddleware:
                             else nullcontext()
                         )
 
-                    for attribute, value in _get_request_attributes(scope):
+                    for attribute, value in _get_request_attributes(scope).items():
                         sentry_scope.set_attribute(attribute, value)
 
                     with span_ctx as span:
@@ -449,7 +449,7 @@ class SentryAsgiMiddleware:
         self: "SentryAsgiMiddleware", segment_style: str, asgi_scope: "Any"
     ) -> "Tuple[str, str]":
         name = None
-        source = SEGMENT_SOURCE_FOR_STYLE[segment_style]
+        source = SEGMENT_SOURCE_FOR_STYLE[segment_style].value
         ty = asgi_scope.get("type")
 
         if segment_style == "endpoint":
