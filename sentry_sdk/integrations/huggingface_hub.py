@@ -41,7 +41,7 @@ class HuggingfaceHubIntegration(Integration):
         huggingface_hub.inference._client.InferenceClient.text_generation = (
             _wrap_huggingface_task(
                 huggingface_hub.inference._client.InferenceClient.text_generation,
-                OP.GEN_AI_GENERATE_TEXT,
+                OP.GEN_AI_TEXT_COMPLETION,
             )
         )
         huggingface_hub.inference._client.InferenceClient.chat_completion = (
