@@ -583,16 +583,15 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         if messages is not None and isinstance(messages, str):
             messages = [messages]
 
-        if isinstance(response, Stream):
-            response._iterator = _wrap_synchronous_completions_chunk_iterator(
-                span=span,
-                integration=integration,
-                start_time=start_time,
-                messages=messages,
-                response=response,
-                old_iterator=response._iterator,
-                finish_span=True,
-            )
+        response._iterator = _wrap_synchronous_completions_chunk_iterator(
+            span=span,
+            integration=integration,
+            start_time=start_time,
+            messages=messages,
+            response=response,
+            old_iterator=response._iterator,
+            finish_span=True,
+        )
     elif isinstance(response, AsyncStream):
         messages = kwargs.get("messages")
 
