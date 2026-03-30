@@ -577,9 +577,36 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    if is_streaming_response:
-        _set_streaming_completions_api_output_data(
-            span, response, kwargs, integration, start_time, finish_span=True
+    if isinstance(response, Stream):
+        messages = kwargs.get("messages")
+
+        if messages is not None and isinstance(messages, str):
+            messages = [messages]
+
+        if isinstance(response, Stream):
+            response._iterator = _wrap_synchronous_completions_chunk_iterator(
+                span=span,
+                integration=integration,
+                start_time=start_time,
+                messages=messages,
+                response=response,
+                old_iterator=response._iterator,
+                finish_span=True,
+            )
+    elif isinstance(response, AsyncStream):
+        messages = kwargs.get("messages")
+
+        if messages is not None and isinstance(messages, str):
+            messages = [messages]
+
+        response._iterator = _wrap_asynchronous_completions_chunk_iterator(
+            span=span,
+            integration=integration,
+            start_time=start_time,
+            messages=messages,
+            response=response,
+            old_iterator=response._iterator,
+            finish_span=True,
         )
     else:
         _set_completions_api_output_data(
@@ -847,41 +874,6 @@ async def _wrap_asynchronous_responses_event_iterator(
         span.__exit__(None, None, None)
 
 
-def _set_streaming_completions_api_output_data(
-    span: "Span",
-    response: "Any",
-    kwargs: "dict[str, Any]",
-    integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
-    finish_span: bool = True,
-) -> None:
-    messages = kwargs.get("messages")
-
-    if messages is not None and isinstance(messages, str):
-        messages = [messages]
-
-    if isinstance(response, Stream):
-        response._iterator = _wrap_synchronous_completions_chunk_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            messages=messages,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=finish_span,
-        )
-    elif isinstance(response, AsyncStream):
-        response._iterator = _wrap_asynchronous_completions_chunk_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            messages=messages,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=finish_span,
-        )
-
-
 def _set_responses_api_output_data(
     span: "Span",
     response: "Any",
@@ -901,42 +893,6 @@ def _set_responses_api_output_data(
         integration,
         finish_span,
     )
-
-
-def _set_streaming_responses_api_output_data(
-    span: "Span",
-    response: "Any",
-    kwargs: "dict[str, Any]",
-    integration: "OpenAIIntegration",
-    start_time: "Optional[float]" = None,
-    finish_span: bool = True,
-) -> None:
-    input = kwargs.get("input")
-
-    if input is not None and isinstance(input, str):
-        input = [input]
-
-    if isinstance(response, Stream):
-        response._iterator = _wrap_synchronous_responses_event_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            input=input,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=finish_span,
-        )
-
-    elif isinstance(response, AsyncStream):
-        response._iterator = _wrap_asynchronous_responses_event_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            input=input,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=finish_span,
-        )
 
 
 def _set_embeddings_output_data(
@@ -1143,9 +1099,36 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
     start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    if is_streaming_response:
-        _set_streaming_responses_api_output_data(
-            span, response, kwargs, integration, start_time, finish_span=True
+    if isinstance(response, Stream):
+        input = kwargs.get("input")
+
+        if input is not None and isinstance(input, str):
+            input = [input]
+
+        response._iterator = _wrap_synchronous_responses_event_iterator(
+            span=span,
+            integration=integration,
+            start_time=start_time,
+            input=input,
+            response=response,
+            old_iterator=response._iterator,
+            finish_span=True,
+        )
+
+    elif isinstance(response, AsyncStream):
+        input = kwargs.get("input")
+
+        if input is not None and isinstance(input, str):
+            input = [input]
+
+        response._iterator = _wrap_asynchronous_responses_event_iterator(
+            span=span,
+            integration=integration,
+            start_time=start_time,
+            input=input,
+            response=response,
+            old_iterator=response._iterator,
+            finish_span=True,
         )
     else:
         _set_responses_api_output_data(
