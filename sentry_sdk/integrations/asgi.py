@@ -338,23 +338,13 @@ class SentryAsgiMiddleware:
                                 return await send(event)
 
                             if asgi_version == 2:
-                                result = await self.app(scope)(
+                                return await self.app(scope)(
                                     receive, _sentry_wrapped_send
                                 )
                             else:
-                                result = await self.app(
+                                return await self.app(
                                     scope, receive, _sentry_wrapped_send
                                 )
-
-                            with capture_internal_exceptions():
-                                name, source = self._get_segment_name_and_source(
-                                    self.transaction_style, scope
-                                )
-                                if isinstance(span, StreamedSpan):
-                                    span.name = name
-                                    span.set_attribute("sentry.span.source", source)
-
-                            return result
 
                         except Exception as exc:
                             suppress_chained_exceptions = (
@@ -370,6 +360,15 @@ class SentryAsgiMiddleware:
                             with capture_internal_exceptions():
                                 self._capture_request_exception(exc)
                             reraise(*exc_info)
+
+                        finally:
+                            with capture_internal_exceptions():
+                                name, source = self._get_segment_name_and_source(
+                                    self.transaction_style, scope
+                                )
+                                if isinstance(span, StreamedSpan):
+                                    span.name = name
+                                    span.set_attribute("sentry.span.source", source)
         finally:
             _asgi_middleware_applied.set(False)
 
