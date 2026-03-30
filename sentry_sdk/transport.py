@@ -550,14 +550,13 @@ class HttpTransportCore(Transport):
         if self.options["socket_options"] is not None:
             socket_options = self.options["socket_options"]
 
-        if self.options["keep_alive"]:
-            if socket_options is None:
-                socket_options = []
+        if socket_options is None:
+            socket_options = []
 
-            used_options = {(o[0], o[1]) for o in socket_options}
-            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
-                if (default_option[0], default_option[1]) not in used_options:
-                    socket_options.append(default_option)
+        used_options = {(o[0], o[1]) for o in socket_options}
+        for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+            if (default_option[0], default_option[1]) not in used_options:
+                socket_options.append(default_option)
 
         if socket_options is not None:
             options["socket_options"] = socket_options
