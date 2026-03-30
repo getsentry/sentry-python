@@ -623,6 +623,15 @@ def _set_streaming_completions_api_output_data(
     ttft: "Optional[float]" = None
     data_buf: "list[list[str]]" = []  # one for each choice
 
+    if not hasattr(response, "_iterator"):
+        # The response is not a Stream object (e.g. a LegacyAPIResponse returned
+        # when third-party libraries such as LiteLLM use the openai client with
+        # openai >= 2.x).  We cannot wrap the iterator, so we skip instrumentation
+        # and close the span immediately to avoid an AttributeError.
+        if finish_span:
+            span.__exit__(None, None, None)
+        return
+
     old_iterator = response._iterator
 
     def new_iterator() -> "Iterator[ChatCompletionChunk]":
@@ -755,6 +764,15 @@ def _set_streaming_responses_api_output_data(
 
     ttft: "Optional[float]" = None
     data_buf: "list[list[str]]" = []  # one for each choice
+
+    if not hasattr(response, "_iterator"):
+        # The response is not a Stream object (e.g. a LegacyAPIResponse returned
+        # when third-party libraries such as LiteLLM use the openai client with
+        # openai >= 2.x).  We cannot wrap the iterator, so we skip instrumentation
+        # and close the span immediately to avoid an AttributeError.
+        if finish_span:
+            span.__exit__(None, None, None)
+        return
 
     old_iterator = response._iterator
 
