@@ -577,7 +577,8 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     start_time = time.perf_counter()
     response = yield f, args, kwargs
 
-    if isinstance(response, Stream):
+    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
+    if isinstance(response, Stream) and hasattr(response, "_iterator"):
         messages = kwargs.get("messages")
 
         if messages is not None and isinstance(messages, str):
@@ -592,7 +593,9 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
             old_iterator=response._iterator,
             finish_span=True,
         )
-    elif isinstance(response, AsyncStream):
+
+    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
+    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
         messages = kwargs.get("messages")
 
         if messages is not None and isinstance(messages, str):
@@ -1098,6 +1101,7 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
     start_time = time.perf_counter()
     response = yield f, args, kwargs
 
+    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, Stream):
         input = kwargs.get("input")
 
@@ -1114,6 +1118,7 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
             finish_span=True,
         )
 
+    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     elif isinstance(response, AsyncStream):
         input = kwargs.get("input")
 
