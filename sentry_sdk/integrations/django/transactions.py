@@ -15,27 +15,24 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from django.urls.resolvers import URLPattern
-    from typing import Tuple
     from typing import Union
     from re import Pattern
 
-from django import VERSION as DJANGO_VERSION
-
-if DJANGO_VERSION >= (2, 0):
+try:
     from django.urls.resolvers import RoutePattern
-else:
-    RoutePattern = None
+except ImportError:
+    RoutePattern = None  # type: ignore[assignment, misc]
 
 try:
     from django.urls import get_resolver
 except ImportError:
-    from django.core.urlresolvers import get_resolver
+    from django.core.urlresolvers import get_resolver  # type: ignore[no-redef]
 
 
 def get_regex(resolver_or_pattern: "Union[URLPattern, URLResolver]") -> "Pattern[str]":
     """Utility method for django's deprecated resolver.regex"""
     try:
-        regex = resolver_or_pattern.regex
+        regex = resolver_or_pattern.regex  # type: ignore[union-attr]
     except AttributeError:
         regex = resolver_or_pattern.pattern.regex
     return regex
@@ -72,7 +69,8 @@ class RavenResolver:
             and isinstance(pattern.pattern, RoutePattern)
         ):
             return self._new_style_group_matcher.sub(
-                lambda m: "{%s}" % m.group(2), str(pattern.pattern._route)
+                lambda m: "{%s}" % m.group(2),
+                str(pattern.pattern._route),  # type: ignore[attr-defined]
             )
 
         result = get_regex(pattern).pattern
@@ -149,7 +147,7 @@ class RavenResolver:
     def resolve(
         self,
         path: str,
-        urlconf: "Union[None, Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern]]" = None,
+        urlconf: "Optional[str]" = None,
     ) -> "Optional[str]":
         resolver = get_resolver(urlconf)
         match = self._resolve(resolver, path)

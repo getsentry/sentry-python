@@ -255,7 +255,7 @@ class StreamedSpan:
         baggage: "Optional[Baggage]" = None,
         sample_rate: "Optional[float]" = None,
         sample_rand: "Optional[float]" = None,
-    ):
+    ) -> None:
         self._name: str = name
         self._active: bool = active
         self._attributes: "Attributes" = {}
@@ -571,6 +571,7 @@ class NoOpStreamedSpan(StreamedSpan):
         self._scope = scope  # type: ignore[assignment]
         self._unsampled_reason = unsampled_reason
 
+        self._segment = None  # type: ignore[assignment]
         self._finished = False
 
         self._start()
@@ -665,6 +666,9 @@ class NoOpStreamedSpan(StreamedSpan):
     def active(self) -> bool:
         return True
 
+    # XXX[span-first]: These default span_id and trace_id values will be used
+    # in outgoing requests if a noop span is active. Is that how it should be?
+
     @property
     def span_id(self) -> str:
         return "0000000000000000"
@@ -684,6 +688,13 @@ class NoOpStreamedSpan(StreamedSpan):
     @property
     def timestamp(self) -> "Optional[datetime]":
         return None
+
+    def _to_traceparent(self) -> str:
+        propagation_context = (
+            sentry_sdk.get_current_scope().get_active_propagation_context()
+        )
+
+        return f"{propagation_context.trace_id}-{propagation_context.span_id}-0"
 
 
 def trace(
