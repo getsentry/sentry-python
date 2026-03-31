@@ -641,6 +641,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     SPANDATA.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
                 )
 
+            run_name = kwargs.get("name")
+            if run_name is not None:
+                span.set_data(
+                    SPANDATA.GEN_AI_PIPELINE_NAME,
+                    run_name,
+                )
+
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,
