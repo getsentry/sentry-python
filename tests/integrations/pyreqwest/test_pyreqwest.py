@@ -210,9 +210,7 @@ def test_outgoing_trace_headers_append_to_baggage(sentry_init, server_port):
     assert "sentry-trace_id=01234567890123456789012345678901" in baggage
     assert "sentry-sample_rand=0.500000" in baggage
     assert "sentry-environment=production" in baggage
-    assert (
-        "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42" in baggage
-    )
+    assert "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42" in baggage
     assert "sentry-transaction=/interactions/other-dogs/new-dog" in baggage
     assert "sentry-sample_rate=1.0" in baggage
     assert "sentry-sampled=true" in baggage
