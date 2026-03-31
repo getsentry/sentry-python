@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.consts - sentry-python 2.52.0a9 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.consts - sentry-python 2.57.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
@@ -186,852 +186,852 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="78">            <span class="s2">&quot;transport_compression_algo&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CompressionAlgo</span><span class="p">],</span>
 </span><span data-line="79">            <span class="s2">&quot;transport_num_pools&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
 </span><span data-line="80">            <span class="s2">&quot;transport_http2&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="81">            <span class="s2">&quot;enable_logs&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="82">            <span class="s2">&quot;before_send_log&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Log</span><span class="p">,</span> <span class="n">Hint</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Log</span><span class="p">]]],</span>
-</span><span data-line="83">            <span class="s2">&quot;enable_metrics&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="84">            <span class="s2">&quot;before_send_metric&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Metric</span><span class="p">,</span> <span class="n">Hint</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Metric</span><span class="p">]]],</span>
-</span><span data-line="85">            <span class="s2">&quot;trace_lifecycle&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;static&quot;</span><span class="p">,</span> <span class="s2">&quot;stream&quot;</span><span class="p">]],</span>
-</span><span data-line="86">            <span class="s2">&quot;ignore_spans&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">IgnoreSpansConfig</span><span class="p">],</span>
-</span><span data-line="87">            <span class="s2">&quot;suppress_asgi_chained_exceptions&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
-</span><span data-line="88">        <span class="p">},</span>
-</span><span data-line="89">        <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span data-line="90">    <span class="p">)</span>
-</span><span data-line="91">
-</span><span data-line="92"><span class="n">DEFAULT_QUEUE_SIZE</span> <span class="o">=</span> <span class="mi">100</span>
-</span><span data-line="93"><span class="n">DEFAULT_MAX_BREADCRUMBS</span> <span class="o">=</span> <span class="mi">100</span>
-</span><span data-line="94"><span class="n">MATCH_ALL</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;.*&quot;</span>
-</span><span data-line="95">
-</span><span data-line="96"><span class="n">FALSE_VALUES</span> <span class="o">=</span> <span class="p">[</span>
-</span><span data-line="97">    <span class="s2">&quot;false&quot;</span><span class="p">,</span>
-</span><span data-line="98">    <span class="s2">&quot;no&quot;</span><span class="p">,</span>
-</span><span data-line="99">    <span class="s2">&quot;off&quot;</span><span class="p">,</span>
-</span><span data-line="100">    <span class="s2">&quot;n&quot;</span><span class="p">,</span>
-</span><span data-line="101">    <span class="s2">&quot;0&quot;</span><span class="p">,</span>
-</span><span data-line="102"><span class="p">]</span>
-</span><span data-line="103">
+</span><span data-line="81">            <span class="s2">&quot;transport_async&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="82">            <span class="s2">&quot;enable_logs&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="83">            <span class="s2">&quot;before_send_log&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Log</span><span class="p">,</span> <span class="n">Hint</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Log</span><span class="p">]]],</span>
+</span><span data-line="84">            <span class="s2">&quot;enable_metrics&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="85">            <span class="s2">&quot;before_send_metric&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Metric</span><span class="p">,</span> <span class="n">Hint</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Metric</span><span class="p">]]],</span>
+</span><span data-line="86">            <span class="s2">&quot;trace_lifecycle&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;static&quot;</span><span class="p">,</span> <span class="s2">&quot;stream&quot;</span><span class="p">]],</span>
+</span><span data-line="87">            <span class="s2">&quot;ignore_spans&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">IgnoreSpansConfig</span><span class="p">],</span>
+</span><span data-line="88">            <span class="s2">&quot;suppress_asgi_chained_exceptions&quot;</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span>
+</span><span data-line="89">        <span class="p">},</span>
+</span><span data-line="90">        <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span data-line="91">    <span class="p">)</span>
+</span><span data-line="92">
+</span><span data-line="93"><span class="n">DEFAULT_QUEUE_SIZE</span> <span class="o">=</span> <span class="mi">100</span>
+</span><span data-line="94"><span class="n">DEFAULT_MAX_BREADCRUMBS</span> <span class="o">=</span> <span class="mi">100</span>
+</span><span data-line="95"><span class="n">MATCH_ALL</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;.*&quot;</span>
+</span><span data-line="96">
+</span><span data-line="97"><span class="n">FALSE_VALUES</span> <span class="o">=</span> <span class="p">[</span>
+</span><span data-line="98">    <span class="s2">&quot;false&quot;</span><span class="p">,</span>
+</span><span data-line="99">    <span class="s2">&quot;no&quot;</span><span class="p">,</span>
+</span><span data-line="100">    <span class="s2">&quot;off&quot;</span><span class="p">,</span>
+</span><span data-line="101">    <span class="s2">&quot;n&quot;</span><span class="p">,</span>
+</span><span data-line="102">    <span class="s2">&quot;0&quot;</span><span class="p">,</span>
+</span><span data-line="103"><span class="p">]</span>
 </span><span data-line="104">
-</span><span data-line="105"><span class="k">class</span><span class="w"> </span><span class="nc">SPANTEMPLATE</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
-</span><span data-line="106">    <span class="n">DEFAULT</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
-</span><span data-line="107">    <span class="n">AI_AGENT</span> <span class="o">=</span> <span class="s2">&quot;ai_agent&quot;</span>
-</span><span data-line="108">    <span class="n">AI_TOOL</span> <span class="o">=</span> <span class="s2">&quot;ai_tool&quot;</span>
-</span><span data-line="109">    <span class="n">AI_CHAT</span> <span class="o">=</span> <span class="s2">&quot;ai_chat&quot;</span>
-</span><span data-line="110">
-</span><span data-line="111">    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="112">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span>
-</span><span data-line="113">
+</span><span data-line="105">
+</span><span data-line="106"><span class="k">class</span><span class="w"> </span><span class="nc">SPANTEMPLATE</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+</span><span data-line="107">    <span class="n">DEFAULT</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
+</span><span data-line="108">    <span class="n">AI_AGENT</span> <span class="o">=</span> <span class="s2">&quot;ai_agent&quot;</span>
+</span><span data-line="109">    <span class="n">AI_TOOL</span> <span class="o">=</span> <span class="s2">&quot;ai_tool&quot;</span>
+</span><span data-line="110">    <span class="n">AI_CHAT</span> <span class="o">=</span> <span class="s2">&quot;ai_chat&quot;</span>
+</span><span data-line="111">
+</span><span data-line="112">    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="113">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span>
 </span><span data-line="114">
-</span><span data-line="115"><span class="k">class</span><span class="w"> </span><span class="nc">INSTRUMENTER</span><span class="p">:</span>
-</span><span data-line="116">    <span class="n">SENTRY</span> <span class="o">=</span> <span class="s2">&quot;sentry&quot;</span>
-</span><span data-line="117">    <span class="n">OTEL</span> <span class="o">=</span> <span class="s2">&quot;otel&quot;</span>
-</span><span data-line="118">
+</span><span data-line="115">
+</span><span data-line="116"><span class="k">class</span><span class="w"> </span><span class="nc">INSTRUMENTER</span><span class="p">:</span>
+</span><span data-line="117">    <span class="n">SENTRY</span> <span class="o">=</span> <span class="s2">&quot;sentry&quot;</span>
+</span><span data-line="118">    <span class="n">OTEL</span> <span class="o">=</span> <span class="s2">&quot;otel&quot;</span>
 </span><span data-line="119">
-</span><span data-line="120"><span class="k">class</span><span class="w"> </span><span class="nc">SPANNAME</span><span class="p">:</span>
-</span><span data-line="121">    <span class="n">DB_COMMIT</span> <span class="o">=</span> <span class="s2">&quot;COMMIT&quot;</span>
-</span><span data-line="122">    <span class="n">DB_ROLLBACK</span> <span class="o">=</span> <span class="s2">&quot;ROLLBACK&quot;</span>
-</span><span data-line="123">
+</span><span data-line="120">
+</span><span data-line="121"><span class="k">class</span><span class="w"> </span><span class="nc">SPANNAME</span><span class="p">:</span>
+</span><span data-line="122">    <span class="n">DB_COMMIT</span> <span class="o">=</span> <span class="s2">&quot;COMMIT&quot;</span>
+</span><span data-line="123">    <span class="n">DB_ROLLBACK</span> <span class="o">=</span> <span class="s2">&quot;ROLLBACK&quot;</span>
 </span><span data-line="124">
-</span><span data-line="125"><span class="k">class</span><span class="w"> </span><span class="nc">SPANDATA</span><span class="p">:</span>
-</span><span data-line="126"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="127"><span class="sd">    Additional information describing the type of the span.</span>
-</span><span data-line="128"><span class="sd">    See: https://develop.sentry.dev/sdk/performance/span-data-conventions/</span>
-</span><span data-line="129"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="130">
-</span><span data-line="131">    <span class="n">AI_CITATIONS</span> <span class="o">=</span> <span class="s2">&quot;ai.citations&quot;</span>
-</span><span data-line="132"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="133"><span class="sd">    .. deprecated::</span>
-</span><span data-line="134"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="135">
-</span><span data-line="136"><span class="sd">    References or sources cited by the AI model in its response.</span>
-</span><span data-line="137"><span class="sd">    Example: [&quot;Smith et al. 2020&quot;, &quot;Jones 2019&quot;]</span>
-</span><span data-line="138"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="139">
-</span><span data-line="140">    <span class="n">AI_DOCUMENTS</span> <span class="o">=</span> <span class="s2">&quot;ai.documents&quot;</span>
-</span><span data-line="141"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="142"><span class="sd">    .. deprecated::</span>
-</span><span data-line="143"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="144">
-</span><span data-line="145"><span class="sd">    Documents or content chunks used as context for the AI model.</span>
-</span><span data-line="146"><span class="sd">    Example: [&quot;doc1.txt&quot;, &quot;doc2.pdf&quot;]</span>
-</span><span data-line="147"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="148">
-</span><span data-line="149">    <span class="n">AI_FINISH_REASON</span> <span class="o">=</span> <span class="s2">&quot;ai.finish_reason&quot;</span>
-</span><span data-line="150"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="151"><span class="sd">    .. deprecated::</span>
-</span><span data-line="152"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_FINISH_REASONS instead.</span>
-</span><span data-line="153">
-</span><span data-line="154"><span class="sd">    The reason why the model stopped generating.</span>
-</span><span data-line="155"><span class="sd">    Example: &quot;length&quot;</span>
-</span><span data-line="156"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="157">
-</span><span data-line="158">    <span class="n">AI_FREQUENCY_PENALTY</span> <span class="o">=</span> <span class="s2">&quot;ai.frequency_penalty&quot;</span>
-</span><span data-line="159"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="160"><span class="sd">    .. deprecated::</span>
-</span><span data-line="161"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_FREQUENCY_PENALTY instead.</span>
-</span><span data-line="162">
-</span><span data-line="163"><span class="sd">    Used to reduce repetitiveness of generated tokens.</span>
-</span><span data-line="164"><span class="sd">    Example: 0.5</span>
-</span><span data-line="165"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="166">
-</span><span data-line="167">    <span class="n">AI_FUNCTION_CALL</span> <span class="o">=</span> <span class="s2">&quot;ai.function_call&quot;</span>
-</span><span data-line="168"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="169"><span class="sd">    .. deprecated::</span>
-</span><span data-line="170"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.</span>
-</span><span data-line="171">
-</span><span data-line="172"><span class="sd">    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls</span>
-</span><span data-line="173"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="174">
-</span><span data-line="175">    <span class="n">AI_GENERATION_ID</span> <span class="o">=</span> <span class="s2">&quot;ai.generation_id&quot;</span>
-</span><span data-line="176"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="177"><span class="sd">    .. deprecated::</span>
-</span><span data-line="178"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_ID instead.</span>
-</span><span data-line="179">
-</span><span data-line="180"><span class="sd">    Unique identifier for the completion.</span>
-</span><span data-line="181"><span class="sd">    Example: &quot;gen_123abc&quot;</span>
-</span><span data-line="182"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="183">
-</span><span data-line="184">    <span class="n">AI_INPUT_MESSAGES</span> <span class="o">=</span> <span class="s2">&quot;ai.input_messages&quot;</span>
-</span><span data-line="185"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="186"><span class="sd">    .. deprecated::</span>
-</span><span data-line="187"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_MESSAGES instead.</span>
-</span><span data-line="188">
-</span><span data-line="189"><span class="sd">    The input messages to an LLM call.</span>
-</span><span data-line="190"><span class="sd">    Example: [{&quot;role&quot;: &quot;user&quot;, &quot;message&quot;: &quot;hello&quot;}]</span>
-</span><span data-line="191"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="192">
-</span><span data-line="193">    <span class="n">AI_LOGIT_BIAS</span> <span class="o">=</span> <span class="s2">&quot;ai.logit_bias&quot;</span>
-</span><span data-line="194"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="195"><span class="sd">    .. deprecated::</span>
-</span><span data-line="196"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="197">
-</span><span data-line="198"><span class="sd">    For an AI model call, the logit bias</span>
-</span><span data-line="199"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="200">
-</span><span data-line="201">    <span class="n">AI_METADATA</span> <span class="o">=</span> <span class="s2">&quot;ai.metadata&quot;</span>
-</span><span data-line="202"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="203"><span class="sd">    .. deprecated::</span>
-</span><span data-line="204"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="205">
-</span><span data-line="206"><span class="sd">    Extra metadata passed to an AI pipeline step.</span>
-</span><span data-line="207"><span class="sd">    Example: {&quot;executed_function&quot;: &quot;add_integers&quot;}</span>
-</span><span data-line="208"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="209">
-</span><span data-line="210">    <span class="n">AI_MODEL_ID</span> <span class="o">=</span> <span class="s2">&quot;ai.model_id&quot;</span>
-</span><span data-line="211"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="212"><span class="sd">    .. deprecated::</span>
-</span><span data-line="213"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_MODEL or GEN_AI_RESPONSE_MODEL instead.</span>
-</span><span data-line="214">
-</span><span data-line="215"><span class="sd">    The unique descriptor of the model being executed.</span>
-</span><span data-line="216"><span class="sd">    Example: gpt-4</span>
-</span><span data-line="217"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="218">
-</span><span data-line="219">    <span class="n">AI_PIPELINE_NAME</span> <span class="o">=</span> <span class="s2">&quot;ai.pipeline.name&quot;</span>
-</span><span data-line="220"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="221"><span class="sd">    .. deprecated::</span>
-</span><span data-line="222"><span class="sd">        This attribute is deprecated. Use GEN_AI_PIPELINE_NAME instead.</span>
-</span><span data-line="223">
-</span><span data-line="224"><span class="sd">    Name of the AI pipeline or chain being executed.</span>
-</span><span data-line="225"><span class="sd">    Example: &quot;qa-pipeline&quot;</span>
-</span><span data-line="226"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="227">
-</span><span data-line="228">    <span class="n">AI_PREAMBLE</span> <span class="o">=</span> <span class="s2">&quot;ai.preamble&quot;</span>
-</span><span data-line="229"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="230"><span class="sd">    .. deprecated::</span>
-</span><span data-line="231"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="232">
-</span><span data-line="233"><span class="sd">    For an AI model call, the preamble parameter.</span>
-</span><span data-line="234"><span class="sd">    Preambles are a part of the prompt used to adjust the model&#39;s overall behavior and conversation style.</span>
-</span><span data-line="235"><span class="sd">    Example: &quot;You are now a clown.&quot;</span>
-</span><span data-line="236"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="237">
-</span><span data-line="238">    <span class="n">AI_PRESENCE_PENALTY</span> <span class="o">=</span> <span class="s2">&quot;ai.presence_penalty&quot;</span>
-</span><span data-line="239"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="240"><span class="sd">    .. deprecated::</span>
-</span><span data-line="241"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_PRESENCE_PENALTY instead.</span>
-</span><span data-line="242">
-</span><span data-line="243"><span class="sd">    Used to reduce repetitiveness of generated tokens.</span>
-</span><span data-line="244"><span class="sd">    Example: 0.5</span>
-</span><span data-line="245"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="246">
-</span><span data-line="247">    <span class="n">AI_RAW_PROMPTING</span> <span class="o">=</span> <span class="s2">&quot;ai.raw_prompting&quot;</span>
-</span><span data-line="248"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="249"><span class="sd">    .. deprecated::</span>
-</span><span data-line="250"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="251">
-</span><span data-line="252"><span class="sd">    Minimize pre-processing done to the prompt sent to the LLM.</span>
-</span><span data-line="253"><span class="sd">    Example: true</span>
-</span><span data-line="254"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="255">
-</span><span data-line="256">    <span class="n">AI_RESPONSE_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;ai.response_format&quot;</span>
-</span><span data-line="257"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="258"><span class="sd">    .. deprecated::</span>
-</span><span data-line="259"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="260">
-</span><span data-line="261"><span class="sd">    For an AI model call, the format of the response</span>
-</span><span data-line="262"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="263">
-</span><span data-line="264">    <span class="n">AI_RESPONSES</span> <span class="o">=</span> <span class="s2">&quot;ai.responses&quot;</span>
-</span><span data-line="265"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="266"><span class="sd">    .. deprecated::</span>
-</span><span data-line="267"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_TEXT instead.</span>
-</span><span data-line="268">
-</span><span data-line="269"><span class="sd">    The responses to an AI model call. Always as a list.</span>
-</span><span data-line="270"><span class="sd">    Example: [&quot;hello&quot;, &quot;world&quot;]</span>
-</span><span data-line="271"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="272">
-</span><span data-line="273">    <span class="n">AI_SEARCH_QUERIES</span> <span class="o">=</span> <span class="s2">&quot;ai.search_queries&quot;</span>
-</span><span data-line="274"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="275"><span class="sd">    .. deprecated::</span>
-</span><span data-line="276"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="277">
-</span><span data-line="278"><span class="sd">    Queries used to search for relevant context or documents.</span>
-</span><span data-line="279"><span class="sd">    Example: [&quot;climate change effects&quot;, &quot;renewable energy&quot;]</span>
-</span><span data-line="280"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="281">
-</span><span data-line="282">    <span class="n">AI_SEARCH_REQUIRED</span> <span class="o">=</span> <span class="s2">&quot;ai.is_search_required&quot;</span>
-</span><span data-line="283"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="284"><span class="sd">    .. deprecated::</span>
-</span><span data-line="285"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="286">
-</span><span data-line="287"><span class="sd">    Boolean indicating if the model needs to perform a search.</span>
-</span><span data-line="288"><span class="sd">    Example: true</span>
-</span><span data-line="289"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="290">
-</span><span data-line="291">    <span class="n">AI_SEARCH_RESULTS</span> <span class="o">=</span> <span class="s2">&quot;ai.search_results&quot;</span>
-</span><span data-line="292"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="293"><span class="sd">    .. deprecated::</span>
-</span><span data-line="294"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="295">
-</span><span data-line="296"><span class="sd">    Results returned from search queries for context.</span>
-</span><span data-line="297"><span class="sd">    Example: [&quot;Result 1&quot;, &quot;Result 2&quot;]</span>
-</span><span data-line="298"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="299">
-</span><span data-line="300">    <span class="n">AI_SEED</span> <span class="o">=</span> <span class="s2">&quot;ai.seed&quot;</span>
-</span><span data-line="301"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="302"><span class="sd">    .. deprecated::</span>
-</span><span data-line="303"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_SEED instead.</span>
-</span><span data-line="304">
-</span><span data-line="305"><span class="sd">    The seed, ideally models given the same seed and same other parameters will produce the exact same output.</span>
-</span><span data-line="306"><span class="sd">    Example: 123.45</span>
-</span><span data-line="307"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="308">
-</span><span data-line="309">    <span class="n">AI_STREAMING</span> <span class="o">=</span> <span class="s2">&quot;ai.streaming&quot;</span>
-</span><span data-line="310"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="311"><span class="sd">    .. deprecated::</span>
-</span><span data-line="312"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_STREAMING instead.</span>
-</span><span data-line="313">
-</span><span data-line="314"><span class="sd">    Whether or not the AI model call&#39;s response was streamed back asynchronously</span>
-</span><span data-line="315"><span class="sd">    Example: true</span>
-</span><span data-line="316"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="317">
-</span><span data-line="318">    <span class="n">AI_TAGS</span> <span class="o">=</span> <span class="s2">&quot;ai.tags&quot;</span>
-</span><span data-line="319"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="320"><span class="sd">    .. deprecated::</span>
-</span><span data-line="321"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="322">
-</span><span data-line="323"><span class="sd">    Tags that describe an AI pipeline step.</span>
-</span><span data-line="324"><span class="sd">    Example: {&quot;executed_function&quot;: &quot;add_integers&quot;}</span>
-</span><span data-line="325"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="326">
-</span><span data-line="327">    <span class="n">AI_TEMPERATURE</span> <span class="o">=</span> <span class="s2">&quot;ai.temperature&quot;</span>
-</span><span data-line="328"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="329"><span class="sd">    .. deprecated::</span>
-</span><span data-line="330"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_TEMPERATURE instead.</span>
-</span><span data-line="331">
-</span><span data-line="332"><span class="sd">    For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.</span>
-</span><span data-line="333"><span class="sd">    Example: 0.5</span>
-</span><span data-line="334"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="335">
-</span><span data-line="336">    <span class="n">AI_TEXTS</span> <span class="o">=</span> <span class="s2">&quot;ai.texts&quot;</span>
-</span><span data-line="337"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="338"><span class="sd">    .. deprecated::</span>
-</span><span data-line="339"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="340">
-</span><span data-line="341"><span class="sd">    Raw text inputs provided to the model.</span>
-</span><span data-line="342"><span class="sd">    Example: [&quot;What is machine learning?&quot;]</span>
-</span><span data-line="343"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="344">
-</span><span data-line="345">    <span class="n">AI_TOP_K</span> <span class="o">=</span> <span class="s2">&quot;ai.top_k&quot;</span>
-</span><span data-line="346"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="347"><span class="sd">    .. deprecated::</span>
-</span><span data-line="348"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_K instead.</span>
-</span><span data-line="349">
-</span><span data-line="350"><span class="sd">    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.</span>
-</span><span data-line="351"><span class="sd">    Example: 35</span>
-</span><span data-line="352"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="353">
-</span><span data-line="354">    <span class="n">AI_TOP_P</span> <span class="o">=</span> <span class="s2">&quot;ai.top_p&quot;</span>
-</span><span data-line="355"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="356"><span class="sd">    .. deprecated::</span>
-</span><span data-line="357"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_P instead.</span>
-</span><span data-line="358">
-</span><span data-line="359"><span class="sd">    For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.</span>
-</span><span data-line="360"><span class="sd">    Example: 0.5</span>
-</span><span data-line="361"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="362">
-</span><span data-line="363">    <span class="n">AI_TOOL_CALLS</span> <span class="o">=</span> <span class="s2">&quot;ai.tool_calls&quot;</span>
-</span><span data-line="364"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="365"><span class="sd">    .. deprecated::</span>
-</span><span data-line="366"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.</span>
-</span><span data-line="367">
-</span><span data-line="368"><span class="sd">    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls</span>
-</span><span data-line="369"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="370">
-</span><span data-line="371">    <span class="n">AI_TOOLS</span> <span class="o">=</span> <span class="s2">&quot;ai.tools&quot;</span>
-</span><span data-line="372"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="373"><span class="sd">    .. deprecated::</span>
-</span><span data-line="374"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_AVAILABLE_TOOLS instead.</span>
-</span><span data-line="375">
-</span><span data-line="376"><span class="sd">    For an AI model call, the functions that are available</span>
-</span><span data-line="377"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="378">
-</span><span data-line="379">    <span class="n">AI_WARNINGS</span> <span class="o">=</span> <span class="s2">&quot;ai.warnings&quot;</span>
-</span><span data-line="380"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="381"><span class="sd">    .. deprecated::</span>
-</span><span data-line="382"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
-</span><span data-line="383">
-</span><span data-line="384"><span class="sd">    Warning messages generated during model execution.</span>
-</span><span data-line="385"><span class="sd">    Example: [&quot;Token limit exceeded&quot;]</span>
-</span><span data-line="386"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="387">
-</span><span data-line="388">    <span class="n">CACHE_HIT</span> <span class="o">=</span> <span class="s2">&quot;cache.hit&quot;</span>
-</span><span data-line="389"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="390"><span class="sd">    A boolean indicating whether the requested data was found in the cache.</span>
-</span><span data-line="391"><span class="sd">    Example: true</span>
-</span><span data-line="392"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="393">
-</span><span data-line="394">    <span class="n">CACHE_ITEM_SIZE</span> <span class="o">=</span> <span class="s2">&quot;cache.item_size&quot;</span>
-</span><span data-line="395"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="396"><span class="sd">    The size of the requested data in bytes.</span>
-</span><span data-line="397"><span class="sd">    Example: 58</span>
-</span><span data-line="398"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="399">
-</span><span data-line="400">    <span class="n">CACHE_KEY</span> <span class="o">=</span> <span class="s2">&quot;cache.key&quot;</span>
-</span><span data-line="401"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="402"><span class="sd">    The key of the requested data.</span>
-</span><span data-line="403"><span class="sd">    Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3</span>
-</span><span data-line="404"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="405">
-</span><span data-line="406">    <span class="n">CODE_FILEPATH</span> <span class="o">=</span> <span class="s2">&quot;code.filepath&quot;</span>
-</span><span data-line="407"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="408"><span class="sd">    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).</span>
-</span><span data-line="409"><span class="sd">    Example: &quot;/app/myapplication/http/handler/server.py&quot;</span>
-</span><span data-line="410"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="411">
-</span><span data-line="412">    <span class="n">CODE_FUNCTION</span> <span class="o">=</span> <span class="s2">&quot;code.function&quot;</span>
-</span><span data-line="413"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="414"><span class="sd">    The method or function name, or equivalent (usually rightmost part of the code unit&#39;s name).</span>
-</span><span data-line="415"><span class="sd">    Example: &quot;server_request&quot;</span>
-</span><span data-line="416"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="417">
-</span><span data-line="418">    <span class="n">CODE_LINENO</span> <span class="o">=</span> <span class="s2">&quot;code.lineno&quot;</span>
-</span><span data-line="419"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="420"><span class="sd">    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.</span>
-</span><span data-line="421"><span class="sd">    Example: 42</span>
-</span><span data-line="422"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="423">
-</span><span data-line="424">    <span class="n">CODE_NAMESPACE</span> <span class="o">=</span> <span class="s2">&quot;code.namespace&quot;</span>
-</span><span data-line="425"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="426"><span class="sd">    The &quot;namespace&quot; within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.</span>
-</span><span data-line="427"><span class="sd">    Example: &quot;http.handler&quot;</span>
-</span><span data-line="428"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="429">
-</span><span data-line="430">    <span class="n">DB_MONGODB_COLLECTION</span> <span class="o">=</span> <span class="s2">&quot;db.mongodb.collection&quot;</span>
-</span><span data-line="431"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="432"><span class="sd">    The MongoDB collection being accessed within the database.</span>
-</span><span data-line="433"><span class="sd">    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes</span>
-</span><span data-line="434"><span class="sd">    Example: public.users; customers</span>
-</span><span data-line="435"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="436">
-</span><span data-line="437">    <span class="n">DB_NAME</span> <span class="o">=</span> <span class="s2">&quot;db.name&quot;</span>
-</span><span data-line="438"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="439"><span class="sd">    The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).</span>
-</span><span data-line="440"><span class="sd">    Example: myDatabase</span>
-</span><span data-line="441"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="442">
-</span><span data-line="443">    <span class="n">DB_OPERATION</span> <span class="o">=</span> <span class="s2">&quot;db.operation&quot;</span>
-</span><span data-line="444"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="445"><span class="sd">    The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.</span>
-</span><span data-line="446"><span class="sd">    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md</span>
-</span><span data-line="447"><span class="sd">    Example: findAndModify, HMSET, SELECT</span>
-</span><span data-line="448"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="449">
-</span><span data-line="450">    <span class="n">DB_SYSTEM</span> <span class="o">=</span> <span class="s2">&quot;db.system&quot;</span>
-</span><span data-line="451"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="452"><span class="sd">    An identifier for the database management system (DBMS) product being used.</span>
-</span><span data-line="453"><span class="sd">    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md</span>
-</span><span data-line="454"><span class="sd">    Example: postgresql</span>
-</span><span data-line="455"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="456">
-</span><span data-line="457">    <span class="n">DB_USER</span> <span class="o">=</span> <span class="s2">&quot;db.user&quot;</span>
-</span><span data-line="458"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="459"><span class="sd">    The name of the database user used for connecting to the database.</span>
-</span><span data-line="460"><span class="sd">    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md</span>
-</span><span data-line="461"><span class="sd">    Example: my_user</span>
-</span><span data-line="462"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="463">
-</span><span data-line="464">    <span class="n">GEN_AI_AGENT_NAME</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.agent.name&quot;</span>
-</span><span data-line="465"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="466"><span class="sd">    The name of the agent being used.</span>
-</span><span data-line="467"><span class="sd">    Example: &quot;ResearchAssistant&quot;</span>
-</span><span data-line="468"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="469">
-</span><span data-line="470">    <span class="n">GEN_AI_CONVERSATION_ID</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.conversation.id&quot;</span>
-</span><span data-line="471"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="472"><span class="sd">    The unique identifier for the conversation/thread with the AI model.</span>
-</span><span data-line="473"><span class="sd">    Example: &quot;conv_abc123&quot;</span>
-</span><span data-line="474"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="475">
-</span><span data-line="476">    <span class="n">GEN_AI_CHOICE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.choice&quot;</span>
-</span><span data-line="477"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="478"><span class="sd">    The model&#39;s response message.</span>
-</span><span data-line="479"><span class="sd">    Example: &quot;The weather in Paris is rainy and overcast, with temperatures around 57°F&quot;</span>
-</span><span data-line="480"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="481">
-</span><span data-line="482">    <span class="n">GEN_AI_EMBEDDINGS_INPUT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.embeddings.input&quot;</span>
-</span><span data-line="483"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="484"><span class="sd">    The input to the embeddings operation.</span>
-</span><span data-line="485"><span class="sd">    Example: &quot;Hello!&quot;</span>
-</span><span data-line="486"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="487">
-</span><span data-line="488">    <span class="n">GEN_AI_OPERATION_NAME</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.operation.name&quot;</span>
-</span><span data-line="489"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="490"><span class="sd">    The name of the operation being performed.</span>
-</span><span data-line="491"><span class="sd">    Example: &quot;chat&quot;</span>
-</span><span data-line="492"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="493">
-</span><span data-line="494">    <span class="n">GEN_AI_PIPELINE_NAME</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.pipeline.name&quot;</span>
-</span><span data-line="495"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="496"><span class="sd">    Name of the AI pipeline or chain being executed.</span>
-</span><span data-line="497"><span class="sd">    Example: &quot;qa-pipeline&quot;</span>
-</span><span data-line="498"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="499">
-</span><span data-line="500">    <span class="n">GEN_AI_RESPONSE_FINISH_REASONS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.finish_reasons&quot;</span>
-</span><span data-line="501"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="502"><span class="sd">    The reason why the model stopped generating.</span>
-</span><span data-line="503"><span class="sd">    Example: &quot;COMPLETE&quot;</span>
-</span><span data-line="504"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="505">
-</span><span data-line="506">    <span class="n">GEN_AI_RESPONSE_ID</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.id&quot;</span>
-</span><span data-line="507"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="508"><span class="sd">    Unique identifier for the completion.</span>
-</span><span data-line="509"><span class="sd">    Example: &quot;gen_123abc&quot;</span>
-</span><span data-line="510"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="511">
-</span><span data-line="512">    <span class="n">GEN_AI_RESPONSE_MODEL</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.model&quot;</span>
-</span><span data-line="513"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="514"><span class="sd">    Exact model identifier used to generate the response</span>
-</span><span data-line="515"><span class="sd">    Example: gpt-4o-mini-2024-07-18</span>
-</span><span data-line="516"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="517">
-</span><span data-line="518">    <span class="n">GEN_AI_RESPONSE_STREAMING</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.streaming&quot;</span>
-</span><span data-line="519"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="520"><span class="sd">    Whether or not the AI model call&#39;s response was streamed back asynchronously</span>
-</span><span data-line="521"><span class="sd">    Example: true</span>
-</span><span data-line="522"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="523">
-</span><span data-line="524">    <span class="n">GEN_AI_RESPONSE_TEXT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.text&quot;</span>
-</span><span data-line="525"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="526"><span class="sd">    The model&#39;s response text messages.</span>
-</span><span data-line="527"><span class="sd">    Example: [&quot;The weather in Paris is rainy and overcast, with temperatures around 57°F&quot;, &quot;The weather in London is sunny and warm, with temperatures around 65°F&quot;]</span>
-</span><span data-line="528"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="529">
-</span><span data-line="530">    <span class="n">GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.time_to_first_token&quot;</span>
-</span><span data-line="531"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="532"><span class="sd">    The time it took to receive the first token from the model.</span>
-</span><span data-line="533"><span class="sd">    Example: 0.1</span>
-</span><span data-line="534"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="535">
-</span><span data-line="536">    <span class="n">GEN_AI_RESPONSE_TOOL_CALLS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.tool_calls&quot;</span>
-</span><span data-line="537"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="538"><span class="sd">    The tool calls in the model&#39;s response.</span>
-</span><span data-line="539"><span class="sd">    Example: [{&quot;name&quot;: &quot;get_weather&quot;, &quot;arguments&quot;: {&quot;location&quot;: &quot;Paris&quot;}}]</span>
-</span><span data-line="540"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="541">
-</span><span data-line="542">    <span class="n">GEN_AI_REQUEST_AVAILABLE_TOOLS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.available_tools&quot;</span>
-</span><span data-line="543"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="544"><span class="sd">    The available tools for the model.</span>
-</span><span data-line="545"><span class="sd">    Example: [{&quot;name&quot;: &quot;get_weather&quot;, &quot;description&quot;: &quot;Get the weather for a given location&quot;}, {&quot;name&quot;: &quot;get_news&quot;, &quot;description&quot;: &quot;Get the news for a given topic&quot;}]</span>
-</span><span data-line="546"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="547">
-</span><span data-line="548">    <span class="n">GEN_AI_REQUEST_FREQUENCY_PENALTY</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.frequency_penalty&quot;</span>
-</span><span data-line="549"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="550"><span class="sd">    The frequency penalty parameter used to reduce repetitiveness of generated tokens.</span>
-</span><span data-line="551"><span class="sd">    Example: 0.1</span>
-</span><span data-line="552"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="553">
-</span><span data-line="554">    <span class="n">GEN_AI_REQUEST_MAX_TOKENS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.max_tokens&quot;</span>
-</span><span data-line="555"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="556"><span class="sd">    The maximum number of tokens to generate in the response.</span>
-</span><span data-line="557"><span class="sd">    Example: 2048</span>
-</span><span data-line="558"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="559">
-</span><span data-line="560">    <span class="n">GEN_AI_SYSTEM_INSTRUCTIONS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.system_instructions&quot;</span>
-</span><span data-line="561"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="562"><span class="sd">    The system instructions passed to the model.</span>
-</span><span data-line="563"><span class="sd">    Example: [{&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;You are a helpful assistant.&quot;},{&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;Be concise and clear.&quot;}]</span>
-</span><span data-line="564"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="565">
-</span><span data-line="566">    <span class="n">GEN_AI_REQUEST_MESSAGES</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.messages&quot;</span>
-</span><span data-line="567"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="568"><span class="sd">    The messages passed to the model. The &quot;content&quot; can be a string or an array of objects.</span>
-</span><span data-line="569"><span class="sd">    Example: [{role: &quot;system&quot;, &quot;content: &quot;Generate a random number.&quot;}, {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: [{&quot;text&quot;: &quot;Generate a random number between 0 and 10.&quot;, &quot;type&quot;: &quot;text&quot;}]}]</span>
-</span><span data-line="570"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="571">
-</span><span data-line="572">    <span class="n">GEN_AI_REQUEST_MODEL</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.model&quot;</span>
-</span><span data-line="573"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="574"><span class="sd">    The model identifier being used for the request.</span>
-</span><span data-line="575"><span class="sd">    Example: &quot;gpt-4-turbo&quot;</span>
-</span><span data-line="576"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="577">
-</span><span data-line="578">    <span class="n">GEN_AI_REQUEST_PRESENCE_PENALTY</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.presence_penalty&quot;</span>
-</span><span data-line="579"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="580"><span class="sd">    The presence penalty parameter used to reduce repetitiveness of generated tokens.</span>
-</span><span data-line="581"><span class="sd">    Example: 0.1</span>
-</span><span data-line="582"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="583">
-</span><span data-line="584">    <span class="n">GEN_AI_REQUEST_SEED</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.seed&quot;</span>
-</span><span data-line="585"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="586"><span class="sd">    The seed, ideally models given the same seed and same other parameters will produce the exact same output.</span>
-</span><span data-line="587"><span class="sd">    Example: &quot;1234567890&quot;</span>
-</span><span data-line="588"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="589">
-</span><span data-line="590">    <span class="n">GEN_AI_REQUEST_TEMPERATURE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.temperature&quot;</span>
-</span><span data-line="591"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="592"><span class="sd">    The temperature parameter used to control randomness in the output.</span>
-</span><span data-line="593"><span class="sd">    Example: 0.7</span>
-</span><span data-line="594"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="595">
-</span><span data-line="596">    <span class="n">GEN_AI_REQUEST_TOP_K</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.top_k&quot;</span>
-</span><span data-line="597"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="598"><span class="sd">    Limits the model to only consider the K most likely next tokens, where K is an integer (e.g., top_k=20 means only the 20 highest probability tokens are considered).</span>
-</span><span data-line="599"><span class="sd">    Example: 35</span>
-</span><span data-line="600"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="601">
-</span><span data-line="602">    <span class="n">GEN_AI_REQUEST_TOP_P</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.top_p&quot;</span>
-</span><span data-line="603"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="604"><span class="sd">    The top_p parameter used to control diversity via nucleus sampling.</span>
-</span><span data-line="605"><span class="sd">    Example: 1.0</span>
-</span><span data-line="606"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="607">
-</span><span data-line="608">    <span class="n">GEN_AI_SYSTEM</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.system&quot;</span>
-</span><span data-line="609"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="610"><span class="sd">    The name of the AI system being used.</span>
-</span><span data-line="611"><span class="sd">    Example: &quot;openai&quot;</span>
-</span><span data-line="612"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="613">
-</span><span data-line="614">    <span class="n">GEN_AI_TOOL_DESCRIPTION</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.description&quot;</span>
-</span><span data-line="615"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="616"><span class="sd">    The description of the tool being used.</span>
-</span><span data-line="617"><span class="sd">    Example: &quot;Searches the web for current information about a topic&quot;</span>
-</span><span data-line="618"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="619">
-</span><span data-line="620">    <span class="n">GEN_AI_TOOL_INPUT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.input&quot;</span>
-</span><span data-line="621"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="622"><span class="sd">    The input of the tool being used.</span>
-</span><span data-line="623"><span class="sd">    Example: {&quot;location&quot;: &quot;Paris&quot;}</span>
-</span><span data-line="624"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="625">
-</span><span data-line="626">    <span class="n">GEN_AI_TOOL_NAME</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.name&quot;</span>
-</span><span data-line="627"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="628"><span class="sd">    The name of the tool being used.</span>
-</span><span data-line="629"><span class="sd">    Example: &quot;web_search&quot;</span>
-</span><span data-line="630"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="631">
-</span><span data-line="632">    <span class="n">GEN_AI_TOOL_OUTPUT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.output&quot;</span>
-</span><span data-line="633"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="634"><span class="sd">    The output of the tool being used.</span>
-</span><span data-line="635"><span class="sd">    Example: &quot;rainy, 57°F&quot;</span>
-</span><span data-line="636"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="637">
-</span><span data-line="638">    <span class="n">GEN_AI_TOOL_TYPE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.type&quot;</span>
-</span><span data-line="639"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="640"><span class="sd">    The type of tool being used.</span>
-</span><span data-line="641"><span class="sd">    Example: &quot;function&quot;</span>
-</span><span data-line="642"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="643">
-</span><span data-line="644">    <span class="n">GEN_AI_USAGE_INPUT_TOKENS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.input_tokens&quot;</span>
-</span><span data-line="645"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="646"><span class="sd">    The number of tokens in the input.</span>
-</span><span data-line="647"><span class="sd">    Example: 150</span>
-</span><span data-line="648"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="649">
-</span><span data-line="650">    <span class="n">GEN_AI_USAGE_INPUT_TOKENS_CACHED</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.input_tokens.cached&quot;</span>
-</span><span data-line="651"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="652"><span class="sd">    The number of cached tokens in the input.</span>
-</span><span data-line="653"><span class="sd">    Example: 50</span>
-</span><span data-line="654"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="655">
-</span><span data-line="656">    <span class="n">GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.input_tokens.cache_write&quot;</span>
-</span><span data-line="657"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="658"><span class="sd">    The number of tokens written to the cache when processing the AI input (prompt).</span>
-</span><span data-line="659"><span class="sd">    Example: 100</span>
-</span><span data-line="660"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="661">
-</span><span data-line="662">    <span class="n">GEN_AI_USAGE_OUTPUT_TOKENS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.output_tokens&quot;</span>
-</span><span data-line="663"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="664"><span class="sd">    The number of tokens in the output.</span>
-</span><span data-line="665"><span class="sd">    Example: 250</span>
-</span><span data-line="666"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="667">
-</span><span data-line="668">    <span class="n">GEN_AI_USAGE_OUTPUT_TOKENS_REASONING</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.output_tokens.reasoning&quot;</span>
-</span><span data-line="669"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="670"><span class="sd">    The number of tokens used for reasoning in the output.</span>
-</span><span data-line="671"><span class="sd">    Example: 75</span>
-</span><span data-line="672"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="673">
-</span><span data-line="674">    <span class="n">GEN_AI_USAGE_TOTAL_TOKENS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.total_tokens&quot;</span>
-</span><span data-line="675"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="676"><span class="sd">    The total number of tokens used (input + output).</span>
-</span><span data-line="677"><span class="sd">    Example: 400</span>
-</span><span data-line="678"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="679">
-</span><span data-line="680">    <span class="n">GEN_AI_USER_MESSAGE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.user.message&quot;</span>
-</span><span data-line="681"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="682"><span class="sd">    The user message passed to the model.</span>
-</span><span data-line="683"><span class="sd">    Example: &quot;What&#39;s the weather in Paris?&quot;</span>
-</span><span data-line="684"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="685">
-</span><span data-line="686">    <span class="n">HTTP_FRAGMENT</span> <span class="o">=</span> <span class="s2">&quot;http.fragment&quot;</span>
-</span><span data-line="687"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="688"><span class="sd">    The Fragments present in the URL.</span>
-</span><span data-line="689"><span class="sd">    Example: #foo=bar</span>
-</span><span data-line="690"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="691">
-</span><span data-line="692">    <span class="n">HTTP_METHOD</span> <span class="o">=</span> <span class="s2">&quot;http.method&quot;</span>
-</span><span data-line="693"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="694"><span class="sd">    The HTTP method used.</span>
-</span><span data-line="695"><span class="sd">    Example: GET</span>
-</span><span data-line="696"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="697">
-</span><span data-line="698">    <span class="n">HTTP_QUERY</span> <span class="o">=</span> <span class="s2">&quot;http.query&quot;</span>
-</span><span data-line="699"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="700"><span class="sd">    The Query string present in the URL.</span>
-</span><span data-line="701"><span class="sd">    Example: ?foo=bar&amp;bar=baz</span>
-</span><span data-line="702"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="703">
-</span><span data-line="704">    <span class="n">HTTP_STATUS_CODE</span> <span class="o">=</span> <span class="s2">&quot;http.response.status_code&quot;</span>
-</span><span data-line="705"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="706"><span class="sd">    The HTTP status code as an integer.</span>
-</span><span data-line="707"><span class="sd">    Example: 418</span>
-</span><span data-line="708"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="709">
-</span><span data-line="710">    <span class="n">MESSAGING_DESTINATION_NAME</span> <span class="o">=</span> <span class="s2">&quot;messaging.destination.name&quot;</span>
-</span><span data-line="711"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="712"><span class="sd">    The destination name where the message is being consumed from,</span>
-</span><span data-line="713"><span class="sd">    e.g. the queue name or topic.</span>
-</span><span data-line="714"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="715">
-</span><span data-line="716">    <span class="n">MESSAGING_MESSAGE_ID</span> <span class="o">=</span> <span class="s2">&quot;messaging.message.id&quot;</span>
-</span><span data-line="717"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="718"><span class="sd">    The message&#39;s identifier.</span>
-</span><span data-line="719"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="720">
-</span><span data-line="721">    <span class="n">MESSAGING_MESSAGE_RECEIVE_LATENCY</span> <span class="o">=</span> <span class="s2">&quot;messaging.message.receive.latency&quot;</span>
-</span><span data-line="722"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="723"><span class="sd">    The latency between when the task was enqueued and when it was started to be processed.</span>
-</span><span data-line="724"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="725">
-</span><span data-line="726">    <span class="n">MESSAGING_MESSAGE_RETRY_COUNT</span> <span class="o">=</span> <span class="s2">&quot;messaging.message.retry.count&quot;</span>
-</span><span data-line="727"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="728"><span class="sd">    Number of retries/attempts to process a message.</span>
-</span><span data-line="729"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="730">
-</span><span data-line="731">    <span class="n">MESSAGING_SYSTEM</span> <span class="o">=</span> <span class="s2">&quot;messaging.system&quot;</span>
-</span><span data-line="732"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="733"><span class="sd">    The messaging system&#39;s name, e.g. `kafka`, `aws_sqs`</span>
-</span><span data-line="734"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="735">
-</span><span data-line="736">    <span class="n">NETWORK_PEER_ADDRESS</span> <span class="o">=</span> <span class="s2">&quot;network.peer.address&quot;</span>
-</span><span data-line="737"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="738"><span class="sd">    Peer address of the network connection - IP address or Unix domain socket name.</span>
-</span><span data-line="739"><span class="sd">    Example: 10.1.2.80, /tmp/my.sock, localhost</span>
-</span><span data-line="740"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="741">
-</span><span data-line="742">    <span class="n">NETWORK_PEER_PORT</span> <span class="o">=</span> <span class="s2">&quot;network.peer.port&quot;</span>
-</span><span data-line="743"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="744"><span class="sd">    Peer port number of the network connection.</span>
-</span><span data-line="745"><span class="sd">    Example: 6379</span>
-</span><span data-line="746"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="747">
-</span><span data-line="748">    <span class="n">NETWORK_TRANSPORT</span> <span class="o">=</span> <span class="s2">&quot;network.transport&quot;</span>
-</span><span data-line="749"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="750"><span class="sd">    The transport protocol used for the network connection.</span>
-</span><span data-line="751"><span class="sd">    Example: &quot;tcp&quot;, &quot;udp&quot;, &quot;unix&quot;</span>
-</span><span data-line="752"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="753">
-</span><span data-line="754">    <span class="n">PROFILER_ID</span> <span class="o">=</span> <span class="s2">&quot;profiler_id&quot;</span>
-</span><span data-line="755"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="756"><span class="sd">    Label identifying the profiler id that the span occurred in. This should be a string.</span>
-</span><span data-line="757"><span class="sd">    Example: &quot;5249fbada8d5416482c2f6e47e337372&quot;</span>
-</span><span data-line="758"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="759">
-</span><span data-line="760">    <span class="n">SERVER_ADDRESS</span> <span class="o">=</span> <span class="s2">&quot;server.address&quot;</span>
-</span><span data-line="761"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="762"><span class="sd">    Name of the database host.</span>
-</span><span data-line="763"><span class="sd">    Example: example.com</span>
-</span><span data-line="764"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="765">
-</span><span data-line="766">    <span class="n">SERVER_PORT</span> <span class="o">=</span> <span class="s2">&quot;server.port&quot;</span>
-</span><span data-line="767"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="768"><span class="sd">    Logical server port number</span>
-</span><span data-line="769"><span class="sd">    Example: 80; 8080; 443</span>
-</span><span data-line="770"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="771">
-</span><span data-line="772">    <span class="n">SERVER_SOCKET_ADDRESS</span> <span class="o">=</span> <span class="s2">&quot;server.socket.address&quot;</span>
-</span><span data-line="773"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="774"><span class="sd">    Physical server IP address or Unix socket address.</span>
-</span><span data-line="775"><span class="sd">    Example: 10.5.3.2</span>
-</span><span data-line="776"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="777">
-</span><span data-line="778">    <span class="n">SERVER_SOCKET_PORT</span> <span class="o">=</span> <span class="s2">&quot;server.socket.port&quot;</span>
-</span><span data-line="779"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="780"><span class="sd">    Physical server port.</span>
-</span><span data-line="781"><span class="sd">    Recommended: If different than server.port.</span>
-</span><span data-line="782"><span class="sd">    Example: 16456</span>
-</span><span data-line="783"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="784">
-</span><span data-line="785">    <span class="n">THREAD_ID</span> <span class="o">=</span> <span class="s2">&quot;thread.id&quot;</span>
-</span><span data-line="786"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="787"><span class="sd">    Identifier of a thread from where the span originated. This should be a string.</span>
-</span><span data-line="788"><span class="sd">    Example: &quot;7972576320&quot;</span>
-</span><span data-line="789"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="790">
-</span><span data-line="791">    <span class="n">THREAD_NAME</span> <span class="o">=</span> <span class="s2">&quot;thread.name&quot;</span>
-</span><span data-line="792"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="793"><span class="sd">    Label identifying a thread from where the span originated. This should be a string.</span>
-</span><span data-line="794"><span class="sd">    Example: &quot;MainThread&quot;</span>
-</span><span data-line="795"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="796">
-</span><span data-line="797">    <span class="n">MCP_TOOL_NAME</span> <span class="o">=</span> <span class="s2">&quot;mcp.tool.name&quot;</span>
-</span><span data-line="798"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="799"><span class="sd">    The name of the MCP tool being called.</span>
-</span><span data-line="800"><span class="sd">    Example: &quot;get_weather&quot;</span>
-</span><span data-line="801"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="802">
-</span><span data-line="803">    <span class="n">MCP_PROMPT_NAME</span> <span class="o">=</span> <span class="s2">&quot;mcp.prompt.name&quot;</span>
-</span><span data-line="804"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="805"><span class="sd">    The name of the MCP prompt being retrieved.</span>
-</span><span data-line="806"><span class="sd">    Example: &quot;code_review&quot;</span>
-</span><span data-line="807"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="808">
-</span><span data-line="809">    <span class="n">MCP_RESOURCE_URI</span> <span class="o">=</span> <span class="s2">&quot;mcp.resource.uri&quot;</span>
-</span><span data-line="810"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="811"><span class="sd">    The URI of the MCP resource being accessed.</span>
-</span><span data-line="812"><span class="sd">    Example: &quot;file:///path/to/resource&quot;</span>
-</span><span data-line="813"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="814">
-</span><span data-line="815">    <span class="n">MCP_METHOD_NAME</span> <span class="o">=</span> <span class="s2">&quot;mcp.method.name&quot;</span>
-</span><span data-line="816"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="817"><span class="sd">    The MCP protocol method name being called.</span>
-</span><span data-line="818"><span class="sd">    Example: &quot;tools/call&quot;, &quot;prompts/get&quot;, &quot;resources/read&quot;</span>
-</span><span data-line="819"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="820">
-</span><span data-line="821">    <span class="n">MCP_REQUEST_ID</span> <span class="o">=</span> <span class="s2">&quot;mcp.request.id&quot;</span>
-</span><span data-line="822"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="823"><span class="sd">    The unique identifier for the MCP request.</span>
-</span><span data-line="824"><span class="sd">    Example: &quot;req_123abc&quot;</span>
-</span><span data-line="825"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="826">
-</span><span data-line="827">    <span class="n">MCP_TOOL_RESULT_CONTENT</span> <span class="o">=</span> <span class="s2">&quot;mcp.tool.result.content&quot;</span>
-</span><span data-line="828"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="829"><span class="sd">    The result/output content from an MCP tool execution.</span>
-</span><span data-line="830"><span class="sd">    Example: &quot;The weather is sunny&quot;</span>
-</span><span data-line="831"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="832">
-</span><span data-line="833">    <span class="n">MCP_TOOL_RESULT_CONTENT_COUNT</span> <span class="o">=</span> <span class="s2">&quot;mcp.tool.result.content_count&quot;</span>
-</span><span data-line="834"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="835"><span class="sd">    The number of items/keys in the MCP tool result.</span>
-</span><span data-line="836"><span class="sd">    Example: 5</span>
-</span><span data-line="837"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="838">
-</span><span data-line="839">    <span class="n">MCP_TOOL_RESULT_IS_ERROR</span> <span class="o">=</span> <span class="s2">&quot;mcp.tool.result.is_error&quot;</span>
-</span><span data-line="840"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="841"><span class="sd">    Whether the MCP tool execution resulted in an error.</span>
-</span><span data-line="842"><span class="sd">    Example: True</span>
-</span><span data-line="843"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="844">
-</span><span data-line="845">    <span class="n">MCP_PROMPT_RESULT_MESSAGE_CONTENT</span> <span class="o">=</span> <span class="s2">&quot;mcp.prompt.result.message_content&quot;</span>
-</span><span data-line="846"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="847"><span class="sd">    The message content from an MCP prompt retrieval.</span>
-</span><span data-line="848"><span class="sd">    Example: &quot;Review the following code...&quot;</span>
-</span><span data-line="849"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="850">
-</span><span data-line="851">    <span class="n">MCP_PROMPT_RESULT_MESSAGE_ROLE</span> <span class="o">=</span> <span class="s2">&quot;mcp.prompt.result.message_role&quot;</span>
-</span><span data-line="852"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="853"><span class="sd">    The role of the message in an MCP prompt retrieval (only set for single-message prompts).</span>
-</span><span data-line="854"><span class="sd">    Example: &quot;user&quot;, &quot;assistant&quot;, &quot;system&quot;</span>
-</span><span data-line="855"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="856">
-</span><span data-line="857">    <span class="n">MCP_PROMPT_RESULT_MESSAGE_COUNT</span> <span class="o">=</span> <span class="s2">&quot;mcp.prompt.result.message_count&quot;</span>
-</span><span data-line="858"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="859"><span class="sd">    The number of messages in an MCP prompt result.</span>
-</span><span data-line="860"><span class="sd">    Example: 1, 3</span>
-</span><span data-line="861"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="862">
-</span><span data-line="863">    <span class="n">MCP_RESOURCE_PROTOCOL</span> <span class="o">=</span> <span class="s2">&quot;mcp.resource.protocol&quot;</span>
-</span><span data-line="864"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="865"><span class="sd">    The protocol/scheme of the MCP resource URI.</span>
-</span><span data-line="866"><span class="sd">    Example: &quot;file&quot;, &quot;http&quot;, &quot;https&quot;</span>
-</span><span data-line="867"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="868">
-</span><span data-line="869">    <span class="n">MCP_TRANSPORT</span> <span class="o">=</span> <span class="s2">&quot;mcp.transport&quot;</span>
-</span><span data-line="870"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="871"><span class="sd">    The transport method used for MCP communication.</span>
-</span><span data-line="872"><span class="sd">    Example: &quot;http&quot;, &quot;sse&quot;, &quot;stdio&quot;</span>
-</span><span data-line="873"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="874">
-</span><span data-line="875">    <span class="n">MCP_SESSION_ID</span> <span class="o">=</span> <span class="s2">&quot;mcp.session.id&quot;</span>
-</span><span data-line="876"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="877"><span class="sd">    The session identifier for the MCP connection.</span>
-</span><span data-line="878"><span class="sd">    Example: &quot;a1b2c3d4e5f6&quot;</span>
-</span><span data-line="879"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="880">
+</span><span data-line="125">
+</span><span data-line="126"><span class="k">class</span><span class="w"> </span><span class="nc">SPANDATA</span><span class="p">:</span>
+</span><span data-line="127"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="128"><span class="sd">    Additional information describing the type of the span.</span>
+</span><span data-line="129"><span class="sd">    See: https://develop.sentry.dev/sdk/performance/span-data-conventions/</span>
+</span><span data-line="130"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="131">
+</span><span data-line="132">    <span class="n">AI_CITATIONS</span> <span class="o">=</span> <span class="s2">&quot;ai.citations&quot;</span>
+</span><span data-line="133"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="134"><span class="sd">    .. deprecated::</span>
+</span><span data-line="135"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="136">
+</span><span data-line="137"><span class="sd">    References or sources cited by the AI model in its response.</span>
+</span><span data-line="138"><span class="sd">    Example: [&quot;Smith et al. 2020&quot;, &quot;Jones 2019&quot;]</span>
+</span><span data-line="139"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="140">
+</span><span data-line="141">    <span class="n">AI_DOCUMENTS</span> <span class="o">=</span> <span class="s2">&quot;ai.documents&quot;</span>
+</span><span data-line="142"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="143"><span class="sd">    .. deprecated::</span>
+</span><span data-line="144"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="145">
+</span><span data-line="146"><span class="sd">    Documents or content chunks used as context for the AI model.</span>
+</span><span data-line="147"><span class="sd">    Example: [&quot;doc1.txt&quot;, &quot;doc2.pdf&quot;]</span>
+</span><span data-line="148"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="149">
+</span><span data-line="150">    <span class="n">AI_FINISH_REASON</span> <span class="o">=</span> <span class="s2">&quot;ai.finish_reason&quot;</span>
+</span><span data-line="151"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="152"><span class="sd">    .. deprecated::</span>
+</span><span data-line="153"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_FINISH_REASONS instead.</span>
+</span><span data-line="154">
+</span><span data-line="155"><span class="sd">    The reason why the model stopped generating.</span>
+</span><span data-line="156"><span class="sd">    Example: &quot;length&quot;</span>
+</span><span data-line="157"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="158">
+</span><span data-line="159">    <span class="n">AI_FREQUENCY_PENALTY</span> <span class="o">=</span> <span class="s2">&quot;ai.frequency_penalty&quot;</span>
+</span><span data-line="160"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="161"><span class="sd">    .. deprecated::</span>
+</span><span data-line="162"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_FREQUENCY_PENALTY instead.</span>
+</span><span data-line="163">
+</span><span data-line="164"><span class="sd">    Used to reduce repetitiveness of generated tokens.</span>
+</span><span data-line="165"><span class="sd">    Example: 0.5</span>
+</span><span data-line="166"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="167">
+</span><span data-line="168">    <span class="n">AI_FUNCTION_CALL</span> <span class="o">=</span> <span class="s2">&quot;ai.function_call&quot;</span>
+</span><span data-line="169"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="170"><span class="sd">    .. deprecated::</span>
+</span><span data-line="171"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.</span>
+</span><span data-line="172">
+</span><span data-line="173"><span class="sd">    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls</span>
+</span><span data-line="174"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="175">
+</span><span data-line="176">    <span class="n">AI_GENERATION_ID</span> <span class="o">=</span> <span class="s2">&quot;ai.generation_id&quot;</span>
+</span><span data-line="177"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="178"><span class="sd">    .. deprecated::</span>
+</span><span data-line="179"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_ID instead.</span>
+</span><span data-line="180">
+</span><span data-line="181"><span class="sd">    Unique identifier for the completion.</span>
+</span><span data-line="182"><span class="sd">    Example: &quot;gen_123abc&quot;</span>
+</span><span data-line="183"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="184">
+</span><span data-line="185">    <span class="n">AI_INPUT_MESSAGES</span> <span class="o">=</span> <span class="s2">&quot;ai.input_messages&quot;</span>
+</span><span data-line="186"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="187"><span class="sd">    .. deprecated::</span>
+</span><span data-line="188"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_MESSAGES instead.</span>
+</span><span data-line="189">
+</span><span data-line="190"><span class="sd">    The input messages to an LLM call.</span>
+</span><span data-line="191"><span class="sd">    Example: [{&quot;role&quot;: &quot;user&quot;, &quot;message&quot;: &quot;hello&quot;}]</span>
+</span><span data-line="192"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="193">
+</span><span data-line="194">    <span class="n">AI_LOGIT_BIAS</span> <span class="o">=</span> <span class="s2">&quot;ai.logit_bias&quot;</span>
+</span><span data-line="195"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="196"><span class="sd">    .. deprecated::</span>
+</span><span data-line="197"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="198">
+</span><span data-line="199"><span class="sd">    For an AI model call, the logit bias</span>
+</span><span data-line="200"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="201">
+</span><span data-line="202">    <span class="n">AI_METADATA</span> <span class="o">=</span> <span class="s2">&quot;ai.metadata&quot;</span>
+</span><span data-line="203"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="204"><span class="sd">    .. deprecated::</span>
+</span><span data-line="205"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="206">
+</span><span data-line="207"><span class="sd">    Extra metadata passed to an AI pipeline step.</span>
+</span><span data-line="208"><span class="sd">    Example: {&quot;executed_function&quot;: &quot;add_integers&quot;}</span>
+</span><span data-line="209"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="210">
+</span><span data-line="211">    <span class="n">AI_MODEL_ID</span> <span class="o">=</span> <span class="s2">&quot;ai.model_id&quot;</span>
+</span><span data-line="212"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="213"><span class="sd">    .. deprecated::</span>
+</span><span data-line="214"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_MODEL or GEN_AI_RESPONSE_MODEL instead.</span>
+</span><span data-line="215">
+</span><span data-line="216"><span class="sd">    The unique descriptor of the model being executed.</span>
+</span><span data-line="217"><span class="sd">    Example: gpt-4</span>
+</span><span data-line="218"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="219">
+</span><span data-line="220">    <span class="n">AI_PIPELINE_NAME</span> <span class="o">=</span> <span class="s2">&quot;ai.pipeline.name&quot;</span>
+</span><span data-line="221"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="222"><span class="sd">    .. deprecated::</span>
+</span><span data-line="223"><span class="sd">        This attribute is deprecated. Use GEN_AI_PIPELINE_NAME instead.</span>
+</span><span data-line="224">
+</span><span data-line="225"><span class="sd">    Name of the AI pipeline or chain being executed.</span>
+</span><span data-line="226"><span class="sd">    Example: &quot;qa-pipeline&quot;</span>
+</span><span data-line="227"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="228">
+</span><span data-line="229">    <span class="n">AI_PREAMBLE</span> <span class="o">=</span> <span class="s2">&quot;ai.preamble&quot;</span>
+</span><span data-line="230"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="231"><span class="sd">    .. deprecated::</span>
+</span><span data-line="232"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="233">
+</span><span data-line="234"><span class="sd">    For an AI model call, the preamble parameter.</span>
+</span><span data-line="235"><span class="sd">    Preambles are a part of the prompt used to adjust the model&#39;s overall behavior and conversation style.</span>
+</span><span data-line="236"><span class="sd">    Example: &quot;You are now a clown.&quot;</span>
+</span><span data-line="237"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="238">
+</span><span data-line="239">    <span class="n">AI_PRESENCE_PENALTY</span> <span class="o">=</span> <span class="s2">&quot;ai.presence_penalty&quot;</span>
+</span><span data-line="240"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="241"><span class="sd">    .. deprecated::</span>
+</span><span data-line="242"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_PRESENCE_PENALTY instead.</span>
+</span><span data-line="243">
+</span><span data-line="244"><span class="sd">    Used to reduce repetitiveness of generated tokens.</span>
+</span><span data-line="245"><span class="sd">    Example: 0.5</span>
+</span><span data-line="246"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="247">
+</span><span data-line="248">    <span class="n">AI_RAW_PROMPTING</span> <span class="o">=</span> <span class="s2">&quot;ai.raw_prompting&quot;</span>
+</span><span data-line="249"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="250"><span class="sd">    .. deprecated::</span>
+</span><span data-line="251"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="252">
+</span><span data-line="253"><span class="sd">    Minimize pre-processing done to the prompt sent to the LLM.</span>
+</span><span data-line="254"><span class="sd">    Example: true</span>
+</span><span data-line="255"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="256">
+</span><span data-line="257">    <span class="n">AI_RESPONSE_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;ai.response_format&quot;</span>
+</span><span data-line="258"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="259"><span class="sd">    .. deprecated::</span>
+</span><span data-line="260"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="261">
+</span><span data-line="262"><span class="sd">    For an AI model call, the format of the response</span>
+</span><span data-line="263"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="264">
+</span><span data-line="265">    <span class="n">AI_RESPONSES</span> <span class="o">=</span> <span class="s2">&quot;ai.responses&quot;</span>
+</span><span data-line="266"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="267"><span class="sd">    .. deprecated::</span>
+</span><span data-line="268"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_TEXT instead.</span>
+</span><span data-line="269">
+</span><span data-line="270"><span class="sd">    The responses to an AI model call. Always as a list.</span>
+</span><span data-line="271"><span class="sd">    Example: [&quot;hello&quot;, &quot;world&quot;]</span>
+</span><span data-line="272"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="273">
+</span><span data-line="274">    <span class="n">AI_SEARCH_QUERIES</span> <span class="o">=</span> <span class="s2">&quot;ai.search_queries&quot;</span>
+</span><span data-line="275"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="276"><span class="sd">    .. deprecated::</span>
+</span><span data-line="277"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="278">
+</span><span data-line="279"><span class="sd">    Queries used to search for relevant context or documents.</span>
+</span><span data-line="280"><span class="sd">    Example: [&quot;climate change effects&quot;, &quot;renewable energy&quot;]</span>
+</span><span data-line="281"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="282">
+</span><span data-line="283">    <span class="n">AI_SEARCH_REQUIRED</span> <span class="o">=</span> <span class="s2">&quot;ai.is_search_required&quot;</span>
+</span><span data-line="284"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="285"><span class="sd">    .. deprecated::</span>
+</span><span data-line="286"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="287">
+</span><span data-line="288"><span class="sd">    Boolean indicating if the model needs to perform a search.</span>
+</span><span data-line="289"><span class="sd">    Example: true</span>
+</span><span data-line="290"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="291">
+</span><span data-line="292">    <span class="n">AI_SEARCH_RESULTS</span> <span class="o">=</span> <span class="s2">&quot;ai.search_results&quot;</span>
+</span><span data-line="293"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="294"><span class="sd">    .. deprecated::</span>
+</span><span data-line="295"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="296">
+</span><span data-line="297"><span class="sd">    Results returned from search queries for context.</span>
+</span><span data-line="298"><span class="sd">    Example: [&quot;Result 1&quot;, &quot;Result 2&quot;]</span>
+</span><span data-line="299"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="300">
+</span><span data-line="301">    <span class="n">AI_SEED</span> <span class="o">=</span> <span class="s2">&quot;ai.seed&quot;</span>
+</span><span data-line="302"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="303"><span class="sd">    .. deprecated::</span>
+</span><span data-line="304"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_SEED instead.</span>
+</span><span data-line="305">
+</span><span data-line="306"><span class="sd">    The seed, ideally models given the same seed and same other parameters will produce the exact same output.</span>
+</span><span data-line="307"><span class="sd">    Example: 123.45</span>
+</span><span data-line="308"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="309">
+</span><span data-line="310">    <span class="n">AI_STREAMING</span> <span class="o">=</span> <span class="s2">&quot;ai.streaming&quot;</span>
+</span><span data-line="311"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="312"><span class="sd">    .. deprecated::</span>
+</span><span data-line="313"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_STREAMING instead.</span>
+</span><span data-line="314">
+</span><span data-line="315"><span class="sd">    Whether or not the AI model call&#39;s response was streamed back asynchronously</span>
+</span><span data-line="316"><span class="sd">    Example: true</span>
+</span><span data-line="317"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="318">
+</span><span data-line="319">    <span class="n">AI_TAGS</span> <span class="o">=</span> <span class="s2">&quot;ai.tags&quot;</span>
+</span><span data-line="320"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="321"><span class="sd">    .. deprecated::</span>
+</span><span data-line="322"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="323">
+</span><span data-line="324"><span class="sd">    Tags that describe an AI pipeline step.</span>
+</span><span data-line="325"><span class="sd">    Example: {&quot;executed_function&quot;: &quot;add_integers&quot;}</span>
+</span><span data-line="326"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="327">
+</span><span data-line="328">    <span class="n">AI_TEMPERATURE</span> <span class="o">=</span> <span class="s2">&quot;ai.temperature&quot;</span>
+</span><span data-line="329"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="330"><span class="sd">    .. deprecated::</span>
+</span><span data-line="331"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_TEMPERATURE instead.</span>
+</span><span data-line="332">
+</span><span data-line="333"><span class="sd">    For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.</span>
+</span><span data-line="334"><span class="sd">    Example: 0.5</span>
+</span><span data-line="335"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="336">
+</span><span data-line="337">    <span class="n">AI_TEXTS</span> <span class="o">=</span> <span class="s2">&quot;ai.texts&quot;</span>
+</span><span data-line="338"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="339"><span class="sd">    .. deprecated::</span>
+</span><span data-line="340"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="341">
+</span><span data-line="342"><span class="sd">    Raw text inputs provided to the model.</span>
+</span><span data-line="343"><span class="sd">    Example: [&quot;What is machine learning?&quot;]</span>
+</span><span data-line="344"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="345">
+</span><span data-line="346">    <span class="n">AI_TOP_K</span> <span class="o">=</span> <span class="s2">&quot;ai.top_k&quot;</span>
+</span><span data-line="347"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="348"><span class="sd">    .. deprecated::</span>
+</span><span data-line="349"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_K instead.</span>
+</span><span data-line="350">
+</span><span data-line="351"><span class="sd">    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.</span>
+</span><span data-line="352"><span class="sd">    Example: 35</span>
+</span><span data-line="353"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="354">
+</span><span data-line="355">    <span class="n">AI_TOP_P</span> <span class="o">=</span> <span class="s2">&quot;ai.top_p&quot;</span>
+</span><span data-line="356"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="357"><span class="sd">    .. deprecated::</span>
+</span><span data-line="358"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_P instead.</span>
+</span><span data-line="359">
+</span><span data-line="360"><span class="sd">    For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.</span>
+</span><span data-line="361"><span class="sd">    Example: 0.5</span>
+</span><span data-line="362"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="363">
+</span><span data-line="364">    <span class="n">AI_TOOL_CALLS</span> <span class="o">=</span> <span class="s2">&quot;ai.tool_calls&quot;</span>
+</span><span data-line="365"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="366"><span class="sd">    .. deprecated::</span>
+</span><span data-line="367"><span class="sd">        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.</span>
+</span><span data-line="368">
+</span><span data-line="369"><span class="sd">    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls</span>
+</span><span data-line="370"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="371">
+</span><span data-line="372">    <span class="n">AI_TOOLS</span> <span class="o">=</span> <span class="s2">&quot;ai.tools&quot;</span>
+</span><span data-line="373"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="374"><span class="sd">    .. deprecated::</span>
+</span><span data-line="375"><span class="sd">        This attribute is deprecated. Use GEN_AI_REQUEST_AVAILABLE_TOOLS instead.</span>
+</span><span data-line="376">
+</span><span data-line="377"><span class="sd">    For an AI model call, the functions that are available</span>
+</span><span data-line="378"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="379">
+</span><span data-line="380">    <span class="n">AI_WARNINGS</span> <span class="o">=</span> <span class="s2">&quot;ai.warnings&quot;</span>
+</span><span data-line="381"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="382"><span class="sd">    .. deprecated::</span>
+</span><span data-line="383"><span class="sd">        This attribute is deprecated. Use GEN_AI_* attributes instead.</span>
+</span><span data-line="384">
+</span><span data-line="385"><span class="sd">    Warning messages generated during model execution.</span>
+</span><span data-line="386"><span class="sd">    Example: [&quot;Token limit exceeded&quot;]</span>
+</span><span data-line="387"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="388">
+</span><span data-line="389">    <span class="n">CACHE_HIT</span> <span class="o">=</span> <span class="s2">&quot;cache.hit&quot;</span>
+</span><span data-line="390"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="391"><span class="sd">    A boolean indicating whether the requested data was found in the cache.</span>
+</span><span data-line="392"><span class="sd">    Example: true</span>
+</span><span data-line="393"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="394">
+</span><span data-line="395">    <span class="n">CACHE_ITEM_SIZE</span> <span class="o">=</span> <span class="s2">&quot;cache.item_size&quot;</span>
+</span><span data-line="396"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="397"><span class="sd">    The size of the requested data in bytes.</span>
+</span><span data-line="398"><span class="sd">    Example: 58</span>
+</span><span data-line="399"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="400">
+</span><span data-line="401">    <span class="n">CACHE_KEY</span> <span class="o">=</span> <span class="s2">&quot;cache.key&quot;</span>
+</span><span data-line="402"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="403"><span class="sd">    The key of the requested data.</span>
+</span><span data-line="404"><span class="sd">    Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3</span>
+</span><span data-line="405"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="406">
+</span><span data-line="407">    <span class="n">CODE_FILEPATH</span> <span class="o">=</span> <span class="s2">&quot;code.filepath&quot;</span>
+</span><span data-line="408"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="409"><span class="sd">    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).</span>
+</span><span data-line="410"><span class="sd">    Example: &quot;/app/myapplication/http/handler/server.py&quot;</span>
+</span><span data-line="411"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="412">
+</span><span data-line="413">    <span class="n">CODE_FUNCTION</span> <span class="o">=</span> <span class="s2">&quot;code.function&quot;</span>
+</span><span data-line="414"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="415"><span class="sd">    The method or function name, or equivalent (usually rightmost part of the code unit&#39;s name).</span>
+</span><span data-line="416"><span class="sd">    Example: &quot;server_request&quot;</span>
+</span><span data-line="417"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="418">
+</span><span data-line="419">    <span class="n">CODE_LINENO</span> <span class="o">=</span> <span class="s2">&quot;code.lineno&quot;</span>
+</span><span data-line="420"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="421"><span class="sd">    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.</span>
+</span><span data-line="422"><span class="sd">    Example: 42</span>
+</span><span data-line="423"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="424">
+</span><span data-line="425">    <span class="n">CODE_NAMESPACE</span> <span class="o">=</span> <span class="s2">&quot;code.namespace&quot;</span>
+</span><span data-line="426"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="427"><span class="sd">    The &quot;namespace&quot; within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.</span>
+</span><span data-line="428"><span class="sd">    Example: &quot;http.handler&quot;</span>
+</span><span data-line="429"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="430">
+</span><span data-line="431">    <span class="n">DB_MONGODB_COLLECTION</span> <span class="o">=</span> <span class="s2">&quot;db.mongodb.collection&quot;</span>
+</span><span data-line="432"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="433"><span class="sd">    The MongoDB collection being accessed within the database.</span>
+</span><span data-line="434"><span class="sd">    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes</span>
+</span><span data-line="435"><span class="sd">    Example: public.users; customers</span>
+</span><span data-line="436"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="437">
+</span><span data-line="438">    <span class="n">DB_NAME</span> <span class="o">=</span> <span class="s2">&quot;db.name&quot;</span>
+</span><span data-line="439"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="440"><span class="sd">    The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).</span>
+</span><span data-line="441"><span class="sd">    Example: myDatabase</span>
+</span><span data-line="442"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="443">
+</span><span data-line="444">    <span class="n">DB_OPERATION</span> <span class="o">=</span> <span class="s2">&quot;db.operation&quot;</span>
+</span><span data-line="445"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="446"><span class="sd">    The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.</span>
+</span><span data-line="447"><span class="sd">    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md</span>
+</span><span data-line="448"><span class="sd">    Example: findAndModify, HMSET, SELECT</span>
+</span><span data-line="449"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="450">
+</span><span data-line="451">    <span class="n">DB_SYSTEM</span> <span class="o">=</span> <span class="s2">&quot;db.system&quot;</span>
+</span><span data-line="452"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="453"><span class="sd">    An identifier for the database management system (DBMS) product being used.</span>
+</span><span data-line="454"><span class="sd">    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md</span>
+</span><span data-line="455"><span class="sd">    Example: postgresql</span>
+</span><span data-line="456"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="457">
+</span><span data-line="458">    <span class="n">DB_USER</span> <span class="o">=</span> <span class="s2">&quot;db.user&quot;</span>
+</span><span data-line="459"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="460"><span class="sd">    The name of the database user used for connecting to the database.</span>
+</span><span data-line="461"><span class="sd">    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md</span>
+</span><span data-line="462"><span class="sd">    Example: my_user</span>
+</span><span data-line="463"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="464">
+</span><span data-line="465">    <span class="n">GEN_AI_AGENT_NAME</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.agent.name&quot;</span>
+</span><span data-line="466"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="467"><span class="sd">    The name of the agent being used.</span>
+</span><span data-line="468"><span class="sd">    Example: &quot;ResearchAssistant&quot;</span>
+</span><span data-line="469"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="470">
+</span><span data-line="471">    <span class="n">GEN_AI_CONVERSATION_ID</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.conversation.id&quot;</span>
+</span><span data-line="472"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="473"><span class="sd">    The unique identifier for the conversation/thread with the AI model.</span>
+</span><span data-line="474"><span class="sd">    Example: &quot;conv_abc123&quot;</span>
+</span><span data-line="475"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="476">
+</span><span data-line="477">    <span class="n">GEN_AI_CHOICE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.choice&quot;</span>
+</span><span data-line="478"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="479"><span class="sd">    The model&#39;s response message.</span>
+</span><span data-line="480"><span class="sd">    Example: &quot;The weather in Paris is rainy and overcast, with temperatures around 57°F&quot;</span>
+</span><span data-line="481"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="482">
+</span><span data-line="483">    <span class="n">GEN_AI_EMBEDDINGS_INPUT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.embeddings.input&quot;</span>
+</span><span data-line="484"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="485"><span class="sd">    The input to the embeddings operation.</span>
+</span><span data-line="486"><span class="sd">    Example: &quot;Hello!&quot;</span>
+</span><span data-line="487"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="488">
+</span><span data-line="489">    <span class="n">GEN_AI_OPERATION_NAME</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.operation.name&quot;</span>
+</span><span data-line="490"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="491"><span class="sd">    The name of the operation being performed.</span>
+</span><span data-line="492"><span class="sd">    Example: &quot;chat&quot;</span>
+</span><span data-line="493"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="494">
+</span><span data-line="495">    <span class="n">GEN_AI_PIPELINE_NAME</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.pipeline.name&quot;</span>
+</span><span data-line="496"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="497"><span class="sd">    Name of the AI pipeline or chain being executed.</span>
+</span><span data-line="498"><span class="sd">    Example: &quot;qa-pipeline&quot;</span>
+</span><span data-line="499"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="500">
+</span><span data-line="501">    <span class="n">GEN_AI_RESPONSE_FINISH_REASONS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.finish_reasons&quot;</span>
+</span><span data-line="502"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="503"><span class="sd">    The reason why the model stopped generating.</span>
+</span><span data-line="504"><span class="sd">    Example: &quot;COMPLETE&quot;</span>
+</span><span data-line="505"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="506">
+</span><span data-line="507">    <span class="n">GEN_AI_RESPONSE_ID</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.id&quot;</span>
+</span><span data-line="508"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="509"><span class="sd">    Unique identifier for the completion.</span>
+</span><span data-line="510"><span class="sd">    Example: &quot;gen_123abc&quot;</span>
+</span><span data-line="511"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="512">
+</span><span data-line="513">    <span class="n">GEN_AI_RESPONSE_MODEL</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.model&quot;</span>
+</span><span data-line="514"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="515"><span class="sd">    Exact model identifier used to generate the response</span>
+</span><span data-line="516"><span class="sd">    Example: gpt-4o-mini-2024-07-18</span>
+</span><span data-line="517"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="518">
+</span><span data-line="519">    <span class="n">GEN_AI_RESPONSE_STREAMING</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.streaming&quot;</span>
+</span><span data-line="520"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="521"><span class="sd">    Whether or not the AI model call&#39;s response was streamed back asynchronously</span>
+</span><span data-line="522"><span class="sd">    Example: true</span>
+</span><span data-line="523"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="524">
+</span><span data-line="525">    <span class="n">GEN_AI_RESPONSE_TEXT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.text&quot;</span>
+</span><span data-line="526"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="527"><span class="sd">    The model&#39;s response text messages.</span>
+</span><span data-line="528"><span class="sd">    Example: [&quot;The weather in Paris is rainy and overcast, with temperatures around 57°F&quot;, &quot;The weather in London is sunny and warm, with temperatures around 65°F&quot;]</span>
+</span><span data-line="529"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="530">
+</span><span data-line="531">    <span class="n">GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.time_to_first_token&quot;</span>
+</span><span data-line="532"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="533"><span class="sd">    The time it took to receive the first token from the model.</span>
+</span><span data-line="534"><span class="sd">    Example: 0.1</span>
+</span><span data-line="535"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="536">
+</span><span data-line="537">    <span class="n">GEN_AI_RESPONSE_TOOL_CALLS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.response.tool_calls&quot;</span>
+</span><span data-line="538"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="539"><span class="sd">    The tool calls in the model&#39;s response.</span>
+</span><span data-line="540"><span class="sd">    Example: [{&quot;name&quot;: &quot;get_weather&quot;, &quot;arguments&quot;: {&quot;location&quot;: &quot;Paris&quot;}}]</span>
+</span><span data-line="541"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="542">
+</span><span data-line="543">    <span class="n">GEN_AI_REQUEST_AVAILABLE_TOOLS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.available_tools&quot;</span>
+</span><span data-line="544"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="545"><span class="sd">    The available tools for the model.</span>
+</span><span data-line="546"><span class="sd">    Example: [{&quot;name&quot;: &quot;get_weather&quot;, &quot;description&quot;: &quot;Get the weather for a given location&quot;}, {&quot;name&quot;: &quot;get_news&quot;, &quot;description&quot;: &quot;Get the news for a given topic&quot;}]</span>
+</span><span data-line="547"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="548">
+</span><span data-line="549">    <span class="n">GEN_AI_REQUEST_FREQUENCY_PENALTY</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.frequency_penalty&quot;</span>
+</span><span data-line="550"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="551"><span class="sd">    The frequency penalty parameter used to reduce repetitiveness of generated tokens.</span>
+</span><span data-line="552"><span class="sd">    Example: 0.1</span>
+</span><span data-line="553"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="554">
+</span><span data-line="555">    <span class="n">GEN_AI_REQUEST_MAX_TOKENS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.max_tokens&quot;</span>
+</span><span data-line="556"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="557"><span class="sd">    The maximum number of tokens to generate in the response.</span>
+</span><span data-line="558"><span class="sd">    Example: 2048</span>
+</span><span data-line="559"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="560">
+</span><span data-line="561">    <span class="n">GEN_AI_SYSTEM_INSTRUCTIONS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.system_instructions&quot;</span>
+</span><span data-line="562"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="563"><span class="sd">    The system instructions passed to the model.</span>
+</span><span data-line="564"><span class="sd">    Example: [{&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;You are a helpful assistant.&quot;},{&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: &quot;Be concise and clear.&quot;}]</span>
+</span><span data-line="565"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="566">
+</span><span data-line="567">    <span class="n">GEN_AI_REQUEST_MESSAGES</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.messages&quot;</span>
+</span><span data-line="568"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="569"><span class="sd">    The messages passed to the model. The &quot;content&quot; can be a string or an array of objects.</span>
+</span><span data-line="570"><span class="sd">    Example: [{role: &quot;system&quot;, &quot;content: &quot;Generate a random number.&quot;}, {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: [{&quot;text&quot;: &quot;Generate a random number between 0 and 10.&quot;, &quot;type&quot;: &quot;text&quot;}]}]</span>
+</span><span data-line="571"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="572">
+</span><span data-line="573">    <span class="n">GEN_AI_REQUEST_MODEL</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.model&quot;</span>
+</span><span data-line="574"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="575"><span class="sd">    The model identifier being used for the request.</span>
+</span><span data-line="576"><span class="sd">    Example: &quot;gpt-4-turbo&quot;</span>
+</span><span data-line="577"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="578">
+</span><span data-line="579">    <span class="n">GEN_AI_REQUEST_PRESENCE_PENALTY</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.presence_penalty&quot;</span>
+</span><span data-line="580"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="581"><span class="sd">    The presence penalty parameter used to reduce repetitiveness of generated tokens.</span>
+</span><span data-line="582"><span class="sd">    Example: 0.1</span>
+</span><span data-line="583"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="584">
+</span><span data-line="585">    <span class="n">GEN_AI_REQUEST_SEED</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.seed&quot;</span>
+</span><span data-line="586"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="587"><span class="sd">    The seed, ideally models given the same seed and same other parameters will produce the exact same output.</span>
+</span><span data-line="588"><span class="sd">    Example: &quot;1234567890&quot;</span>
+</span><span data-line="589"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="590">
+</span><span data-line="591">    <span class="n">GEN_AI_REQUEST_TEMPERATURE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.temperature&quot;</span>
+</span><span data-line="592"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="593"><span class="sd">    The temperature parameter used to control randomness in the output.</span>
+</span><span data-line="594"><span class="sd">    Example: 0.7</span>
+</span><span data-line="595"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="596">
+</span><span data-line="597">    <span class="n">GEN_AI_REQUEST_TOP_K</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.top_k&quot;</span>
+</span><span data-line="598"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="599"><span class="sd">    Limits the model to only consider the K most likely next tokens, where K is an integer (e.g., top_k=20 means only the 20 highest probability tokens are considered).</span>
+</span><span data-line="600"><span class="sd">    Example: 35</span>
+</span><span data-line="601"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="602">
+</span><span data-line="603">    <span class="n">GEN_AI_REQUEST_TOP_P</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.request.top_p&quot;</span>
+</span><span data-line="604"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="605"><span class="sd">    The top_p parameter used to control diversity via nucleus sampling.</span>
+</span><span data-line="606"><span class="sd">    Example: 1.0</span>
+</span><span data-line="607"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="608">
+</span><span data-line="609">    <span class="n">GEN_AI_SYSTEM</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.system&quot;</span>
+</span><span data-line="610"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="611"><span class="sd">    The name of the AI system being used.</span>
+</span><span data-line="612"><span class="sd">    Example: &quot;openai&quot;</span>
+</span><span data-line="613"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="614">
+</span><span data-line="615">    <span class="n">GEN_AI_TOOL_DESCRIPTION</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.description&quot;</span>
+</span><span data-line="616"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="617"><span class="sd">    The description of the tool being used.</span>
+</span><span data-line="618"><span class="sd">    Example: &quot;Searches the web for current information about a topic&quot;</span>
+</span><span data-line="619"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="620">
+</span><span data-line="621">    <span class="n">GEN_AI_TOOL_INPUT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.input&quot;</span>
+</span><span data-line="622"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="623"><span class="sd">    The input of the tool being used.</span>
+</span><span data-line="624"><span class="sd">    Example: {&quot;location&quot;: &quot;Paris&quot;}</span>
+</span><span data-line="625"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="626">
+</span><span data-line="627">    <span class="n">GEN_AI_TOOL_NAME</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.name&quot;</span>
+</span><span data-line="628"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="629"><span class="sd">    The name of the tool being used.</span>
+</span><span data-line="630"><span class="sd">    Example: &quot;web_search&quot;</span>
+</span><span data-line="631"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="632">
+</span><span data-line="633">    <span class="n">GEN_AI_TOOL_OUTPUT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.output&quot;</span>
+</span><span data-line="634"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="635"><span class="sd">    The output of the tool being used.</span>
+</span><span data-line="636"><span class="sd">    Example: &quot;rainy, 57°F&quot;</span>
+</span><span data-line="637"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="638">
+</span><span data-line="639">    <span class="n">GEN_AI_TOOL_TYPE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.tool.type&quot;</span>
+</span><span data-line="640"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="641"><span class="sd">    The type of tool being used.</span>
+</span><span data-line="642"><span class="sd">    Example: &quot;function&quot;</span>
+</span><span data-line="643"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="644">
+</span><span data-line="645">    <span class="n">GEN_AI_USAGE_INPUT_TOKENS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.input_tokens&quot;</span>
+</span><span data-line="646"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="647"><span class="sd">    The number of tokens in the input.</span>
+</span><span data-line="648"><span class="sd">    Example: 150</span>
+</span><span data-line="649"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="650">
+</span><span data-line="651">    <span class="n">GEN_AI_USAGE_INPUT_TOKENS_CACHED</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.input_tokens.cached&quot;</span>
+</span><span data-line="652"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="653"><span class="sd">    The number of cached tokens in the input.</span>
+</span><span data-line="654"><span class="sd">    Example: 50</span>
+</span><span data-line="655"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="656">
+</span><span data-line="657">    <span class="n">GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.input_tokens.cache_write&quot;</span>
+</span><span data-line="658"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="659"><span class="sd">    The number of tokens written to the cache when processing the AI input (prompt).</span>
+</span><span data-line="660"><span class="sd">    Example: 100</span>
+</span><span data-line="661"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="662">
+</span><span data-line="663">    <span class="n">GEN_AI_USAGE_OUTPUT_TOKENS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.output_tokens&quot;</span>
+</span><span data-line="664"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="665"><span class="sd">    The number of tokens in the output.</span>
+</span><span data-line="666"><span class="sd">    Example: 250</span>
+</span><span data-line="667"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="668">
+</span><span data-line="669">    <span class="n">GEN_AI_USAGE_OUTPUT_TOKENS_REASONING</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.output_tokens.reasoning&quot;</span>
+</span><span data-line="670"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="671"><span class="sd">    The number of tokens used for reasoning in the output.</span>
+</span><span data-line="672"><span class="sd">    Example: 75</span>
+</span><span data-line="673"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="674">
+</span><span data-line="675">    <span class="n">GEN_AI_USAGE_TOTAL_TOKENS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.usage.total_tokens&quot;</span>
+</span><span data-line="676"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="677"><span class="sd">    The total number of tokens used (input + output).</span>
+</span><span data-line="678"><span class="sd">    Example: 400</span>
+</span><span data-line="679"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="680">
+</span><span data-line="681">    <span class="n">GEN_AI_USER_MESSAGE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.user.message&quot;</span>
+</span><span data-line="682"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="683"><span class="sd">    The user message passed to the model.</span>
+</span><span data-line="684"><span class="sd">    Example: &quot;What&#39;s the weather in Paris?&quot;</span>
+</span><span data-line="685"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="686">
+</span><span data-line="687">    <span class="n">HTTP_FRAGMENT</span> <span class="o">=</span> <span class="s2">&quot;http.fragment&quot;</span>
+</span><span data-line="688"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="689"><span class="sd">    The Fragments present in the URL.</span>
+</span><span data-line="690"><span class="sd">    Example: #foo=bar</span>
+</span><span data-line="691"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="692">
+</span><span data-line="693">    <span class="n">HTTP_METHOD</span> <span class="o">=</span> <span class="s2">&quot;http.method&quot;</span>
+</span><span data-line="694"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="695"><span class="sd">    The HTTP method used.</span>
+</span><span data-line="696"><span class="sd">    Example: GET</span>
+</span><span data-line="697"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="698">
+</span><span data-line="699">    <span class="n">HTTP_QUERY</span> <span class="o">=</span> <span class="s2">&quot;http.query&quot;</span>
+</span><span data-line="700"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="701"><span class="sd">    The Query string present in the URL.</span>
+</span><span data-line="702"><span class="sd">    Example: ?foo=bar&amp;bar=baz</span>
+</span><span data-line="703"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="704">
+</span><span data-line="705">    <span class="n">HTTP_STATUS_CODE</span> <span class="o">=</span> <span class="s2">&quot;http.response.status_code&quot;</span>
+</span><span data-line="706"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="707"><span class="sd">    The HTTP status code as an integer.</span>
+</span><span data-line="708"><span class="sd">    Example: 418</span>
+</span><span data-line="709"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="710">
+</span><span data-line="711">    <span class="n">MESSAGING_DESTINATION_NAME</span> <span class="o">=</span> <span class="s2">&quot;messaging.destination.name&quot;</span>
+</span><span data-line="712"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="713"><span class="sd">    The destination name where the message is being consumed from,</span>
+</span><span data-line="714"><span class="sd">    e.g. the queue name or topic.</span>
+</span><span data-line="715"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="716">
+</span><span data-line="717">    <span class="n">MESSAGING_MESSAGE_ID</span> <span class="o">=</span> <span class="s2">&quot;messaging.message.id&quot;</span>
+</span><span data-line="718"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="719"><span class="sd">    The message&#39;s identifier.</span>
+</span><span data-line="720"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="721">
+</span><span data-line="722">    <span class="n">MESSAGING_MESSAGE_RECEIVE_LATENCY</span> <span class="o">=</span> <span class="s2">&quot;messaging.message.receive.latency&quot;</span>
+</span><span data-line="723"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="724"><span class="sd">    The latency between when the task was enqueued and when it was started to be processed.</span>
+</span><span data-line="725"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="726">
+</span><span data-line="727">    <span class="n">MESSAGING_MESSAGE_RETRY_COUNT</span> <span class="o">=</span> <span class="s2">&quot;messaging.message.retry.count&quot;</span>
+</span><span data-line="728"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="729"><span class="sd">    Number of retries/attempts to process a message.</span>
+</span><span data-line="730"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="731">
+</span><span data-line="732">    <span class="n">MESSAGING_SYSTEM</span> <span class="o">=</span> <span class="s2">&quot;messaging.system&quot;</span>
+</span><span data-line="733"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="734"><span class="sd">    The messaging system&#39;s name, e.g. `kafka`, `aws_sqs`</span>
+</span><span data-line="735"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="736">
+</span><span data-line="737">    <span class="n">NETWORK_PEER_ADDRESS</span> <span class="o">=</span> <span class="s2">&quot;network.peer.address&quot;</span>
+</span><span data-line="738"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="739"><span class="sd">    Peer address of the network connection - IP address or Unix domain socket name.</span>
+</span><span data-line="740"><span class="sd">    Example: 10.1.2.80, /tmp/my.sock, localhost</span>
+</span><span data-line="741"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="742">
+</span><span data-line="743">    <span class="n">NETWORK_PEER_PORT</span> <span class="o">=</span> <span class="s2">&quot;network.peer.port&quot;</span>
+</span><span data-line="744"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="745"><span class="sd">    Peer port number of the network connection.</span>
+</span><span data-line="746"><span class="sd">    Example: 6379</span>
+</span><span data-line="747"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="748">
+</span><span data-line="749">    <span class="n">NETWORK_TRANSPORT</span> <span class="o">=</span> <span class="s2">&quot;network.transport&quot;</span>
+</span><span data-line="750"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="751"><span class="sd">    The transport protocol used for the network connection.</span>
+</span><span data-line="752"><span class="sd">    Example: &quot;tcp&quot;, &quot;udp&quot;, &quot;unix&quot;</span>
+</span><span data-line="753"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="754">
+</span><span data-line="755">    <span class="n">PROFILER_ID</span> <span class="o">=</span> <span class="s2">&quot;profiler_id&quot;</span>
+</span><span data-line="756"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="757"><span class="sd">    Label identifying the profiler id that the span occurred in. This should be a string.</span>
+</span><span data-line="758"><span class="sd">    Example: &quot;5249fbada8d5416482c2f6e47e337372&quot;</span>
+</span><span data-line="759"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="760">
+</span><span data-line="761">    <span class="n">SERVER_ADDRESS</span> <span class="o">=</span> <span class="s2">&quot;server.address&quot;</span>
+</span><span data-line="762"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="763"><span class="sd">    Name of the database host.</span>
+</span><span data-line="764"><span class="sd">    Example: example.com</span>
+</span><span data-line="765"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="766">
+</span><span data-line="767">    <span class="n">SERVER_PORT</span> <span class="o">=</span> <span class="s2">&quot;server.port&quot;</span>
+</span><span data-line="768"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="769"><span class="sd">    Logical server port number</span>
+</span><span data-line="770"><span class="sd">    Example: 80; 8080; 443</span>
+</span><span data-line="771"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="772">
+</span><span data-line="773">    <span class="n">SERVER_SOCKET_ADDRESS</span> <span class="o">=</span> <span class="s2">&quot;server.socket.address&quot;</span>
+</span><span data-line="774"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="775"><span class="sd">    Physical server IP address or Unix socket address.</span>
+</span><span data-line="776"><span class="sd">    Example: 10.5.3.2</span>
+</span><span data-line="777"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="778">
+</span><span data-line="779">    <span class="n">SERVER_SOCKET_PORT</span> <span class="o">=</span> <span class="s2">&quot;server.socket.port&quot;</span>
+</span><span data-line="780"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="781"><span class="sd">    Physical server port.</span>
+</span><span data-line="782"><span class="sd">    Recommended: If different than server.port.</span>
+</span><span data-line="783"><span class="sd">    Example: 16456</span>
+</span><span data-line="784"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="785">
+</span><span data-line="786">    <span class="n">THREAD_ID</span> <span class="o">=</span> <span class="s2">&quot;thread.id&quot;</span>
+</span><span data-line="787"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="788"><span class="sd">    Identifier of a thread from where the span originated. This should be a string.</span>
+</span><span data-line="789"><span class="sd">    Example: &quot;7972576320&quot;</span>
+</span><span data-line="790"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="791">
+</span><span data-line="792">    <span class="n">THREAD_NAME</span> <span class="o">=</span> <span class="s2">&quot;thread.name&quot;</span>
+</span><span data-line="793"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="794"><span class="sd">    Label identifying a thread from where the span originated. This should be a string.</span>
+</span><span data-line="795"><span class="sd">    Example: &quot;MainThread&quot;</span>
+</span><span data-line="796"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="797">
+</span><span data-line="798">    <span class="n">MCP_TOOL_NAME</span> <span class="o">=</span> <span class="s2">&quot;mcp.tool.name&quot;</span>
+</span><span data-line="799"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="800"><span class="sd">    The name of the MCP tool being called.</span>
+</span><span data-line="801"><span class="sd">    Example: &quot;get_weather&quot;</span>
+</span><span data-line="802"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="803">
+</span><span data-line="804">    <span class="n">MCP_PROMPT_NAME</span> <span class="o">=</span> <span class="s2">&quot;mcp.prompt.name&quot;</span>
+</span><span data-line="805"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="806"><span class="sd">    The name of the MCP prompt being retrieved.</span>
+</span><span data-line="807"><span class="sd">    Example: &quot;code_review&quot;</span>
+</span><span data-line="808"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="809">
+</span><span data-line="810">    <span class="n">MCP_RESOURCE_URI</span> <span class="o">=</span> <span class="s2">&quot;mcp.resource.uri&quot;</span>
+</span><span data-line="811"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="812"><span class="sd">    The URI of the MCP resource being accessed.</span>
+</span><span data-line="813"><span class="sd">    Example: &quot;file:///path/to/resource&quot;</span>
+</span><span data-line="814"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="815">
+</span><span data-line="816">    <span class="n">MCP_METHOD_NAME</span> <span class="o">=</span> <span class="s2">&quot;mcp.method.name&quot;</span>
+</span><span data-line="817"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="818"><span class="sd">    The MCP protocol method name being called.</span>
+</span><span data-line="819"><span class="sd">    Example: &quot;tools/call&quot;, &quot;prompts/get&quot;, &quot;resources/read&quot;</span>
+</span><span data-line="820"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="821">
+</span><span data-line="822">    <span class="n">MCP_REQUEST_ID</span> <span class="o">=</span> <span class="s2">&quot;mcp.request.id&quot;</span>
+</span><span data-line="823"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="824"><span class="sd">    The unique identifier for the MCP request.</span>
+</span><span data-line="825"><span class="sd">    Example: &quot;req_123abc&quot;</span>
+</span><span data-line="826"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="827">
+</span><span data-line="828">    <span class="n">MCP_TOOL_RESULT_CONTENT</span> <span class="o">=</span> <span class="s2">&quot;mcp.tool.result.content&quot;</span>
+</span><span data-line="829"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="830"><span class="sd">    The result/output content from an MCP tool execution.</span>
+</span><span data-line="831"><span class="sd">    Example: &quot;The weather is sunny&quot;</span>
+</span><span data-line="832"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="833">
+</span><span data-line="834">    <span class="n">MCP_TOOL_RESULT_CONTENT_COUNT</span> <span class="o">=</span> <span class="s2">&quot;mcp.tool.result.content_count&quot;</span>
+</span><span data-line="835"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="836"><span class="sd">    The number of items/keys in the MCP tool result.</span>
+</span><span data-line="837"><span class="sd">    Example: 5</span>
+</span><span data-line="838"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="839">
+</span><span data-line="840">    <span class="n">MCP_TOOL_RESULT_IS_ERROR</span> <span class="o">=</span> <span class="s2">&quot;mcp.tool.result.is_error&quot;</span>
+</span><span data-line="841"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="842"><span class="sd">    Whether the MCP tool execution resulted in an error.</span>
+</span><span data-line="843"><span class="sd">    Example: True</span>
+</span><span data-line="844"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="845">
+</span><span data-line="846">    <span class="n">MCP_PROMPT_RESULT_MESSAGE_CONTENT</span> <span class="o">=</span> <span class="s2">&quot;mcp.prompt.result.message_content&quot;</span>
+</span><span data-line="847"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="848"><span class="sd">    The message content from an MCP prompt retrieval.</span>
+</span><span data-line="849"><span class="sd">    Example: &quot;Review the following code...&quot;</span>
+</span><span data-line="850"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="851">
+</span><span data-line="852">    <span class="n">MCP_PROMPT_RESULT_MESSAGE_ROLE</span> <span class="o">=</span> <span class="s2">&quot;mcp.prompt.result.message_role&quot;</span>
+</span><span data-line="853"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="854"><span class="sd">    The role of the message in an MCP prompt retrieval (only set for single-message prompts).</span>
+</span><span data-line="855"><span class="sd">    Example: &quot;user&quot;, &quot;assistant&quot;, &quot;system&quot;</span>
+</span><span data-line="856"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="857">
+</span><span data-line="858">    <span class="n">MCP_PROMPT_RESULT_MESSAGE_COUNT</span> <span class="o">=</span> <span class="s2">&quot;mcp.prompt.result.message_count&quot;</span>
+</span><span data-line="859"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="860"><span class="sd">    The number of messages in an MCP prompt result.</span>
+</span><span data-line="861"><span class="sd">    Example: 1, 3</span>
+</span><span data-line="862"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="863">
+</span><span data-line="864">    <span class="n">MCP_RESOURCE_PROTOCOL</span> <span class="o">=</span> <span class="s2">&quot;mcp.resource.protocol&quot;</span>
+</span><span data-line="865"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="866"><span class="sd">    The protocol/scheme of the MCP resource URI.</span>
+</span><span data-line="867"><span class="sd">    Example: &quot;file&quot;, &quot;http&quot;, &quot;https&quot;</span>
+</span><span data-line="868"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="869">
+</span><span data-line="870">    <span class="n">MCP_TRANSPORT</span> <span class="o">=</span> <span class="s2">&quot;mcp.transport&quot;</span>
+</span><span data-line="871"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="872"><span class="sd">    The transport method used for MCP communication.</span>
+</span><span data-line="873"><span class="sd">    Example: &quot;http&quot;, &quot;sse&quot;, &quot;stdio&quot;</span>
+</span><span data-line="874"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="875">
+</span><span data-line="876">    <span class="n">MCP_SESSION_ID</span> <span class="o">=</span> <span class="s2">&quot;mcp.session.id&quot;</span>
+</span><span data-line="877"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="878"><span class="sd">    The session identifier for the MCP connection.</span>
+</span><span data-line="879"><span class="sd">    Example: &quot;a1b2c3d4e5f6&quot;</span>
+</span><span data-line="880"><span class="sd">    &quot;&quot;&quot;</span>
 </span><span data-line="881">
-</span><span data-line="882"><span class="k">class</span><span class="w"> </span><span class="nc">SPANSTATUS</span><span class="p">:</span>
-</span><span data-line="883"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="884"><span class="sd">    The status of a Sentry span.</span>
-</span><span data-line="885">
-</span><span data-line="886"><span class="sd">    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context</span>
-</span><span data-line="887"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="888">
-</span><span data-line="889">    <span class="n">ABORTED</span> <span class="o">=</span> <span class="s2">&quot;aborted&quot;</span>
-</span><span data-line="890">    <span class="n">ALREADY_EXISTS</span> <span class="o">=</span> <span class="s2">&quot;already_exists&quot;</span>
-</span><span data-line="891">    <span class="n">CANCELLED</span> <span class="o">=</span> <span class="s2">&quot;cancelled&quot;</span>
-</span><span data-line="892">    <span class="n">DATA_LOSS</span> <span class="o">=</span> <span class="s2">&quot;data_loss&quot;</span>
-</span><span data-line="893">    <span class="n">DEADLINE_EXCEEDED</span> <span class="o">=</span> <span class="s2">&quot;deadline_exceeded&quot;</span>
-</span><span data-line="894">    <span class="n">FAILED_PRECONDITION</span> <span class="o">=</span> <span class="s2">&quot;failed_precondition&quot;</span>
-</span><span data-line="895">    <span class="n">INTERNAL_ERROR</span> <span class="o">=</span> <span class="s2">&quot;internal_error&quot;</span>
-</span><span data-line="896">    <span class="n">INVALID_ARGUMENT</span> <span class="o">=</span> <span class="s2">&quot;invalid_argument&quot;</span>
-</span><span data-line="897">    <span class="n">NOT_FOUND</span> <span class="o">=</span> <span class="s2">&quot;not_found&quot;</span>
-</span><span data-line="898">    <span class="n">OK</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
-</span><span data-line="899">    <span class="n">OUT_OF_RANGE</span> <span class="o">=</span> <span class="s2">&quot;out_of_range&quot;</span>
-</span><span data-line="900">    <span class="n">PERMISSION_DENIED</span> <span class="o">=</span> <span class="s2">&quot;permission_denied&quot;</span>
-</span><span data-line="901">    <span class="n">RESOURCE_EXHAUSTED</span> <span class="o">=</span> <span class="s2">&quot;resource_exhausted&quot;</span>
-</span><span data-line="902">    <span class="n">UNAUTHENTICATED</span> <span class="o">=</span> <span class="s2">&quot;unauthenticated&quot;</span>
-</span><span data-line="903">    <span class="n">UNAVAILABLE</span> <span class="o">=</span> <span class="s2">&quot;unavailable&quot;</span>
-</span><span data-line="904">    <span class="n">UNIMPLEMENTED</span> <span class="o">=</span> <span class="s2">&quot;unimplemented&quot;</span>
-</span><span data-line="905">    <span class="n">UNKNOWN_ERROR</span> <span class="o">=</span> <span class="s2">&quot;unknown_error&quot;</span>
-</span><span data-line="906">
+</span><span data-line="882">
+</span><span data-line="883"><span class="k">class</span><span class="w"> </span><span class="nc">SPANSTATUS</span><span class="p">:</span>
+</span><span data-line="884"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="885"><span class="sd">    The status of a Sentry span.</span>
+</span><span data-line="886">
+</span><span data-line="887"><span class="sd">    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context</span>
+</span><span data-line="888"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="889">
+</span><span data-line="890">    <span class="n">ABORTED</span> <span class="o">=</span> <span class="s2">&quot;aborted&quot;</span>
+</span><span data-line="891">    <span class="n">ALREADY_EXISTS</span> <span class="o">=</span> <span class="s2">&quot;already_exists&quot;</span>
+</span><span data-line="892">    <span class="n">CANCELLED</span> <span class="o">=</span> <span class="s2">&quot;cancelled&quot;</span>
+</span><span data-line="893">    <span class="n">DATA_LOSS</span> <span class="o">=</span> <span class="s2">&quot;data_loss&quot;</span>
+</span><span data-line="894">    <span class="n">DEADLINE_EXCEEDED</span> <span class="o">=</span> <span class="s2">&quot;deadline_exceeded&quot;</span>
+</span><span data-line="895">    <span class="n">FAILED_PRECONDITION</span> <span class="o">=</span> <span class="s2">&quot;failed_precondition&quot;</span>
+</span><span data-line="896">    <span class="n">INTERNAL_ERROR</span> <span class="o">=</span> <span class="s2">&quot;internal_error&quot;</span>
+</span><span data-line="897">    <span class="n">INVALID_ARGUMENT</span> <span class="o">=</span> <span class="s2">&quot;invalid_argument&quot;</span>
+</span><span data-line="898">    <span class="n">NOT_FOUND</span> <span class="o">=</span> <span class="s2">&quot;not_found&quot;</span>
+</span><span data-line="899">    <span class="n">OK</span> <span class="o">=</span> <span class="s2">&quot;ok&quot;</span>
+</span><span data-line="900">    <span class="n">OUT_OF_RANGE</span> <span class="o">=</span> <span class="s2">&quot;out_of_range&quot;</span>
+</span><span data-line="901">    <span class="n">PERMISSION_DENIED</span> <span class="o">=</span> <span class="s2">&quot;permission_denied&quot;</span>
+</span><span data-line="902">    <span class="n">RESOURCE_EXHAUSTED</span> <span class="o">=</span> <span class="s2">&quot;resource_exhausted&quot;</span>
+</span><span data-line="903">    <span class="n">UNAUTHENTICATED</span> <span class="o">=</span> <span class="s2">&quot;unauthenticated&quot;</span>
+</span><span data-line="904">    <span class="n">UNAVAILABLE</span> <span class="o">=</span> <span class="s2">&quot;unavailable&quot;</span>
+</span><span data-line="905">    <span class="n">UNIMPLEMENTED</span> <span class="o">=</span> <span class="s2">&quot;unimplemented&quot;</span>
+</span><span data-line="906">    <span class="n">UNKNOWN_ERROR</span> <span class="o">=</span> <span class="s2">&quot;unknown_error&quot;</span>
 </span><span data-line="907">
-</span><span data-line="908"><span class="k">class</span><span class="w"> </span><span class="nc">OP</span><span class="p">:</span>
-</span><span data-line="909">    <span class="n">ANTHROPIC_MESSAGES_CREATE</span> <span class="o">=</span> <span class="s2">&quot;ai.messages.create.anthropic&quot;</span>
-</span><span data-line="910">    <span class="n">CACHE_GET</span> <span class="o">=</span> <span class="s2">&quot;cache.get&quot;</span>
-</span><span data-line="911">    <span class="n">CACHE_PUT</span> <span class="o">=</span> <span class="s2">&quot;cache.put&quot;</span>
-</span><span data-line="912">    <span class="n">COHERE_CHAT_COMPLETIONS_CREATE</span> <span class="o">=</span> <span class="s2">&quot;ai.chat_completions.create.cohere&quot;</span>
-</span><span data-line="913">    <span class="n">COHERE_EMBEDDINGS_CREATE</span> <span class="o">=</span> <span class="s2">&quot;ai.embeddings.create.cohere&quot;</span>
-</span><span data-line="914">    <span class="n">DB</span> <span class="o">=</span> <span class="s2">&quot;db&quot;</span>
-</span><span data-line="915">    <span class="n">DB_REDIS</span> <span class="o">=</span> <span class="s2">&quot;db.redis&quot;</span>
-</span><span data-line="916">    <span class="n">EVENT_DJANGO</span> <span class="o">=</span> <span class="s2">&quot;event.django&quot;</span>
-</span><span data-line="917">    <span class="n">FUNCTION</span> <span class="o">=</span> <span class="s2">&quot;function&quot;</span>
-</span><span data-line="918">    <span class="n">FUNCTION_AWS</span> <span class="o">=</span> <span class="s2">&quot;function.aws&quot;</span>
-</span><span data-line="919">    <span class="n">FUNCTION_GCP</span> <span class="o">=</span> <span class="s2">&quot;function.gcp&quot;</span>
-</span><span data-line="920">    <span class="n">GEN_AI_CHAT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.chat&quot;</span>
-</span><span data-line="921">    <span class="n">GEN_AI_CREATE_AGENT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.create_agent&quot;</span>
-</span><span data-line="922">    <span class="n">GEN_AI_EMBEDDINGS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.embeddings&quot;</span>
-</span><span data-line="923">    <span class="n">GEN_AI_EXECUTE_TOOL</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.execute_tool&quot;</span>
-</span><span data-line="924">    <span class="n">GEN_AI_GENERATE_TEXT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.generate_text&quot;</span>
-</span><span data-line="925">    <span class="n">GEN_AI_HANDOFF</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.handoff&quot;</span>
-</span><span data-line="926">    <span class="n">GEN_AI_PIPELINE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.pipeline&quot;</span>
+</span><span data-line="908">
+</span><span data-line="909"><span class="k">class</span><span class="w"> </span><span class="nc">OP</span><span class="p">:</span>
+</span><span data-line="910">    <span class="n">ANTHROPIC_MESSAGES_CREATE</span> <span class="o">=</span> <span class="s2">&quot;ai.messages.create.anthropic&quot;</span>
+</span><span data-line="911">    <span class="n">CACHE_GET</span> <span class="o">=</span> <span class="s2">&quot;cache.get&quot;</span>
+</span><span data-line="912">    <span class="n">CACHE_PUT</span> <span class="o">=</span> <span class="s2">&quot;cache.put&quot;</span>
+</span><span data-line="913">    <span class="n">COHERE_CHAT_COMPLETIONS_CREATE</span> <span class="o">=</span> <span class="s2">&quot;ai.chat_completions.create.cohere&quot;</span>
+</span><span data-line="914">    <span class="n">COHERE_EMBEDDINGS_CREATE</span> <span class="o">=</span> <span class="s2">&quot;ai.embeddings.create.cohere&quot;</span>
+</span><span data-line="915">    <span class="n">DB</span> <span class="o">=</span> <span class="s2">&quot;db&quot;</span>
+</span><span data-line="916">    <span class="n">DB_REDIS</span> <span class="o">=</span> <span class="s2">&quot;db.redis&quot;</span>
+</span><span data-line="917">    <span class="n">EVENT_DJANGO</span> <span class="o">=</span> <span class="s2">&quot;event.django&quot;</span>
+</span><span data-line="918">    <span class="n">FUNCTION</span> <span class="o">=</span> <span class="s2">&quot;function&quot;</span>
+</span><span data-line="919">    <span class="n">FUNCTION_AWS</span> <span class="o">=</span> <span class="s2">&quot;function.aws&quot;</span>
+</span><span data-line="920">    <span class="n">FUNCTION_GCP</span> <span class="o">=</span> <span class="s2">&quot;function.gcp&quot;</span>
+</span><span data-line="921">    <span class="n">GEN_AI_CHAT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.chat&quot;</span>
+</span><span data-line="922">    <span class="n">GEN_AI_CREATE_AGENT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.create_agent&quot;</span>
+</span><span data-line="923">    <span class="n">GEN_AI_EMBEDDINGS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.embeddings&quot;</span>
+</span><span data-line="924">    <span class="n">GEN_AI_EXECUTE_TOOL</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.execute_tool&quot;</span>
+</span><span data-line="925">    <span class="n">GEN_AI_TEXT_COMPLETION</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.text_completion&quot;</span>
+</span><span data-line="926">    <span class="n">GEN_AI_HANDOFF</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.handoff&quot;</span>
 </span><span data-line="927">    <span class="n">GEN_AI_INVOKE_AGENT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.invoke_agent&quot;</span>
 </span><span data-line="928">    <span class="n">GEN_AI_RESPONSES</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.responses&quot;</span>
 </span><span data-line="929">    <span class="n">GRAPHQL_EXECUTE</span> <span class="o">=</span> <span class="s2">&quot;graphql.execute&quot;</span>
@@ -1606,7 +1606,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1492"><span class="k">del</span> <span class="n">_get_default_options</span>
 </span><span data-line="1493">
 </span><span data-line="1494">
-</span><span data-line="1495"><span class="n">VERSION</span> <span class="o">=</span> <span class="s2">&quot;2.52.0a9&quot;</span>
+</span><span data-line="1495"><span class="n">VERSION</span> <span class="o">=</span> <span class="s2">&quot;2.57.0&quot;</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -1637,7 +1637,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=70f07802"></script>
+      <script src="../../_static/documentation_options.js?v=a2d10b90"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=cac61aee"></script></body>
