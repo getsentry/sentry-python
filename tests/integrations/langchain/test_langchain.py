@@ -174,7 +174,7 @@ def test_langchain_chat(
     sentry_init,
     capture_events,
     get_model_response,
-    nonstreaming_responses_model_response,
+    nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[
@@ -188,7 +188,7 @@ def test_langchain_chat(
     events = capture_events()
 
     model_response = get_model_response(
-        nonstreaming_responses_model_response,
+        nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
         request_headers={
             "X-Stainless-Raw-Response": "True",
@@ -199,7 +199,6 @@ def test_langchain_chat(
         model_name="gpt-3.5-turbo",
         temperature=0,
         openai_api_key="badkey",
-        use_responses_api=True,
     )
 
     with patch.object(
