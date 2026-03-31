@@ -67,6 +67,7 @@ from openai.types.responses.response_usage import (
 )
 
 LANGCHAIN_VERSION = package_version("langchain")
+LANGCHAIN_OPENAI_VERSION = package_version("langchain-openai")
 
 
 @tool
@@ -187,12 +188,15 @@ def test_langchain_chat(
     )
     events = capture_events()
 
+    request_headers = {}
+    # Changed in https://github.com/langchain-ai/langchain/pull/32655
+    if LANGCHAIN_OPENAI_VERSION >= (0, 3, 32):
+        request_headers["X-Stainless-Raw-Response"] = "True"
+
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={
-            "X-Stainless-Raw-Response": "True",
-        },
+        request_headers=request_headers,
     )
 
     llm = ChatOpenAI(
