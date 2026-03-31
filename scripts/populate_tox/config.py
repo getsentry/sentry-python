@@ -308,6 +308,14 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio"],
         },
+        "python": ">=3.10",
+    },
+    "pyreqwest": {
+        "package": "pyreqwest",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.11",
     },
     "pymongo": {
         "package": "pymongo",
