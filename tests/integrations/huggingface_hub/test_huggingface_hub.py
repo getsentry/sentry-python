@@ -507,12 +507,12 @@ def test_text_generation(
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.generate_text"
-    assert span["description"] == "generate_text test-model"
+    assert span["op"] == "gen_ai.text_completion"
+    assert span["description"] == "text_completion test-model"
     assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
-        "gen_ai.operation.name": "generate_text",
+        "gen_ai.operation.name": "text_completion",
         "gen_ai.request.model": "test-model",
         "gen_ai.response.finish_reasons": "length",
         "gen_ai.response.streaming": False,
@@ -576,12 +576,12 @@ def test_text_generation_streaming(
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.generate_text"
-    assert span["description"] == "generate_text test-model"
+    assert span["op"] == "gen_ai.text_completion"
+    assert span["description"] == "text_completion test-model"
     assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
-        "gen_ai.operation.name": "generate_text",
+        "gen_ai.operation.name": "text_completion",
         "gen_ai.request.model": "test-model",
         "gen_ai.response.finish_reasons": "length",
         "gen_ai.response.streaming": True,
