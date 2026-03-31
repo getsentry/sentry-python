@@ -754,7 +754,7 @@ def _record_token_usage(span: "Span", response: "Any") -> None:
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
-def _get_available_tools(obj: "Any") -> "tuple[Optional[str], Optional[List[Any]]]":
+def _get_available_tools(obj: "Any") -> "Optional[List[Any]]":
     """
     Get the agent name and available tools for the agent.
     """
@@ -772,7 +772,7 @@ def _get_available_tools(obj: "Any") -> "tuple[Optional[str], Optional[List[Any]
     return tools
 
 
-def _get_run_name(obj: "Any", args: "Any"):
+def _get_run_name(obj: "Any", args: "Any") -> "Optional[str]":
     agent = getattr(obj, "agent", None)
     runnable = getattr(agent, "runnable", None)
     runnable_config = getattr(runnable, "config", {})
