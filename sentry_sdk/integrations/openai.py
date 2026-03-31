@@ -1102,7 +1102,7 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
     response = yield f, args, kwargs
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    if isinstance(response, Stream):
+    if isinstance(response, Stream) and hasattr(response, "_iterator"):
         input = kwargs.get("input")
 
         if input is not None and isinstance(input, str):
@@ -1119,7 +1119,7 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
         )
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream):
+    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
         input = kwargs.get("input")
 
         if input is not None and isinstance(input, str):
