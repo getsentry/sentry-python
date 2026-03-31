@@ -1017,24 +1017,14 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
 
         start_span_function = get_start_span_function()
 
-        agent_name = kwargs.get("metadata", {}).get("lc_agent_name")
         run_name = _get_run_name(self, args)
-
-        span_name = "invoke_agent"
-        if agent_name is not None:
-            span_name = f"invoke_agent {agent_name}"
-        elif run_name:
-            span_name = f"invoke_agent {run_name}"
 
         span = start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=span_name,
+            name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         )
         span.__enter__()
-
-        if agent_name is not None:
-            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
