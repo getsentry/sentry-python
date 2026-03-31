@@ -15,9 +15,8 @@ except ImportError:
     Omit = None
 
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
-from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
-from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
-from openai.types.chat.chat_completion import Choice
+from openai.types import CreateEmbeddingResponse, Embedding
+from openai.types.chat import ChatCompletionChunk
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
@@ -60,26 +59,6 @@ except ImportError:
 
 
 OPENAI_VERSION = package_version("openai")
-EXAMPLE_CHAT_COMPLETION = ChatCompletion(
-    id="chat-id",
-    choices=[
-        Choice(
-            index=0,
-            finish_reason="stop",
-            message=ChatCompletionMessage(
-                role="assistant", content="the model response"
-            ),
-        )
-    ],
-    created=10000000,
-    model="response-model-id",
-    object="chat.completion",
-    usage=CompletionUsage(
-        completion_tokens=10,
-        prompt_tokens=20,
-        total_tokens=30,
-    ),
-)
 
 
 if SKIP_RESPONSES_TESTS:
@@ -131,7 +110,11 @@ else:
     ],
 )
 def test_nonstreaming_chat_completion_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
@@ -141,7 +124,9 @@ def test_nonstreaming_chat_completion_no_prompts(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     with start_transaction(name="openai tx"):
         response = (
@@ -228,7 +213,13 @@ def test_nonstreaming_chat_completion_no_prompts(
         ),
     ],
 )
-def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, request):
+def test_nonstreaming_chat_completion(
+    sentry_init,
+    capture_events,
+    messages,
+    request,
+    nonstreaming_chat_completions_model_response,
+):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -237,7 +228,9 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     with start_transaction(name="openai tx"):
         response = (
@@ -307,7 +300,11 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     ],
 )
 async def test_nonstreaming_chat_completion_async_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
@@ -317,7 +314,9 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = mock.AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     with start_transaction(name="openai tx"):
         response = await client.chat.completions.create(
@@ -403,7 +402,11 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     ],
 )
 async def test_nonstreaming_chat_completion_async(
-    sentry_init, capture_events, messages, request
+    sentry_init,
+    capture_events,
+    messages,
+    request,
+    nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -413,7 +416,9 @@ async def test_nonstreaming_chat_completion_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     with start_transaction(name="openai tx"):
         response = await client.chat.completions.create(
@@ -1551,7 +1556,9 @@ async def test_embeddings_create_raises_error_async(
     assert event["level"] == "error"
 
 
-def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
+def test_span_origin_nonstreaming_chat(
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -1559,7 +1566,9 @@ def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     with start_transaction(name="openai tx"):
         client.chat.completions.create(
@@ -1573,7 +1582,9 @@ def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_events):
+async def test_span_origin_nonstreaming_chat_async(
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -1581,7 +1592,9 @@ async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_events):
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     with start_transaction(name="openai tx"):
         await client.chat.completions.create(
@@ -3125,7 +3138,9 @@ async def test_streaming_responses_api_async(
     "tools",
     [[], None, NOT_GIVEN, omit],
 )
-def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
+def test_empty_tools_in_chat_completion(
+    sentry_init, capture_events, tools, nonstreaming_chat_completions_model_response
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -3133,7 +3148,9 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     with start_transaction(name="openai tx"):
         client.chat.completions.create(
@@ -3164,7 +3181,11 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     ],
 )
 def test_openai_message_role_mapping(
-    sentry_init, capture_events, test_message, expected_role
+    sentry_init,
+    capture_events,
+    test_message,
+    expected_role,
+    nonstreaming_chat_completions_model_response,
 ):
     """Test that OpenAI integration properly maps message roles like 'ai' to 'assistant'"""
 
@@ -3176,7 +3197,9 @@ def test_openai_message_role_mapping(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     test_messages = [test_message]
 
@@ -3197,7 +3220,9 @@ def test_openai_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
-def test_openai_message_truncation(sentry_init, capture_events):
+def test_openai_message_truncation(
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+):
     """Test that large messages are truncated properly in OpenAI integration."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -3207,7 +3232,9 @@ def test_openai_message_truncation(sentry_init, capture_events):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response
+    )
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000

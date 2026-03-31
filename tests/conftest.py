@@ -1103,6 +1103,30 @@ def nonstreaming_responses_model_response():
 
 
 @pytest.fixture
+def nonstreaming_chat_completions_model_response():
+    return openai.types.chat.ChatCompletion(
+        id="chat-id",
+        choices=[
+            openai.types.chat.chat_completion.Choice(
+                index=0,
+                finish_reason="stop",
+                message=openai.types.chat.ChatCompletionMessage(
+                    role="assistant", content="the model response"
+                ),
+            )
+        ],
+        created=10000000,
+        model="response-model-id",
+        object="chat.completion",
+        usage=openai.types.CompletionUsage(
+            completion_tokens=10,
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+
+@pytest.fixture
 def responses_tool_call_model_responses():
     def inner(
         tool_name: str,
