@@ -957,7 +957,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
         run_name = _get_run_name(self, args)
         with start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=run_name,
+            name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         ) as span:
             if run_name:
