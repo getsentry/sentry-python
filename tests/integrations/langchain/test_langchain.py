@@ -170,6 +170,56 @@ def test_langchain_text_completion(
     assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
 
 
+def test_langchain_chat(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_responses_model_response,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    model_response = get_model_response(
+        nonstreaming_responses_model_response,
+        serialize_pydantic=True,
+        request_headers={
+            "X-Stainless-Raw-Response": "True",
+        },
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+        use_responses_api=True,
+    )
+
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        return_value=model_response,
+    ) as _:
+        with start_transaction():
+            llm.invoke(
+                "How many letters in the word eudca",
+                config={"run_name": "my-snazzy-pipeline"},
+            )
+
+    tx = events[0]
+
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    assert len(chat_spans) == 1
+    assert chat_spans[0]["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+
+
 @pytest.mark.skipif(
     LANGCHAIN_VERSION < (1,),
     reason="LangChain 1.0+ required (ONE AGENT refactor)",
