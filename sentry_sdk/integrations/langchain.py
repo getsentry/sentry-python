@@ -426,9 +426,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if ai_system:
                 span.set_data(SPANDATA.GEN_AI_SYSTEM, ai_system)
 
-            agent_name = kwargs.get("metadata", {}).get("lc_agent_name")
-            if agent_name is not None:
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+            agent_metadata = kwargs.get("metadata")
+            if isinstance(agent_metadata, dict) and "lc_agent_name" in agent_metadata:
+                span.set_data(
+                    SPANDATA.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
+                )
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
@@ -626,9 +628,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if tool_description is not None:
                 span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
 
-            agent_name = kwargs.get("metadata", {}).get("lc_agent_name")
-            if agent_name is not None:
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+            agent_metadata = kwargs.get("metadata")
+            if isinstance(agent_metadata, dict) and "lc_agent_name" in agent_metadata:
+                span.set_data(
+                    SPANDATA.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
+                )
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
