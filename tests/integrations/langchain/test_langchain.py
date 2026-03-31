@@ -147,18 +147,22 @@ def test_langchain_text_completion(
     ) as _:
         with start_transaction():
             input_text = "What is the capital of France?"
-            model.invoke(input_text)
+            model.invoke(input_text, config={"run_name": "my-snazzy-pipeline"})
 
     tx = events[0]
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
     ]
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
-    assert llm_span["description"] == "generate_text gpt-3.5-turbo"
+    assert llm_span["description"] == "text_completion gpt-3.5-turbo"
+    assert llm_span["data"]["gen_ai.system"] == "openai"
+    assert llm_span["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
     assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
     assert llm_span["data"]["gen_ai.response.text"] == "The capital of France is Paris."
     assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
@@ -254,6 +258,7 @@ def test_langchain_create_agent(
     assert len(chat_spans) == 1
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
 
+    assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
     assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
     assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
     assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
@@ -413,10 +418,12 @@ def test_tool_execution_span(
     assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
     assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
     assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+    assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
 
     assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
     assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
     assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+    assert chat_spans[1]["data"]["gen_ai.system"] == "openai-chat"
 
     if send_default_pii and include_prompts:
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -1264,6 +1271,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
             serialized=serialized,
             prompts=prompts,
             run_id=run_id,
+            name="my_pipeline",
             invocation_params={
                 "temperature": 0.7,
                 "max_tokens": 100,
@@ -1288,13 +1296,17 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
     ]
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
+    assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
+    assert llm_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "my_pipeline"
 
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
     messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
@@ -2002,11 +2014,14 @@ def test_langchain_response_model_extraction(
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
     ]
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
+    assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
 
     if expected_model is not None:
         assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["data"]
@@ -2224,6 +2239,96 @@ class TestTransformLangchainContentBlock:
             "mime_type": "image/png",
             "uri": "gs://bucket/path/to/image.png",
         }
+
+
+@pytest.mark.parametrize(
+    "ai_type,expected_system",
+    [
+        # Real LangChain _type values (from _llm_type properties)
+        # OpenAI
+        ("openai-chat", "openai-chat"),
+        ("openai", "openai"),
+        # Azure OpenAI
+        ("azure-openai-chat", "azure-openai-chat"),
+        ("azure", "azure"),
+        # Anthropic
+        ("anthropic-chat", "anthropic-chat"),
+        # Google
+        ("vertexai", "vertexai"),
+        ("chat-google-generative-ai", "chat-google-generative-ai"),
+        ("google_gemini", "google_gemini"),
+        # AWS Bedrock
+        ("amazon_bedrock_chat", "amazon_bedrock_chat"),
+        ("amazon_bedrock", "amazon_bedrock"),
+        # Cohere
+        ("cohere-chat", "cohere-chat"),
+        # Ollama
+        ("chat-ollama", "chat-ollama"),
+        ("ollama-llm", "ollama-llm"),
+        # Mistral
+        ("mistralai-chat", "mistralai-chat"),
+        # Fireworks
+        ("fireworks-chat", "fireworks-chat"),
+        ("fireworks", "fireworks"),
+        # HuggingFace
+        ("huggingface-chat-wrapper", "huggingface-chat-wrapper"),
+        # Groq
+        ("groq-chat", "groq-chat"),
+        # NVIDIA
+        ("chat-nvidia-ai-playground", "chat-nvidia-ai-playground"),
+        # xAI
+        ("xai-chat", "xai-chat"),
+        # DeepSeek
+        ("chat-deepseek", "chat-deepseek"),
+        # Edge cases
+        ("", None),
+        (None, None),
+    ],
+)
+def test_langchain_ai_system_detection(
+    sentry_init, capture_events, ai_type, expected_system
+):
+    sentry_init(
+        integrations=[LangchainIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    run_id = "test-ai-system-uuid"
+    serialized = {"_type": ai_type} if ai_type is not None else {}
+    prompts = ["Test prompt"]
+
+    with start_transaction():
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            invocation_params={"_type": ai_type, "model": "test-model"},
+        )
+
+        generation = Mock(text="Test response", message=None)
+        response = Mock(generations=[[generation]])
+        callback.on_llm_end(response=response, run_id=run_id)
+
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
+
+    llm_spans = [
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
+    ]
+    assert len(llm_spans) > 0
+
+    llm_span = llm_spans[0]
+
+    if expected_system is not None:
+        assert llm_span["data"][SPANDATA.GEN_AI_SYSTEM] == expected_system
+    else:
+        assert SPANDATA.GEN_AI_SYSTEM not in llm_span.get("data", {})
 
 
 class TestTransformLangchainMessageContent:

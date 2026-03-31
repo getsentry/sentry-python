@@ -108,6 +108,15 @@ except ImportError:
     OllamaEmbeddings = None
 
 
+def _get_ai_system(all_params: "Dict[str, Any]") -> "Optional[str]":
+    ai_type = all_params.get("_type")
+
+    if not ai_type or not isinstance(ai_type, str):
+        return None
+
+    return ai_type
+
+
 DATA_FIELDS = {
     "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
     "function_call": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -368,11 +377,17 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 parent_run_id,
-                op=OP.GEN_AI_GENERATE_TEXT,
-                name=f"generate_text {model}".strip(),
+                op=OP.GEN_AI_TEXT_COMPLETION,
+                name=f"text_completion {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
+
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "text_completion")
+
+            pipeline_name = kwargs.get("name")
+            if pipeline_name:
+                span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, pipeline_name)
 
             if model:
                 span.set_data(
@@ -380,11 +395,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     model,
                 )
 
-            ai_type = all_params.get("_type", "")
-            if "anthropic" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
-            elif "openai" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+            ai_system = _get_ai_system(all_params)
+            if ai_system:
+                span.set_data(SPANDATA.GEN_AI_SYSTEM, ai_system)
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
@@ -448,11 +461,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if model:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            ai_type = all_params.get("_type", "")
-            if "anthropic" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
-            elif "openai" in ai_type:
-                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+            ai_system = _get_ai_system(all_params)
+            if ai_system:
+                span.set_data(SPANDATA.GEN_AI_SYSTEM, ai_system)
 
             agent_name = _get_current_agent()
             if agent_name:
