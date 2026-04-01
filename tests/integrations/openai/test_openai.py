@@ -2105,12 +2105,24 @@ def test_completions_token_usage_manual_output_counting_choices():
     response.usage.prompt_tokens = 20
     response.usage.total_tokens = 20
     response.choices = [
-        mock.MagicMock(message="one"),
-        mock.MagicMock(message="two"),
-        mock.MagicMock(message="three"),
+        Choice(
+            index=0,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="one"),
+        ),
+        Choice(
+            index=1,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="two"),
+        ),
+        Choice(
+            index=2,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="three"),
+        ),
     ]
     messages = []
-    streaming_message_responses = []
+    streaming_message_responses = None
 
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
@@ -2127,7 +2139,7 @@ def test_completions_token_usage_manual_output_counting_choices():
             span,
             input_tokens=20,
             input_tokens_cached=None,
-            output_tokens=None,
+            output_tokens=11,
             output_tokens_reasoning=None,
             total_tokens=20,
         )
