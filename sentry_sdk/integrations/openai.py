@@ -604,7 +604,11 @@ def _set_common_output_data(
                 )
 
         _calculate_responses_token_usage(
-            input, response, span, None, integration.count_tokens
+            input=input,
+            response=response,
+            span=span,
+            streaming_message_responses=None,
+            count_tokens=integration.count_tokens,
         )
 
         if finish_span:
@@ -871,11 +875,11 @@ def _wrap_synchronous_responses_event_iterator(
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
 
                 _calculate_responses_token_usage(
-                    input,
-                    x.response,
-                    span,
-                    None,
-                    integration.count_tokens,
+                    input=input,
+                    response=x.response,
+                    span=span,
+                    streaming_message_responses=None,
+                    count_tokens=integration.count_tokens,
                 )
                 count_tokens_manually = False
 
@@ -892,11 +896,11 @@ def _wrap_synchronous_responses_event_iterator(
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
             if count_tokens_manually:
                 _calculate_responses_token_usage(
-                    input,
-                    response,
-                    span,
-                    all_responses,
-                    integration.count_tokens,
+                    input=input,
+                    response=response,
+                    span=span,
+                    streaming_message_responses=all_responses,
+                    count_tokens=integration.count_tokens,
                 )
 
     if finish_span:
@@ -934,11 +938,11 @@ async def _wrap_asynchronous_responses_event_iterator(
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
 
                 _calculate_responses_token_usage(
-                    input,
-                    x.response,
-                    span,
-                    None,
-                    integration.count_tokens,
+                    input=input,
+                    response=x.response,
+                    span=span,
+                    streaming_message_responses=None,
+                    count_tokens=integration.count_tokens,
                 )
                 count_tokens_manually = False
 
@@ -955,11 +959,11 @@ async def _wrap_asynchronous_responses_event_iterator(
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
             if count_tokens_manually:
                 _calculate_responses_token_usage(
-                    input,
-                    response,
-                    span,
-                    all_responses,
-                    integration.count_tokens,
+                    input=input,
+                    response=response,
+                    span=span,
+                    streaming_message_responses=all_responses,
+                    count_tokens=integration.count_tokens,
                 )
     if finish_span:
         span.__exit__(None, None, None)
