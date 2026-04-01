@@ -233,10 +233,7 @@ def _success_callback(
         is_streaming = kwargs.get("stream")
         # Callback is fired multiple times when streaming a response.
         # Flag checked at https://github.com/BerriAI/litellm/blob/33c3f13443eaf990ac8c6e3da78bddbc2b7d0e7a/litellm/litellm_core_utils/litellm_logging.py#L1603
-        if (
-            is_streaming is not True
-            or kwargs.get("complete_streaming_response") is not None
-        ):
+        if is_streaming is not True or "complete_streaming_response" in kwargs:
             span.__exit__(None, None, None)
 
 
