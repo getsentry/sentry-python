@@ -223,7 +223,7 @@ def test_langchain_chat(
     assert chat_spans[0]["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
 
 
-def test_langchain_tool(
+def test_langchain_tool_call_with_run_name(
     sentry_init,
     capture_events,
 ):
