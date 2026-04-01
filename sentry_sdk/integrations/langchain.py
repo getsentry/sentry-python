@@ -765,7 +765,9 @@ def _record_token_usage(span: "Span", response: "Any") -> None:
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
-def _get_available_tools(obj: "Any") -> "Optional[List[Any]]":
+def _get_request_data(
+    obj: "Any", args: "Any", kwargs: "Any"
+) -> "tuple[Optional[str], Optional[List[Any]]]":
     """
     Get the agent name and available tools for the agent.
     """
@@ -780,13 +782,6 @@ def _get_available_tools(obj: "Any") -> "Optional[List[Any]]":
     )
     tools = tools if tools and len(tools) > 0 else None
 
-    return tools
-
-
-def _get_run_name(obj: "Any", args: "Any") -> "Optional[str]":
-    agent = getattr(obj, "agent", None)
-    runnable = getattr(agent, "runnable", None)
-    runnable_config = getattr(runnable, "config", {})
     try:
         agent_name = None
         if len(args) > 1:
@@ -796,7 +791,7 @@ def _get_run_name(obj: "Any", args: "Any") -> "Optional[str]":
     except Exception:
         pass
 
-    return agent_name
+    return (agent_name, tools)
 
 
 def _simplify_langchain_tools(tools: "Any") -> "Optional[List[Any]]":
@@ -964,8 +959,9 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
         if integration is None:
             return f(self, *args, **kwargs)
 
+        run_name, tools = _get_request_data(self, args, kwargs)
         start_span_function = get_start_span_function()
-        run_name = _get_run_name(self, args)
+
         with start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
@@ -977,7 +973,6 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            tools = _get_available_tools(self)
             _set_tools_on_span(span, tools)
 
             # Run the agent
@@ -1022,9 +1017,8 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         if integration is None:
             return f(self, *args, **kwargs)
 
+        run_name, tools = _get_request_data(self, args, kwargs)
         start_span_function = get_start_span_function()
-
-        run_name = _get_run_name(self, args)
 
         span = start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
@@ -1033,10 +1027,12 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         )
         span.__enter__()
 
+        if run_name:
+            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, run_name)
+
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-        tools = _get_available_tools(self)
         _set_tools_on_span(span, tools)
 
         input = args[0].get("input") if len(args) >= 1 else None
