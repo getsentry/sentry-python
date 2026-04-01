@@ -611,6 +611,10 @@ def test_streaming_chat_completion_no_prompts(
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
 def test_streaming_chat_completion_with_usage_in_stream(
     sentry_init,
     capture_events,
@@ -689,6 +693,10 @@ def test_streaming_chat_completion_with_usage_in_stream(
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
 @pytest.mark.asyncio
 async def test_streaming_chat_completion_async_with_usage_in_stream(
     sentry_init,
