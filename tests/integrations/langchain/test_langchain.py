@@ -171,7 +171,7 @@ def test_langchain_text_completion(
     assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
 
 
-def test_langchain_chat(
+def test_langchain_chat_with_run_name(
     sentry_init,
     capture_events,
     get_model_response,
