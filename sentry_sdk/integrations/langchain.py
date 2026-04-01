@@ -432,6 +432,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     SPANDATA.GEN_AI_AGENT_NAME, agent_metadata["lc_agent_name"]
                 )
 
+            run_name = kwargs.get("name")
+            if run_name:
+                span.set_data(
+                    SPANDATA.GEN_AI_PIPELINE_NAME,
+                    run_name,
+                )
+
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
