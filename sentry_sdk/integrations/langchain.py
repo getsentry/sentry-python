@@ -975,7 +975,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
             origin=LangchainIntegration.origin,
         ) as span:
             if run_name:
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, run_name)
+                span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, run_name)
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
@@ -1035,7 +1035,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         span.__enter__()
 
         if run_name:
-            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, run_name)
+            span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, run_name)
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
