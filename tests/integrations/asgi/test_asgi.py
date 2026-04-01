@@ -6,6 +6,7 @@ from sentry_sdk import capture_message
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.integrations._asgi_common import _get_ip, _get_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
+from tests.conftest import envelopes_to_spans
 
 from async_asgi_testclient import TestClient
 
@@ -164,34 +165,79 @@ def test_invalid_transaction_style(asgi3_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("span_streaming", "send_default_pii"),
+    [[False, True], [False, True]],
+)
 async def test_capture_transaction(
     sentry_init,
     asgi3_app,
     capture_events,
+    capture_envelopes,
+    span_streaming,
+    send_default_pii,
 ):
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(
+        send_default_pii=send_default_pii,
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
     app = SentryAsgiMiddleware(asgi3_app)
 
     async with TestClient(app) as client:
-        events = capture_events()
+        if span_streaming:
+            envelopes = capture_envelopes()
+        else:
+            events = capture_events()
         await client.get("/some_url?somevalue=123")
 
-    (transaction_event,) = events
+    sentry_sdk.flush()
 
-    assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "/some_url"
-    assert transaction_event["transaction_info"] == {"source": "url"}
-    assert transaction_event["contexts"]["trace"]["op"] == "http.server"
-    assert transaction_event["request"] == {
-        "headers": {
-            "host": "localhost",
-            "remote-addr": "127.0.0.1",
-            "user-agent": "ASGI-Test-Client",
-        },
-        "method": "GET",
-        "query_string": "somevalue=123",
-        "url": "http://localhost/some_url",
-    }
+    if span_streaming:
+        spans = envelopes_to_spans(envelopes)
+        assert len(spans) == 1
+        (span,) = spans
+
+        assert span["is_segment"] is True
+        assert span["name"] == "/some_url"
+
+        assert span["attributes"]["sentry.span.source"] == "url"
+        assert span["attributes"]["sentry.op"] == "http.server"
+
+        if send_default_pii:
+            assert span["attributes"]["client.address"] == "127.0.0.1"
+        else:
+            assert "client.address" not in span["attributes"]
+
+        assert span["attributes"]["http.request.method"] == "GET"
+        assert span["attributes"]["url.full"] == "http://localhost/some_url"
+        assert span["attributes"]["http.query"] == "somevalue=123"
+        assert span["attributes"]["http.request.protocol.name"] == "http"
+        assert span["attributes"]["http.request.header.host"] == "localhost"
+        assert span["attributes"]["http.request.header.remote-addr"] == "127.0.0.1"
+        assert (
+            span["attributes"]["http.request.header.user-agent"] == "ASGI-Test-Client"
+        )
+
+    else:
+        (transaction_event,) = events
+
+        assert transaction_event["type"] == "transaction"
+        assert transaction_event["transaction"] == "/some_url"
+        assert transaction_event["transaction_info"] == {"source": "url"}
+        assert transaction_event["contexts"]["trace"]["op"] == "http.server"
+        assert transaction_event["request"] == {
+            "headers": {
+                "host": "localhost",
+                "remote-addr": "127.0.0.1",
+                "user-agent": "ASGI-Test-Client",
+            },
+            "method": "GET",
+            "query_string": "somevalue=123",
+            "url": "http://localhost/some_url",
+        }
 
 
 @pytest.mark.asyncio

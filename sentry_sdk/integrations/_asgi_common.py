@@ -120,9 +120,8 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
             attributes["http.request.method"] = asgi_scope["method"].upper()
 
         headers = _filter_headers(_get_headers(asgi_scope))
-        # TODO[span-first]: Correctly merge headers if duplicate
         for header, value in headers.items():
-            attributes[f"http.request.headers.{header.lower()}"] = [value]
+            attributes[f"http.request.header.{header.lower()}"] = value
 
         attributes["http.query"] = _get_query(asgi_scope)
 

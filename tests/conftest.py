@@ -1212,6 +1212,29 @@ def werkzeug_set_cookie(client, servername, key, value):
         client.set_cookie(key, value)
 
 
+def envelopes_to_spans(envelopes):
+    res: "list[dict[str, Any]]" = []
+    for envelope in envelopes:
+        for item in envelope.items:
+            if item.type == "span":
+                for span_json in item.payload.json["items"]:
+                    span = {
+                        "start_timestamp": span_json["start_timestamp"],
+                        "end_timestamp": span_json.get("end_timestamp"),
+                        "trace_id": span_json["trace_id"],
+                        "span_id": span_json["span_id"],
+                        "name": span_json["name"],
+                        "status": span_json["status"],
+                        "is_segment": span_json["is_segment"],
+                        "parent_span_id": span_json.get("parent_span_id"),
+                        "attributes": {
+                            k: v["value"] for (k, v) in span_json["attributes"].items()
+                        },
+                    }
+                    res.append(span)
+    return res
+
+
 @contextmanager
 def patch_start_tracing_child(
     fake_transaction_is_none: bool = False,
