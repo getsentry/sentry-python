@@ -158,23 +158,34 @@ def _calculate_completions_token_usage(
 ) -> None:
     """Extract and record token usage from a Chat Completions API response."""
     input_tokens: "Optional[int]" = 0
+    input_tokens_cached: "Optional[int]" = 0
     output_tokens: "Optional[int]" = 0
+    output_tokens_reasoning: "Optional[int]" = 0
     total_tokens: "Optional[int]" = 0
     usage = None
 
     if streaming_message_token_usage:
         usage = streaming_message_token_usage
-
-    if hasattr(response, "usage"):
+    elif hasattr(response, "usage"):
         usage = response.usage
 
     if usage is not None:
         if hasattr(usage, "prompt_tokens") and isinstance(usage.prompt_tokens, int):
             input_tokens = usage.prompt_tokens
+        if hasattr(usage, "prompt_tokens_details"):
+            cached = getattr(usage.prompt_tokens_details, "cached_tokens", None)
+            if isinstance(cached, int):
+                input_tokens_cached = cached
         if hasattr(usage, "completion_tokens") and isinstance(
             usage.completion_tokens, int
         ):
             output_tokens = usage.completion_tokens
+        if hasattr(usage, "completion_tokens_details"):
+            reasoning = getattr(
+                usage.completion_tokens_details, "reasoning_tokens", None
+            )
+            if isinstance(reasoning, int):
+                output_tokens_reasoning = reasoning
         if hasattr(usage, "total_tokens") and isinstance(usage.total_tokens, int):
             total_tokens = usage.total_tokens
 
@@ -204,13 +215,17 @@ def _calculate_completions_token_usage(
 
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
+    input_tokens_cached = input_tokens_cached or None
     output_tokens = output_tokens or None
+    output_tokens_reasoning = output_tokens_reasoning or None
     total_tokens = total_tokens or None
 
     record_token_usage(
         span,
         input_tokens=input_tokens,
+        input_tokens_cached=input_tokens_cached,
         output_tokens=output_tokens,
+        output_tokens_reasoning=output_tokens_reasoning,
         total_tokens=total_tokens,
     )
 

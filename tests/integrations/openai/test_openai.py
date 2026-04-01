@@ -1970,7 +1970,47 @@ def test_completions_token_usage_from_response():
         mock_record_token_usage.assert_called_once_with(
             span,
             input_tokens=20,
+            input_tokens_cached=None,
             output_tokens=10,
+            output_tokens_reasoning=None,
+            total_tokens=30,
+        )
+
+
+def test_completions_token_usage_with_detailed_fields():
+    """Cached and reasoning token counts are extracted from prompt_tokens_details and completion_tokens_details."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.prompt_tokens = 20
+    response.usage.prompt_tokens_details = mock.MagicMock()
+    response.usage.prompt_tokens_details.cached_tokens = 5
+    response.usage.completion_tokens = 10
+    response.usage.completion_tokens_details = mock.MagicMock()
+    response.usage.completion_tokens_details.reasoning_tokens = 8
+    response.usage.total_tokens = 30
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_completions_token_usage(
+            messages=[],
+            response=response,
+            span=span,
+            streaming_message_responses=[],
+            streaming_message_token_usage=None,
+            count_tokens=count_tokens,
+        )
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=5,
+            output_tokens=10,
+            output_tokens_reasoning=8,
             total_tokens=30,
         )
 
@@ -2007,7 +2047,9 @@ def test_completions_token_usage_manual_input_counting():
         mock_record_token_usage.assert_called_once_with(
             span,
             input_tokens=11,
+            input_tokens_cached=None,
             output_tokens=10,
+            output_tokens_reasoning=None,
             total_tokens=10,
         )
 
@@ -2044,7 +2086,9 @@ def test_completions_token_usage_manual_output_counting_streaming():
         mock_record_token_usage.assert_called_once_with(
             span,
             input_tokens=20,
+            input_tokens_cached=None,
             output_tokens=11,
+            output_tokens_reasoning=None,
             total_tokens=20,
         )
 
@@ -2082,7 +2126,9 @@ def test_completions_token_usage_manual_output_counting_choices():
         mock_record_token_usage.assert_called_once_with(
             span,
             input_tokens=20,
+            input_tokens_cached=None,
             output_tokens=None,
+            output_tokens_reasoning=None,
             total_tokens=20,
         )
 
@@ -2112,7 +2158,9 @@ def test_completions_token_usage_no_usage_data():
         mock_record_token_usage.assert_called_once_with(
             span,
             input_tokens=None,
+            input_tokens_cached=None,
             output_tokens=None,
+            output_tokens_reasoning=None,
             total_tokens=None,
         )
 
