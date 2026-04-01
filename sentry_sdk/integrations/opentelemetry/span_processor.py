@@ -84,9 +84,9 @@ class SentrySpanProcessor(SpanProcessor):
 
     def __new__(cls) -> "SentrySpanProcessor":
         if not hasattr(cls, "instance"):
-            cls.instance = super().__new__(cls)  # type: ignore[misc]
+            cls.instance = super().__new__(cls)
 
-        return cls.instance
+        return cls.instance  # type: ignore[misc]
 
     def __init__(self) -> None:
         @add_global_event_processor
