@@ -329,7 +329,12 @@ class UnwrappedItem:
 
 @pytest.fixture
 def capture_items(monkeypatch):
-    """Capture envelope payload, unfurling individual items."""
+    """
+    Capture envelope payload, unfurling individual items.
+
+    Makes it easier to work with both events and attribute-based telemetry in
+    one test.
+    """
 
     def inner(*types):
         telemetry = []
