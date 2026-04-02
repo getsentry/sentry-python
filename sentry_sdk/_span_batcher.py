@@ -94,8 +94,8 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # 210 is the rough size of the payload without attributes, and then we
         # estimate the attributes separately.
         estimate = 210
-        for value in item._attributes.values():
-            estimate += 7
+        for key, value in item._attributes.items():
+            estimate += 40 + len(key)
 
             if isinstance(value, str):
                 estimate += len(value)
