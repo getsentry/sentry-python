@@ -17,7 +17,31 @@ env:
     ${{ github.workspace }}/dist-serverless
 
 jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      has_code_changes: ${{ steps.changes.outputs.has_code_changes }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes
+        with:
+          filters: |
+            has_code_changes:
+              - 'sentry_sdk/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - '**/*.py'
+              - '**/*.cfg'
+              - '**/*.toml'
+              - '**/*.ini'
+              - 'Makefile'
+              - 'requirements*.txt'
+              - '.github/workflows/**'
+
   lint:
+    needs: changes
+    if: needs.changes.outputs.has_code_changes == 'true'
     name: Lint Sources
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -33,6 +57,8 @@ jobs:
           tox -e linters
 
   build_lambda_layer:
+    needs: changes
+    if: needs.changes.outputs.has_code_changes == 'true'
     name: Build Package
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -62,6 +88,8 @@ jobs:
           if-no-files-found: 'error'
 
   docs:
+    needs: changes
+    if: needs.changes.outputs.has_code_changes == 'true'
     name: Build SDK API Doc
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -82,3 +110,18 @@ jobs:
           path: |
             docs/_build/gh-pages.zip
           if-no-files-found: 'error'
+
+  check_required_ci:
+    name: All CI checks passed
+    needs: [changes, lint, build_lambda_layer, docs]
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check for failures
+        if: |
+          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
+          needs.lint.result == 'failure' || needs.lint.result == 'cancelled' ||
+          needs.build_lambda_layer.result == 'failure' || needs.build_lambda_layer.result == 'cancelled' ||
+          needs.docs.result == 'failure' || needs.docs.result == 'cancelled'
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
