@@ -103,45 +103,6 @@ def mock_usage():
 
 
 @pytest.fixture
-def mock_model_response():
-    return Response(
-        id="resp_123",
-        output=[
-            ResponseOutputMessage(
-                id="msg_123",
-                type="message",
-                status="completed",
-                content=[
-                    ResponseOutputText(
-                        text="Hello, how can I help you?",
-                        type="output_text",
-                        annotations=[],
-                    )
-                ],
-                role="assistant",
-            )
-        ],
-        parallel_tool_calls=False,
-        tool_choice="none",
-        tools=[],
-        created_at=10000000,
-        model="gpt-4",
-        object="response",
-        usage=ResponseUsage(
-            input_tokens=10,
-            input_tokens_details=InputTokensDetails(
-                cached_tokens=0,
-            ),
-            output_tokens=20,
-            output_tokens_details=OutputTokensDetails(
-                reasoning_tokens=5,
-            ),
-            total_tokens=30,
-        ),
-    )
-
-
-@pytest.fixture
 def test_agent():
     """Create a real Agent instance for testing."""
     return Agent(
@@ -198,13 +159,19 @@ def test_agent_custom_model():
 
 @pytest.mark.asyncio
 async def test_agent_invocation_span_no_pii(
-    sentry_init, capture_events, test_agent, mock_model_response, get_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    nonstreaming_responses_model_response,
+    get_model_response,
 ):
     client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response, serialize_pydantic=True)
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
 
     with patch.object(
         agent.model._client._client,
@@ -340,7 +307,7 @@ async def test_agent_invocation_span(
     sentry_init,
     capture_events,
     test_agent_with_instructions,
-    mock_model_response,
+    nonstreaming_responses_model_response,
     instructions,
     input,
     request,
@@ -353,7 +320,9 @@ async def test_agent_invocation_span(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent_with_instructions(instructions).clone(model=model)
 
-    response = get_model_response(mock_model_response, serialize_pydantic=True)
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
 
     with patch.object(
         agent.model._client._client,
@@ -503,7 +472,7 @@ async def test_client_span_custom_model(
     sentry_init,
     capture_events,
     test_agent_custom_model,
-    mock_model_response,
+    nonstreaming_responses_model_response,
     get_model_response,
 ):
     """
@@ -514,7 +483,9 @@ async def test_client_span_custom_model(
     model = OpenAIResponsesModel(model="my-custom-model", openai_client=client)
     agent = test_agent_custom_model.clone(model=model)
 
-    response = get_model_response(mock_model_response, serialize_pydantic=True)
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
 
     with patch.object(
         agent.model._client._client,
@@ -547,7 +518,7 @@ def test_agent_invocation_span_sync_no_pii(
     sentry_init,
     capture_events,
     test_agent,
-    mock_model_response,
+    nonstreaming_responses_model_response,
     get_model_response,
 ):
     """
@@ -557,7 +528,9 @@ def test_agent_invocation_span_sync_no_pii(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response, serialize_pydantic=True)
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
 
     with patch.object(
         agent.model._client._client,
@@ -687,7 +660,7 @@ def test_agent_invocation_span_sync(
     sentry_init,
     capture_events,
     test_agent_with_instructions,
-    mock_model_response,
+    nonstreaming_responses_model_response,
     instructions,
     input,
     request,
@@ -700,7 +673,9 @@ def test_agent_invocation_span_sync(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent_with_instructions(instructions).clone(model=model)
 
-    response = get_model_response(mock_model_response, serialize_pydantic=True)
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
 
     with patch.object(
         agent.model._client._client,
@@ -1087,7 +1062,11 @@ async def test_max_turns_before_handoff_span(
 
 @pytest.mark.asyncio
 async def test_tool_execution_span(
-    sentry_init, capture_events, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    get_model_response,
+    responses_tool_call_model_responses,
 ):
     """
     Test tool execution span creation.
@@ -1103,75 +1082,45 @@ async def test_tool_execution_span(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
 
-    tool_response = get_model_response(
-        Response(
-            id="resp_tool_123",
-            output=[
-                ResponseFunctionToolCall(
-                    id="call_123",
-                    call_id="call_123",
-                    name="simple_test_tool",
-                    type="function_call",
-                    arguments='{"message": "hello"}',
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
+    responses = responses_tool_call_model_responses(
+        tool_name="simple_test_tool",
+        arguments='{"message": "hello"}',
+        response_model="gpt-4",
+        response_text="Task completed using the tool",
+        response_ids=iter(["resp_tool_123", "resp_final_123"]),
+        usages=iter(
+            [
+                ResponseUsage(
+                    input_tokens=10,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=5,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=15,
                 ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                ResponseUsage(
+                    input_tokens=15,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=10,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=25,
                 ),
-                total_tokens=15,
-            ),
+            ]
         ),
+    )
+    tool_response = get_model_response(
+        next(responses),
         serialize_pydantic=True,
     )
-
     final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Task completed using the tool",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=25,
-            ),
-        ),
+        next(responses),
         serialize_pydantic=True,
     )
 
@@ -1370,7 +1319,11 @@ async def test_tool_execution_span(
 
 @pytest.mark.asyncio
 async def test_hosted_mcp_tool_propagation_header_streamed(
-    sentry_init, test_agent, async_iterator, server_side_event_chunks
+    sentry_init,
+    test_agent,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """
     Test responses API is given trace propagation headers with HostedMCPTool.
@@ -1402,11 +1355,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
-    request = httpx.Request(
-        "POST",
-        "/responses",
-    )
-
+    request_headers = {}
     # openai-agents calls with_streaming_response() if available starting with
     # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
     # When using with_streaming_response() the header set below changes the response type:
@@ -1414,12 +1363,10 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
     if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
         agent_with_tool.model._client.responses, "with_streaming_response"
     ):
-        request.headers["X-Stainless-Raw-Response"] = "stream"
+        request_headers["X-Stainless-Raw-Response"] = "stream"
 
-    response = httpx.Response(
-        200,
-        request=request,
-        content=async_iterator(
+    response = get_model_response(
+        async_iterator(
             server_side_event_chunks(
                 [
                     ResponseCreatedEvent(
@@ -1478,6 +1425,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
                 ]
             )
         ),
+        request_headers=request_headers,
     )
 
     # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
@@ -2230,7 +2178,11 @@ async def test_mcp_tool_execution_without_pii(
 
 @pytest.mark.asyncio
 async def test_multiple_agents_asyncio(
-    sentry_init, capture_events, test_agent, mock_model_response, get_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    nonstreaming_responses_model_response,
+    get_model_response,
 ):
     """
     Test that multiple agents can be run at the same time in asyncio tasks
@@ -2240,7 +2192,9 @@ async def test_multiple_agents_asyncio(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response, serialize_pydantic=True)
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
 
     with patch.object(
         agent.model._client._client,
@@ -2318,7 +2272,11 @@ def test_openai_agents_message_role_mapping(
 
 @pytest.mark.asyncio
 async def test_tool_execution_error_tracing(
-    sentry_init, capture_events, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    get_model_response,
+    responses_tool_call_model_responses,
 ):
     """
     Test that tool execution errors are properly tracked via error tracing patch.
@@ -2341,75 +2299,45 @@ async def test_tool_execution_error_tracing(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[failing_tool], model=model)
 
-    tool_response = get_model_response(
-        Response(
-            id="resp_1",
-            output=[
-                ResponseFunctionToolCall(
-                    id="call_123",
-                    call_id="call_123",
-                    name="failing_tool",
-                    type="function_call",
-                    arguments='{"message": "test"}',
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
+    responses = responses_tool_call_model_responses(
+        tool_name="failing_tool",
+        arguments='{"message": "test"}',
+        response_model="gpt-4-0613",
+        response_text="An error occurred while running the tool",
+        response_ids=iter(["resp_1", "resp_2"]),
+        usages=iter(
+            [
+                ResponseUsage(
+                    input_tokens=10,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=5,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=15,
                 ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
+                ResponseUsage(
+                    input_tokens=15,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=0,
+                    ),
+                    output_tokens=10,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=0,
+                    ),
+                    total_tokens=25,
                 ),
-                total_tokens=15,
-            ),
+            ]
         ),
+    )
+    tool_response = get_model_response(
+        next(responses),
         serialize_pydantic=True,
     )
-
     final_response = get_model_response(
-        Response(
-            id="resp_2",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="An error occurred while running the tool",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4-0613",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=25,
-            ),
-        ),
+        next(responses),
         serialize_pydantic=True,
     )
 
@@ -2440,7 +2368,10 @@ async def test_tool_execution_error_tracing(
     # Find the execute_tool span
     execute_tool_span = None
     for span in spans:
-        if span.get("description", "").startswith("execute_tool failing_tool"):
+        description = span.get("description", "")
+        if description is not None and description.startswith(
+            "execute_tool failing_tool"
+        ):
             execute_tool_span = span
             break
 
@@ -3154,7 +3085,11 @@ async def test_streaming_span_update_captures_response_data(
 
 @pytest.mark.asyncio
 async def test_streaming_ttft_on_chat_span(
-    sentry_init, test_agent, async_iterator, server_side_event_chunks
+    sentry_init,
+    test_agent,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """
     Test that time-to-first-token (TTFT) is recorded on chat spans during streaming.
@@ -3182,11 +3117,7 @@ async def test_streaming_ttft_on_chat_span(
         traces_sample_rate=1.0,
     )
 
-    request = httpx.Request(
-        "POST",
-        "/responses",
-    )
-
+    request_headers = {}
     # openai-agents calls with_streaming_response() if available starting with
     # https://github.com/openai/openai-agents-python/commit/159beb56130f7d85192acfd593c9168757984dc0.
     # When using with_streaming_response() the header set below changes the response type:
@@ -3194,12 +3125,10 @@ async def test_streaming_ttft_on_chat_span(
     if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
         agent_with_tool.model._client.responses, "with_streaming_response"
     ):
-        request.headers["X-Stainless-Raw-Response"] = "stream"
+        request_headers["X-Stainless-Raw-Response"] = "stream"
 
-    response = httpx.Response(
-        200,
-        request=request,
-        content=async_iterator(
+    response = get_model_response(
+        async_iterator(
             server_side_event_chunks(
                 [
                     ResponseCreatedEvent(
@@ -3276,6 +3205,7 @@ async def test_streaming_ttft_on_chat_span(
                 ]
             )
         ),
+        request_headers=request_headers,
     )
 
     # Patching https://github.com/openai/openai-python/blob/656e3cab4a18262a49b961d41293367e45ee71b9/src/openai/_base_client.py#L1604
@@ -3313,7 +3243,11 @@ async def test_streaming_ttft_on_chat_span(
 )
 @pytest.mark.asyncio
 async def test_conversation_id_on_all_spans(
-    sentry_init, capture_events, test_agent, mock_model_response, get_model_response
+    sentry_init,
+    capture_events,
+    test_agent,
+    nonstreaming_responses_model_response,
+    get_model_response,
 ):
     """
     Test that gen_ai.conversation.id is set on all AI-related spans when passed to Runner.run().
@@ -3323,7 +3257,9 @@ async def test_conversation_id_on_all_spans(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response, serialize_pydantic=True)
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
 
     with patch.object(
         agent.model._client._client,
@@ -3508,7 +3444,7 @@ async def test_no_conversation_id_when_not_provided(
     sentry_init,
     capture_events,
     test_agent,
-    mock_model_response,
+    nonstreaming_responses_model_response,
     get_model_response,
 ):
     """
@@ -3519,7 +3455,9 @@ async def test_no_conversation_id_when_not_provided(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent = test_agent.clone(model=model)
 
-    response = get_model_response(mock_model_response, serialize_pydantic=True)
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
 
     with patch.object(
         agent.model._client._client,

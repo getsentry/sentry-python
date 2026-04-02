@@ -25,6 +25,7 @@ __all__ = [  # noqa
     "configure_scope",
     "continue_trace",
     "flush",
+    "flush_async",
     "get_baggage",
     "get_client",
     "get_global_scope",

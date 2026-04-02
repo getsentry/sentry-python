@@ -29,6 +29,7 @@
       "Bash(grep:*)",
       "Bash(mv:*)",
       "Bash(source .venv/bin/activate)",
+      "Bash(source tox.venv/bin/activate:*)",
       "Bash(tox:*)",
       "Bash(tox.venv/bin/tox:*)",
       "Bash(.tox/*/bin/python:*)",
