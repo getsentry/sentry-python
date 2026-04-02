@@ -1178,6 +1178,30 @@ def streaming_chat_completions_model_response():
 
 
 @pytest.fixture
+def nonstreaming_chat_completions_model_response():
+    return openai.types.chat.ChatCompletion(
+        id="chatcmpl-test",
+        choices=[
+            openai.types.chat.chat_completion.Choice(
+                index=0,
+                finish_reason="stop",
+                message=openai.types.chat.ChatCompletionMessage(
+                    role="assistant", content="Test response"
+                ),
+            )
+        ],
+        created=1234567890,
+        model="gpt-3.5-turbo",
+        object="chat.completion",
+        usage=openai.types.CompletionUsage(
+            prompt_tokens=10,
+            completion_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+
+@pytest.fixture
 def nonstreaming_responses_model_response():
     return openai.types.responses.Response(
         id="resp_123",
