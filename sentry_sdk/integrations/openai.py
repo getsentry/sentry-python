@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
+    from openai.types.responses.response_usage import ResponseUsage
     from openai.types.responses import (
         ResponseInputParam,
         SequenceNotStr,
@@ -148,6 +149,14 @@ def _capture_exception(exc: "Any", manual_span_cleanup: bool = True) -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
+def _has_attr_and_is_int(
+    token_usage: Union["CompletionUsage", "ResponseUsage"], attr_name: str
+) -> bool:
+    return hasattr(token_usage, attr_name) and isinstance(
+        getattr(token_usage, attr_name, None), int
+    )
+
+
 def _calculate_completions_token_usage(
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
     response: "Any",
@@ -170,24 +179,24 @@ def _calculate_completions_token_usage(
         usage = response.usage
 
     if usage is not None:
-        if hasattr(usage, "prompt_tokens") and isinstance(usage.prompt_tokens, int):
+        if _has_attr_and_is_int(usage, "prompt_tokens"):
             input_tokens = usage.prompt_tokens
+        if _has_attr_and_is_int(usage, "completion_tokens"):
+            output_tokens = usage.completion_tokens
+        if _has_attr_and_is_int(usage, "total_tokens"):
+            total_tokens = usage.total_tokens
+
         if hasattr(usage, "prompt_tokens_details"):
             cached = getattr(usage.prompt_tokens_details, "cached_tokens", None)
             if isinstance(cached, int):
                 input_tokens_cached = cached
-        if hasattr(usage, "completion_tokens") and isinstance(
-            usage.completion_tokens, int
-        ):
-            output_tokens = usage.completion_tokens
+
         if hasattr(usage, "completion_tokens_details"):
             reasoning = getattr(
                 usage.completion_tokens_details, "reasoning_tokens", None
             )
             if isinstance(reasoning, int):
                 output_tokens_reasoning = reasoning
-        if hasattr(usage, "total_tokens") and isinstance(usage.total_tokens, int):
-            total_tokens = usage.total_tokens
 
     # Manually count input tokens
     if input_tokens == 0:
@@ -246,20 +255,23 @@ def _calculate_responses_token_usage(
 
     if hasattr(response, "usage"):
         usage = response.usage
-        if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
+
+        if _has_attr_and_is_int(usage, "input_tokens"):
             input_tokens = usage.input_tokens
+        if _has_attr_and_is_int(usage, "output_tokens"):
+            output_tokens = usage.output_tokens
+        if _has_attr_and_is_int(usage, "total_tokens"):
+            total_tokens = usage.total_tokens
+
         if hasattr(usage, "input_tokens_details"):
             cached = getattr(usage.input_tokens_details, "cached_tokens", None)
             if isinstance(cached, int):
                 input_tokens_cached = cached
-        if hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
-            output_tokens = usage.output_tokens
+
         if hasattr(usage, "output_tokens_details"):
             reasoning = getattr(usage.output_tokens_details, "reasoning_tokens", None)
             if isinstance(reasoning, int):
                 output_tokens_reasoning = reasoning
-        if hasattr(usage, "total_tokens") and isinstance(usage.total_tokens, int):
-            total_tokens = usage.total_tokens
 
     # Manually count input tokens
     if input_tokens == 0:
