@@ -268,7 +268,7 @@ def test_streaming_chat_completion(
                 client=client,
                 stream=True,
             )
-            for chunk in response:
+            for _ in response:
                 pass
 
             streaming_handler.executor.shutdown(wait=True)
