@@ -31,8 +31,24 @@ from sentry_sdk.integrations.litellm import (
 )
 from sentry_sdk.utils import package_version
 
+from openai import OpenAI
+
+from concurrent.futures import ThreadPoolExecutor
+
+import litellm.utils as litellm_utils
+from litellm.litellm_core_utils import streaming_handler
+from litellm.litellm_core_utils import thread_pool_executor
+
 
 LITELLM_VERSION = package_version("litellm")
+
+
+@pytest.fixture()
+def reset_litellm_executor():
+    yield
+    thread_pool_executor.executor = ThreadPoolExecutor(max_workers=100)
+    litellm_utils.executor = thread_pool_executor.executor
+    streaming_handler.executor = thread_pool_executor.executor
 
 
 @pytest.fixture
@@ -212,7 +228,14 @@ def test_nonstreaming_chat_completion(
     ],
 )
 def test_streaming_chat_completion(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
+    streaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
@@ -222,29 +245,45 @@ def test_streaming_chat_completion(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    mock_response = MockCompletionResponse()
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-            "stream": True,
-        }
+    client = OpenAI(api_key="z")
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
+    model_response = get_model_response(
+        server_side_event_chunks(
+            streaming_chat_completions_model_response,
+            include_event_type=False,
+        ),
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            response = litellm.completion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+                stream=True,
+            )
+            for _ in response:
+                pass
+
+            streaming_handler.executor.shutdown(wait=True)
 
     assert len(events) == 1
     (event,) = events
 
     assert event["type"] == "transaction"
-    assert len(event["spans"]) == 1
-    (span,) = event["spans"]
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
