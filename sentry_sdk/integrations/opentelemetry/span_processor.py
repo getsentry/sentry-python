@@ -86,7 +86,8 @@ class SentrySpanProcessor(SpanProcessor):
         if not hasattr(cls, "instance"):
             cls.instance = super().__new__(cls)
 
-        return cls.instance
+        # "instance" class attribute is guaranteed to be set above (mypy believes instance is an instance-only attribute).
+        return cls.instance  # type: ignore[misc]
 
     def __init__(self) -> None:
         @add_global_event_processor

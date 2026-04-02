@@ -696,6 +696,9 @@ def _extract_response_text(
         if not hasattr(candidate, "content") or not hasattr(candidate.content, "parts"):
             continue
 
+        if candidate.content is None or candidate.content.parts is None:
+            continue
+
         for part in candidate.content.parts:
             if getattr(part, "text", None):
                 texts.append(part.text)
