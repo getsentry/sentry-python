@@ -163,7 +163,13 @@ class MockEmbeddingResponse:
     ],
 )
 def test_nonstreaming_chat_completion(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
@@ -173,22 +179,28 @@ def test_nonstreaming_chat_completion(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    mock_response = MockCompletionResponse()
 
-    with start_transaction(name="litellm test"):
-        # Simulate what litellm does: call input callback, then success callback
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-        }
+    client = OpenAI(api_key="z")
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
 
     assert len(events) == 1
     (event,) = events
@@ -196,8 +208,13 @@ def test_nonstreaming_chat_completion(
     assert event["type"] == "transaction"
     assert event["transaction"] == "litellm test"
 
-    assert len(event["spans"]) == 1
-    (span,) = event["spans"]
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
 
     assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "chat gpt-3.5-turbo"
