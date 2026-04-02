@@ -123,7 +123,9 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
         for header, value in headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 
-        attributes["http.query"] = _get_query(asgi_scope)
+        query = _get_query(asgi_scope)
+        if query:
+            attributes["http.query"] = query
 
         attributes["url.full"] = _get_url(
             asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
