@@ -119,7 +119,7 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
         if asgi_scope.get("method"):
             attributes["http.request.method"] = asgi_scope["method"].upper()
 
-        headers = _filter_headers(_get_headers(asgi_scope))
+        headers = _filter_headers(_get_headers(asgi_scope), use_annotated_value=False)
         for header, value in headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 
