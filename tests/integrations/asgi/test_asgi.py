@@ -186,7 +186,7 @@ async def test_capture_transaction(
 
     async with TestClient(app) as client:
         if span_streaming:
-            items = capture_items(["span"])
+            items = capture_items("span")
         else:
             events = capture_events()
         await client.get("/some_url?somevalue=123")
@@ -256,7 +256,7 @@ async def test_capture_transaction_with_error(
     app = SentryAsgiMiddleware(asgi3_app_with_error)
 
     if span_streaming:
-        items = capture_items(["event", "span"])
+        items = capture_items("event", "span")
     else:
         events = capture_events()
 
