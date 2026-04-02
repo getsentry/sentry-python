@@ -338,7 +338,7 @@ def capture_items(monkeypatch):
 
         def append_envelope(envelope):
             for item in envelope:
-                if types is None or item.type not in types:
+                if types and item.type not in types:
                     continue
 
                 if item.type in ("metric", "log", "span"):
