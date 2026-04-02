@@ -293,6 +293,12 @@ def _calculate_responses_token_usage(
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
                 output_tokens += count_tokens(message)
+        elif hasattr(response, "output"):
+            for output_item in response.output:
+                if hasattr(output_item, "content"):
+                    for content_item in output_item.content:
+                        if hasattr(content_item, "text"):
+                            output_tokens += count_tokens(content_item.text)
 
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
@@ -794,18 +800,20 @@ def _wrap_synchronous_completions_chunk_iterator(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
             )
+        all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
-            _calculate_completions_token_usage(
-                messages=messages,
-                response=response,
-                span=span,
-                streaming_message_responses=all_responses,
-                streaming_message_total_token_usage=streaming_message_total_token_usage,
-                count_tokens=integration.count_tokens,
-            )
+
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=all_responses,
+            streaming_message_total_token_usage=streaming_message_total_token_usage,
+            count_tokens=integration.count_tokens,
+        )
 
     if finish_span:
         span.__exit__(None, None, None)
@@ -854,18 +862,20 @@ async def _wrap_asynchronous_completions_chunk_iterator(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
             )
+        all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
-            _calculate_completions_token_usage(
-                messages=messages,
-                response=response,
-                span=span,
-                streaming_message_responses=all_responses,
-                streaming_message_total_token_usage=streaming_message_total_token_usage,
-                count_tokens=integration.count_tokens,
-            )
+
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=all_responses,
+            streaming_message_total_token_usage=streaming_message_total_token_usage,
+            count_tokens=integration.count_tokens,
+        )
 
     if finish_span:
         span.__exit__(None, None, None)
@@ -921,6 +931,7 @@ def _wrap_synchronous_responses_event_iterator(
             all_responses = ["".join(chunk) for chunk in data_buf]
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
+
             if count_tokens_manually:
                 _calculate_responses_token_usage(
                     input=input,
