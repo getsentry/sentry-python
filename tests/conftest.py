@@ -7,6 +7,7 @@ import warnings
 import brotli
 import gzip
 import io
+from dataclasses import dataclass
 from threading import Thread
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -316,6 +317,47 @@ def capture_envelopes(monkeypatch):
         monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
 
         return envelopes
+
+    return inner
+
+
+@dataclass
+class UnwrappedItem:
+    type: str
+    payload: dict
+
+
+@pytest.fixture
+def capture_items(monkeypatch):
+    """Capture envelope payload, unfurling individual items."""
+
+    def inner(types=None):
+        telemetry = []
+        test_client = sentry_sdk.get_client()
+        old_capture_envelope = test_client.transport.capture_envelope
+
+        def append_envelope(envelope):
+            for item in envelope:
+                if types is None or item.type not in types:
+                    continue
+
+                if item.type in ("metric", "log", "span"):
+                    for json in item.payload.json["items"]:
+                        t = {k: v for k, v in json.items() if k != "attributes"}
+                        t["attributes"] = {
+                            k: v["value"] for k, v in json["attributes"].items()
+                        }
+                        telemetry.append(UnwrappedItem(type=item.type, payload=t))
+                else:
+                    telemetry.append(
+                        UnwrappedItem(type=item.type, payload=item.payload.json)
+                    )
+
+            return old_capture_envelope(envelope)
+
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
+
+        return telemetry
 
     return inner
 
