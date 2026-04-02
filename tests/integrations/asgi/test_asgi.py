@@ -303,35 +303,78 @@ async def test_capture_transaction_with_error(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 async def test_has_trace_if_performance_enabled(
     sentry_init,
     asgi3_app_with_error_and_msg,
     capture_events,
+    capture_items,
+    span_streaming,
 ):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
-            events = capture_events()
+            if span_streaming:
+                items = capture_items("event", "span")
+            else:
+                events = capture_events()
             await client.get("/")
 
-    msg_event, error_event, transaction_event = events
+    sentry_sdk.flush()
 
-    assert msg_event["contexts"]["trace"]
-    assert "trace_id" in msg_event["contexts"]["trace"]
+    if span_streaming:
+        for item in items:
+            print(item)
+            print()
+        msg_event, error_event, span = items
 
-    assert error_event["contexts"]["trace"]
-    assert "trace_id" in error_event["contexts"]["trace"]
+        assert msg_event.type == "event"
+        msg_event = msg_event.payload
+        assert msg_event["contexts"]["trace"]
+        assert "trace_id" in msg_event["contexts"]["trace"]
 
-    assert transaction_event["contexts"]["trace"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
+        assert error_event.type == "event"
+        error_event = error_event.payload
+        assert error_event["contexts"]["trace"]
+        assert "trace_id" in error_event["contexts"]["trace"]
 
-    assert (
-        error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
-        == msg_event["contexts"]["trace"]["trace_id"]
-    )
+        assert span.type == "span"
+        span = span.payload
+        assert span["trace_id"] is not None
+
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == msg_event["contexts"]["trace"]["trace_id"]
+            == span["trace_id"]
+        )
+
+    else:
+        msg_event, error_event, transaction_event = events
+
+        assert msg_event["contexts"]["trace"]
+        assert "trace_id" in msg_event["contexts"]["trace"]
+
+        assert error_event["contexts"]["trace"]
+        assert "trace_id" in error_event["contexts"]["trace"]
+
+        assert transaction_event["contexts"]["trace"]
+        assert "trace_id" in transaction_event["contexts"]["trace"]
+
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == transaction_event["contexts"]["trace"]["trace_id"]
+            == msg_event["contexts"]["trace"]["trace_id"]
+        )
 
 
 @pytest.mark.asyncio
