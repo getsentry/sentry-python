@@ -333,9 +333,6 @@ async def test_has_trace_if_performance_enabled(
     sentry_sdk.flush()
 
     if span_streaming:
-        for item in items:
-            print(item)
-            print()
         msg_event, error_event, span = items
 
         assert msg_event.type == "event"
