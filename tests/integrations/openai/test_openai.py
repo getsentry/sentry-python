@@ -1972,7 +1972,7 @@ def test_completions_token_usage_from_response():
             response=response,
             span=span,
             streaming_message_responses=streaming_message_responses,
-            streaming_message_token_usage=None,
+            streaming_message_total_token_usage=None,
             count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
@@ -2010,7 +2010,7 @@ def test_completions_token_usage_with_detailed_fields():
             response=response,
             span=span,
             streaming_message_responses=[],
-            streaming_message_token_usage=None,
+            streaming_message_total_token_usage=None,
             count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
@@ -2049,7 +2049,7 @@ def test_completions_token_usage_manual_input_counting():
             response=response,
             span=span,
             streaming_message_responses=streaming_message_responses,
-            streaming_message_token_usage=None,
+            streaming_message_total_token_usage=None,
             count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
@@ -2088,7 +2088,7 @@ def test_completions_token_usage_manual_output_counting_streaming():
             response=response,
             span=span,
             streaming_message_responses=streaming_message_responses,
-            streaming_message_token_usage=None,
+            streaming_message_total_token_usage=None,
             count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
@@ -2140,7 +2140,7 @@ def test_completions_token_usage_manual_output_counting_choices():
             response=response,
             span=span,
             streaming_message_responses=streaming_message_responses,
-            streaming_message_token_usage=None,
+            streaming_message_total_token_usage=None,
             count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
@@ -2172,7 +2172,7 @@ def test_completions_token_usage_no_usage_data():
             response=response,
             span=span,
             streaming_message_responses=streaming_message_responses,
-            streaming_message_token_usage=None,
+            streaming_message_total_token_usage=None,
             count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
@@ -2227,6 +2227,7 @@ def test_responses_token_usage_no_usage_data():
         return len(str(msg))
 
     response = mock.MagicMock()
+    response.usage = None
     input = []
     streaming_message_responses = None
 

@@ -153,7 +153,7 @@ def _calculate_completions_token_usage(
     response: "Any",
     span: "Span",
     streaming_message_responses: "Optional[List[str]]",
-    streaming_message_token_usage: "Optional[CompletionUsage]",
+    streaming_message_total_token_usage: "Optional[CompletionUsage]",
     count_tokens: "Callable[..., Any]",
 ) -> None:
     """Extract and record token usage from a Chat Completions API response."""
@@ -164,8 +164,8 @@ def _calculate_completions_token_usage(
     total_tokens: "Optional[int]" = 0
     usage = None
 
-    if streaming_message_token_usage:
-        usage = streaming_message_token_usage
+    if streaming_message_total_token_usage is not None:
+        usage = streaming_message_total_token_usage
     elif hasattr(response, "usage"):
         usage = response.usage
 
@@ -579,7 +579,7 @@ def _set_common_output_data(
             response=response,
             span=span,
             streaming_message_responses=None,
-            streaming_message_token_usage=None,
+            streaming_message_total_token_usage=None,
             count_tokens=integration.count_tokens,
         )
 
@@ -635,7 +635,7 @@ def _set_common_output_data(
             response=response,
             span=span,
             streaming_message_responses=None,
-            streaming_message_token_usage=None,
+            streaming_message_total_token_usage=None,
             count_tokens=integration.count_tokens,
         )
         if finish_span:
@@ -755,7 +755,7 @@ def _wrap_synchronous_completions_chunk_iterator(
     """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
-    streaming_message_token_usage = None
+    streaming_message_total_token_usage = None
 
     for x in old_iterator:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
@@ -773,7 +773,7 @@ def _wrap_synchronous_completions_chunk_iterator(
                         data_buf[choice_index].append(content or "")
                     choice_index += 1
             if hasattr(x, "usage"):
-                streaming_message_token_usage = x.usage
+                streaming_message_total_token_usage = x.usage
 
         yield x
 
@@ -791,7 +791,7 @@ def _wrap_synchronous_completions_chunk_iterator(
                 response=response,
                 span=span,
                 streaming_message_responses=all_responses,
-                streaming_message_token_usage=streaming_message_token_usage,
+                streaming_message_total_token_usage=streaming_message_total_token_usage,
                 count_tokens=integration.count_tokens,
             )
 
@@ -815,7 +815,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
-    streaming_message_token_usage = None
+    streaming_message_total_token_usage = None
 
     async for x in old_iterator:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
@@ -833,7 +833,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
                         data_buf[choice_index].append(content or "")
                     choice_index += 1
             if hasattr(x, "usage"):
-                streaming_message_token_usage = x.usage
+                streaming_message_total_token_usage = x.usage
 
         yield x
 
@@ -851,7 +851,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
                 response=response,
                 span=span,
                 streaming_message_responses=all_responses,
-                streaming_message_token_usage=streaming_message_token_usage,
+                streaming_message_total_token_usage=streaming_message_total_token_usage,
                 count_tokens=integration.count_tokens,
             )
 
