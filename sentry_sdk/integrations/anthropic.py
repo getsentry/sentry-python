@@ -602,7 +602,7 @@ def _set_output_data(
 
 def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     """
-    Creates an AI Client Span for both non-streaming and streaming calls.
+    Creates and manages an AI Client Span for both non-streaming and streaming calls.
     """
     integration = kwargs.pop("integration")
     if integration is None:
@@ -690,7 +690,7 @@ async def _sentry_patched_create_async(
     f: "Any", *args: "Any", **kwargs: "Any"
 ) -> "Any":
     """
-    Creates an AI Client Span for both non-streaming and streaming calls.
+    Creates and manages an AI Client Span for both non-streaming and streaming calls.
     """
     integration = kwargs.pop("integration")
     if integration is None:
