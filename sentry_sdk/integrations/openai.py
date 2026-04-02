@@ -150,7 +150,7 @@ def _capture_exception(exc: "Any", manual_span_cleanup: bool = True) -> None:
 
 
 def _has_attr_and_is_int(
-    token_usage: Union["CompletionUsage", "ResponseUsage"], attr_name: str
+    token_usage: "Union[CompletionUsage, ResponseUsage]", attr_name: str
 ) -> bool:
     return hasattr(token_usage, attr_name) and isinstance(
         getattr(token_usage, attr_name, None), int
