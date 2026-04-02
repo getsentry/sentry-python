@@ -863,18 +863,19 @@ async def test_transaction_name(
         },
     )
 
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        envelopes = capture_envelopes()
+
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
     async with TestClient(app) as client:
-        if span_streaming:
-            items = capture_items("span")
-        else:
-            envelopes = capture_envelopes()
         await client.get(request_url)
 
-    sentry_sdk.flush()
-
     if span_streaming:
+        sentry_sdk.flush()
+
         assert len(items) == 1
         span = items[0].payload
 
