@@ -63,6 +63,9 @@ def _patch_graph_nodes() -> None:
         with ai_client_span(None, model, model_settings) as span:
             result = await original_model_request_run(self, ctx)
 
+            # The instructions are added in `_prepare_request` that runs as part of `ModelRequestNode.run`, so the input
+            # must be recorded after the call. See _get_instructions() added with
+            # https://github.com/pydantic/pydantic-ai/commit/f5271434a56c7a3bb5a3c93f2d1236d8b18afe3e
             if messages:
                 _set_input_messages(span, messages)
 
