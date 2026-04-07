@@ -25,10 +25,10 @@ if TYPE_CHECKING:
     from typing import Any
 
 try:
-    from pydantic_ai.messages import (
+    from pydantic_ai.messages import (  # type: ignore
         BaseToolCallPart,
         TextPart,
-    )  # type: ignore
+    )
 except ImportError:
     # Fallback if these classes are not available
     BaseToolCallPart = None
