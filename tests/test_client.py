@@ -26,9 +26,22 @@ from sentry_sdk import (
 from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 from sentry_sdk.utils import capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
-from sentry_sdk.transport import Transport
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.transport import Transport, AsyncHttpTransport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk._compat import PY38
+
+try:
+    import gevent  # noqa: F401
+
+    running_under_gevent = True
+except ImportError:
+    running_under_gevent = False
+
+skip_under_gevent = pytest.mark.skipif(
+    running_under_gevent, reason="Async tests not compatible with gevent"
+)
 
 from typing import TYPE_CHECKING
 
@@ -42,6 +55,241 @@ maximum_python_312 = pytest.mark.skipif(
     sys.version_info > (3, 12),
     reason="Since Python 3.13, `FrameLocalsProxy` skips items of `locals()` that have non-`str` keys; this is a CPython implementation detail: https://github.com/python/cpython/blame/7b413952e817ae87bfda2ac85dd84d30a6ce743b/Objects/frameobject.c#L148",
 )
+
+PROXY_TESTCASES = [
+    {
+        "dsn": "http://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "arg_http_proxy": "http://localhost/123",
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "http",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "arg_http_proxy": "https://localhost/123",
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "https",
+    },
+    {
+        "dsn": "http://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "arg_http_proxy": "http://localhost/123",
+        "arg_https_proxy": "https://localhost/123",
+        "expected_proxy_scheme": "http",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "arg_http_proxy": "http://localhost/123",
+        "arg_https_proxy": "https://localhost/123",
+        "expected_proxy_scheme": "https",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "arg_http_proxy": "http://localhost/123",
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "http",
+    },
+    {
+        "dsn": "http://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": None,
+    },
+    {
+        "dsn": "http://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": None,
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "http",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": "https://localhost/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "https",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": None,
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "http",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": "https://localhost/123",
+        "arg_http_proxy": "",
+        "arg_https_proxy": "",
+        "expected_proxy_scheme": None,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": "https://localhost/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "https",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": None,
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "http",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": "https://localhost/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": "",
+        "expected_proxy_scheme": "http",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": "https://localhost/123",
+        "arg_http_proxy": "",
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "https",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": "https://localhost/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": "",
+        "expected_proxy_scheme": None,
+    },
+    {
+        "dsn": "http://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": "https://localhost/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "http",
+    },
+    # NO_PROXY testcases
+    {
+        "dsn": "http://foo@sentry.io/123",
+        "env_http_proxy": "http://localhost/123",
+        "env_https_proxy": None,
+        "env_no_proxy": "sentry.io,example.com",
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": None,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": "https://localhost/123",
+        "env_no_proxy": "example.com,sentry.io",
+        "arg_http_proxy": None,
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": None,
+    },
+    {
+        "dsn": "http://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "env_no_proxy": "sentry.io,example.com",
+        "arg_http_proxy": "http://localhost/123",
+        "arg_https_proxy": None,
+        "expected_proxy_scheme": "http",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "env_no_proxy": "sentry.io,example.com",
+        "arg_http_proxy": None,
+        "arg_https_proxy": "https://localhost/123",
+        "expected_proxy_scheme": "https",
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "env_http_proxy": None,
+        "env_https_proxy": None,
+        "env_no_proxy": "sentry.io,example.com",
+        "arg_http_proxy": None,
+        "arg_https_proxy": "https://localhost/123",
+        "expected_proxy_scheme": "https",
+        "arg_proxy_headers": {"Test-Header": "foo-bar"},
+    },
+]
+
+SOCKS_PROXY_TESTCASES = [
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": "http://localhost/123",
+        "arg_https_proxy": None,
+        "should_be_socks_proxy": False,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": "socks4a://localhost/123",
+        "arg_https_proxy": None,
+        "should_be_socks_proxy": True,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": "socks4://localhost/123",
+        "arg_https_proxy": None,
+        "should_be_socks_proxy": True,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": "socks5h://localhost/123",
+        "arg_https_proxy": None,
+        "should_be_socks_proxy": True,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": "socks5://localhost/123",
+        "arg_https_proxy": None,
+        "should_be_socks_proxy": True,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": "socks4a://localhost/123",
+        "should_be_socks_proxy": True,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": "socks4://localhost/123",
+        "should_be_socks_proxy": True,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": "socks5h://localhost/123",
+        "should_be_socks_proxy": True,
+    },
+    {
+        "dsn": "https://foo@sentry.io/123",
+        "arg_http_proxy": None,
+        "arg_https_proxy": "socks5://localhost/123",
+        "should_be_socks_proxy": True,
+    },
+]
 
 
 class EnvelopeCapturedError(Exception):
@@ -68,186 +316,7 @@ def test_transport_option(monkeypatch):
     assert str(Client(transport=transport).dsn) == dsn
 
 
-@pytest.mark.parametrize(
-    "testcase",
-    [
-        {
-            "dsn": "http://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "arg_http_proxy": "http://localhost/123",
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "http",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "arg_http_proxy": "https://localhost/123",
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "https",
-        },
-        {
-            "dsn": "http://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "arg_http_proxy": "http://localhost/123",
-            "arg_https_proxy": "https://localhost/123",
-            "expected_proxy_scheme": "http",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "arg_http_proxy": "http://localhost/123",
-            "arg_https_proxy": "https://localhost/123",
-            "expected_proxy_scheme": "https",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "arg_http_proxy": "http://localhost/123",
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "http",
-        },
-        {
-            "dsn": "http://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": None,
-        },
-        {
-            "dsn": "http://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": None,
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "http",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": "https://localhost/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "https",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": None,
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "http",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": "https://localhost/123",
-            "arg_http_proxy": "",
-            "arg_https_proxy": "",
-            "expected_proxy_scheme": None,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": "https://localhost/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "https",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": None,
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "http",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": "https://localhost/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": "",
-            "expected_proxy_scheme": "http",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": "https://localhost/123",
-            "arg_http_proxy": "",
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "https",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": "https://localhost/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": "",
-            "expected_proxy_scheme": None,
-        },
-        {
-            "dsn": "http://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": "https://localhost/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "http",
-        },
-        # NO_PROXY testcases
-        {
-            "dsn": "http://foo@sentry.io/123",
-            "env_http_proxy": "http://localhost/123",
-            "env_https_proxy": None,
-            "env_no_proxy": "sentry.io,example.com",
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": None,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": "https://localhost/123",
-            "env_no_proxy": "example.com,sentry.io",
-            "arg_http_proxy": None,
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": None,
-        },
-        {
-            "dsn": "http://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "env_no_proxy": "sentry.io,example.com",
-            "arg_http_proxy": "http://localhost/123",
-            "arg_https_proxy": None,
-            "expected_proxy_scheme": "http",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "env_no_proxy": "sentry.io,example.com",
-            "arg_http_proxy": None,
-            "arg_https_proxy": "https://localhost/123",
-            "expected_proxy_scheme": "https",
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "env_http_proxy": None,
-            "env_https_proxy": None,
-            "env_no_proxy": "sentry.io,example.com",
-            "arg_http_proxy": None,
-            "arg_https_proxy": "https://localhost/123",
-            "expected_proxy_scheme": "https",
-            "arg_proxy_headers": {"Test-Header": "foo-bar"},
-        },
-    ],
-)
+@pytest.mark.parametrize("testcase", PROXY_TESTCASES)
 @pytest.mark.parametrize(
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
@@ -300,65 +369,7 @@ def test_proxy(monkeypatch, testcase, http2):
             assert proxy_headers == testcase["arg_proxy_headers"]
 
 
-@pytest.mark.parametrize(
-    "testcase",
-    [
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": "http://localhost/123",
-            "arg_https_proxy": None,
-            "should_be_socks_proxy": False,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": "socks4a://localhost/123",
-            "arg_https_proxy": None,
-            "should_be_socks_proxy": True,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": "socks4://localhost/123",
-            "arg_https_proxy": None,
-            "should_be_socks_proxy": True,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": "socks5h://localhost/123",
-            "arg_https_proxy": None,
-            "should_be_socks_proxy": True,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": "socks5://localhost/123",
-            "arg_https_proxy": None,
-            "should_be_socks_proxy": True,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": "socks4a://localhost/123",
-            "should_be_socks_proxy": True,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": "socks4://localhost/123",
-            "should_be_socks_proxy": True,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": "socks5h://localhost/123",
-            "should_be_socks_proxy": True,
-        },
-        {
-            "dsn": "https://foo@sentry.io/123",
-            "arg_http_proxy": None,
-            "arg_https_proxy": "socks5://localhost/123",
-            "should_be_socks_proxy": True,
-        },
-    ],
-)
+@pytest.mark.parametrize("testcase", SOCKS_PROXY_TESTCASES)
 @pytest.mark.parametrize(
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
@@ -1585,3 +1596,266 @@ def test_keep_alive(env_value, arg_value, expected_value):
         )
 
     assert transport_cls.options["keep_alive"] is expected_value
+
+
+@pytest.mark.parametrize("testcase", PROXY_TESTCASES)
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_proxy(monkeypatch, testcase):
+    # These are just the same tests as the sync ones, but they need to be run in an event loop
+    # and respect the shutdown behavior of the async transport
+    if testcase["env_http_proxy"] is not None:
+        monkeypatch.setenv("HTTP_PROXY", testcase["env_http_proxy"])
+    if testcase["env_https_proxy"] is not None:
+        monkeypatch.setenv("HTTPS_PROXY", testcase["env_https_proxy"])
+    if testcase.get("env_no_proxy") is not None:
+        monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
+
+    kwargs = {
+        "_experiments": {"transport_async": True},
+        "integrations": [AsyncioIntegration()],
+    }
+
+    if testcase["arg_http_proxy"] is not None:
+        kwargs["http_proxy"] = testcase["arg_http_proxy"]
+    if testcase["arg_https_proxy"] is not None:
+        kwargs["https_proxy"] = testcase["arg_https_proxy"]
+    if testcase.get("arg_proxy_headers") is not None:
+        kwargs["proxy_headers"] = testcase["arg_proxy_headers"]
+
+    client = Client(testcase["dsn"], **kwargs)
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    proxy = getattr(
+        client.transport._pool,
+        "proxy",
+        getattr(client.transport._pool, "_proxy_url", None),
+    )
+    if testcase["expected_proxy_scheme"] is None:
+        assert proxy is None
+    else:
+        scheme = (
+            proxy.scheme.decode("ascii")
+            if isinstance(proxy.scheme, bytes)
+            else proxy.scheme
+        )
+        assert scheme == testcase["expected_proxy_scheme"]
+
+        if testcase.get("arg_proxy_headers") is not None:
+            proxy_headers = dict(
+                (k.decode("ascii"), v.decode("ascii"))
+                for k, v in client.transport._pool._proxy_headers
+            )
+            assert proxy_headers == testcase["arg_proxy_headers"]
+
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_with_async_transport_warns():
+    """Test close() with AsyncHttpTransport emits a warning."""
+    import warnings as _warnings
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    with _warnings.catch_warnings(record=True) as w:
+        _warnings.simplefilter("always")
+        client.close()
+        assert any("close_async()" in str(warning.message) for warning in w)
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_async_with_async_transport():
+    """Test close_async() properly closes async transport."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    await client.close_async(timeout=1.0)
+    assert client.transport is None
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_async_with_sync_transport():
+    """Test close_async() aborts with non-async transport."""
+    client = Client("https://foo@sentry.io/123")
+    assert not isinstance(client.transport, AsyncHttpTransport)
+
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
+        await client.close_async()
+        mock_logger.debug.assert_any_call(
+            "close_async() used with non-async transport, aborting. Please use close() instead."
+        )
+    # Transport should NOT have been set to None
+    assert client.transport is not None
+    client.close()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_close_async_no_transport():
+    """Test close_async() does nothing when transport is None."""
+    client = Client("https://foo@sentry.io/123")
+    client.transport = None
+    # Should not raise
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_with_async_transport_warns():
+    """Test flush() with AsyncHttpTransport emits a warning and returns."""
+    import warnings as _warnings
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    with _warnings.catch_warnings(record=True) as w:
+        _warnings.simplefilter("always")
+        client.flush(timeout=1.0)
+        assert any("flush_async()" in str(warning.message) for warning in w)
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_with_async_transport():
+    """Test flush_async() works with async transport."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    # Should not raise
+    await client.flush_async(timeout=1.0)
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_uses_shutdown_timeout_default():
+    """Test flush_async() uses shutdown_timeout when no timeout provided."""
+    client = Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+        shutdown_timeout=5.0,
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    with mock.patch.object(client.transport, "flush", return_value=None) as mock_flush:
+        await client.flush_async()
+        mock_flush.assert_called_once_with(timeout=5.0, callback=None)
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_with_sync_transport():
+    """Test flush_async() aborts with non-async transport."""
+    client = Client("https://foo@sentry.io/123")
+    assert not isinstance(client.transport, AsyncHttpTransport)
+
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
+        await client.flush_async()
+        mock_logger.debug.assert_any_call(
+            "flush_async() used with non-async transport, aborting. Please use flush() instead."
+        )
+    client.close()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_flush_async_no_transport():
+    """Test flush_async() does nothing when transport is None."""
+    client = Client("https://foo@sentry.io/123")
+    client.transport = None
+    # Should not raise
+    await client.flush_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_client_async_context_manager():
+    """Test Client works as async context manager."""
+    async with Client(
+        "https://foo@sentry.io/123",
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    ) as client:
+        assert isinstance(client.transport, AsyncHttpTransport)
+        assert client.is_active()
+    # After __aexit__, transport should be None
+    assert client.transport is None
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
+async def test_client_async_context_manager_with_sync_transport():
+    """Test Client async context manager with sync transport is safe."""
+    async with Client("https://foo@sentry.io/123") as client:
+        assert client.is_active()
+    # close_async with sync transport is a no-op for transport cleanup
+    # Transport won't be None because close_async aborts for non-async transport
+    assert client.transport is not None
+    client.close()
+
+
+@pytest.mark.parametrize("testcase", SOCKS_PROXY_TESTCASES)
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_socks_proxy(testcase):
+    # These are just the same tests as the sync ones, but they need to be run in an event loop
+    # and respect the shutdown behavior of the async transport
+
+    kwargs = {
+        "_experiments": {"transport_async": True},
+        "integrations": [AsyncioIntegration()],
+    }
+
+    if testcase["arg_http_proxy"] is not None:
+        kwargs["http_proxy"] = testcase["arg_http_proxy"]
+    if testcase["arg_https_proxy"] is not None:
+        kwargs["https_proxy"] = testcase["arg_https_proxy"]
+
+    client = Client(testcase["dsn"], **kwargs)
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    assert ("socks" in str(type(client.transport._pool)).lower()) == testcase[
+        "should_be_socks_proxy"
+    ], (
+        f"Expected {kwargs} to result in SOCKS == {testcase['should_be_socks_proxy']}"
+        f"but got {str(type(client.transport._pool))}"
+    )
+
+    await client.close_async()

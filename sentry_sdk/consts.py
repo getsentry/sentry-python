@@ -78,12 +78,14 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
+            "transport_async": Optional[bool],
             "enable_logs": Optional[bool],
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
             "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
             "ignore_spans": Optional[IgnoreSpansConfig],
+            "suppress_asgi_chained_exceptions": Optional[bool],
         },
         total=False,
     )
@@ -920,9 +922,8 @@ class OP:
     GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
-    GEN_AI_GENERATE_TEXT = "gen_ai.generate_text"
+    GEN_AI_TEXT_COMPLETION = "gen_ai.text_completion"
     GEN_AI_HANDOFF = "gen_ai.handoff"
-    GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
     GEN_AI_RESPONSES = "gen_ai.responses"
     GRAPHQL_EXECUTE = "graphql.execute"
@@ -1491,4 +1492,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.55.0"
+VERSION = "2.57.0"
