@@ -94,11 +94,15 @@ def _patch_graph_nodes() -> None:
 
             # Create chat span for streaming request
             with ai_client_span(None, model, model_settings) as span:
-                if messages:
-                    _set_input_messages(span, messages)
-
                 # Call the original stream method
                 async with original_stream_method(self, ctx) as stream:
+                    # The instructions are added in `_prepare_request` that runs as part of __aenter__ on the
+                    # context manager returned by `ModelRequestNode.stream()`, so the input must be recorded after the
+                    # call. See _get_instructions() added with
+                    # https://github.com/pydantic/pydantic-ai/commit/f5271434a56c7a3bb5a3c93f2d1236d8b18afe3e
+                    if messages:
+                        _set_input_messages(span, messages)
+
                     yield stream
 
                 # After streaming completes, update span with response data
