@@ -107,6 +107,10 @@ def _create_run_wrapper(
             model = kwargs.get("model")
             model_settings = kwargs.get("model_settings")
 
+            metadata = kwargs.get("metadata")
+            if not metadata:
+                kwargs["metadata"] = {"_sentry_span": None}
+
             # Create invoke_agent span
             with invoke_agent_span(
                 user_prompt, self, model, model_settings, is_streaming
@@ -147,6 +151,10 @@ def _create_streaming_wrapper(
         user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
         model = kwargs.get("model")
         model_settings = kwargs.get("model_settings")
+
+        metadata = kwargs.get("metadata")
+        if not metadata:
+            kwargs["metadata"] = {"_sentry_span": None}
 
         # Call original function to get the context manager
         original_ctx_manager = original_func(self, *args, **kwargs)

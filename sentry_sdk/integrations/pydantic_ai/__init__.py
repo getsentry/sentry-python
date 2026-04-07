@@ -1,8 +1,10 @@
-from sentry_sdk.integrations import DidNotEnable, Integration
+import functools
 
+from sentry_sdk.integrations import DidNotEnable, Integration
 
 try:
     import pydantic_ai  # type: ignore # noqa: F401
+    from pydantic_ai import Agent
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
@@ -13,6 +15,14 @@ from .patches import (
     _patch_model_request,
     _patch_tool_execution,
 )
+
+from .spans.ai_client import ai_client_span, update_ai_client_span
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pydantic_ai import ModelRequestContext, RunContext
+    from pydantic_ai.messages import ModelResponse
 
 
 class PydanticAIIntegration(Integration):
@@ -45,6 +55,57 @@ class PydanticAIIntegration(Integration):
         - Tool executions
         """
         _patch_agent_run()
-        _patch_graph_nodes()
-        _patch_model_request()
+
+        try:
+            from pydantic_ai.capabilities import Hooks
+
+            hooks = Hooks()
+
+            @hooks.on.before_model_request
+            async def on_request(
+                ctx: "RunContext[None]", request_context: "ModelRequestContext"
+            ) -> "ModelRequestContext":
+                span = ai_client_span(
+                    messages=request_context.messages,
+                    agent=None,
+                    model=request_context.model,
+                    model_settings=request_context.model_settings,
+                )
+                ctx.metadata["_sentry_span"] = span
+                span.__enter__()
+
+                return request_context
+
+            @hooks.on.after_model_request
+            async def on_response(
+                ctx: "RunContext[None]",
+                *,
+                request_context: "ModelRequestContext",
+                response: "ModelResponse",
+            ) -> "ModelResponse":
+                span = ctx.metadata["_sentry_span"]
+                if span is None:
+                    return response
+
+                update_ai_client_span(span, response)
+                span.__exit__(None, None, None)
+                del ctx.metadata["_sentry_span"]
+
+                return response
+
+            original_init = Agent.__init__
+
+            @functools.wraps(original_init)
+            def patched_init(self, *args, **kwargs):
+                caps = list(kwargs.get("capabilities") or [])
+                caps.append(hooks)
+                kwargs["capabilities"] = caps
+                original_init(self, *args, **kwargs)
+
+            Agent.__init__ = patched_init
+
+        except ImportError:
+            _patch_graph_nodes()
+            _patch_model_request()
+
         _patch_tool_execution()
