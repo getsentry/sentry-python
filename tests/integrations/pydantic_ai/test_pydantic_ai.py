@@ -2812,9 +2812,15 @@ async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
         ),
         pytest.param(
             "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            {"media_type": "image/png"},
+            {},
             "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
             id="http_url_with_base64_query_param",
+        ),
+        pytest.param(
+            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            {"media_type": "image/png"},
+            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
+            id="http_url_with_base64_query_param_and_media_type",
         ),
         pytest.param(
             "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=",
