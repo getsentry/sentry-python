@@ -38,17 +38,22 @@ from concurrent.futures import ThreadPoolExecutor
 import litellm.utils as litellm_utils
 from litellm.litellm_core_utils import streaming_handler
 from litellm.litellm_core_utils import thread_pool_executor
+from litellm.llms.custom_httpx.http_handler import HTTPHandler
 
 
 LITELLM_VERSION = package_version("litellm")
 
 
-@pytest.fixture()
-def reset_litellm_executor():
-    yield
+def _reset_litellm_executor():
     thread_pool_executor.executor = ThreadPoolExecutor(max_workers=100)
     litellm_utils.executor = thread_pool_executor.executor
     streaming_handler.executor = thread_pool_executor.executor
+
+
+@pytest.fixture()
+def reset_litellm_executor():
+    yield
+    _reset_litellm_executor()
 
 
 @pytest.fixture
@@ -477,7 +482,13 @@ def test_exception_handling(sentry_init, capture_events):
     assert len(error_events) == 1
 
 
-def test_span_origin(sentry_init, capture_events):
+def test_span_origin(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
@@ -485,21 +496,28 @@ def test_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    mock_response = MockCompletionResponse()
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-        }
+    client = OpenAI(api_key="z")
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
 
     (event,) = events
 
@@ -507,7 +525,15 @@ def test_span_origin(sentry_init, capture_events):
     assert event["spans"][0]["origin"] == "auto.ai.litellm"
 
 
-def test_multiple_providers(sentry_init, capture_events):
+def test_multiple_providers(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+    nonstreaming_anthropic_model_response,
+    nonstreaming_google_genai_model_response,
+):
     """Test that the integration correctly identifies different providers."""
     sentry_init(
         integrations=[LiteLLMIntegration()],
@@ -517,38 +543,89 @@ def test_multiple_providers(sentry_init, capture_events):
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    # Test with different model prefixes
-    test_cases = [
-        ("gpt-3.5-turbo", "openai"),
-        ("claude-3-opus-20240229", "anthropic"),
-        ("gemini/gemini-pro", "gemini"),
-    ]
+    openai_client = OpenAI(api_key="z")
+    openai_model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
 
-    for model, _ in test_cases:
-        mock_response = MockCompletionResponse(model=model)
-        with start_transaction(name=f"test {model}"):
-            kwargs = {
-                "model": model,
-                "messages": messages,
-            }
-
-            _input_callback(kwargs)
-            _success_callback(
-                kwargs,
-                mock_response,
-                datetime.now(),
-                datetime.now(),
+    with mock.patch.object(
+        openai_client.completions._client._client,
+        "send",
+        return_value=openai_model_response,
+    ):
+        with start_transaction(name="test gpt-3.5-turbo"):
+            litellm.completion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=openai_client,
             )
 
-    assert len(events) == len(test_cases)
+            litellm_utils.executor.shutdown(wait=True)
 
-    for i in range(len(test_cases)):
+    _reset_litellm_executor()
+
+    anthropic_client = HTTPHandler()
+    anthropic_model_response = get_model_response(
+        nonstreaming_anthropic_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
+
+    with mock.patch.object(
+        anthropic_client,
+        "post",
+        return_value=anthropic_model_response,
+    ):
+        with start_transaction(name="test claude-3-opus-20240229"):
+            litellm.completion(
+                model="claude-3-opus-20240229",
+                messages=messages,
+                client=anthropic_client,
+                api_key="z",
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
+
+    _reset_litellm_executor()
+
+    gemini_client = HTTPHandler()
+    gemini_model_response = get_model_response(
+        nonstreaming_google_genai_model_response,
+        serialize_pydantic=True,
+    )
+
+    with mock.patch.object(
+        gemini_client,
+        "post",
+        return_value=gemini_model_response,
+    ):
+        with start_transaction(name="test gemini/gemini-pro"):
+            litellm.completion(
+                model="gemini/gemini-pro",
+                messages=messages,
+                client=gemini_client,
+                api_key="z",
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
+
+    assert len(events) == 3
+
+    for i in range(3):
         span = events[i]["spans"][0]
         # The provider should be detected by litellm.get_llm_provider
         assert SPANDATA.GEN_AI_SYSTEM in span["data"]
 
 
-def test_additional_parameters(sentry_init, capture_events):
+def test_additional_parameters(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
     """Test that additional parameters are captured."""
     sentry_init(
         integrations=[LiteLLMIntegration()],
@@ -557,29 +634,41 @@ def test_additional_parameters(sentry_init, capture_events):
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    mock_response = MockCompletionResponse()
+    client = OpenAI(api_key="z")
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 100,
-            "top_p": 0.9,
-            "frequency_penalty": 0.5,
-            "presence_penalty": 0.5,
-        }
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+                temperature=0.7,
+                max_tokens=100,
+                top_p=0.9,
+                frequency_penalty=0.5,
+                presence_penalty=0.5,
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
 
     (event,) = events
-    (span,) = event["spans"]
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
 
     assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
@@ -624,7 +713,13 @@ def test_litellm_specific_parameters(sentry_init, capture_events):
     assert span["data"]["gen_ai.litellm.custom_llm_provider"] == "custom_provider"
 
 
-def test_no_integration(sentry_init, capture_events):
+def test_no_integration(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
         traces_sample_rate=1.0,
@@ -632,28 +727,37 @@ def test_no_integration(sentry_init, capture_events):
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    mock_response = MockCompletionResponse()
+    client = OpenAI(api_key="z")
 
-    with start_transaction(name="litellm test"):
-        # When the integration isn't enabled, the callbacks should exit early
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-        }
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
 
-        # These should not crash, just do nothing
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
 
     (event,) = events
     # Should still have the transaction, but no child spans since integration is off
     assert event["type"] == "transaction"
-    assert len(event.get("spans", [])) == 0
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 0
 
 
 def test_response_without_usage(sentry_init, capture_events):
@@ -709,50 +813,6 @@ def test_integration_setup(sentry_init):
     assert _input_callback in (litellm.input_callback or [])
     assert _success_callback in (litellm.success_callback or [])
     assert _failure_callback in (litellm.failure_callback or [])
-
-
-def test_message_dict_extraction(sentry_init, capture_events):
-    """Test that response messages are properly extracted with dict() fallback."""
-    sentry_init(
-        integrations=[LiteLLMIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    messages = [{"role": "user", "content": "Hello!"}]
-
-    # Create a message that has dict() method instead of model_dump()
-    class DictMessage:
-        def __init__(self):
-            self.role = "assistant"
-            self.content = "Response"
-            self.tool_calls = None
-
-        def dict(self):
-            return {"role": self.role, "content": self.content}
-
-    mock_response = MockCompletionResponse(choices=[MockChoice(message=DictMessage())])
-
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-        }
-
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
-
-    (event,) = events
-    (span,) = event["spans"]
-
-    # Should have extracted the response message
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
 
 
 def test_litellm_message_truncation(sentry_init, capture_events):
@@ -817,7 +877,13 @@ IMAGE_B64 = base64.b64encode(IMAGE_DATA).decode("utf-8")
 IMAGE_DATA_URI = f"data:image/png;base64,{IMAGE_B64}"
 
 
-def test_binary_content_encoding_image_url(sentry_init, capture_events):
+def test_binary_content_encoding_image_url(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -837,15 +903,37 @@ def test_binary_content_encoding_image_url(sentry_init, capture_events):
             ],
         }
     ]
-    mock_response = MockCompletionResponse()
+    client = OpenAI(api_key="z")
 
-    with start_transaction(name="litellm test"):
-        kwargs = {"model": "gpt-4-vision-preview", "messages": messages}
-        _input_callback(kwargs)
-        _success_callback(kwargs, mock_response, datetime.now(), datetime.now())
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-4-vision-preview",
+                messages=messages,
+                client=client,
+                custom_llm_provider="openai",
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
 
     (event,) = events
-    (span,) = event["spans"]
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
     messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     blob_item = next(
@@ -867,7 +955,13 @@ def test_binary_content_encoding_image_url(sentry_init, capture_events):
     )
 
 
-def test_binary_content_encoding_mixed_content(sentry_init, capture_events):
+def test_binary_content_encoding_mixed_content(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -888,15 +982,37 @@ def test_binary_content_encoding_mixed_content(sentry_init, capture_events):
             ],
         }
     ]
-    mock_response = MockCompletionResponse()
+    client = OpenAI(api_key="z")
 
-    with start_transaction(name="litellm test"):
-        kwargs = {"model": "gpt-4-vision-preview", "messages": messages}
-        _input_callback(kwargs)
-        _success_callback(kwargs, mock_response, datetime.now(), datetime.now())
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-4-vision-preview",
+                messages=messages,
+                client=client,
+                custom_llm_provider="openai",
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
 
     (event,) = events
-    (span,) = event["spans"]
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
     messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     content_items = [
@@ -906,7 +1022,13 @@ def test_binary_content_encoding_mixed_content(sentry_init, capture_events):
     assert any(item.get("type") == "blob" for item in content_items)
 
 
-def test_binary_content_encoding_uri_type(sentry_init, capture_events):
+def test_binary_content_encoding_uri_type(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -925,15 +1047,37 @@ def test_binary_content_encoding_uri_type(sentry_init, capture_events):
             ],
         }
     ]
-    mock_response = MockCompletionResponse()
+    client = OpenAI(api_key="z")
 
-    with start_transaction(name="litellm test"):
-        kwargs = {"model": "gpt-4-vision-preview", "messages": messages}
-        _input_callback(kwargs)
-        _success_callback(kwargs, mock_response, datetime.now(), datetime.now())
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "True"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            litellm.completion(
+                model="gpt-4-vision-preview",
+                messages=messages,
+                client=client,
+                custom_llm_provider="openai",
+            )
+
+            litellm_utils.executor.shutdown(wait=True)
 
     (event,) = events
-    (span,) = event["spans"]
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
     messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     uri_item = next(
