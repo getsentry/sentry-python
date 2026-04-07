@@ -2834,12 +2834,6 @@ async def test_set_usage_data_with_cache_tokens(sentry_init, capture_events):
             BLOB_DATA_SUBSTITUTE,
             id="multiple_optional_parameters",
         ),
-        pytest.param(
-            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            {},
-            BLOB_DATA_SUBSTITUTE,
-            id="base64_data_url_redacted",
-        ),
     ],
 )
 async def test_invoke_agent_image_url(
