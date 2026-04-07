@@ -1221,8 +1221,11 @@ async def test_invoke_agent_with_instructions(
     agent = Agent(
         "test",
         name="test_instructions",
-        system_prompt="System prompt",
     )
+
+    # Add instructions via _instructions attribute (internal API)
+    agent._instructions = ["Instruction 1", "Instruction 2"]
+    agent._system_prompts = ["System prompt"]
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
@@ -1234,7 +1237,6 @@ async def test_invoke_agent_with_instructions(
 
     await agent.run(
         "Test input",
-        instructions=["Instruction 1", "Instruction 2"],
     )
 
     (transaction,) = events
