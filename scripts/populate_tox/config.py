@@ -234,6 +234,9 @@ TEST_SUITE_CONFIG = {
     },
     "litellm": {
         "package": "litellm",
+        "deps": {
+            "*": ["anthropic", "google-genai"],
+        },
     },
     "litestar": {
         "package": "litestar",
