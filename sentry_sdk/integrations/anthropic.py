@@ -921,22 +921,21 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
 
     @wraps(f)
     def _sentry_patched_enter(self: "MessageStreamManager") -> "MessageStream":
-        stream = f(self)
         if not hasattr(self, "_max_tokens"):
-            return stream
+            return f(self)
 
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
 
         if integration is None:
-            return stream
+            return f(self)
 
         if self._messages is None:
-            return stream
+            return f(self)
 
         try:
             iter(self._messages)
         except TypeError:
-            return stream
+            return f(self)
 
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
@@ -958,6 +957,15 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
             top_p=self._top_p,
             tools=self._tools,
         )
+
+        try:
+            stream = f(self)
+        except Exception as exc:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+                span.__exit__(*exc_info)
+            reraise(*exc_info)
 
         stream._span = span
         stream._integration = integration
@@ -1008,22 +1016,21 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
     async def _sentry_patched_aenter(
         self: "AsyncMessageStreamManager",
     ) -> "AsyncMessageStream":
-        stream = await f(self)
         if not hasattr(self, "_max_tokens"):
-            return stream
+            return await f(self)
 
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
 
         if integration is None:
-            return stream
+            return await f(self)
 
         if self._messages is None:
-            return stream
+            return await f(self)
 
         try:
             iter(self._messages)
         except TypeError:
-            return stream
+            return await f(self)
 
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
@@ -1045,6 +1052,15 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
             top_p=self._top_p,
             tools=self._tools,
         )
+
+        try:
+            stream = await f(self)
+        except Exception as exc:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+                span.__exit__(*exc_info)
+            reraise(*exc_info)
 
         stream._span = span
         stream._integration = integration
