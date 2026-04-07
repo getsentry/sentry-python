@@ -1235,9 +1235,7 @@ async def test_invoke_agent_with_instructions(
 
     events = capture_events()
 
-    await agent.run(
-        "Test input",
-    )
+    await agent.run("Test input")
 
     (transaction,) = events
     spans = transaction["spans"]
