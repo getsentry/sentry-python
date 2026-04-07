@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk.integrations import DidNotEnable
 
+from ..utils import _set_input_messages
+
 try:
     from pydantic_ai import models  # type: ignore
 except ImportError:
@@ -32,7 +34,10 @@ def _patch_model_request() -> None:
             self: "Any", messages: "Any", *args: "Any", **kwargs: "Any"
         ) -> "Any":
             # Pass all messages (full conversation history)
-            with ai_client_span(messages, None, self, None) as span:
+            with ai_client_span(None, self, None) as span:
+                if messages:
+                    _set_input_messages(span, messages)
+
                 result = await original_request(self, messages, *args, **kwargs)
                 update_ai_client_span(span, result)
                 return result

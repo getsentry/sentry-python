@@ -7,6 +7,7 @@ from ..spans import (
     ai_client_span,
     update_ai_client_span,
 )
+from ..utils import _set_input_messages
 
 try:
     from pydantic_ai._agent_graph import ModelRequestNode  # type: ignore
@@ -59,8 +60,11 @@ def _patch_graph_nodes() -> None:
     async def wrapped_model_request_run(self: "Any", ctx: "Any") -> "Any":
         messages, model, model_settings = _extract_span_data(self, ctx)
 
-        with ai_client_span(messages, None, model, model_settings) as span:
+        with ai_client_span(None, model, model_settings) as span:
             result = await original_model_request_run(self, ctx)
+
+            if messages:
+                _set_input_messages(span, messages)
 
             # Extract response from result if available
             model_response = None
@@ -86,7 +90,10 @@ def _patch_graph_nodes() -> None:
             messages, model, model_settings = _extract_span_data(self, ctx)
 
             # Create chat span for streaming request
-            with ai_client_span(messages, None, model, model_settings) as span:
+            with ai_client_span(None, model, model_settings) as span:
+                if messages:
+                    _set_input_messages(span, messages)
+
                 # Call the original stream method
                 async with original_stream_method(self, ctx) as stream:
                     yield stream

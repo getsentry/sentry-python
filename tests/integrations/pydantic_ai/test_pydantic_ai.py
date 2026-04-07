@@ -10,7 +10,7 @@ import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
-from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
+from sentry_sdk.integrations.pydantic_ai.utils import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, ImageUrl, UserPromptPart
@@ -1221,11 +1221,8 @@ async def test_invoke_agent_with_instructions(
     agent = Agent(
         "test",
         name="test_instructions",
+        system_prompt="System prompt",
     )
-
-    # Add instructions via _instructions attribute (internal API)
-    agent._instructions = ["Instruction 1", "Instruction 2"]
-    agent._system_prompts = ["System prompt"]
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
@@ -1235,7 +1232,10 @@ async def test_invoke_agent_with_instructions(
 
     events = capture_events()
 
-    await agent.run("Test input")
+    await agent.run(
+        "Test input",
+        instructions=["Instruction 1", "Instruction 2"],
+    )
 
     (transaction,) = events
     spans = transaction["spans"]
@@ -1637,7 +1637,6 @@ async def test_input_messages_error_handling(sentry_init, capture_events):
     Test that _set_input_messages handles errors gracefully.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1791,7 +1790,6 @@ async def test_message_parts_with_list_content(sentry_init, capture_events):
     """
     import sentry_sdk
     from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1898,7 +1896,6 @@ async def test_message_with_system_prompt_part(sentry_init, capture_events):
     """
     import sentry_sdk
     from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
     from pydantic_ai import messages
 
     sentry_init(
@@ -1935,7 +1932,6 @@ async def test_message_with_instructions(sentry_init, capture_events):
     """
     import sentry_sdk
     from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1970,7 +1966,6 @@ async def test_set_input_messages_without_prompts(sentry_init, capture_events):
     Test that _set_input_messages respects _should_send_prompts().
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=False)],
@@ -2612,7 +2607,7 @@ async def test_ai_client_span_with_streaming_flag(sentry_init, capture_events):
         scope._contexts["pydantic_ai_agent"] = {"_streaming": True}
 
         # Create ai_client span
-        span = ai_client_span([], None, None, None)
+        span = ai_client_span(None, None, None)
         span.finish()
 
     # Should not crash
@@ -2643,7 +2638,7 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_events)
         scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
 
         # Create ai_client span without passing agent
-        span = ai_client_span([], None, None, None)
+        span = ai_client_span(None, None, None)
         span.finish()
 
     # Should not crash
