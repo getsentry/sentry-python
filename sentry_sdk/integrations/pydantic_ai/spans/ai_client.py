@@ -28,7 +28,7 @@ try:
     from pydantic_ai.messages import (
         BaseToolCallPart,
         TextPart,
-    )
+    )  # type: ignore
 except ImportError:
     # Fallback if these classes are not available
     BaseToolCallPart = None

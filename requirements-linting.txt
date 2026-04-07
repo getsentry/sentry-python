@@ -10,7 +10,6 @@ types-webob
 opentelemetry-distro[otlp]
 pymongo # There is no separate types module.
 loguru # There is no separate types module.
-pydantic-ai # There is no separate types module.
 pre-commit # local linting
 httpcore
 launchdarkly-server-sdk
