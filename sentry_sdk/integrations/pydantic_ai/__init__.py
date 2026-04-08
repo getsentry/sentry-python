@@ -22,17 +22,17 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable
 
-    from pydantic_ai._run_context import RunContext
-    from pydantic_ai.models import ModelRequestContext
-    from pydantic_ai.messages import ModelResponse
+    from pydantic_ai._run_context import RunContext  # type: ignore
+    from pydantic_ai.models import ModelRequestContext  # type: ignore
+    from pydantic_ai.messages import ModelResponse  # type: ignore
 
 
-def _patch_wrap_model_request():
+def _patch_wrap_model_request() -> None:
     original_wrap_model_request = CombinedCapability.wrap_model_request
 
     @wraps(original_wrap_model_request)
     async def wrapped_wrap_model_request(
-        self,
+        self: "CombinedCapability",
         ctx: "RunContext[Any]",
         *,
         request_context: "ModelRequestContext",
