@@ -1,6 +1,5 @@
 from sentry_sdk.integrations import DidNotEnable, Integration
 
-
 try:
     import pydantic_ai  # type: ignore # noqa: F401
 except ImportError:

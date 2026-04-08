@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.consts import SPANDATA
 
 from ..spans import (
     ai_client_span,
@@ -65,6 +66,8 @@ def _patch_graph_nodes() -> None:
         messages, model, model_settings = _extract_span_data(self, ctx)
 
         with ai_client_span(messages, None, model, model_settings) as span:
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+
             result = await original_model_request_run(self, ctx)
 
             # Extract response from result if available
@@ -97,6 +100,8 @@ def _patch_graph_nodes() -> None:
 
             # Create chat span for streaming request
             with ai_client_span(messages, None, model, model_settings) as span:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
                 # Call the original stream method
                 async with original_stream_method(self, ctx) as stream:
                     yield stream

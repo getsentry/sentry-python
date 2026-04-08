@@ -234,7 +234,7 @@ async def test_agent_run_stream_events(sentry_init, capture_events, test_agent):
     assert len(chat_spans) == 1
 
     for chat_span in chat_spans:
-        assert chat_span["data"]["gen_ai.response.streaming"] is False
+        assert chat_span["data"]["gen_ai.response.streaming"] is True
 
 
 @pytest.mark.asyncio

@@ -58,7 +58,7 @@ class _StreamingContextManagerWrapper:
 
         # Push agent to contextvar stack after span is successfully created and entered
         # This ensures proper pairing with pop_agent() in __aexit__ even if exceptions occur
-        push_agent(self.agent, self.is_streaming)
+        push_agent(self.agent)
 
         # Enter the original context manager
         result = await self.original_ctx_manager.__aenter__()
@@ -113,7 +113,7 @@ def _create_run_wrapper(
             ) as span:
                 # Push agent to contextvar stack after span is successfully created and entered
                 # This ensures proper pairing with pop_agent() in finally even if exceptions occur
-                push_agent(self, is_streaming)
+                push_agent(self)
 
                 try:
                     result = await original_func(self, *args, **kwargs)
