@@ -21,6 +21,7 @@ from .spans.ai_client import ai_client_span, update_ai_client_span
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Any
     from pydantic_ai import ModelRequestContext, RunContext
     from pydantic_ai.messages import ModelResponse  # type: ignore
 
@@ -108,7 +109,9 @@ class PydanticAIIntegration(Integration):
         original_init = Agent.__init__
 
         @functools.wraps(original_init)
-        def patched_init(self, *args, **kwargs) -> None:
+        def patched_init(
+            self: "Agent[Any, Any]", *args: "Any", **kwargs: "Any"
+        ) -> None:
             caps = list(kwargs.get("capabilities") or [])
             caps.append(hooks)
             kwargs["capabilities"] = caps
