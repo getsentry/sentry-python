@@ -41,14 +41,6 @@ def get_current_agent() -> "Any":
     return None
 
 
-def get_is_streaming() -> bool:
-    """Get the streaming flag from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1].get("is_streaming", False)
-    return False
-
-
 def _should_send_prompts() -> bool:
     """
     Check if prompts should be sent to Sentry.
