@@ -50,7 +50,9 @@ class HuggingfaceHubIntegration(Integration):
         )
 
 
-def _capture_exception(exc: "Any") -> None:
+def _capture_exception(exc: "Any", span: "Any" = None) -> None:
+    if span is not None:
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -126,8 +128,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         except Exception as e:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
-                _capture_exception(e)
-                span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                _capture_exception(e, span)
                 span.__exit__(None, None, None)
             reraise(*exc_info)
 
