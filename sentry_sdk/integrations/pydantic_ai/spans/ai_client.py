@@ -16,7 +16,6 @@ from ..utils import (
     _set_model_data,
     _should_send_prompts,
     _get_model_name,
-    get_current_agent,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -261,11 +260,9 @@ def ai_client_span(
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
+    _set_model_data(span, agent, model, model_settings)
 
-    # Add available tools if agent is available
-    agent_obj = agent or get_current_agent()
-    _set_available_tools(span, agent_obj)
+    _set_available_tools(span, agent)
 
     # Set input messages (full conversation history)
     if messages:

@@ -6,7 +6,7 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import invoke_agent_span, update_invoke_agent_span
-from ..utils import _capture_exception, pop_agent, push_agent
+from ..utils import _capture_exception
 
 from typing import TYPE_CHECKING
 
@@ -56,10 +56,6 @@ class _StreamingContextManagerWrapper:
         )
         self._span.__enter__()
 
-        # Push agent to contextvar stack after span is successfully created and entered
-        # This ensures proper pairing with pop_agent() in __aexit__ even if exceptions occur
-        push_agent(self.agent, self.is_streaming)
-
         # Enter the original context manager
         result = await self.original_ctx_manager.__aenter__()
         self._result = result
@@ -74,9 +70,6 @@ class _StreamingContextManagerWrapper:
             if exc_type is None and self._result and self._span is not None:
                 update_invoke_agent_span(self._span, self._result)
         finally:
-            # Pop agent from contextvar stack
-            pop_agent()
-
             # Clean up invoke span
             if self._span:
                 self._span.__exit__(exc_type, exc_val, exc_tb)
@@ -111,10 +104,6 @@ def _create_run_wrapper(
             with invoke_agent_span(
                 user_prompt, self, model, model_settings, is_streaming
             ) as span:
-                # Push agent to contextvar stack after span is successfully created and entered
-                # This ensures proper pairing with pop_agent() in finally even if exceptions occur
-                push_agent(self, is_streaming)
-
                 try:
                     result = await original_func(self, *args, **kwargs)
 
@@ -127,9 +116,6 @@ def _create_run_wrapper(
                     with capture_internal_exceptions():
                         _capture_exception(exc)
                     reraise(*exc_info)
-                finally:
-                    # Pop agent from contextvar stack
-                    pop_agent()
 
     return wrapper
 
