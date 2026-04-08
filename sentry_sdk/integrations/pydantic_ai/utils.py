@@ -1,5 +1,4 @@
 import sentry_sdk
-from contextvars import ContextVar
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import set_span_errored
@@ -9,36 +8,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional
-
-
-# Store the current agent context in a contextvar for re-entrant safety
-# Using a list as a stack to support nested agent calls
-_agent_context_stack: "ContextVar[list[dict[str, Any]]]" = ContextVar(
-    "pydantic_ai_agent_context_stack", default=[]
-)
-
-
-def push_agent(agent: "Any") -> None:
-    """Push an agent context onto the stack."""
-    stack = _agent_context_stack.get().copy()
-    stack.append(agent)
-    _agent_context_stack.set(stack)
-
-
-def pop_agent() -> None:
-    """Pop an agent context from the stack."""
-    stack = _agent_context_stack.get().copy()
-    if stack:
-        stack.pop()
-    _agent_context_stack.set(stack)
-
-
-def get_current_agent() -> "Any":
-    """Get the current agent from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1]
-    return None
 
 
 def _should_send_prompts() -> bool:
@@ -66,16 +35,10 @@ def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
 
     Args:
         span: The span to set data on
-        agent: Agent object (can be None, will try to get from contextvar if not provided)
+        agent: Agent object
     """
-    # Extract agent name from agent object or contextvar
-    agent_obj = agent
-    if not agent_obj:
-        # Try to get from contextvar
-        agent_obj = get_current_agent()
-
-    if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
-        span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
+    if agent and hasattr(agent, "name") and agent.name:
+        span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
 
 def _get_model_name(model_obj: "Any") -> "Optional[str]":
@@ -104,7 +67,7 @@ def _get_model_name(model_obj: "Any") -> "Optional[str]":
 
 
 def _set_model_data(
-    span: "sentry_sdk.tracing.Span", model: "Any", model_settings: "Any"
+    span: "sentry_sdk.tracing.Span", agent: "Any", model: "Any", model_settings: "Any"
 ) -> None:
     """Set model-related data on a span.
 
@@ -113,13 +76,10 @@ def _set_model_data(
         model: Model object (can be None, will try to get from agent if not provided)
         model_settings: Model settings (can be None, will try to get from agent if not provided)
     """
-    # Try to get agent from contextvar if we need it
-    agent_obj = get_current_agent()
-
     # Extract model information
     model_obj = model
-    if not model_obj and agent_obj and hasattr(agent_obj, "model"):
-        model_obj = agent_obj.model
+    if not model_obj and agent and hasattr(agent, "model"):
+        model_obj = agent.model
 
     if model_obj:
         # Set system from model
@@ -133,8 +93,8 @@ def _set_model_data(
 
     # Extract model settings
     settings = model_settings
-    if not settings and agent_obj and hasattr(agent_obj, "model_settings"):
-        settings = agent_obj.model_settings
+    if not settings and agent and hasattr(agent, "model_settings"):
+        settings = agent.model_settings
 
     if settings:
         settings_map = {

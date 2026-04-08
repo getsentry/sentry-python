@@ -6,7 +6,7 @@ import sentry_sdk
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import execute_tool_span, update_execute_tool_span
-from ..utils import _capture_exception, get_current_agent
+from ..utils import _capture_exception
 
 from typing import TYPE_CHECKING
 
@@ -57,10 +57,7 @@ def _patch_execute_tool_call() -> None:
         if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
             tool_type = "mcp"
 
-        # Get agent from contextvar
-        agent = get_current_agent()
-
-        if agent and tool:
+        if tool:
             try:
                 args_dict = call.args_as_dict()
             except Exception:
@@ -72,7 +69,7 @@ def _patch_execute_tool_call() -> None:
                 with execute_tool_span(
                     name,
                     args_dict,
-                    agent,
+                    validated.ctx.agent,
                     tool_type=tool_type,
                     tool_definition=selected_tool_definition,
                 ) as span:
@@ -136,10 +133,7 @@ def _patch_call_tool() -> None:
         if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
             tool_type = "mcp"
 
-        # Get agent from contextvar
-        agent = get_current_agent()
-
-        if agent and tool:
+        if tool:
             try:
                 args_dict = call.args_as_dict()
             except Exception:
@@ -151,7 +145,7 @@ def _patch_call_tool() -> None:
                 with execute_tool_span(
                     name,
                     args_dict,
-                    agent,
+                    call.ctx.agent,
                     tool_type=tool_type,
                     tool_definition=selected_tool_definition,
                 ) as span:

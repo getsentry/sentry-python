@@ -54,7 +54,7 @@ def invoke_agent_span(
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
     _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
+    _set_model_data(span, agent, model, model_settings)
     _set_available_tools(span, agent)
 
     # Add user prompt and system prompts if available and prompts are enabled
