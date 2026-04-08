@@ -62,7 +62,7 @@ class PydanticAIIntegration(Integration):
             from pydantic_ai.capabilities import Hooks  # type: ignore
         except ImportError:
             Hooks = None
-            PydanticAIIntegration.are_request_hooks_available = True
+            PydanticAIIntegration.are_request_hooks_available = False
 
         if Hooks is None:
             _patch_graph_nodes()
