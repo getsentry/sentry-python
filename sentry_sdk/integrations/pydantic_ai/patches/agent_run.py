@@ -96,7 +96,9 @@ def _create_run_wrapper(
         original_func: The original run method
         is_streaming: Whether this is a streaming method (for future use)
     """
-    from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+    from sentry_sdk.integrations.pydantic_ai import (
+        PydanticAIIntegration,
+    )  # Required to avoid circular import
 
     @wraps(original_func)
     async def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
@@ -146,7 +148,9 @@ def _create_streaming_wrapper(
     """
     Wraps run_stream method that returns an async context manager.
     """
-    from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
+    from sentry_sdk.integrations.pydantic_ai import (
+        PydanticAIIntegration,
+    )  # Required to avoid circular import
 
     @wraps(original_func)
     def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":

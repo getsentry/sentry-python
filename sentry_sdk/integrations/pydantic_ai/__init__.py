@@ -62,7 +62,6 @@ class PydanticAIIntegration(Integration):
             from pydantic_ai.capabilities import Hooks  # type: ignore
         except ImportError:
             Hooks = None
-            # Save to populate ctx.metadata
             PydanticAIIntegration.are_request_hooks_available = True
 
         if Hooks is None:
@@ -72,6 +71,9 @@ class PydanticAIIntegration(Integration):
 
         _patch_tool_execution()
 
+        # Assumptions:
+        # - Model requests within a run are sequential.
+        # - ctx.metadata is a shared dict instance between hooks.
         hooks = Hooks()
 
         @hooks.on.before_model_request  # type: ignore
@@ -112,6 +114,20 @@ class PydanticAIIntegration(Integration):
             del run_context_metadata["_sentry_span"]
 
             return response
+
+        @hooks.on.model_request_error  # type: ignore
+        async def on_error(
+            ctx: "RunContext[None]",
+            *,
+            request_context: "ModelRequestContext",
+            error: "Exception",
+        ) -> "ModelResponse":
+            run_context_metadata = ctx.metadata
+            if isinstance(run_context_metadata, dict):
+                span = run_context_metadata.pop("_sentry_span", None)
+                if span is not None:
+                    span.__exit__(type(error), error, error.__traceback__)
+            raise error
 
         original_init = Agent.__init__
 
