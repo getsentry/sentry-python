@@ -84,7 +84,10 @@ class PydanticAIIntegration(Integration):
                 model=request_context.model,
                 model_settings=request_context.model_settings,
             )
-            ctx.metadata["_sentry_span"] = span
+            run_context_metadata = ctx.metadata
+            if isinstance(run_context_metadata, dict):
+                run_context_metadata["_sentry_span"] = span
+
             span.__enter__()
 
             return request_context
@@ -96,13 +99,17 @@ class PydanticAIIntegration(Integration):
             request_context: "ModelRequestContext",
             response: "ModelResponse",
         ) -> "ModelResponse":
-            span = ctx.metadata["_sentry_span"]
+            run_context_metadata = ctx.metadata
+            if not isinstance(run_context_metadata, dict):
+                return response
+
+            span = run_context_metadata["_sentry_span"]
             if span is None:
                 return response
 
             update_ai_client_span(span, response)
             span.__exit__(None, None, None)
-            del ctx.metadata["_sentry_span"]
+            del run_context_metadata["_sentry_span"]
 
             return response
 
