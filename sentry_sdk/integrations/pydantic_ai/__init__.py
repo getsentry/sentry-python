@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pydantic_ai import ModelRequestContext, RunContext
-    from pydantic_ai.messages import ModelResponse
+    from pydantic_ai.messages import ModelResponse  # type: ignore
 
 
 class PydanticAIIntegration(Integration):
@@ -57,11 +57,11 @@ class PydanticAIIntegration(Integration):
         _patch_agent_run()
 
         try:
-            from pydantic_ai.capabilities import Hooks
+            from pydantic_ai.capabilities import Hooks  # type: ignore
 
             hooks = Hooks()
 
-            @hooks.on.before_model_request
+            @hooks.on.before_model_request  # type: ignore
             async def on_request(
                 ctx: "RunContext[None]", request_context: "ModelRequestContext"
             ) -> "ModelRequestContext":
@@ -76,7 +76,7 @@ class PydanticAIIntegration(Integration):
 
                 return request_context
 
-            @hooks.on.after_model_request
+            @hooks.on.after_model_request  # type: ignore
             async def on_response(
                 ctx: "RunContext[None]",
                 *,
@@ -96,11 +96,11 @@ class PydanticAIIntegration(Integration):
             original_init = Agent.__init__
 
             @functools.wraps(original_init)
-            def patched_init(self, *args, **kwargs):
+            def patched_init(self, *args, **kwargs) -> None:
                 caps = list(kwargs.get("capabilities") or [])
                 caps.append(hooks)
                 kwargs["capabilities"] = caps
-                original_init(self, *args, **kwargs)
+                return original_init(self, *args, **kwargs)
 
             Agent.__init__ = patched_init
 
