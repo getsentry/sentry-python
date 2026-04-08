@@ -11,13 +11,9 @@ from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
-    _set_agent_data,
-    _set_available_tools,
     _set_model_data,
     _should_send_prompts,
     _get_model_name,
-    get_current_agent,
-    get_is_streaming,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -236,22 +232,17 @@ def _set_output_data(span: "sentry_sdk.tracing.Span", response: "Any") -> None:
 
 
 def ai_client_span(
-    messages: "Any", agent: "Any", model: "Any", model_settings: "Any"
+    messages: "Any", model: "Any", model_settings: "Any"
 ) -> "sentry_sdk.tracing.Span":
     """Create a span for an AI client call (model request).
 
     Args:
         messages: Full conversation history (list of messages)
-        agent: Agent object
         model: Model object
         model_settings: Model settings
     """
     # Determine model name for span name
-    model_obj = model
-    if agent and hasattr(agent, "model"):
-        model_obj = agent.model
-
-    model_name = _get_model_name(model_obj) or "unknown"
+    model_name = _get_model_name(model) or "unknown"
 
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
@@ -260,16 +251,7 @@ def ai_client_span(
     )
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-
-    _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
-
-    # Set streaming flag from contextvar
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
-
-    # Add available tools if agent is available
-    agent_obj = agent or get_current_agent()
-    _set_available_tools(span, agent_obj)
 
     # Set input messages (full conversation history)
     if messages:

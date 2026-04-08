@@ -2612,7 +2612,7 @@ async def test_ai_client_span_with_streaming_flag(sentry_init, capture_events):
         scope._contexts["pydantic_ai_agent"] = {"_streaming": True}
 
         # Create ai_client span
-        span = ai_client_span([], None, None, None)
+        span = ai_client_span([], None, None)
         span.finish()
 
     # Should not crash
@@ -2643,7 +2643,7 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_events)
         scope._contexts["pydantic_ai_agent"] = {"_agent": mock_agent}
 
         # Create ai_client span without passing agent
-        span = ai_client_span([], None, None, None)
+        span = ai_client_span([], None, None)
         span.finish()
 
     # Should not crash
