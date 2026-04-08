@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 class PydanticAIIntegration(Integration):
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
+    are_request_hooks_available = True
 
     def __init__(
         self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
@@ -58,54 +59,59 @@ class PydanticAIIntegration(Integration):
 
         try:
             from pydantic_ai.capabilities import Hooks  # type: ignore
-
-            hooks = Hooks()
-
-            @hooks.on.before_model_request  # type: ignore
-            async def on_request(
-                ctx: "RunContext[None]", request_context: "ModelRequestContext"
-            ) -> "ModelRequestContext":
-                span = ai_client_span(
-                    messages=request_context.messages,
-                    agent=None,
-                    model=request_context.model,
-                    model_settings=request_context.model_settings,
-                )
-                ctx.metadata["_sentry_span"] = span
-                span.__enter__()
-
-                return request_context
-
-            @hooks.on.after_model_request  # type: ignore
-            async def on_response(
-                ctx: "RunContext[None]",
-                *,
-                request_context: "ModelRequestContext",
-                response: "ModelResponse",
-            ) -> "ModelResponse":
-                span = ctx.metadata["_sentry_span"]
-                if span is None:
-                    return response
-
-                update_ai_client_span(span, response)
-                span.__exit__(None, None, None)
-                del ctx.metadata["_sentry_span"]
-
-                return response
-
-            original_init = Agent.__init__
-
-            @functools.wraps(original_init)
-            def patched_init(self, *args, **kwargs) -> None:
-                caps = list(kwargs.get("capabilities") or [])
-                caps.append(hooks)
-                kwargs["capabilities"] = caps
-                return original_init(self, *args, **kwargs)
-
-            Agent.__init__ = patched_init
-
         except ImportError:
+            Hooks = None
+            # Save to populate ctx.metadata
+            PydanticAIIntegration.are_request_hooks_available = True
+
+        if Hooks is None:
             _patch_graph_nodes()
             _patch_model_request()
+            return
 
         _patch_tool_execution()
+
+        hooks = Hooks()
+
+        @hooks.on.before_model_request  # type: ignore
+        async def on_request(
+            ctx: "RunContext[None]", request_context: "ModelRequestContext"
+        ) -> "ModelRequestContext":
+            span = ai_client_span(
+                messages=request_context.messages,
+                agent=None,
+                model=request_context.model,
+                model_settings=request_context.model_settings,
+            )
+            ctx.metadata["_sentry_span"] = span
+            span.__enter__()
+
+            return request_context
+
+        @hooks.on.after_model_request  # type: ignore
+        async def on_response(
+            ctx: "RunContext[None]",
+            *,
+            request_context: "ModelRequestContext",
+            response: "ModelResponse",
+        ) -> "ModelResponse":
+            span = ctx.metadata["_sentry_span"]
+            if span is None:
+                return response
+
+            update_ai_client_span(span, response)
+            span.__exit__(None, None, None)
+            del ctx.metadata["_sentry_span"]
+
+            return response
+
+        original_init = Agent.__init__
+
+        @functools.wraps(original_init)
+        def patched_init(self, *args, **kwargs) -> None:
+            caps = list(kwargs.get("capabilities") or [])
+            caps.append(hooks)
+            kwargs["capabilities"] = caps
+            return original_init(self, *args, **kwargs)
+
+        Agent.__init__ = patched_init
