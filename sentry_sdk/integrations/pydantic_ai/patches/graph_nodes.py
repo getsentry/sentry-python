@@ -53,7 +53,7 @@ def _patch_graph_nodes() -> None:
     """
 
     # Patch ModelRequestNode to create ai_client spans
-    original_model_request_run = ModelRequestNode._make_request
+    original_model_request_run = ModelRequestNode.run
 
     @wraps(original_model_request_run)
     async def wrapped_model_request_run(self: "Any", ctx: "Any") -> "Any":
