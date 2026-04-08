@@ -10,7 +10,6 @@ except ImportError:
 from .patches import (
     _patch_agent_run,
     _patch_graph_nodes,
-    _patch_model_request,
     _patch_tool_execution,
 )
 
@@ -46,5 +45,4 @@ class PydanticAIIntegration(Integration):
         """
         _patch_agent_run()
         _patch_graph_nodes()
-        _patch_model_request()
         _patch_tool_execution()
