@@ -57,8 +57,12 @@ def get_request_url(
     path_info = environ.get("PATH_INFO", "").lstrip("/")
     path = f"{script_name}/{path_info}"
 
+    scheme = environ.get("wsgi.url_scheme")
+    if use_x_forwarded_for:
+        scheme = environ.get("HTTP_X_FORWARDED_PROTO", scheme)
+
     return "%s://%s/%s" % (
-        environ.get("wsgi.url_scheme"),
+        scheme,
         get_host(environ, use_x_forwarded_for),
         wsgi_decoding_dance(path).lstrip("/"),
     )
