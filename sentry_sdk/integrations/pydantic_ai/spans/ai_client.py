@@ -17,7 +17,6 @@ from ..utils import (
     _should_send_prompts,
     _get_model_name,
     get_current_agent,
-    get_is_streaming,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -263,9 +262,6 @@ def ai_client_span(
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
-
-    # Set streaming flag from contextvar
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
 
     # Add available tools if agent is available
     agent_obj = agent or get_current_agent()
