@@ -57,6 +57,7 @@ class PydanticAIIntegration(Integration):
         - Tool executions
         """
         _patch_agent_run()
+        _patch_tool_execution()
 
         try:
             from pydantic_ai.capabilities import Hooks  # type: ignore
@@ -69,11 +70,9 @@ class PydanticAIIntegration(Integration):
             _patch_model_request()
             return
 
-        _patch_tool_execution()
-
         # Assumptions:
         # - Model requests within a run are sequential.
-        # - ctx.metadata is a shared dict instance between hooks.
+        # - ctx.metadata is a shared dictionary instance between hooks.
         hooks = Hooks()
 
         @hooks.on.before_model_request  # type: ignore
