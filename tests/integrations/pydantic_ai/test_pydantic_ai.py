@@ -222,7 +222,7 @@ async def test_agent_run_sync_model_error(sentry_init, capture_events):
     )
 
     with pytest.raises(RuntimeError, match="model exploded"):
-        await agent.run("Test input")
+        agent.run_sync("Test input")
 
     print("events", len(events))
     (error, transaction) = events
