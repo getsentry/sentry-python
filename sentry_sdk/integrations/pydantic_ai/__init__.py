@@ -103,7 +103,7 @@ def register_hooks(hooks: "Hooks") -> None:
         kwargs["capabilities"] = caps
 
         metadata = kwargs.get("metadata")
-        if not metadata:
+        if metadata is None:
             kwargs["metadata"] = {}  # Used as shared reference between hooks
 
         return original_init(self, *args, **kwargs)
