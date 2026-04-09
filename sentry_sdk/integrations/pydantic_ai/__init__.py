@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from pydantic_ai.capabilities import Hooks  # type: ignore
 
 
-def register_hooks(hooks: "Hooks"):
+def register_hooks(hooks: "Hooks") -> None:
     """
     Creates hooks for chat model calls and register the hooks by adding the hooks to the `capabilities` argument passed to `Agent.__init__()`.
     """
@@ -153,7 +153,7 @@ class PydanticAIIntegration(Integration):
         _patch_tool_execution()
 
         try:
-            from pydantic_ai.capabilities import Hooks  # type: ignore
+            from pydantic_ai.capabilities import Hooks
         except ImportError:
             Hooks = None
             PydanticAIIntegration.are_request_hooks_available = False
