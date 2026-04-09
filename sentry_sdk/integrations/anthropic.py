@@ -17,7 +17,6 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -195,8 +194,6 @@ class AnthropicIntegration(Integration):
 
 
 def _capture_exception(exc: "Any") -> None:
-    set_span_errored()
-
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -633,7 +630,7 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
-            span.__exit__(None, None, None)
+            span.__exit__(*exc_info)
         reraise(*exc_info)
 
     if isinstance(result, Stream):
@@ -721,7 +718,7 @@ async def _sentry_patched_create_async(
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
-            span.__exit__(None, None, None)
+            span.__exit__(*exc_info)
         reraise(*exc_info)
 
     if isinstance(result, AsyncStream):
