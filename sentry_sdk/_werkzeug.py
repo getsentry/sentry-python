@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Iterator
     from typing import Tuple
+    from typing import Optional
 
 
 #
@@ -62,35 +63,41 @@ def _get_headers(environ: "Dict[str, str]") -> "Iterator[Tuple[str, str]]":
             yield key.replace("_", "-").title(), value
 
 
-#
+def _strip_default_port(host: str, scheme: "Optional[str]") -> str:
+    """Strip the port from the host if it's the default for the scheme."""
+    if scheme == "http" and host.endswith(":80"):
+        return host[:-3]
+    if scheme == "https" and host.endswith(":443"):
+        return host[:-4]
+    return host
+
+
 # `get_host` comes from `werkzeug.wsgi.get_host`
 # https://github.com/pallets/werkzeug/blob/1.0.1/src/werkzeug/wsgi.py#L145
-#
+
+
 def get_host(environ: "Dict[str, str]", use_x_forwarded_for: bool = False) -> str:
     """
     Return the host for the given WSGI environment.
     """
+    scheme = environ.get("wsgi.url_scheme")
+    if use_x_forwarded_for:
+        scheme = environ.get("HTTP_X_FORWARDED_PROTO", scheme)
+
     if use_x_forwarded_for and "HTTP_X_FORWARDED_HOST" in environ:
-        rv = environ["HTTP_X_FORWARDED_HOST"]
-        if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
-            rv = rv[:-3]
-        elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
-            rv = rv[:-4]
+        return _strip_default_port(environ["HTTP_X_FORWARDED_HOST"], scheme)
     elif environ.get("HTTP_HOST"):
-        rv = environ["HTTP_HOST"]
-        if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
-            rv = rv[:-3]
-        elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
-            rv = rv[:-4]
+        return _strip_default_port(environ["HTTP_HOST"], scheme)
     elif environ.get("SERVER_NAME"):
+        # SERVER_NAME/SERVER_PORT describe the internal server, so use
+        # wsgi.url_scheme (not the forwarded scheme) for port decisions.
         rv = environ["SERVER_NAME"]
         if (environ["wsgi.url_scheme"], environ["SERVER_PORT"]) not in (
             ("https", "443"),
             ("http", "80"),
         ):
             rv += ":" + environ["SERVER_PORT"]
+        return rv
     else:
         # In spite of the WSGI spec, SERVER_NAME might not be present.
-        rv = "unknown"
-
-    return rv
+        return "unknown"
