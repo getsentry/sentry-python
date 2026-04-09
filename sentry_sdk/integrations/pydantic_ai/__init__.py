@@ -37,16 +37,18 @@ def register_hooks(hooks: "Hooks") -> None:
     async def on_request(
         ctx: "RunContext[None]", request_context: "ModelRequestContext"
     ) -> "ModelRequestContext":
+        run_context_metadata = ctx.metadata
+        if not isinstance(run_context_metadata, dict):
+            return request_context
+
         span = ai_client_span(
             messages=request_context.messages,
             agent=None,
             model=request_context.model,
             model_settings=request_context.model_settings,
         )
-        run_context_metadata = ctx.metadata
-        if isinstance(run_context_metadata, dict):
-            run_context_metadata["_sentry_span"] = span
 
+        run_context_metadata["_sentry_span"] = span
         span.__enter__()
 
         return request_context
