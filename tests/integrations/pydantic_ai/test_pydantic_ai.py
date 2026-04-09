@@ -204,8 +204,7 @@ def test_agent_run_sync(sentry_init, capture_events, get_test_agent):
         assert chat_span["data"]["gen_ai.response.streaming"] is False
 
 
-@pytest.mark.asyncio
-async def test_agent_run_sync_model_error(sentry_init, capture_events):
+def test_agent_run_sync_model_error(sentry_init, capture_events):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
