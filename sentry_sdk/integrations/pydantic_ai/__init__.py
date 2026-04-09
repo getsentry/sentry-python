@@ -101,6 +101,11 @@ def register_hooks(hooks: "Hooks") -> None:
         caps = list(kwargs.get("capabilities") or [])
         caps.append(hooks)
         kwargs["capabilities"] = caps
+
+        metadata = kwargs.get("metadata")
+        if not metadata:
+            kwargs["metadata"] = {}  # Used as shared reference between hooks
+
         return original_init(self, *args, **kwargs)
 
     Agent.__init__ = patched_init
@@ -118,13 +123,12 @@ class PydanticAIIntegration(Integration):
     Hooks using the decorators provided by `pydantic_ai.capabilities` create and manage spans for model calls when these hooks are available (newer library versions).
     The span is created in `on_request` and stored in the metadata of the `RunContext` object shared with `on_response` and `on_error`.
 
-    The metadata dictionary on the RunContext instance is initialized with `{"_sentry_span": None}` in the `_create_run_wrapper()` and `_create_streaming_wrapper()` wrappers that
-    instrument `Agent.run()` and `Agent.run_stream()`, respectively. A non-empty dictionary is required for the metadata object to be a shared reference between hooks.
+    The metadata on the RunContext instance is initialized with an empty dictionary in `Agent.__init__()`. The dictionary is required for the metadata object
+    to be a shared reference between hooks.
     """
 
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
-    are_request_hooks_available = True
 
     def __init__(
         self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
@@ -158,7 +162,6 @@ class PydanticAIIntegration(Integration):
             from pydantic_ai.capabilities import Hooks
         except ImportError:
             Hooks = None
-            PydanticAIIntegration.are_request_hooks_available = False
 
         if Hooks is None:
             _patch_graph_nodes()

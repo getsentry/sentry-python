@@ -96,9 +96,6 @@ def _create_run_wrapper(
         original_func: The original run method
         is_streaming: Whether this is a streaming method (for future use)
     """
-    from sentry_sdk.integrations.pydantic_ai import (
-        PydanticAIIntegration,
-    )  # Required to avoid circular import
 
     @wraps(original_func)
     async def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
@@ -109,11 +106,6 @@ def _create_run_wrapper(
             user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
             model = kwargs.get("model")
             model_settings = kwargs.get("model_settings")
-
-            if PydanticAIIntegration.are_request_hooks_available:
-                metadata = kwargs.get("metadata")
-                if not metadata:
-                    kwargs["metadata"] = {"_sentry_span": None}
 
             # Create invoke_agent span
             with invoke_agent_span(
@@ -148,9 +140,6 @@ def _create_streaming_wrapper(
     """
     Wraps run_stream method that returns an async context manager.
     """
-    from sentry_sdk.integrations.pydantic_ai import (
-        PydanticAIIntegration,
-    )  # Required to avoid circular import
 
     @wraps(original_func)
     def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
@@ -158,11 +147,6 @@ def _create_streaming_wrapper(
         user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
         model = kwargs.get("model")
         model_settings = kwargs.get("model_settings")
-
-        if PydanticAIIntegration.are_request_hooks_available:
-            metadata = kwargs.get("metadata")
-            if not metadata:
-                kwargs["metadata"] = {"_sentry_span": None}
 
         # Call original function to get the context manager
         original_ctx_manager = original_func(self, *args, **kwargs)
