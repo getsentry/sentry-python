@@ -47,27 +47,28 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                 if not name:
                     return await handler(request, context)
 
-                # What if the headers are empty?
-                transaction = sentry_sdk.continue_trace(
-                    dict(context.invocation_metadata()),
-                    op=OP.GRPC_SERVER,
-                    name=name,
-                    source=TransactionSource.CUSTOM,
-                    origin=SPAN_ORIGIN,
-                )
+                with sentry_sdk.isolation_scope():
+                    # What if the headers are empty?
+                    transaction = sentry_sdk.continue_trace(
+                        dict(context.invocation_metadata()),
+                        op=OP.GRPC_SERVER,
+                        name=name,
+                        source=TransactionSource.CUSTOM,
+                        origin=SPAN_ORIGIN,
+                    )
 
-                with sentry_sdk.start_transaction(transaction=transaction):
-                    try:
-                        return await handler.unary_unary(request, context)
-                    except AbortError:
-                        raise
-                    except Exception as exc:
-                        event, hint = event_from_exception(
-                            exc,
-                            mechanism={"type": "grpc", "handled": False},
-                        )
-                        sentry_sdk.capture_event(event, hint=hint)
-                        raise
+                    with sentry_sdk.start_transaction(transaction=transaction):
+                        try:
+                            return await handler.unary_unary(request, context)
+                        except AbortError:
+                            raise
+                        except Exception as exc:
+                            event, hint = event_from_exception(
+                                exc,
+                                mechanism={"type": "grpc", "handled": False},
+                            )
+                            sentry_sdk.capture_event(event, hint=hint)
+                            raise
 
         elif not handler.request_streaming and handler.response_streaming:
             handler_factory = grpc.unary_stream_rpc_method_handler

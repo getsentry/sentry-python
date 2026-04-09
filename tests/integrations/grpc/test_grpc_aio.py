@@ -177,6 +177,26 @@ async def test_grpc_server_abort(grpc_server_and_channel, capture_events):
 
 
 @pytest.mark.asyncio
+async def test_grpc_server_uses_isolation_scope_per_request(
+    grpc_server_and_channel, capture_events
+):
+    _, channel = grpc_server_and_channel
+    events = capture_events()
+
+    stub = gRPCTestServiceStub(channel)
+    await stub.TestServe(gRPCTestMessage(text="scope:first"))
+    await stub.TestServe(gRPCTestMessage(text="scope:second"))
+
+    first_event, second_event = events
+
+    assert first_event["extra"]["grpc_scope_marker"] == "scope:first"
+    assert "grpc_previous_scope_marker" not in first_event.get("extra", {})
+
+    assert second_event["extra"]["grpc_scope_marker"] == "scope:second"
+    assert "grpc_previous_scope_marker" not in second_event.get("extra", {})
+
+
+@pytest.mark.asyncio
 async def test_grpc_client_starts_span(
     grpc_server_and_channel, capture_events_forksafe
 ):
@@ -304,6 +324,13 @@ class TestService(gRPCTestServiceServicer):
 
     @classmethod
     async def TestServe(cls, request, context):  # noqa: N802
+        if request.text.startswith("scope:"):
+            scope = sentry_sdk.get_isolation_scope()
+            previous_marker = scope._extras.get("grpc_scope_marker")
+            if previous_marker is not None:
+                scope.set_extra("grpc_previous_scope_marker", previous_marker)
+            scope.set_extra("grpc_scope_marker", request.text)
+
         with start_span(
             op="test",
             name="test",
