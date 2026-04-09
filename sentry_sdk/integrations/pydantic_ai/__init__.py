@@ -1,6 +1,7 @@
 import functools
 
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.utils import capture_internal_exceptions
 
 try:
     import pydantic_ai  # type: ignore # noqa: F401
@@ -24,9 +25,101 @@ if TYPE_CHECKING:
     from typing import Any
     from pydantic_ai import ModelRequestContext, RunContext
     from pydantic_ai.messages import ModelResponse  # type: ignore
+    from pydantic_ai.capabilities import Hooks  # type: ignore
+
+
+def register_hooks(hooks: "Hooks"):
+    """
+    Creates hooks for chat model calls and register the hooks by adding the hooks to the `capabilities` argument passed to `Agent.__init__()`.
+    """
+
+    @hooks.on.before_model_request  # type: ignore
+    async def on_request(
+        ctx: "RunContext[None]", request_context: "ModelRequestContext"
+    ) -> "ModelRequestContext":
+        span = ai_client_span(
+            messages=request_context.messages,
+            agent=None,
+            model=request_context.model,
+            model_settings=request_context.model_settings,
+        )
+        run_context_metadata = ctx.metadata
+        if isinstance(run_context_metadata, dict):
+            run_context_metadata["_sentry_span"] = span
+
+        span.__enter__()
+
+        return request_context
+
+    @hooks.on.after_model_request  # type: ignore
+    async def on_response(
+        ctx: "RunContext[None]",
+        *,
+        request_context: "ModelRequestContext",
+        response: "ModelResponse",
+    ) -> "ModelResponse":
+        run_context_metadata = ctx.metadata
+        if not isinstance(run_context_metadata, dict):
+            return response
+
+        span = run_context_metadata.pop("_sentry_span", None)
+        if span is None:
+            return response
+
+        update_ai_client_span(span, response)
+        span.__exit__(None, None, None)
+
+        return response
+
+    @hooks.on.model_request_error  # type: ignore
+    async def on_error(
+        ctx: "RunContext[None]",
+        *,
+        request_context: "ModelRequestContext",
+        error: "Exception",
+    ) -> "ModelResponse":
+        run_context_metadata = ctx.metadata
+
+        if not isinstance(run_context_metadata, dict):
+            raise error
+
+        span = run_context_metadata.pop("_sentry_span", None)
+        if span is None:
+            raise error
+
+        with capture_internal_exceptions():
+            span.__exit__(type(error), error, error.__traceback__)
+
+        raise error
+
+    original_init = Agent.__init__
+
+    @functools.wraps(original_init)
+    def patched_init(self: "Agent[Any, Any]", *args: "Any", **kwargs: "Any") -> None:
+        caps = list(kwargs.get("capabilities") or [])
+        caps.append(hooks)
+        kwargs["capabilities"] = caps
+        return original_init(self, *args, **kwargs)
+
+    Agent.__init__ = patched_init
 
 
 class PydanticAIIntegration(Integration):
+    """
+    Typical interaction with the library:
+    1. The user creates an Agent instance with configuration, including system instructions sent to every model call.
+    2. The user calls `Agent.run()` or `Agent.run_stream()` to start an agent run. The latter can be used to incrementally receive progress.
+    - Each run invocation has `RunContext` objects that are passed to the library hooks.
+    3. In a loop, the agent repeatedly calls the model, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
+
+    Internally, Pydantic AI maintains an execution graph in which ModelRequestNode are responsible for model calls, including retries.
+    Hooks created with the decorators provided by `pydantic_ai.capabilities` are used to create spans for model calls when these hooks are available (newer library versions).
+    The span is created in `on_request` and stored in the metadata of the shared `RunContext` object that is passed to `on_response` and `on_error`.
+
+    The metadata dictionary on the RunContext instance is initialized with `{"_sentry_span": None}` in the `_create_run_wrapper()` and `_create_streaming_wrapper()` wrappers that
+    instrument `Agent.run()` and `Agent.run_stream()`, respectively. A non-empty dictionary is required for the metadata object to be a shared reference between hooks.
+    """
+
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
     are_request_hooks_available = True
@@ -70,73 +163,5 @@ class PydanticAIIntegration(Integration):
             _patch_model_request()
             return
 
-        # Assumptions:
-        # - Model requests within a run are sequential.
-        # - ctx.metadata is a shared dictionary instance between hooks.
         hooks = Hooks()
-
-        @hooks.on.before_model_request  # type: ignore
-        async def on_request(
-            ctx: "RunContext[None]", request_context: "ModelRequestContext"
-        ) -> "ModelRequestContext":
-            span = ai_client_span(
-                messages=request_context.messages,
-                agent=None,
-                model=request_context.model,
-                model_settings=request_context.model_settings,
-            )
-            run_context_metadata = ctx.metadata
-            if isinstance(run_context_metadata, dict):
-                run_context_metadata["_sentry_span"] = span
-
-            span.__enter__()
-
-            return request_context
-
-        @hooks.on.after_model_request  # type: ignore
-        async def on_response(
-            ctx: "RunContext[None]",
-            *,
-            request_context: "ModelRequestContext",
-            response: "ModelResponse",
-        ) -> "ModelResponse":
-            run_context_metadata = ctx.metadata
-            if not isinstance(run_context_metadata, dict):
-                return response
-
-            span = run_context_metadata["_sentry_span"]
-            if span is None:
-                return response
-
-            update_ai_client_span(span, response)
-            span.__exit__(None, None, None)
-            del run_context_metadata["_sentry_span"]
-
-            return response
-
-        @hooks.on.model_request_error  # type: ignore
-        async def on_error(
-            ctx: "RunContext[None]",
-            *,
-            request_context: "ModelRequestContext",
-            error: "Exception",
-        ) -> "ModelResponse":
-            run_context_metadata = ctx.metadata
-            if isinstance(run_context_metadata, dict):
-                span = run_context_metadata.pop("_sentry_span", None)
-                if span is not None:
-                    span.__exit__(type(error), error, error.__traceback__)
-            raise error
-
-        original_init = Agent.__init__
-
-        @functools.wraps(original_init)
-        def patched_init(
-            self: "Agent[Any, Any]", *args: "Any", **kwargs: "Any"
-        ) -> None:
-            caps = list(kwargs.get("capabilities") or [])
-            caps.append(hooks)
-            kwargs["capabilities"] = caps
-            return original_init(self, *args, **kwargs)
-
-        Agent.__init__ = patched_init
+        register_hooks(hooks)

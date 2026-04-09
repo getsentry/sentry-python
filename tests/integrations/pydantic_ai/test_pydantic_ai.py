@@ -16,6 +16,7 @@ from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, ImageUrl, UserPromptPart
 from pydantic_ai.usage import RequestUsage
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
+from pydantic_ai.models.function import FunctionModel
 
 
 @pytest.fixture
@@ -92,6 +93,35 @@ async def test_agent_run_async(sentry_init, capture_events, get_test_agent):
     assert "gen_ai.request.messages" in chat_span["data"]
     assert "gen_ai.usage.input_tokens" in chat_span["data"]
     assert "gen_ai.usage.output_tokens" in chat_span["data"]
+
+
+@pytest.mark.asyncio
+async def test_agent_run_async_model_error(sentry_init, capture_events):
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    def failing_model(messages, info):
+        raise RuntimeError("model exploded")
+
+    agent = Agent(
+        FunctionModel(failing_model),
+        name="test_agent",
+    )
+
+    with pytest.raises(RuntimeError, match="model exploded"):
+        await agent.run("Test input")
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+
+    spans = transaction["spans"]
+    assert len(spans) == 1
+
+    assert spans[0]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -172,6 +202,36 @@ def test_agent_run_sync(sentry_init, capture_events, get_test_agent):
     # Verify streaming flag is False for sync
     for chat_span in chat_spans:
         assert chat_span["data"]["gen_ai.response.streaming"] is False
+
+
+@pytest.mark.asyncio
+async def test_agent_run_sync_model_error(sentry_init, capture_events):
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    def failing_model(messages, info):
+        raise RuntimeError("model exploded")
+
+    agent = Agent(
+        FunctionModel(failing_model),
+        name="test_agent",
+    )
+
+    with pytest.raises(RuntimeError, match="model exploded"):
+        await agent.run("Test input")
+
+    print("events", len(events))
+    (error, transaction) = events
+    assert error["level"] == "error"
+
+    spans = transaction["spans"]
+    assert len(spans) == 1
+
+    assert spans[0]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
