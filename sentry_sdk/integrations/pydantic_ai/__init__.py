@@ -113,8 +113,8 @@ class PydanticAIIntegration(Integration):
     3. In a loop, the agent repeatedly calls the model, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
 
     Internally, Pydantic AI maintains an execution graph in which ModelRequestNode are responsible for model calls, including retries.
-    Hooks created with the decorators provided by `pydantic_ai.capabilities` are used to create spans for model calls when these hooks are available (newer library versions).
-    The span is created in `on_request` and stored in the metadata of the shared `RunContext` object that is passed to `on_response` and `on_error`.
+    Hooks using the decorators provided by `pydantic_ai.capabilities` create and manage spans for model calls when these hooks are available (newer library versions).
+    The span is created in `on_request` and stored in the metadata of the `RunContext` object shared with `on_response` and `on_error`.
 
     The metadata dictionary on the RunContext instance is initialized with `{"_sentry_span": None}` in the `_create_run_wrapper()` and `_create_streaming_wrapper()` wrappers that
     instrument `Agent.run()` and `Agent.run_stream()`, respectively. A non-empty dictionary is required for the metadata object to be a shared reference between hooks.
