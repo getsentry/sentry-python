@@ -38,6 +38,7 @@ from concurrent.futures import ThreadPoolExecutor
 import litellm.utils as litellm_utils
 from litellm.litellm_core_utils import streaming_handler
 from litellm.litellm_core_utils import thread_pool_executor
+from litellm.litellm_core_utils import litellm_logging
 
 
 LITELLM_VERSION = package_version("litellm")
@@ -49,6 +50,7 @@ def reset_litellm_executor():
     thread_pool_executor.executor = ThreadPoolExecutor(max_workers=100)
     litellm_utils.executor = thread_pool_executor.executor
     streaming_handler.executor = thread_pool_executor.executor
+    litellm_logging.executor = thread_pool_executor.executor
 
 
 @pytest.fixture
