@@ -1081,6 +1081,28 @@ def get_model_response():
 
 
 @pytest.fixture
+def get_rate_limit_model_response():
+    def inner(request_headers=None):
+        if request_headers is None:
+            request_headers = {}
+
+        model_request = HttpxRequest(
+            "POST",
+            "/responses",
+            headers=request_headers,
+        )
+
+        response = HttpxResponse(
+            429,
+            request=model_request,
+        )
+
+        return response
+
+    return inner
+
+
+@pytest.fixture
 def streaming_chat_completions_model_response():
     return [
         openai.types.chat.ChatCompletionChunk(
@@ -1214,6 +1236,25 @@ def nonstreaming_chat_completions_model_response():
             prompt_tokens=10,
             completion_tokens=20,
             total_tokens=30,
+        ),
+    )
+
+
+@pytest.fixture
+def openai_embedding_model_response():
+    return openai.types.CreateEmbeddingResponse(
+        data=[
+            openai.types.Embedding(
+                embedding=[0.1, 0.2, 0.3],
+                index=0,
+                object="embedding",
+            )
+        ],
+        model="text-embedding-ada-002",
+        object="list",
+        usage=openai.types.create_embedding_response.Usage(
+            prompt_tokens=5,
+            total_tokens=5,
         ),
     )
 
