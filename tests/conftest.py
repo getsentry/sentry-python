@@ -1219,6 +1219,25 @@ def nonstreaming_chat_completions_model_response():
 
 
 @pytest.fixture
+def openai_embedding_model_response():
+    return openai.types.CreateEmbeddingResponse(
+        data=[
+            openai.types.Embedding(
+                embedding=[0.1, 0.2, 0.3],
+                index=0,
+                object="embedding",
+            )
+        ],
+        model="text-embedding-ada-002",
+        object="list",
+        usage=openai.types.create_embedding_response.Usage(
+            prompt_tokens=5,
+            total_tokens=5,
+        ),
+    )
+
+
+@pytest.fixture
 def nonstreaming_responses_model_response():
     return openai.types.responses.Response(
         id="resp_123",
