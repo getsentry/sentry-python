@@ -82,7 +82,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         provider = "unknown"
 
     call_type = kwargs.get("call_type", None)
-    if call_type == "embedding":
+    if call_type == "embedding" or call_type == "aembedding":
         operation = "embeddings"
     else:
         operation = "chat"
@@ -283,20 +283,6 @@ def _failure_callback(
         span.__exit__(type(exception), exception, None)
 
 
-async def _async_failure_callback(
-    kwargs: "Dict[str, Any]",
-    exception: Exception,
-    start_time: "datetime",
-    end_time: "datetime",
-) -> None:
-    return _failure_callback(
-        kwargs,
-        exception,
-        start_time,
-        end_time,
-    )
-
-
 class LiteLLMIntegration(Integration):
     """
     LiteLLM integration for Sentry.
@@ -366,5 +352,3 @@ class LiteLLMIntegration(Integration):
         litellm.failure_callback = failure_callback or []
         if _failure_callback not in litellm.failure_callback:
             litellm.failure_callback.append(_failure_callback)
-        if _async_failure_callback not in litellm.failure_callback:
-            litellm.failure_callback.append(_async_failure_callback)
