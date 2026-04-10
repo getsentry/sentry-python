@@ -312,6 +312,11 @@ async def test_agent_with_tools(sentry_init, capture_events, get_test_agent):
     """
     Test that tool execution creates execute_tool spans.
     """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
 
     test_agent = get_test_agent()
 
@@ -319,12 +324,6 @@ async def test_agent_with_tools(sentry_init, capture_events, get_test_agent):
     def add_numbers(a: int, b: int) -> int:
         """Add two numbers together."""
         return a + b
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
 
     events = capture_events()
 
@@ -370,6 +369,15 @@ async def test_agent_with_tool_model_retry(
     """
     Test that a handled exception is captured when a tool raises ModelRetry.
     """
+    sentry_init(
+        integrations=[
+            PydanticAIIntegration(
+                handled_tool_call_exceptions=handled_tool_call_exceptions
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
 
     retries = 0
 
@@ -383,16 +391,6 @@ async def test_agent_with_tool_model_retry(
             retries += 1
             raise ModelRetry(message="Try again with the same arguments.")
         return a + b
-
-    sentry_init(
-        integrations=[
-            PydanticAIIntegration(
-                handled_tool_call_exceptions=handled_tool_call_exceptions
-            )
-        ],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
 
     events = capture_events()
 
@@ -452,14 +450,6 @@ async def test_agent_with_tool_validation_error(
     """
     Test that a handled exception is captured when a tool has unsatisfiable constraints.
     """
-
-    test_agent = get_test_agent()
-
-    @test_agent.tool_plain
-    def add_numbers(a: Annotated[int, Field(gt=0, lt=0)], b: int) -> int:
-        """Add two numbers together."""
-        return a + b
-
     sentry_init(
         integrations=[
             PydanticAIIntegration(
@@ -469,6 +459,13 @@ async def test_agent_with_tool_validation_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def add_numbers(a: Annotated[int, Field(gt=0, lt=0)], b: int) -> int:
+        """Add two numbers together."""
+        return a + b
 
     events = capture_events()
 
@@ -519,6 +516,11 @@ async def test_agent_with_tools_streaming(sentry_init, capture_events, get_test_
     """
     Test that tool execution works correctly with streaming.
     """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
 
     test_agent = get_test_agent()
 
@@ -526,12 +528,6 @@ async def test_agent_with_tools_streaming(sentry_init, capture_events, get_test_
     def multiply(a: int, b: int) -> int:
         """Multiply two numbers."""
         return a * b
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
 
     events = capture_events()
 
@@ -708,6 +704,11 @@ async def test_without_pii_tools(sentry_init, capture_events, get_test_agent):
     """
     Test that tool input/output are not captured when send_default_pii is False.
     """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
 
     test_agent = get_test_agent()
 
@@ -715,12 +716,6 @@ async def test_without_pii_tools(sentry_init, capture_events, get_test_agent):
     def sensitive_tool(data: str) -> str:
         """A tool with sensitive data."""
         return f"Processed: {data}"
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=False,
-    )
 
     events = capture_events()
 
@@ -912,6 +907,11 @@ async def test_include_prompts_false_with_tools(
     """
     Test that tool input/output are not captured when include_prompts=False.
     """
+    sentry_init(
+        integrations=[PydanticAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
 
     test_agent = get_test_agent()
 
@@ -919,12 +919,6 @@ async def test_include_prompts_false_with_tools(
     def test_tool(value: int) -> int:
         """A test tool."""
         return value * 2
-
-    sentry_init(
-        integrations=[PydanticAIIntegration(include_prompts=False)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
 
     events = capture_events()
 
@@ -1187,6 +1181,11 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     """
     import sentry_sdk
 
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
     test_agent = get_test_agent()
 
     # Create an agent with a tool that raises an error
@@ -1194,11 +1193,6 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     def failing_tool() -> str:
         """A tool that always fails."""
         raise ValueError("Tool error")
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
 
     # Verify context is not set before run
     scope = sentry_sdk.get_current_scope()
@@ -1507,6 +1501,10 @@ async def test_available_tools_without_description(
     """
     Test that available tools are captured even when description is missing.
     """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
 
     test_agent = get_test_agent()
 
@@ -1514,11 +1512,6 @@ async def test_available_tools_without_description(
     def tool_without_desc(x: int) -> int:
         # No docstring = no description
         return x * 2
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
 
     events = capture_events()
 
@@ -1540,6 +1533,11 @@ async def test_output_with_tool_calls(sentry_init, capture_events, get_test_agen
     """
     Test that tool calls in model response are captured correctly.
     """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
 
     test_agent = get_test_agent()
 
@@ -1547,12 +1545,6 @@ async def test_output_with_tool_calls(sentry_init, capture_events, get_test_agen
     def calc_tool(value: int) -> int:
         """Calculate something."""
         return value + 10
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
 
     events = capture_events()
 
