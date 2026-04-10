@@ -124,7 +124,8 @@ class SentrySpanProcessor(SpanProcessor):
         if client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
-        if not otel_span.get_span_context().is_valid:
+        span_context = otel_span.get_span_context()
+        if span_context is None or not span_context.is_valid:
             return
 
         if self._is_sentry_span(otel_span):
@@ -183,7 +184,7 @@ class SentrySpanProcessor(SpanProcessor):
             return
 
         span_context = otel_span.get_span_context()
-        if not span_context.is_valid:
+        if span_context is None or not span_context.is_valid:
             return
 
         span_id = format_span_id(span_context.span_id)
@@ -263,16 +264,17 @@ class SentrySpanProcessor(SpanProcessor):
         trace_data: "dict[str, Any]" = {}
         span_context = otel_span.get_span_context()
 
-        span_id = format_span_id(span_context.span_id)
-        trace_data["span_id"] = span_id
+        if span_context is not None:
+            span_id = format_span_id(span_context.span_id)
+            trace_data["span_id"] = span_id
 
-        trace_id = format_trace_id(span_context.trace_id)
-        trace_data["trace_id"] = trace_id
+            trace_id = format_trace_id(span_context.trace_id)
+            trace_data["trace_id"] = trace_id
 
-        parent_span_id = (
-            format_span_id(otel_span.parent.span_id) if otel_span.parent else None
-        )
-        trace_data["parent_span_id"] = parent_span_id
+            parent_span_id = (
+                format_span_id(otel_span.parent.span_id) if otel_span.parent else None
+            )
+            trace_data["parent_span_id"] = parent_span_id
 
         sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
         sentry_trace_data = cast("dict[str, Union[str, bool, None]]", sentry_trace_data)
