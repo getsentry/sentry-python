@@ -38,6 +38,7 @@ from concurrent.futures import ThreadPoolExecutor
 import litellm.utils as litellm_utils
 from litellm.litellm_core_utils import streaming_handler
 from litellm.litellm_core_utils import thread_pool_executor
+from litellm.litellm_core_utils import litellm_logging
 from litellm.llms.custom_httpx.http_handler import HTTPHandler
 
 
@@ -48,6 +49,7 @@ def _reset_litellm_executor():
     thread_pool_executor.executor = ThreadPoolExecutor(max_workers=100)
     litellm_utils.executor = thread_pool_executor.executor
     streaming_handler.executor = thread_pool_executor.executor
+    litellm_logging.executor = thread_pool_executor.executor
 
 
 @pytest.fixture()
@@ -158,7 +160,7 @@ def test_nonstreaming_chat_completion(
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -243,7 +245,7 @@ def test_streaming_chat_completion(
             streaming_chat_completions_model_response,
             include_event_type=False,
         ),
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -513,7 +515,7 @@ def test_span_origin(
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -558,7 +560,7 @@ def test_multiple_providers(
     openai_model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -581,7 +583,7 @@ def test_multiple_providers(
     anthropic_model_response = get_model_response(
         nonstreaming_anthropic_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -650,7 +652,7 @@ def test_additional_parameters(
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -743,7 +745,7 @@ def test_no_integration(
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -919,7 +921,7 @@ def test_binary_content_encoding_image_url(
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -998,7 +1000,7 @@ def test_binary_content_encoding_mixed_content(
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -1063,7 +1065,7 @@ def test_binary_content_encoding_uri_type(
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
