@@ -39,8 +39,9 @@ from concurrent.futures import ThreadPoolExecutor
 import litellm.utils as litellm_utils
 from litellm.litellm_core_utils import streaming_handler
 from litellm.litellm_core_utils import thread_pool_executor
+from litellm.litellm_core_utils import litellm_logging
 from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
-from litellm.llms.custom_httpx.http_handler import HTTPHandler
+from litellm.llms.custom_httpx.http_handler import HTTPHandler, AsyncHTTPHandler
 
 
 LITELLM_VERSION = package_version("litellm")
@@ -50,6 +51,7 @@ def _reset_litellm_executor():
     thread_pool_executor.executor = ThreadPoolExecutor(max_workers=100)
     litellm_utils.executor = thread_pool_executor.executor
     streaming_handler.executor = thread_pool_executor.executor
+    litellm_logging.executor = thread_pool_executor.executor
 
 
 @pytest.fixture()
@@ -879,8 +881,6 @@ async def test_async_exception_handling(
                     client=client,
                 )
 
-            litellm_utils.executor.shutdown(wait=True)
-
     # Should have error event and transaction
     assert len(events) >= 1
     # Find the error event
@@ -1067,7 +1067,7 @@ async def test_async_multiple_providers(
 
     _reset_litellm_executor()
 
-    anthropic_client = HTTPHandler()
+    anthropic_client = AsyncHTTPHandler()
     anthropic_model_response = get_model_response(
         nonstreaming_anthropic_model_response,
         serialize_pydantic=True,
@@ -1092,7 +1092,7 @@ async def test_async_multiple_providers(
 
     _reset_litellm_executor()
 
-    gemini_client = HTTPHandler()
+    gemini_client = AsyncHTTPHandler()
     gemini_model_response = get_model_response(
         nonstreaming_google_genai_model_response,
         serialize_pydantic=True,
@@ -1336,12 +1336,12 @@ async def test_async_no_integration(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    client = OpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="z")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -1350,7 +1350,7 @@ async def test_async_no_integration(
         return_value=model_response,
     ):
         with start_transaction(name="litellm test"):
-            await litellm.completion(
+            await litellm.acompletion(
                 model="gpt-3.5-turbo",
                 messages=messages,
                 client=client,
