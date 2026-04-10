@@ -112,7 +112,7 @@ def _create_run_wrapper(
 
             if PydanticAIIntegration.are_request_hooks_available:
                 metadata = kwargs.get("metadata")
-                if not metadata:
+                if metadata is None:
                     kwargs["metadata"] = {"_sentry_span": None}
 
             # Create invoke_agent span
@@ -161,7 +161,7 @@ def _create_streaming_wrapper(
 
         if PydanticAIIntegration.are_request_hooks_available:
             metadata = kwargs.get("metadata")
-            if not metadata:
+            if metadata is None:
                 kwargs["metadata"] = {"_sentry_span": None}
 
         # Call original function to get the context manager
