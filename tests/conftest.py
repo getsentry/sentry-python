@@ -54,6 +54,18 @@ except ImportError:
     openai = None
 
 
+try:
+    import anthropic
+except ImportError:
+    anthropic = None
+
+
+try:
+    import google
+except ImportError:
+    google = None
+
+
 from tests import _warning_recorder, _warning_recorder_mgr
 
 from typing import TYPE_CHECKING
@@ -1050,7 +1062,12 @@ def get_model_response():
         )
 
         if serialize_pydantic:
-            response_content = json.dumps(response_content.model_dump()).encode("utf-8")
+            response_content = json.dumps(
+                response_content.model_dump(
+                    by_alias=True,
+                    exclude_none=True,
+                )
+            ).encode("utf-8")
 
         response = HttpxResponse(
             200,
@@ -1178,6 +1195,30 @@ def streaming_chat_completions_model_response():
 
 
 @pytest.fixture
+def nonstreaming_chat_completions_model_response():
+    return openai.types.chat.ChatCompletion(
+        id="chatcmpl-test",
+        choices=[
+            openai.types.chat.chat_completion.Choice(
+                index=0,
+                finish_reason="stop",
+                message=openai.types.chat.ChatCompletionMessage(
+                    role="assistant", content="Test response"
+                ),
+            )
+        ],
+        created=1234567890,
+        model="gpt-3.5-turbo",
+        object="chat.completion",
+        usage=openai.types.CompletionUsage(
+            prompt_tokens=10,
+            completion_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+
+@pytest.fixture
 def nonstreaming_responses_model_response():
     return openai.types.responses.Response(
         id="resp_123",
@@ -1212,6 +1253,54 @@ def nonstreaming_responses_model_response():
                 reasoning_tokens=5,
             ),
             total_tokens=30,
+        ),
+    )
+
+
+@pytest.fixture
+def nonstreaming_anthropic_model_response():
+    return anthropic.types.Message(
+        id="msg_123",
+        type="message",
+        role="assistant",
+        model="claude-3-opus-20240229",
+        content=[
+            anthropic.types.TextBlock(
+                type="text",
+                text="Hello, how can I help you?",
+            )
+        ],
+        stop_reason="end_turn",
+        stop_sequence=None,
+        usage=anthropic.types.Usage(
+            input_tokens=10,
+            output_tokens=20,
+        ),
+    )
+
+
+@pytest.fixture
+def nonstreaming_google_genai_model_response():
+    return google.genai.types.GenerateContentResponse(
+        response_id="resp_123",
+        candidates=[
+            google.genai.types.Candidate(
+                content=google.genai.types.Content(
+                    role="model",
+                    parts=[
+                        google.genai.types.Part(
+                            text="Hello, how can I help you?",
+                        )
+                    ],
+                ),
+                finish_reason="STOP",
+            )
+        ],
+        model_version="gemini/gemini-pro",
+        usage_metadata=google.genai.types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=20,
+            total_token_count=30,
         ),
     )
 
