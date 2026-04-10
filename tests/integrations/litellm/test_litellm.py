@@ -463,7 +463,9 @@ def test_embeddings_no_pii(
         assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
 
-def test_exception_handling(sentry_init, capture_events):
+def test_exception_handling(
+    reset_litellm_executor, sentry_init, capture_events, get_rate_limit_model_response
+):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
@@ -472,19 +474,24 @@ def test_exception_handling(sentry_init, capture_events):
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-        }
+    client = OpenAI(api_key="z")
 
-        _input_callback(kwargs)
-        _failure_callback(
-            kwargs,
-            Exception("API rate limit reached"),
-            datetime.now(),
-            datetime.now(),
-        )
+    model_response = get_rate_limit_model_response()
+
+    with mock.patch.object(
+        client.embeddings._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            with pytest.raises(litellm.RateLimitError):
+                litellm.completion(
+                    model="gpt-3.5-turbo",
+                    messages=messages,
+                    client=client,
+                )
+
+            litellm_utils.executor.shutdown(wait=True)
 
     # Should have error event and transaction
     assert len(events) >= 1
