@@ -1081,6 +1081,28 @@ def get_model_response():
 
 
 @pytest.fixture
+def get_rate_limit_model_response():
+    def inner(request_headers=None):
+        if request_headers is None:
+            request_headers = {}
+
+        model_request = HttpxRequest(
+            "POST",
+            "/responses",
+            headers=request_headers,
+        )
+
+        response = HttpxResponse(
+            429,
+            request=model_request,
+        )
+
+        return response
+
+    return inner
+
+
+@pytest.fixture
 def streaming_chat_completions_model_response():
     return [
         openai.types.chat.ChatCompletionChunk(
