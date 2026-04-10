@@ -259,6 +259,8 @@ def test_langchain_create_agent(
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
 
     assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
+    assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
+
     assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
     assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
     assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
@@ -414,6 +416,10 @@ def test_tool_execution_span(
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+    assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
+    assert chat_spans[1]["data"]["gen_ai.agent.name"] == "word_length_agent"
+    assert tool_exec_span["data"]["gen_ai.agent.name"] == "word_length_agent"
 
     assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
     assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
