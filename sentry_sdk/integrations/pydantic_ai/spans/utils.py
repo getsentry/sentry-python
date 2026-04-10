@@ -5,7 +5,7 @@ from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.utils import get_modality_from_mime_type
 from sentry_sdk.consts import SPANDATA
 
-from ..consts import DATA_URL_BASE64_REGEX
+from sentry_sdk.ai.consts import DATA_URL_BASE64_REGEX
 
 from typing import TYPE_CHECKING
 
