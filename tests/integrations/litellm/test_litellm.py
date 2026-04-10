@@ -2,6 +2,7 @@ import base64
 import json
 import pytest
 import time
+import asyncio
 from unittest import mock
 from datetime import datetime
 
@@ -31,13 +32,14 @@ from sentry_sdk.integrations.litellm import (
 )
 from sentry_sdk.utils import package_version
 
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 
 from concurrent.futures import ThreadPoolExecutor
 
 import litellm.utils as litellm_utils
 from litellm.litellm_core_utils import streaming_handler
 from litellm.litellm_core_utils import thread_pool_executor
+from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 from litellm.llms.custom_httpx.http_handler import HTTPHandler
 
 
@@ -240,6 +242,89 @@ def test_nonstreaming_chat_completion(
     assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
+@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_async_nonstreaming_chat_completion(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    messages = [{"role": "user", "content": "Hello!"}]
+
+    client = AsyncOpenAI(api_key="z")
+
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            await litellm.acompletion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+            )
+
+            await GLOBAL_LOGGING_WORKER.flush()
+            await asyncio.sleep(0.5)
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "litellm test"
+
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat gpt-3.5-turbo"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+
+
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -294,6 +379,81 @@ def test_streaming_chat_completion(
                 pass
 
             streaming_handler.executor.shutdown(wait=True)
+
+    assert len(events) == 1
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    chat_spans = list(
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    )
+    assert len(chat_spans) == 1
+    span = chat_spans[0]
+
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+
+@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_async_streaming_chat_completion(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+    streaming_chat_completions_model_response,
+):
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    messages = [{"role": "user", "content": "Hello!"}]
+
+    client = AsyncOpenAI(api_key="z")
+
+    model_response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                streaming_chat_completions_model_response,
+                include_event_type=False,
+            ),
+        ),
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            response = await litellm.acompletion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+                stream=True,
+            )
+            async for _ in response:
+                pass
+
+            await GLOBAL_LOGGING_WORKER.flush()
+            await asyncio.sleep(0.5)
 
     assert len(events) == 1
     (event,) = events

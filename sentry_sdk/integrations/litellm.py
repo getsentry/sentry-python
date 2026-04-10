@@ -170,6 +170,10 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             set_data_normalized(span, f"gen_ai.litellm.{key}", value)
 
 
+async def _async_input_callback(kwargs: "Dict[str, Any]") -> None:
+    return _input_callback(kwargs)
+
+
 def _success_callback(
     kwargs: "Dict[str, Any]",
     completion_response: "Any",
@@ -233,8 +237,26 @@ def _success_callback(
         is_streaming = kwargs.get("stream")
         # Callback is fired multiple times when streaming a response.
         # Streaming flag checked at https://github.com/BerriAI/litellm/blob/33c3f13443eaf990ac8c6e3da78bddbc2b7d0e7a/litellm/litellm_core_utils/litellm_logging.py#L1603
-        if is_streaming is not True or "complete_streaming_response" in kwargs:
+        if (
+            is_streaming is not True
+            or "complete_streaming_response" in kwargs
+            or "async_complete_streaming_response" in kwargs
+        ):
             span.__exit__(None, None, None)
+
+
+async def _async_success_callback(
+    kwargs: "Dict[str, Any]",
+    completion_response: "Any",
+    start_time: "datetime",
+    end_time: "datetime",
+) -> None:
+    return _success_callback(
+        kwargs,
+        completion_response,
+        start_time,
+        end_time,
+    )
 
 
 def _failure_callback(
@@ -259,6 +281,20 @@ def _failure_callback(
     finally:
         # Always finish the span and clean up
         span.__exit__(type(exception), exception, None)
+
+
+async def _async_failure_callback(
+    kwargs: "Dict[str, Any]",
+    exception: Exception,
+    start_time: "datetime",
+    end_time: "datetime",
+) -> None:
+    return _failure_callback(
+        kwargs,
+        exception,
+        start_time,
+        end_time,
+    )
 
 
 class LiteLLMIntegration(Integration):
@@ -318,11 +354,17 @@ class LiteLLMIntegration(Integration):
         litellm.input_callback = input_callback or []
         if _input_callback not in litellm.input_callback:
             litellm.input_callback.append(_input_callback)
+        if _async_input_callback not in litellm.input_callback:
+            litellm.input_callback.append(_async_input_callback)
 
         litellm.success_callback = success_callback or []
         if _success_callback not in litellm.success_callback:
             litellm.success_callback.append(_success_callback)
+        if _async_success_callback not in litellm.success_callback:
+            litellm.success_callback.append(_async_success_callback)
 
         litellm.failure_callback = failure_callback or []
         if _failure_callback not in litellm.failure_callback:
             litellm.failure_callback.append(_failure_callback)
+        if _async_failure_callback not in litellm.failure_callback:
+            litellm.failure_callback.append(_async_failure_callback)
