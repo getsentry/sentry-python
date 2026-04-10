@@ -23,9 +23,6 @@ def execute_tool_span(
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
 
-    if tool.__class__.__name__ == "FunctionTool":
-        span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
-
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
     span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
 

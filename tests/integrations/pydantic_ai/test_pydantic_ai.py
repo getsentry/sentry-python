@@ -16,37 +16,44 @@ from pydantic_ai import Agent
 from pydantic_ai.messages import BinaryContent, ImageUrl, UserPromptPart
 from pydantic_ai.usage import RequestUsage
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
+from pydantic_ai.models.function import FunctionModel
 
 
 @pytest.fixture
-def test_agent():
-    """Create a test agent with model settings."""
-    return Agent(
-        "test",
-        name="test_agent",
-        system_prompt="You are a helpful test assistant.",
-    )
+def get_test_agent():
+    def inner():
+        """Create a test agent with model settings."""
+        return Agent(
+            "test",
+            name="test_agent",
+            system_prompt="You are a helpful test assistant.",
+        )
+
+    return inner
 
 
 @pytest.fixture
-def test_agent_with_settings():
-    """Create a test agent with explicit model settings."""
-    from pydantic_ai import ModelSettings
+def get_test_agent_with_settings():
+    def inner():
+        """Create a test agent with explicit model settings."""
+        from pydantic_ai import ModelSettings
 
-    return Agent(
-        "test",
-        name="test_agent_settings",
-        system_prompt="You are a test assistant with settings.",
-        model_settings=ModelSettings(
-            temperature=0.7,
-            max_tokens=100,
-            top_p=0.9,
-        ),
-    )
+        return Agent(
+            "test",
+            name="test_agent_settings",
+            system_prompt="You are a test assistant with settings.",
+            model_settings=ModelSettings(
+                temperature=0.7,
+                max_tokens=100,
+                top_p=0.9,
+            ),
+        )
+
+    return inner
 
 
 @pytest.mark.asyncio
-async def test_agent_run_async(sentry_init, capture_events, test_agent):
+async def test_agent_run_async(sentry_init, capture_events, get_test_agent):
     """
     Test that the integration creates spans for async agent runs.
     """
@@ -58,6 +65,7 @@ async def test_agent_run_async(sentry_init, capture_events, test_agent):
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     result = await test_agent.run("Test input")
 
     assert result is not None
@@ -88,7 +96,36 @@ async def test_agent_run_async(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_agent_run_async_usage_data(sentry_init, capture_events, test_agent):
+async def test_agent_run_async_model_error(sentry_init, capture_events):
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    def failing_model(messages, info):
+        raise RuntimeError("model exploded")
+
+    agent = Agent(
+        FunctionModel(failing_model),
+        name="test_agent",
+    )
+
+    with pytest.raises(RuntimeError, match="model exploded"):
+        await agent.run("Test input")
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+
+    spans = transaction["spans"]
+    assert len(spans) == 1
+
+    assert spans[0]["status"] == "internal_error"
+
+
+@pytest.mark.asyncio
+async def test_agent_run_async_usage_data(sentry_init, capture_events, get_test_agent):
     """
     Test that the invoke_agent span includes token usage and model data.
     """
@@ -100,6 +137,7 @@ async def test_agent_run_async_usage_data(sentry_init, capture_events, test_agen
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     result = await test_agent.run("Test input")
 
     assert result is not None
@@ -132,7 +170,7 @@ async def test_agent_run_async_usage_data(sentry_init, capture_events, test_agen
     assert trace_data["gen_ai.response.model"] == "test"  # Test model name
 
 
-def test_agent_run_sync(sentry_init, capture_events, test_agent):
+def test_agent_run_sync(sentry_init, capture_events, get_test_agent):
     """
     Test that the integration creates spans for sync agent runs.
     """
@@ -144,6 +182,7 @@ def test_agent_run_sync(sentry_init, capture_events, test_agent):
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     result = test_agent.run_sync("Test input")
 
     assert result is not None
@@ -165,8 +204,36 @@ def test_agent_run_sync(sentry_init, capture_events, test_agent):
         assert chat_span["data"]["gen_ai.response.streaming"] is False
 
 
+def test_agent_run_sync_model_error(sentry_init, capture_events):
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    def failing_model(messages, info):
+        raise RuntimeError("model exploded")
+
+    agent = Agent(
+        FunctionModel(failing_model),
+        name="test_agent",
+    )
+
+    with pytest.raises(RuntimeError, match="model exploded"):
+        agent.run_sync("Test input")
+
+    (error, transaction) = events
+    assert error["level"] == "error"
+
+    spans = transaction["spans"]
+    assert len(spans) == 1
+
+    assert spans[0]["status"] == "internal_error"
+
+
 @pytest.mark.asyncio
-async def test_agent_run_stream(sentry_init, capture_events, test_agent):
+async def test_agent_run_stream(sentry_init, capture_events, get_test_agent):
     """
     Test that the integration creates spans for streaming agent runs.
     """
@@ -178,6 +245,7 @@ async def test_agent_run_stream(sentry_init, capture_events, test_agent):
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     async with test_agent.run_stream("Test input") as result:
         # Consume the stream
         async for _ in result.stream_output():
@@ -207,7 +275,7 @@ async def test_agent_run_stream(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_agent_run_stream_events(sentry_init, capture_events, test_agent):
+async def test_agent_run_stream_events(sentry_init, capture_events, get_test_agent):
     """
     Test that run_stream_events creates spans (it uses run internally, so non-streaming).
     """
@@ -220,6 +288,7 @@ async def test_agent_run_stream_events(sentry_init, capture_events, test_agent):
     events = capture_events()
 
     # Consume all events
+    test_agent = get_test_agent()
     async for _ in test_agent.run_stream_events("Test input"):
         pass
 
@@ -239,21 +308,22 @@ async def test_agent_run_stream_events(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_agent_with_tools(sentry_init, capture_events, test_agent):
+async def test_agent_with_tools(sentry_init, capture_events, get_test_agent):
     """
     Test that tool execution creates execute_tool spans.
     """
-
-    @test_agent.tool_plain
-    def add_numbers(a: int, b: int) -> int:
-        """Add two numbers together."""
-        return a + b
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def add_numbers(a: int, b: int) -> int:
+        """Add two numbers together."""
+        return a + b
 
     events = capture_events()
 
@@ -275,7 +345,6 @@ async def test_agent_with_tools(sentry_init, capture_events, test_agent):
     tool_span = tool_spans[0]
     assert "execute_tool" in tool_span["description"]
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span["data"]["gen_ai.tool.type"] == "function"
     assert tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
     assert "gen_ai.tool.input" in tool_span["data"]
     assert "gen_ai.tool.output" in tool_span["data"]
@@ -294,23 +363,11 @@ async def test_agent_with_tools(sentry_init, capture_events, test_agent):
 )
 @pytest.mark.asyncio
 async def test_agent_with_tool_model_retry(
-    sentry_init, capture_events, test_agent, handled_tool_call_exceptions
+    sentry_init, capture_events, get_test_agent, handled_tool_call_exceptions
 ):
     """
     Test that a handled exception is captured when a tool raises ModelRetry.
     """
-
-    retries = 0
-
-    @test_agent.tool_plain
-    def add_numbers(a: int, b: int) -> float:
-        """Add two numbers together, but raises an exception on the first attempt."""
-        nonlocal retries
-        if retries == 0:
-            retries += 1
-            raise ModelRetry(message="Try again with the same arguments.")
-        return a + b
-
     sentry_init(
         integrations=[
             PydanticAIIntegration(
@@ -320,6 +377,19 @@ async def test_agent_with_tool_model_retry(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+
+    retries = 0
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def add_numbers(a: int, b: int) -> float:
+        """Add two numbers together, but raises an exception on the first attempt."""
+        nonlocal retries
+        if retries == 0:
+            retries += 1
+            raise ModelRetry(message="Try again with the same arguments.")
+        return a + b
 
     events = capture_events()
 
@@ -348,14 +418,12 @@ async def test_agent_with_tool_model_retry(
     model_retry_tool_span = tool_spans[0]
     assert "execute_tool" in model_retry_tool_span["description"]
     assert model_retry_tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert model_retry_tool_span["data"]["gen_ai.tool.type"] == "function"
     assert model_retry_tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
     assert "gen_ai.tool.input" in model_retry_tool_span["data"]
 
     tool_span = tool_spans[1]
     assert "execute_tool" in tool_span["description"]
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span["data"]["gen_ai.tool.type"] == "function"
     assert tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
     assert "gen_ai.tool.input" in tool_span["data"]
     assert "gen_ai.tool.output" in tool_span["data"]
@@ -374,17 +442,11 @@ async def test_agent_with_tool_model_retry(
 )
 @pytest.mark.asyncio
 async def test_agent_with_tool_validation_error(
-    sentry_init, capture_events, test_agent, handled_tool_call_exceptions
+    sentry_init, capture_events, get_test_agent, handled_tool_call_exceptions
 ):
     """
     Test that a handled exception is captured when a tool has unsatisfiable constraints.
     """
-
-    @test_agent.tool_plain
-    def add_numbers(a: Annotated[int, Field(gt=0, lt=0)], b: int) -> int:
-        """Add two numbers together."""
-        return a + b
-
     sentry_init(
         integrations=[
             PydanticAIIntegration(
@@ -394,6 +456,13 @@ async def test_agent_with_tool_validation_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def add_numbers(a: Annotated[int, Field(gt=0, lt=0)], b: int) -> int:
+        """Add two numbers together."""
+        return a + b
 
     events = capture_events()
 
@@ -427,7 +496,6 @@ async def test_agent_with_tool_validation_error(
     model_retry_tool_span = tool_spans[0]
     assert "execute_tool" in model_retry_tool_span["description"]
     assert model_retry_tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert model_retry_tool_span["data"]["gen_ai.tool.type"] == "function"
     assert model_retry_tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
     assert "gen_ai.tool.input" in model_retry_tool_span["data"]
 
@@ -440,21 +508,22 @@ async def test_agent_with_tool_validation_error(
 
 
 @pytest.mark.asyncio
-async def test_agent_with_tools_streaming(sentry_init, capture_events, test_agent):
+async def test_agent_with_tools_streaming(sentry_init, capture_events, get_test_agent):
     """
     Test that tool execution works correctly with streaming.
     """
-
-    @test_agent.tool_plain
-    def multiply(a: int, b: int) -> int:
-        """Multiply two numbers."""
-        return a * b
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def multiply(a: int, b: int) -> int:
+        """Multiply two numbers."""
+        return a * b
 
     events = capture_events()
 
@@ -484,7 +553,9 @@ async def test_agent_with_tools_streaming(sentry_init, capture_events, test_agen
 
 
 @pytest.mark.asyncio
-async def test_model_settings(sentry_init, capture_events, test_agent_with_settings):
+async def test_model_settings(
+    sentry_init, capture_events, get_test_agent_with_settings
+):
     """
     Test that model settings are captured in spans.
     """
@@ -495,6 +566,7 @@ async def test_model_settings(sentry_init, capture_events, test_agent_with_setti
 
     events = capture_events()
 
+    test_agent_with_settings = get_test_agent_with_settings()
     await test_agent_with_settings.run("Test input")
 
     (transaction,) = events
@@ -596,7 +668,7 @@ async def test_error_handling(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_without_pii(sentry_init, capture_events, test_agent):
+async def test_without_pii(sentry_init, capture_events, get_test_agent):
     """
     Test that PII is not captured when send_default_pii is False.
     """
@@ -608,6 +680,7 @@ async def test_without_pii(sentry_init, capture_events, test_agent):
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     await test_agent.run("Sensitive input")
 
     (transaction,) = events
@@ -623,21 +696,22 @@ async def test_without_pii(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_without_pii_tools(sentry_init, capture_events, test_agent):
+async def test_without_pii_tools(sentry_init, capture_events, get_test_agent):
     """
     Test that tool input/output are not captured when send_default_pii is False.
     """
-
-    @test_agent.tool_plain
-    def sensitive_tool(data: str) -> str:
-        """A tool with sensitive data."""
-        return f"Processed: {data}"
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
     )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def sensitive_tool(data: str) -> str:
+        """A tool with sensitive data."""
+        return f"Processed: {data}"
 
     events = capture_events()
 
@@ -656,7 +730,7 @@ async def test_without_pii_tools(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_multiple_agents_concurrent(sentry_init, capture_events, test_agent):
+async def test_multiple_agents_concurrent(sentry_init, capture_events, get_test_agent):
     """
     Test that multiple agents can run concurrently without interfering.
     """
@@ -666,6 +740,8 @@ async def test_multiple_agents_concurrent(sentry_init, capture_events, test_agen
     )
 
     events = capture_events()
+
+    test_agent = get_test_agent()
 
     async def run_agent(input_text):
         return await test_agent.run(input_text)
@@ -737,7 +813,7 @@ async def test_message_history(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_gen_ai_system(sentry_init, capture_events, test_agent):
+async def test_gen_ai_system(sentry_init, capture_events, get_test_agent):
     """
     Test that gen_ai.system is set from the model.
     """
@@ -748,6 +824,7 @@ async def test_gen_ai_system(sentry_init, capture_events, test_agent):
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     await test_agent.run("Test input")
 
     (transaction,) = events
@@ -764,7 +841,7 @@ async def test_gen_ai_system(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_include_prompts_false(sentry_init, capture_events, test_agent):
+async def test_include_prompts_false(sentry_init, capture_events, get_test_agent):
     """
     Test that prompts are not captured when include_prompts=False.
     """
@@ -776,6 +853,7 @@ async def test_include_prompts_false(sentry_init, capture_events, test_agent):
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     await test_agent.run("Sensitive prompt")
 
     (transaction,) = events
@@ -791,7 +869,7 @@ async def test_include_prompts_false(sentry_init, capture_events, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_include_prompts_true(sentry_init, capture_events, test_agent):
+async def test_include_prompts_true(sentry_init, capture_events, get_test_agent):
     """
     Test that prompts are captured when include_prompts=True (default).
     """
@@ -803,6 +881,7 @@ async def test_include_prompts_true(sentry_init, capture_events, test_agent):
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     await test_agent.run("Test prompt")
 
     (transaction,) = events
@@ -819,22 +898,23 @@ async def test_include_prompts_true(sentry_init, capture_events, test_agent):
 
 @pytest.mark.asyncio
 async def test_include_prompts_false_with_tools(
-    sentry_init, capture_events, test_agent
+    sentry_init, capture_events, get_test_agent
 ):
     """
     Test that tool input/output are not captured when include_prompts=False.
     """
-
-    @test_agent.tool_plain
-    def test_tool(value: int) -> int:
-        """A test tool."""
-        return value * 2
-
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def test_tool(value: int) -> int:
+        """A test tool."""
+        return value * 2
 
     events = capture_events()
 
@@ -853,7 +933,9 @@ async def test_include_prompts_false_with_tools(
 
 
 @pytest.mark.asyncio
-async def test_include_prompts_requires_pii(sentry_init, capture_events, test_agent):
+async def test_include_prompts_requires_pii(
+    sentry_init, capture_events, get_test_agent
+):
     """
     Test that include_prompts requires send_default_pii=True.
     """
@@ -865,6 +947,7 @@ async def test_include_prompts_requires_pii(sentry_init, capture_events, test_ag
 
     events = capture_events()
 
+    test_agent = get_test_agent()
     await test_agent.run("Test prompt")
 
     (transaction,) = events
@@ -1015,7 +1098,7 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_context_cleanup_after_run(sentry_init, test_agent):
+async def test_context_cleanup_after_run(sentry_init, get_test_agent):
     """
     Test that the pydantic_ai_agent context is properly cleaned up after agent execution.
     """
@@ -1031,13 +1114,14 @@ async def test_context_cleanup_after_run(sentry_init, test_agent):
     assert "pydantic_ai_agent" not in scope._contexts
 
     # Run the agent
+    test_agent = get_test_agent()
     await test_agent.run("Test input")
 
     # Verify context is cleaned up after run
     assert "pydantic_ai_agent" not in scope._contexts
 
 
-def test_context_cleanup_after_run_sync(sentry_init, test_agent):
+def test_context_cleanup_after_run_sync(sentry_init, get_test_agent):
     """
     Test that the pydantic_ai_agent context is properly cleaned up after sync agent execution.
     """
@@ -1053,6 +1137,7 @@ def test_context_cleanup_after_run_sync(sentry_init, test_agent):
     assert "pydantic_ai_agent" not in scope._contexts
 
     # Run the agent synchronously
+    test_agent = get_test_agent()
     test_agent.run_sync("Test input")
 
     # Verify context is cleaned up after run
@@ -1060,7 +1145,7 @@ def test_context_cleanup_after_run_sync(sentry_init, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_context_cleanup_after_streaming(sentry_init, test_agent):
+async def test_context_cleanup_after_streaming(sentry_init, get_test_agent):
     """
     Test that the pydantic_ai_agent context is properly cleaned up after streaming execution.
     """
@@ -1075,6 +1160,7 @@ async def test_context_cleanup_after_streaming(sentry_init, test_agent):
     scope = sentry_sdk.get_current_scope()
     assert "pydantic_ai_agent" not in scope._contexts
 
+    test_agent = get_test_agent()
     # Run the agent with streaming
     async with test_agent.run_stream("Test input") as result:
         async for _ in result.stream_output():
@@ -1085,22 +1171,24 @@ async def test_context_cleanup_after_streaming(sentry_init, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_context_cleanup_on_error(sentry_init, test_agent):
+async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     """
     Test that the pydantic_ai_agent context is cleaned up even when an error occurs.
     """
     import sentry_sdk
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    test_agent = get_test_agent()
 
     # Create an agent with a tool that raises an error
     @test_agent.tool_plain
     def failing_tool() -> str:
         """A tool that always fails."""
         raise ValueError("Tool error")
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
 
     # Verify context is not set before run
     scope = sentry_sdk.get_current_scope()
@@ -1117,7 +1205,7 @@ async def test_context_cleanup_on_error(sentry_init, test_agent):
 
 
 @pytest.mark.asyncio
-async def test_context_isolation_concurrent_agents(sentry_init, test_agent):
+async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
     """
     Test that concurrent agent executions maintain isolated contexts.
     """
@@ -1150,6 +1238,7 @@ async def test_context_isolation_concurrent_agents(sentry_init, test_agent):
 
         return agent_name
 
+    test_agent = get_test_agent()
     # Run both agents concurrently
     results = await asyncio.gather(
         run_and_check_context(test_agent, "agent1"),
@@ -1403,21 +1492,22 @@ async def test_agent_data_from_scope(sentry_init, capture_events):
 
 @pytest.mark.asyncio
 async def test_available_tools_without_description(
-    sentry_init, capture_events, test_agent
+    sentry_init, capture_events, get_test_agent
 ):
     """
     Test that available tools are captured even when description is missing.
     """
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    test_agent = get_test_agent()
 
     @test_agent.tool_plain
     def tool_without_desc(x: int) -> int:
         # No docstring = no description
         return x * 2
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-    )
 
     events = capture_events()
 
@@ -1435,21 +1525,22 @@ async def test_available_tools_without_description(
 
 
 @pytest.mark.asyncio
-async def test_output_with_tool_calls(sentry_init, capture_events, test_agent):
+async def test_output_with_tool_calls(sentry_init, capture_events, get_test_agent):
     """
     Test that tool calls in model response are captured correctly.
     """
-
-    @test_agent.tool_plain
-    def calc_tool(value: int) -> int:
-        """Calculate something."""
-        return value + 10
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+
+    test_agent = get_test_agent()
+
+    @test_agent.tool_plain
+    def calc_tool(value: int) -> int:
+        """Calculate something."""
+        return value + 10
 
     events = capture_events()
 
@@ -1637,7 +1728,6 @@ async def test_input_messages_error_handling(sentry_init, capture_events):
     Test that _set_input_messages handles errors gracefully.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1791,7 +1881,6 @@ async def test_message_parts_with_list_content(sentry_init, capture_events):
     """
     import sentry_sdk
     from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1898,7 +1987,6 @@ async def test_message_with_system_prompt_part(sentry_init, capture_events):
     """
     import sentry_sdk
     from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
     from pydantic_ai import messages
 
     sentry_init(
@@ -1935,7 +2023,6 @@ async def test_message_with_instructions(sentry_init, capture_events):
     """
     import sentry_sdk
     from unittest.mock import MagicMock
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1970,7 +2057,6 @@ async def test_set_input_messages_without_prompts(sentry_init, capture_events):
     Test that _set_input_messages respects _should_send_prompts().
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=False)],

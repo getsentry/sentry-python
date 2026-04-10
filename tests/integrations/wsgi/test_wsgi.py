@@ -6,7 +6,11 @@ from werkzeug.test import Client
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware, _ScopedResponse
+from sentry_sdk.integrations.wsgi import (
+    SentryWsgiMiddleware,
+    _ScopedResponse,
+    get_request_url,
+)
 
 
 @pytest.fixture
@@ -547,3 +551,94 @@ def test_file_response_wrapping(
         assert isinstance(result, _ScopedResponse)
     else:
         assert result is response_mock
+
+
+@pytest.mark.parametrize(
+    "environ,use_x_forwarded_for,expected_url",
+    [
+        # Without use_x_forwarded_for, wsgi.url_scheme is used
+        (
+            {
+                "wsgi.url_scheme": "http",
+                "SERVER_NAME": "example.com",
+                "SERVER_PORT": "80",
+                "PATH_INFO": "/test",
+                "HTTP_X_FORWARDED_PROTO": "https",
+            },
+            False,
+            "http://example.com/test",
+        ),
+        # With use_x_forwarded_for, HTTP_X_FORWARDED_PROTO is respected
+        (
+            {
+                "wsgi.url_scheme": "http",
+                "SERVER_NAME": "example.com",
+                "SERVER_PORT": "80",
+                "PATH_INFO": "/test",
+                "HTTP_X_FORWARDED_PROTO": "https",
+            },
+            True,
+            "https://example.com/test",
+        ),
+        # With use_x_forwarded_for but no forwarded proto, wsgi.url_scheme is used
+        (
+            {
+                "wsgi.url_scheme": "http",
+                "SERVER_NAME": "example.com",
+                "SERVER_PORT": "80",
+                "PATH_INFO": "/test",
+            },
+            True,
+            "http://example.com/test",
+        ),
+        # Forwarded host with default https port is stripped using forwarded proto
+        (
+            {
+                "wsgi.url_scheme": "http",
+                "SERVER_NAME": "internal",
+                "SERVER_PORT": "80",
+                "PATH_INFO": "/test",
+                "HTTP_X_FORWARDED_PROTO": "https",
+                "HTTP_X_FORWARDED_HOST": "example.com:443",
+            },
+            True,
+            "https://example.com/test",
+        ),
+        # Forwarded host with non-default port is preserved
+        (
+            {
+                "wsgi.url_scheme": "http",
+                "SERVER_NAME": "internal",
+                "SERVER_PORT": "80",
+                "PATH_INFO": "/test",
+                "HTTP_X_FORWARDED_PROTO": "https",
+                "HTTP_X_FORWARDED_HOST": "example.com:8443",
+            },
+            True,
+            "https://example.com:8443/test",
+        ),
+        # Forwarded proto with HTTP_HOST (no forwarded host) strips default port
+        (
+            {
+                "wsgi.url_scheme": "http",
+                "HTTP_HOST": "example.com:443",
+                "SERVER_NAME": "internal",
+                "SERVER_PORT": "80",
+                "PATH_INFO": "/test",
+                "HTTP_X_FORWARDED_PROTO": "https",
+            },
+            True,
+            "https://example.com/test",
+        ),
+    ],
+    ids=[
+        "ignores_forwarded_proto_when_disabled",
+        "respects_forwarded_proto_when_enabled",
+        "falls_back_to_url_scheme_when_no_forwarded_proto",
+        "strips_default_https_port_from_forwarded_host",
+        "preserves_non_default_port_on_forwarded_host",
+        "strips_default_port_from_http_host_with_forwarded_proto",
+    ],
+)
+def test_get_request_url_x_forwarded_proto(environ, use_x_forwarded_for, expected_url):
+    assert get_request_url(environ, use_x_forwarded_for) == expected_url
