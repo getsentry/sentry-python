@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.ai.consts import DATA_URL_BASE64_REGEX
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -588,6 +589,20 @@ def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> 
     return 0
 
 
+def _is_image_type_with_blob_content(item: "Dict[str, Any]") -> bool:
+    """
+    Some content blocks contain an image_url property with base64 content as its value.
+    This is used to identify those while not leading to unnecessary copying of data when the image URL does not contain base64 content.
+    """
+    if item.get("type") != "image_url":
+        return False
+
+    image_url = item.get("image_url", {}).get("url", "")
+    data_url_match = DATA_URL_BASE64_REGEX.match(image_url)
+
+    return bool(data_url_match)
+
+
 def redact_blob_message_parts(
     messages: "List[Dict[str, Any]]",
 ) -> "List[Dict[str, Any]]":
@@ -640,7 +655,9 @@ def redact_blob_message_parts(
         content = message.get("content")
         if isinstance(content, list):
             for item in content:
-                if isinstance(item, dict) and item.get("type") == "blob":
+                if isinstance(item, dict) and (
+                    item.get("type") == "blob" or _is_image_type_with_blob_content(item)
+                ):
                     has_blobs = True
                     break
         if has_blobs:
@@ -661,8 +678,11 @@ def redact_blob_message_parts(
         content = message.get("content")
         if isinstance(content, list):
             for item in content:
-                if isinstance(item, dict) and item.get("type") == "blob":
-                    item["content"] = BLOB_DATA_SUBSTITUTE
+                if isinstance(item, dict):
+                    if item.get("type") == "blob":
+                        item["content"] = BLOB_DATA_SUBSTITUTE
+                    elif _is_image_type_with_blob_content(item):
+                        item["image_url"]["url"] = BLOB_DATA_SUBSTITUTE
 
     return messages_copy
 
