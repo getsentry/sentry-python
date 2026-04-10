@@ -50,8 +50,13 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
 
-    from openai.types.responses import ResponseInputParam, SequenceNotStr
-    from openai.types.responses import ResponseStreamEvent
+    from openai.types.responses.response_usage import ResponseUsage
+    from openai.types.responses import (
+        ResponseInputParam,
+        SequenceNotStr,
+        ResponseStreamEvent,
+    )
+    from openai.types import CompletionUsage
     from openai import Omit
 
 try:
@@ -144,20 +149,104 @@ def _capture_exception(exc: "Any", manual_span_cleanup: bool = True) -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _get_usage(usage: "Any", names: "List[str]") -> int:
-    for name in names:
-        if hasattr(usage, name) and isinstance(getattr(usage, name), int):
-            return getattr(usage, name)
-    return 0
+def _has_attr_and_is_int(
+    token_usage: "Union[CompletionUsage, ResponseUsage]", attr_name: str
+) -> bool:
+    return hasattr(token_usage, attr_name) and isinstance(
+        getattr(token_usage, attr_name, None), int
+    )
 
 
-def _calculate_token_usage(
+def _calculate_completions_token_usage(
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
+    response: "Any",
+    span: "Span",
+    streaming_message_responses: "Optional[List[str]]",
+    streaming_message_total_token_usage: "Optional[CompletionUsage]",
+    count_tokens: "Callable[..., Any]",
+) -> None:
+    """Extract and record token usage from a Chat Completions API response."""
+    input_tokens: "Optional[int]" = 0
+    input_tokens_cached: "Optional[int]" = 0
+    output_tokens: "Optional[int]" = 0
+    output_tokens_reasoning: "Optional[int]" = 0
+    total_tokens: "Optional[int]" = 0
+    usage = None
+
+    if streaming_message_total_token_usage is not None:
+        usage = streaming_message_total_token_usage
+    elif hasattr(response, "usage"):
+        usage = response.usage
+
+    if usage is not None:
+        if _has_attr_and_is_int(usage, "prompt_tokens"):
+            input_tokens = usage.prompt_tokens
+        if _has_attr_and_is_int(usage, "completion_tokens"):
+            output_tokens = usage.completion_tokens
+        if _has_attr_and_is_int(usage, "total_tokens"):
+            total_tokens = usage.total_tokens
+
+        if hasattr(usage, "prompt_tokens_details"):
+            cached = getattr(usage.prompt_tokens_details, "cached_tokens", None)
+            if isinstance(cached, int):
+                input_tokens_cached = cached
+
+        if hasattr(usage, "completion_tokens_details"):
+            reasoning = getattr(
+                usage.completion_tokens_details, "reasoning_tokens", None
+            )
+            if isinstance(reasoning, int):
+                output_tokens_reasoning = reasoning
+
+    # Manually count input tokens
+    if input_tokens == 0:
+        for message in messages or []:
+            if isinstance(message, str):
+                input_tokens += count_tokens(message)
+                continue
+            elif isinstance(message, dict):
+                message_content = message.get("content")
+                if message_content is None:
+                    continue
+                text_items = _get_text_items(message_content)
+                input_tokens += sum(count_tokens(text) for text in text_items)
+                continue
+
+    # Manually count output tokens
+    if output_tokens == 0:
+        if streaming_message_responses is not None:
+            for message in streaming_message_responses:
+                output_tokens += count_tokens(message)
+        elif hasattr(response, "choices"):
+            for choice in response.choices:
+                if hasattr(choice, "message") and hasattr(choice.message, "content"):
+                    output_tokens += count_tokens(choice.message.content)
+
+    # Do not set token data if it is 0
+    input_tokens = input_tokens or None
+    input_tokens_cached = input_tokens_cached or None
+    output_tokens = output_tokens or None
+    output_tokens_reasoning = output_tokens_reasoning or None
+    total_tokens = total_tokens or None
+
+    record_token_usage(
+        span,
+        input_tokens=input_tokens,
+        input_tokens_cached=input_tokens_cached,
+        output_tokens=output_tokens,
+        output_tokens_reasoning=output_tokens_reasoning,
+        total_tokens=total_tokens,
+    )
+
+
+def _calculate_responses_token_usage(
+    input: "Any",
     response: "Any",
     span: "Span",
     streaming_message_responses: "Optional[List[str]]",
     count_tokens: "Callable[..., Any]",
 ) -> None:
+    """Extract and record token usage from a Responses API response."""
     input_tokens: "Optional[int]" = 0
     input_tokens_cached: "Optional[int]" = 0
     output_tokens: "Optional[int]" = 0
@@ -165,25 +254,28 @@ def _calculate_token_usage(
     total_tokens: "Optional[int]" = 0
 
     if hasattr(response, "usage"):
-        input_tokens = _get_usage(response.usage, ["input_tokens", "prompt_tokens"])
-        if hasattr(response.usage, "input_tokens_details"):
-            input_tokens_cached = _get_usage(
-                response.usage.input_tokens_details, ["cached_tokens"]
-            )
+        usage = response.usage
 
-        output_tokens = _get_usage(
-            response.usage, ["output_tokens", "completion_tokens"]
-        )
-        if hasattr(response.usage, "output_tokens_details"):
-            output_tokens_reasoning = _get_usage(
-                response.usage.output_tokens_details, ["reasoning_tokens"]
-            )
+        if _has_attr_and_is_int(usage, "input_tokens"):
+            input_tokens = usage.input_tokens
+        if _has_attr_and_is_int(usage, "output_tokens"):
+            output_tokens = usage.output_tokens
+        if _has_attr_and_is_int(usage, "total_tokens"):
+            total_tokens = usage.total_tokens
 
-        total_tokens = _get_usage(response.usage, ["total_tokens"])
+        if hasattr(usage, "input_tokens_details"):
+            cached = getattr(usage.input_tokens_details, "cached_tokens", None)
+            if isinstance(cached, int):
+                input_tokens_cached = cached
 
-    # Manually count tokens
+        if hasattr(usage, "output_tokens_details"):
+            reasoning = getattr(usage.output_tokens_details, "reasoning_tokens", None)
+            if isinstance(reasoning, int):
+                output_tokens_reasoning = reasoning
+
+    # Manually count input tokens
     if input_tokens == 0:
-        for message in messages or []:
+        for message in input or []:
             if isinstance(message, str):
                 input_tokens += count_tokens(message)
                 continue
@@ -196,14 +288,17 @@ def _calculate_token_usage(
                 input_tokens += sum(count_tokens(text) for text in text_items)
                 continue
 
+    # Manually count output tokens
     if output_tokens == 0:
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
                 output_tokens += count_tokens(message)
-        elif hasattr(response, "choices"):
-            for choice in response.choices:
-                if hasattr(choice, "message") and hasattr(choice.message, "content"):
-                    output_tokens += count_tokens(choice.message.content)
+        elif hasattr(response, "output"):
+            for output_item in response.output:
+                if hasattr(output_item, "content"):
+                    for content_item in output_item.content:
+                        if hasattr(content_item, "text"):
+                            output_tokens += count_tokens(content_item.text)
 
     # Do not set token data if it is 0
     input_tokens = input_tokens or None
@@ -486,6 +581,7 @@ def _set_common_output_data(
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
+    # Chat Completions API
     if hasattr(response, "choices"):
         if should_send_default_pii() and integration.include_prompts:
             response_text = [
@@ -496,11 +592,19 @@ def _set_common_output_data(
             if len(response_text) > 0:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
 
-        _calculate_token_usage(input, response, span, None, integration.count_tokens)
+        _calculate_completions_token_usage(
+            messages=input,
+            response=response,
+            span=span,
+            streaming_message_responses=None,
+            streaming_message_total_token_usage=None,
+            count_tokens=integration.count_tokens,
+        )
 
         if finish_span:
             span.__exit__(None, None, None)
 
+    # Responses API
     elif hasattr(response, "output"):
         if should_send_default_pii() and integration.include_prompts:
             output_messages: "dict[str, list[Any]]" = {
@@ -532,12 +636,26 @@ def _set_common_output_data(
                     span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                 )
 
-        _calculate_token_usage(input, response, span, None, integration.count_tokens)
+        _calculate_responses_token_usage(
+            input=input,
+            response=response,
+            span=span,
+            streaming_message_responses=None,
+            count_tokens=integration.count_tokens,
+        )
 
         if finish_span:
             span.__exit__(None, None, None)
+    # Embeddings API (fallback for responses with neither choices nor output)
     else:
-        _calculate_token_usage(input, response, span, None, integration.count_tokens)
+        _calculate_completions_token_usage(
+            messages=input,
+            response=response,
+            span=span,
+            streaming_message_responses=None,
+            streaming_message_total_token_usage=None,
+            count_tokens=integration.count_tokens,
+        )
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -655,6 +773,7 @@ def _wrap_synchronous_completions_chunk_iterator(
     """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
+    streaming_message_total_token_usage = None
 
     for x in old_iterator:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
@@ -671,6 +790,8 @@ def _wrap_synchronous_completions_chunk_iterator(
                             data_buf.append([])
                         data_buf[choice_index].append(content or "")
                     choice_index += 1
+            if hasattr(x, "usage"):
+                streaming_message_total_token_usage = x.usage
 
         yield x
 
@@ -679,17 +800,20 @@ def _wrap_synchronous_completions_chunk_iterator(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
             )
+        all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
-            _calculate_token_usage(
-                messages,
-                response,
-                span,
-                all_responses,
-                integration.count_tokens,
-            )
+
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=all_responses,
+            streaming_message_total_token_usage=streaming_message_total_token_usage,
+            count_tokens=integration.count_tokens,
+        )
 
     if finish_span:
         span.__exit__(None, None, None)
@@ -711,6 +835,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
+    streaming_message_total_token_usage = None
 
     async for x in old_iterator:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
@@ -727,6 +852,8 @@ async def _wrap_asynchronous_completions_chunk_iterator(
                             data_buf.append([])
                         data_buf[choice_index].append(content or "")
                     choice_index += 1
+            if hasattr(x, "usage"):
+                streaming_message_total_token_usage = x.usage
 
         yield x
 
@@ -735,17 +862,20 @@ async def _wrap_asynchronous_completions_chunk_iterator(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN, ttft
             )
+        all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
-            _calculate_token_usage(
-                messages,
-                response,
-                span,
-                all_responses,
-                integration.count_tokens,
-            )
+
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=all_responses,
+            streaming_message_total_token_usage=streaming_message_total_token_usage,
+            count_tokens=integration.count_tokens,
+        )
 
     if finish_span:
         span.__exit__(None, None, None)
@@ -781,12 +911,12 @@ def _wrap_synchronous_responses_event_iterator(
             if isinstance(x, ResponseCompletedEvent):
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
 
-                _calculate_token_usage(
-                    input,
-                    x.response,
-                    span,
-                    None,
-                    integration.count_tokens,
+                _calculate_responses_token_usage(
+                    input=input,
+                    response=x.response,
+                    span=span,
+                    streaming_message_responses=None,
+                    count_tokens=integration.count_tokens,
                 )
                 count_tokens_manually = False
 
@@ -801,13 +931,14 @@ def _wrap_synchronous_responses_event_iterator(
             all_responses = ["".join(chunk) for chunk in data_buf]
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
+
             if count_tokens_manually:
-                _calculate_token_usage(
-                    input,
-                    response,
-                    span,
-                    all_responses,
-                    integration.count_tokens,
+                _calculate_responses_token_usage(
+                    input=input,
+                    response=response,
+                    span=span,
+                    streaming_message_responses=all_responses,
+                    count_tokens=integration.count_tokens,
                 )
 
     if finish_span:
@@ -844,12 +975,12 @@ async def _wrap_asynchronous_responses_event_iterator(
             if isinstance(x, ResponseCompletedEvent):
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
 
-                _calculate_token_usage(
-                    input,
-                    x.response,
-                    span,
-                    None,
-                    integration.count_tokens,
+                _calculate_responses_token_usage(
+                    input=input,
+                    response=x.response,
+                    span=span,
+                    streaming_message_responses=None,
+                    count_tokens=integration.count_tokens,
                 )
                 count_tokens_manually = False
 
@@ -865,12 +996,12 @@ async def _wrap_asynchronous_responses_event_iterator(
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
             if count_tokens_manually:
-                _calculate_token_usage(
-                    input,
-                    response,
-                    span,
-                    all_responses,
-                    integration.count_tokens,
+                _calculate_responses_token_usage(
+                    input=input,
+                    response=response,
+                    span=span,
+                    streaming_message_responses=all_responses,
+                    count_tokens=integration.count_tokens,
                 )
     if finish_span:
         span.__exit__(None, None, None)
