@@ -275,7 +275,6 @@ async def test_agent_with_tools(sentry_init, capture_events, test_agent):
     tool_span = tool_spans[0]
     assert "execute_tool" in tool_span["description"]
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span["data"]["gen_ai.tool.type"] == "function"
     assert tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
     assert "gen_ai.tool.input" in tool_span["data"]
     assert "gen_ai.tool.output" in tool_span["data"]
@@ -348,14 +347,12 @@ async def test_agent_with_tool_model_retry(
     model_retry_tool_span = tool_spans[0]
     assert "execute_tool" in model_retry_tool_span["description"]
     assert model_retry_tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert model_retry_tool_span["data"]["gen_ai.tool.type"] == "function"
     assert model_retry_tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
     assert "gen_ai.tool.input" in model_retry_tool_span["data"]
 
     tool_span = tool_spans[1]
     assert "execute_tool" in tool_span["description"]
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span["data"]["gen_ai.tool.type"] == "function"
     assert tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
     assert "gen_ai.tool.input" in tool_span["data"]
     assert "gen_ai.tool.output" in tool_span["data"]
@@ -427,7 +424,6 @@ async def test_agent_with_tool_validation_error(
     model_retry_tool_span = tool_spans[0]
     assert "execute_tool" in model_retry_tool_span["description"]
     assert model_retry_tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert model_retry_tool_span["data"]["gen_ai.tool.type"] == "function"
     assert model_retry_tool_span["data"]["gen_ai.tool.name"] == "add_numbers"
     assert "gen_ai.tool.input" in model_retry_tool_span["data"]
 
