@@ -44,7 +44,8 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
-    _calculate_token_usage,
+    _calculate_completions_token_usage,
+    _calculate_responses_token_usage,
 )
 from sentry_sdk.utils import safe_serialize
 
@@ -608,6 +609,304 @@ def test_streaming_chat_completion_no_prompts(
         assert span["data"]["gen_ai.usage.total_tokens"] == 9
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
+def test_streaming_chat_completion_with_usage_in_stream(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    """When stream_options=include_usage is set, token usage comes from the final chunk's usage field."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="hel"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="lo"),
+                            finish_reason="stop",
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                    usage=CompletionUsage(
+                        prompt_tokens=20,
+                        completion_tokens=10,
+                        total_tokens=30,
+                    ),
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            for _ in response_stream:
+                pass
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.output_tokens"] == 10
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
+def test_streaming_chat_completion_empty_content_preserves_token_usage(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    """Token usage from the stream is recorded even when no content is produced (e.g. content filter)."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                    usage=CompletionUsage(
+                        prompt_tokens=20,
+                        completion_tokens=0,
+                        total_tokens=20,
+                    ),
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            for _ in response_stream:
+                pass
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert "gen_ai.usage.output_tokens" not in span["data"]
+    assert span["data"]["gen_ai.usage.total_tokens"] == 20
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
+@pytest.mark.asyncio
+async def test_streaming_chat_completion_empty_content_preserves_token_usage_async(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    """Token usage from the stream is recorded even when no content is produced - async variant."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                        usage=CompletionUsage(
+                            prompt_tokens=20,
+                            completion_tokens=0,
+                            total_tokens=20,
+                        ),
+                    ),
+                ],
+                include_event_type=False,
+            )
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            async for _ in response_stream:
+                pass
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert "gen_ai.usage.output_tokens" not in span["data"]
+    assert span["data"]["gen_ai.usage.total_tokens"] == 20
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
+@pytest.mark.asyncio
+async def test_streaming_chat_completion_async_with_usage_in_stream(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    """When stream_options=include_usage is set, token usage comes from the final chunk's usage field (async)."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="hel"),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="lo"),
+                                finish_reason="stop",
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                        usage=CompletionUsage(
+                            prompt_tokens=20,
+                            completion_tokens=10,
+                            total_tokens=30,
+                        ),
+                    ),
+                ],
+                include_event_type=False,
+            )
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            async for _ in response_stream:
+                pass
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.output_tokens"] == 10
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 # noinspection PyTypeChecker
@@ -1780,7 +2079,8 @@ async def test_span_origin_embeddings_async(sentry_init, capture_events):
     assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
-def test_calculate_token_usage_a():
+def test_completions_token_usage_from_response():
+    """Token counts are extracted from response.usage using Completions API field names."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1797,8 +2097,13 @@ def test_calculate_token_usage_a():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
@@ -1810,7 +2115,46 @@ def test_calculate_token_usage_a():
         )
 
 
-def test_calculate_token_usage_b():
+def test_completions_token_usage_with_detailed_fields():
+    """Cached and reasoning token counts are extracted from prompt_tokens_details and completion_tokens_details."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.prompt_tokens = 20
+    response.usage.prompt_tokens_details = mock.MagicMock()
+    response.usage.prompt_tokens_details.cached_tokens = 5
+    response.usage.completion_tokens = 10
+    response.usage.completion_tokens_details = mock.MagicMock()
+    response.usage.completion_tokens_details.reasoning_tokens = 8
+    response.usage.total_tokens = 30
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_completions_token_usage(
+            messages=[],
+            response=response,
+            span=span,
+            streaming_message_responses=[],
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
+        )
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=5,
+            output_tokens=10,
+            output_tokens_reasoning=8,
+            total_tokens=30,
+        )
+
+
+def test_completions_token_usage_manual_input_counting():
+    """When prompt_tokens is missing, input tokens are counted manually from messages."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1830,8 +2174,13 @@ def test_calculate_token_usage_b():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
@@ -1843,7 +2192,8 @@ def test_calculate_token_usage_b():
         )
 
 
-def test_calculate_token_usage_c():
+def test_completions_token_usage_manual_output_counting_streaming():
+    """When completion_tokens is missing, output tokens are counted from streaming responses."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1863,8 +2213,13 @@ def test_calculate_token_usage_c():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
@@ -1876,7 +2231,8 @@ def test_calculate_token_usage_c():
         )
 
 
-def test_calculate_token_usage_d():
+def test_completions_token_usage_manual_output_counting_choices():
+    """When completion_tokens is missing, output tokens are counted from response.choices."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1887,30 +2243,48 @@ def test_calculate_token_usage_d():
     response.usage.prompt_tokens = 20
     response.usage.total_tokens = 20
     response.choices = [
-        mock.MagicMock(message="one"),
-        mock.MagicMock(message="two"),
-        mock.MagicMock(message="three"),
+        Choice(
+            index=0,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="one"),
+        ),
+        Choice(
+            index=1,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="two"),
+        ),
+        Choice(
+            index=2,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="three"),
+        ),
     ]
     messages = []
-    streaming_message_responses = []
+    streaming_message_responses = None
 
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
             input_tokens=20,
             input_tokens_cached=None,
-            output_tokens=None,
+            output_tokens=11,
             output_tokens_reasoning=None,
             total_tokens=20,
         )
 
 
-def test_calculate_token_usage_e():
+def test_completions_token_usage_no_usage_data():
+    """When response has no usage data and no streaming responses, all tokens are None."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1923,8 +2297,13 @@ def test_calculate_token_usage_e():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
@@ -1933,6 +2312,132 @@ def test_calculate_token_usage_e():
             output_tokens=None,
             output_tokens_reasoning=None,
             total_tokens=None,
+        )
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_token_usage_from_response():
+    """Token counts including cached and reasoning tokens are extracted from Responses API."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.input_tokens = 20
+    response.usage.input_tokens_details = mock.MagicMock()
+    response.usage.input_tokens_details.cached_tokens = 5
+    response.usage.output_tokens = 10
+    response.usage.output_tokens_details = mock.MagicMock()
+    response.usage.output_tokens_details.reasoning_tokens = 8
+    response.usage.total_tokens = 30
+    input = []
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_responses_token_usage(input, response, span, None, count_tokens)
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=5,
+            output_tokens=10,
+            output_tokens_reasoning=8,
+            total_tokens=30,
+        )
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_token_usage_no_usage_data():
+    """When Responses API response has no usage data, all tokens are None."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = None
+    input = []
+    streaming_message_responses = None
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_responses_token_usage(
+            input, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=None,
+            input_tokens_cached=None,
+            output_tokens=None,
+            output_tokens_reasoning=None,
+            total_tokens=None,
+        )
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_token_usage_manual_output_counting_response_output():
+    """When output_tokens is missing, output tokens are counted from response.output."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.input_tokens = 20
+    response.usage.total_tokens = 20
+    response.output = [
+        ResponseOutputMessage(
+            id="msg-1",
+            content=[
+                ResponseOutputText(
+                    annotations=[],
+                    text="one",
+                    type="output_text",
+                ),
+            ],
+            role="assistant",
+            status="completed",
+            type="message",
+        ),
+        ResponseOutputMessage(
+            id="msg-2",
+            content=[
+                ResponseOutputText(
+                    annotations=[],
+                    text="two",
+                    type="output_text",
+                ),
+                ResponseOutputText(
+                    annotations=[],
+                    text="three",
+                    type="output_text",
+                ),
+            ],
+            role="assistant",
+            status="completed",
+            type="message",
+        ),
+    ]
+    input = []
+    streaming_message_responses = None
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_responses_token_usage(
+            input, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=None,
+            output_tokens=11,
+            output_tokens_reasoning=None,
+            total_tokens=20,
         )
 
 

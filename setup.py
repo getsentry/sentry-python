@@ -36,7 +36,7 @@ setup(
     # PEP 561
     package_data={"sentry_sdk": ["py.typed"]},
     zip_safe=False,
-    license="MIT",
+    license_expression="MIT",
     python_requires=">=3.6",
     install_requires=[
         "urllib3>=1.26.11",
@@ -99,7 +99,6 @@ setup(
         "Development Status :: 5 - Production/Stable",
         "Environment :: Web Environment",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",

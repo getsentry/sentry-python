@@ -14,13 +14,6 @@ if TYPE_CHECKING:
     from typing import Any
 
 try:
-    from pydantic_ai.mcp import MCPServer  # type: ignore
-
-    HAS_MCP = True
-except ImportError:
-    HAS_MCP = False
-
-try:
     from pydantic_ai._tool_manager import ToolManager  # type: ignore
     from pydantic_ai.exceptions import ToolRetryError  # type: ignore
 except ImportError:
@@ -52,11 +45,6 @@ def _patch_execute_tool_call() -> None:
         tool = self.tools.get(name) if self.tools else None
         selected_tool_definition = getattr(tool, "tool_def", None)
 
-        # Determine tool type by checking tool.toolset
-        tool_type = "function"
-        if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
-            tool_type = "mcp"
-
         # Get agent from contextvar
         agent = get_current_agent()
 
@@ -73,7 +61,6 @@ def _patch_execute_tool_call() -> None:
                     name,
                     args_dict,
                     agent,
-                    tool_type=tool_type,
                     tool_definition=selected_tool_definition,
                 ) as span:
                     try:
@@ -131,11 +118,6 @@ def _patch_call_tool() -> None:
         tool = self.tools.get(name) if self.tools else None
         selected_tool_definition = getattr(tool, "tool_def", None)
 
-        # Determine tool type by checking tool.toolset
-        tool_type = "function"  # default
-        if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
-            tool_type = "mcp"
-
         # Get agent from contextvar
         agent = get_current_agent()
 
@@ -152,7 +134,6 @@ def _patch_call_tool() -> None:
                     name,
                     args_dict,
                     agent,
-                    tool_type=tool_type,
                     tool_definition=selected_tool_definition,
                 ) as span:
                     try:
