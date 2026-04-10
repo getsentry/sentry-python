@@ -306,7 +306,7 @@ def test_embeddings_create(
     model_response = get_model_response(
         openai_embedding_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -367,7 +367,7 @@ def test_embeddings_create_with_list_input(
     model_response = get_model_response(
         openai_embedding_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
@@ -429,7 +429,7 @@ def test_embeddings_no_pii(
     model_response = get_model_response(
         openai_embedding_model_response,
         serialize_pydantic=True,
-        request_headers={"X-Stainless-Raw-Response": "True"},
+        request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
     with mock.patch.object(
