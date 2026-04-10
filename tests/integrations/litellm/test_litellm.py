@@ -481,7 +481,7 @@ def test_exception_handling(
     model_response = get_rate_limit_model_response()
 
     with mock.patch.object(
-        client.embeddings._client._client,
+        client.completions._client._client,
         "send",
         return_value=model_response,
     ):
