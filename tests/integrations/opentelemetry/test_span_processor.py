@@ -68,7 +68,9 @@ def test_get_trace_data_with_span_and_trace():
     parent_context = {}
 
     span_processor = SentrySpanProcessor()
-    sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+    sentry_trace_data = span_processor._get_trace_data(
+        otel_span.get_span_context(), otel_span.parent, parent_context
+    )
     assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
     assert sentry_trace_data["span_id"] == "1234567890abcdef"
     assert sentry_trace_data["parent_span_id"] is None
@@ -90,7 +92,9 @@ def test_get_trace_data_with_span_and_trace_and_parent():
     parent_context = {}
 
     span_processor = SentrySpanProcessor()
-    sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+    sentry_trace_data = span_processor._get_trace_data(
+        otel_span.get_span_context(), otel_span.parent, parent_context
+    )
     assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
     assert sentry_trace_data["span_id"] == "1234567890abcdef"
     assert sentry_trace_data["parent_span_id"] == "abcdef1234567890"
@@ -121,7 +125,9 @@ def test_get_trace_data_with_sentry_trace():
         ],
     ):
         span_processor = SentrySpanProcessor()
-        sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+        sentry_trace_data = span_processor._get_trace_data(
+            otel_span.get_span_context(), otel_span.parent, parent_context
+        )
         assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
         assert sentry_trace_data["span_id"] == "1234567890abcdef"
         assert sentry_trace_data["parent_span_id"] == "abcdef1234567890"
@@ -138,7 +144,9 @@ def test_get_trace_data_with_sentry_trace():
         ],
     ):
         span_processor = SentrySpanProcessor()
-        sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+        sentry_trace_data = span_processor._get_trace_data(
+            otel_span.get_span_context(), otel_span.parent, parent_context
+        )
         assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
         assert sentry_trace_data["span_id"] == "1234567890abcdef"
         assert sentry_trace_data["parent_span_id"] == "abcdef1234567890"
@@ -175,7 +183,9 @@ def test_get_trace_data_with_sentry_trace_and_baggage():
         ],
     ):
         span_processor = SentrySpanProcessor()
-        sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+        sentry_trace_data = span_processor._get_trace_data(
+            otel_span.get_span_context(), otel_span.parent, parent_context
+        )
         assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
         assert sentry_trace_data["span_id"] == "1234567890abcdef"
         assert sentry_trace_data["parent_span_id"] == "abcdef1234567890"
