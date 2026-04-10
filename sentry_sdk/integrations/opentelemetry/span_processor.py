@@ -34,6 +34,7 @@ except ImportError:
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
     from opentelemetry import context as context_api
+    from opentelemetry.trace import SpanContext
     from sentry_sdk._types import Event, Hint
 
 OPEN_TELEMETRY_CONTEXT = "otel"
@@ -131,7 +132,7 @@ class SentrySpanProcessor(SpanProcessor):
         if self._is_sentry_span(otel_span):
             return
 
-        trace_data = self._get_trace_data(otel_span, parent_context)
+        trace_data = self._get_trace_data(otel_span, span_context, parent_context)
 
         parent_span_id = trace_data["parent_span_id"]
         sentry_parent_span = (
@@ -256,25 +257,26 @@ class SentrySpanProcessor(SpanProcessor):
         return ctx
 
     def _get_trace_data(
-        self, otel_span: "OTelSpan", parent_context: "Optional[context_api.Context]"
+        self,
+        otel_span: "OTelSpan",
+        span_context: "SpanContext",
+        parent_context: "Optional[context_api.Context]",
     ) -> "dict[str, Any]":
         """
         Extracts tracing information from one OTel span and its parent OTel context.
         """
         trace_data: "dict[str, Any]" = {}
-        span_context = otel_span.get_span_context()
 
-        if span_context is not None:
-            span_id = format_span_id(span_context.span_id)
-            trace_data["span_id"] = span_id
+        span_id = format_span_id(span_context.span_id)
+        trace_data["span_id"] = span_id
 
-            trace_id = format_trace_id(span_context.trace_id)
-            trace_data["trace_id"] = trace_id
+        trace_id = format_trace_id(span_context.trace_id)
+        trace_data["trace_id"] = trace_id
 
-            parent_span_id = (
-                format_span_id(otel_span.parent.span_id) if otel_span.parent else None
-            )
-            trace_data["parent_span_id"] = parent_span_id
+        parent_span_id = (
+            format_span_id(otel_span.parent.span_id) if otel_span.parent else None
+        )
+        trace_data["parent_span_id"] = parent_span_id
 
         sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
         sentry_trace_data = cast("dict[str, Union[str, bool, None]]", sentry_trace_data)
