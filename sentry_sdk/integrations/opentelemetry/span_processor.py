@@ -132,7 +132,9 @@ class SentrySpanProcessor(SpanProcessor):
         if self._is_sentry_span(otel_span):
             return
 
-        trace_data = self._get_trace_data(otel_span, span_context, parent_context)
+        trace_data = self._get_trace_data(
+            span_context, otel_span.parent, parent_context
+        )
 
         parent_span_id = trace_data["parent_span_id"]
         sentry_parent_span = (
@@ -258,12 +260,12 @@ class SentrySpanProcessor(SpanProcessor):
 
     def _get_trace_data(
         self,
-        otel_span: "OTelSpan",
         span_context: "SpanContext",
+        parent_span_context: "Optional[SpanContext]",
         parent_context: "Optional[context_api.Context]",
     ) -> "dict[str, Any]":
         """
-        Extracts tracing information from one OTel span and its parent OTel context.
+        Extracts tracing information from one OTel span's context and its parent OTel context.
         """
         trace_data: "dict[str, Any]" = {}
 
@@ -274,7 +276,7 @@ class SentrySpanProcessor(SpanProcessor):
         trace_data["trace_id"] = trace_id
 
         parent_span_id = (
-            format_span_id(otel_span.parent.span_id) if otel_span.parent else None
+            format_span_id(parent_span_context.span_id) if parent_span_context else None
         )
         trace_data["parent_span_id"] = parent_span_id
 
