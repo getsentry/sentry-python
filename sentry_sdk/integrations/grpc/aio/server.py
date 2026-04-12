@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.tracing import Transaction, TransactionSource
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import event_from_exception
 
 from typing import TYPE_CHECKING
@@ -21,14 +21,19 @@ except ImportError:
 
 
 class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
-    def __init__(self, find_name=None):
-        # type: (ServerInterceptor, Callable[[ServicerContext], str] | None) -> None
+    def __init__(
+        self: "ServerInterceptor",
+        find_name: "Callable[[ServicerContext], str] | None" = None,
+    ) -> None:
         self._find_method_name = find_name or self._find_name
 
         super().__init__()
 
-    async def intercept_service(self, continuation, handler_call_details):
-        # type: (ServerInterceptor, Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]], HandlerCallDetails) -> Optional[Awaitable[RpcMethodHandler]]
+    async def intercept_service(
+        self: "ServerInterceptor",
+        continuation: "Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]]",
+        handler_call_details: "HandlerCallDetails",
+    ) -> "Optional[Awaitable[RpcMethodHandler]]":
         self._handler_call_details = handler_call_details
         handler = await continuation(handler_call_details)
         if handler is None:
@@ -37,14 +42,13 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         if not handler.request_streaming and not handler.response_streaming:
             handler_factory = grpc.unary_unary_rpc_method_handler
 
-            async def wrapped(request, context):
-                # type: (Any, ServicerContext) -> Any
+            async def wrapped(request: "Any", context: "ServicerContext") -> "Any":
                 name = self._find_method_name(context)
                 if not name:
                     return await handler(request, context)
 
                 # What if the headers are empty?
-                transaction = Transaction.continue_from_headers(
+                transaction = sentry_sdk.continue_trace(
                     dict(context.invocation_metadata()),
                     op=OP.GRPC_SERVER,
                     name=name,
@@ -68,24 +72,21 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         elif not handler.request_streaming and handler.response_streaming:
             handler_factory = grpc.unary_stream_rpc_method_handler
 
-            async def wrapped(request, context):  # type: ignore
-                # type: (Any, ServicerContext) -> Any
+            async def wrapped(request: "Any", context: "ServicerContext") -> "Any":  # type: ignore
                 async for r in handler.unary_stream(request, context):
                     yield r
 
         elif handler.request_streaming and not handler.response_streaming:
             handler_factory = grpc.stream_unary_rpc_method_handler
 
-            async def wrapped(request, context):
-                # type: (Any, ServicerContext) -> Any
+            async def wrapped(request: "Any", context: "ServicerContext") -> "Any":
                 response = handler.stream_unary(request, context)
                 return await response
 
         elif handler.request_streaming and handler.response_streaming:
             handler_factory = grpc.stream_stream_rpc_method_handler
 
-            async def wrapped(request, context):  # type: ignore
-                # type: (Any, ServicerContext) -> Any
+            async def wrapped(request: "Any", context: "ServicerContext") -> "Any":  # type: ignore
                 async for r in handler.stream_stream(request, context):
                     yield r
 
@@ -95,6 +96,5 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
             response_serializer=handler.response_serializer,
         )
 
-    def _find_name(self, context):
-        # type: (ServicerContext) -> str
+    def _find_name(self, context: "ServicerContext") -> str:
         return self._handler_call_details.method

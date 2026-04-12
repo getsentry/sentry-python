@@ -23,6 +23,9 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: write
+  statuses: write
 
 env:
   BUILD_CACHE_KEY: {% raw %}${{ github.sha }}{% endraw %}

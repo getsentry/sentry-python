@@ -3,6 +3,7 @@ import pickle
 import os
 import socket
 import sys
+import asyncio
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -15,6 +16,17 @@ try:
 except (ImportError, ModuleNotFoundError):
     httpcore = None
 
+try:
+    import gevent  # noqa: F401
+
+    running_under_gevent = True
+except ImportError:
+    running_under_gevent = False
+
+skip_under_gevent = pytest.mark.skipif(
+    running_under_gevent, reason="Async tests not compatible with gevent"
+)
+
 import sentry_sdk
 from sentry_sdk import (
     Client,
@@ -25,16 +37,39 @@ from sentry_sdk import (
     Hub,
 )
 from sentry_sdk._compat import PY37, PY38
-from sentry_sdk.envelope import Envelope, Item, parse_json
+from sentry_sdk.envelope import Envelope, Item, parse_json, PayloadRef
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     _parse_rate_limits,
+    AsyncHttpTransport,
     HttpTransport,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 
 
 server = None
+
+
+def _make_async_transport_options(**overrides):
+    defaults = {
+        "dsn": "https://foo@sentry.io/123",
+        "transport": None,
+        "_experiments": {"transport_async": True},
+        "integrations": [AsyncioIntegration()],
+        "send_client_reports": True,
+        "transport_queue_size": 100,
+        "keep_alive": False,
+        "socket_options": None,
+        "ca_certs": None,
+        "cert_file": None,
+        "key_file": None,
+        "http_proxy": None,
+        "https_proxy": None,
+        "proxy_headers": None,
+    }
+    defaults.update(overrides)
+    return defaults
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -63,8 +98,7 @@ def make_client(request, capturing_server):
     return inner
 
 
-def mock_transaction_envelope(span_count):
-    # type: (int) -> Envelope
+def mock_transaction_envelope(span_count: int) -> "Envelope":
     event = defaultdict(
         mock.MagicMock,
         type="transaction",
@@ -386,6 +420,33 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
+def test_envelope_too_large_response(capturing_server, make_client):
+    client = make_client()
+
+    capturing_server.respond_with(code=413)
+    client.capture_event({"type": "error"})
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    # Error, transaction, and client report payloads
+    assert len(capturing_server.captured) == 3
+    report = parse_json(capturing_server.captured[2].envelope.items[0].get_bytes())
+
+    # Client reports for error, transaction and included span
+    assert len(report["discarded_events"]) == 3
+    assert {"reason": "send_error", "category": "error", "quantity": 1} in report[
+        "discarded_events"
+    ]
+    assert {"reason": "send_error", "category": "span", "quantity": 1} in report[
+        "discarded_events"
+    ]
+    assert {"reason": "send_error", "category": "transaction", "quantity": 1} in report[
+        "discarded_events"
+    ]
+
+    capturing_server.clear_captured()
+
+
 def test_simple_rate_limits(capturing_server, make_client):
     client = make_client()
     capturing_server.respond_with(code=429, headers={"Retry-After": "4"})
@@ -591,7 +652,110 @@ def test_complex_limits_without_data_category(
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
-def test_log_item_limits(capturing_server, response_code, make_client):
+@pytest.mark.parametrize(
+    "item",
+    [
+        Item(payload=b"{}", type="log"),
+        Item(
+            type="log",
+            content_type="application/vnd.sentry.items.log+json",
+            headers={
+                "item_count": 2,
+            },
+            payload=PayloadRef(
+                json={
+                    "items": [
+                        {
+                            "body": "This is a 'info' log...",
+                            "level": "info",
+                            "timestamp": datetime(
+                                2025, 1, 1, tzinfo=timezone.utc
+                            ).timestamp(),
+                            "trace_id": "00000000-0000-0000-0000-000000000000",
+                            "attributes": {
+                                "sentry.environment": {
+                                    "value": "production",
+                                    "type": "string",
+                                },
+                                "sentry.release": {
+                                    "value": "1.0.0",
+                                    "type": "string",
+                                },
+                                "sentry.sdk.name": {
+                                    "value": "sentry.python",
+                                    "type": "string",
+                                },
+                                "sentry.sdk.version": {
+                                    "value": "2.45.0",
+                                    "type": "string",
+                                },
+                                "sentry.severity_number": {
+                                    "value": 9,
+                                    "type": "integer",
+                                },
+                                "sentry.severity_text": {
+                                    "value": "info",
+                                    "type": "string",
+                                },
+                                "server.address": {
+                                    "value": "test-server",
+                                    "type": "string",
+                                },
+                            },
+                        },
+                        {
+                            "body": "The recorded value was '2.0'",
+                            "level": "warn",
+                            "timestamp": datetime(
+                                2025, 1, 1, tzinfo=timezone.utc
+                            ).timestamp(),
+                            "trace_id": "00000000-0000-0000-0000-000000000000",
+                            "attributes": {
+                                "sentry.message.parameter.float_var": {
+                                    "value": 2.0,
+                                    "type": "double",
+                                },
+                                "sentry.message.template": {
+                                    "value": "The recorded value was '{float_var}'",
+                                    "type": "string",
+                                },
+                                "sentry.sdk.name": {
+                                    "value": "sentry.python",
+                                    "type": "string",
+                                },
+                                "sentry.sdk.version": {
+                                    "value": "2.45.0",
+                                    "type": "string",
+                                },
+                                "server.address": {
+                                    "value": "test-server",
+                                    "type": "string",
+                                },
+                                "sentry.environment": {
+                                    "value": "production",
+                                    "type": "string",
+                                },
+                                "sentry.release": {
+                                    "value": "1.0.0",
+                                    "type": "string",
+                                },
+                                "sentry.severity_number": {
+                                    "value": 13,
+                                    "type": "integer",
+                                },
+                                "sentry.severity_text": {
+                                    "value": "warn",
+                                    "type": "string",
+                                },
+                            },
+                        },
+                    ]
+                }
+            ),
+        ),
+    ],
+)
+def test_log_item_limits(capturing_server, response_code, item, make_client):
     client = make_client()
     capturing_server.respond_with(
         code=response_code,
@@ -601,7 +765,7 @@ def test_log_item_limits(capturing_server, response_code, make_client):
     )
 
     envelope = Envelope()
-    envelope.add_item(Item(payload=b"{}", type="log"))
+    envelope.add_item(item)
     client.transport.capture_envelope(envelope)
     client.flush()
 
@@ -622,9 +786,22 @@ def test_log_item_limits(capturing_server, response_code, make_client):
     envelope = capturing_server.captured[1].envelope
     assert envelope.items[0].type == "client_report"
     report = parse_json(envelope.items[0].get_bytes())
-    assert report["discarded_events"] == [
-        {"category": "log_item", "reason": "ratelimit_backoff", "quantity": 1},
-    ]
+
+    assert {
+        "category": "log_item",
+        "reason": "ratelimit_backoff",
+        "quantity": 1,
+    } in report["discarded_events"]
+
+    expected_lost_bytes = 1243
+    if item.payload.bytes == b"{}":
+        expected_lost_bytes = 2
+
+    assert {
+        "category": "log_byte",
+        "reason": "ratelimit_backoff",
+        "quantity": expected_lost_bytes,
+    } in report["discarded_events"]
 
 
 def test_hub_cls_backwards_compat():
@@ -699,3 +876,168 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
         "reason": "test",
         "quantity": span_count + 1,
     } in discarded_events
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.parametrize("debug", (True, False))
+@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
+@pytest.mark.parametrize("use_pickle", (True, False))
+@pytest.mark.parametrize("compression_level", (0, 9, None))
+@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
+@pytest.mark.skipif(not PY38, reason="Async transport only supported in Python 3.8+")
+async def test_transport_works_async(
+    capturing_server,
+    request,
+    capsys,
+    caplog,
+    debug,
+    make_client,
+    client_flush_method,
+    use_pickle,
+    compression_level,
+    compression_algo,
+):
+    caplog.set_level(logging.DEBUG)
+
+    experiments = {}
+    if compression_level is not None:
+        experiments["transport_compression_level"] = compression_level
+
+    if compression_algo is not None:
+        experiments["transport_compression_algo"] = compression_algo
+
+    # Enable async transport
+    experiments["transport_async"] = True
+
+    client = make_client(
+        debug=debug,
+        _experiments=experiments,
+        integrations=[AsyncioIntegration()],
+    )
+
+    if use_pickle:
+        client = pickle.loads(pickle.dumps(client))
+
+    # Verify we're using async transport
+    assert isinstance(client.transport, AsyncHttpTransport), (
+        "Expected AsyncHttpTransport"
+    )
+
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
+    capture_message("löl")
+
+    if client_flush_method == "close":
+        await client.close_async(timeout=2.0)
+    if client_flush_method == "flush":
+        await client.flush_async(timeout=2.0)
+
+    out, err = capsys.readouterr()
+    assert not err and not out
+    assert capturing_server.captured
+    should_compress = (
+        # default is to compress with brotli if available, gzip otherwise
+        (compression_level is None)
+        or (
+            # setting compression level to 0 means don't compress
+            compression_level > 0
+        )
+    ) and (
+        # if we couldn't resolve to a known algo, we don't compress
+        compression_algo != "<invalid>"
+    )
+
+    assert capturing_server.captured[0].compressed == should_compress
+    # After flush, the worker task is still running, but the end of the test will shut down the event loop
+    # Therefore, we need to explicitly close the client to clean up the worker task
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
+    if client_flush_method == "flush":
+        await client.close_async(timeout=2.0)
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_two_way_ssl_authentication():
+    current_dir = os.path.dirname(__file__)
+    cert_file = f"{current_dir}/test.pem"
+    key_file = f"{current_dir}/test.key"
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        cert_file=cert_file,
+        key_file=key_file,
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    options = client.transport._get_pool_options()
+    assert options["ssl_context"] is not None
+
+    await client.close_async()
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_concurrent_requests(
+    capturing_server, make_client, caplog
+):
+    """Test multiple simultaneous envelope submissions"""
+    caplog.set_level(logging.DEBUG)
+    client = make_client(
+        _experiments={"transport_async": True}, integrations=[AsyncioIntegration()]
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+
+    num_messages = 15
+
+    async def send_message(i):
+        capture_message(f"concurrent message {i}")
+
+    tasks = [send_message(i) for i in range(num_messages)]
+    await asyncio.gather(*tasks)
+    await client.close_async(timeout=2.0)
+    assert len(capturing_server.captured) == num_messages
+
+
+@skip_under_gevent
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_rate_limiting_with_concurrency(
+    capturing_server, make_client, request
+):
+    """Test async transport rate limiting with concurrent requests"""
+    client = make_client(
+        _experiments={"transport_async": True}, integrations=[AsyncioIntegration()]
+    )
+
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+    capturing_server.respond_with(
+        code=429, headers={"X-Sentry-Rate-Limits": "60:error:organization"}
+    )
+
+    # Send one request first to trigger rate limiting
+    capture_message("initial message")
+    await asyncio.sleep(0.1)  # Wait for request to execute
+    assert client.transport._check_disabled("error") is True
+    capturing_server.clear_captured()
+
+    async def send_message(i):
+        capture_message(f"message {i}")
+        await asyncio.sleep(0.01)
+
+    await asyncio.gather(*[send_message(i) for i in range(5)])
+    await asyncio.sleep(0.1)
+    # New request should be dropped due to rate limiting
+    assert len(capturing_server.captured) == 0
+    await client.close_async(timeout=2.0)

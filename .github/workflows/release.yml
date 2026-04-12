@@ -1,38 +1,40 @@
 name: Release
-
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to release
-        required: true
+        description: Version to release (or "auto")
+        required: false
       force:
-        description: Force a release even when there are release-blockers (optional)
+        description: Force a release even when there are release-blockers
         required: false
       merge_target:
-        description: Target branch to merge into. Uses the default branch as a fallback (optional)
+        description: Target branch to merge into
         required: false
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    name: "Release a new version"
+    name: Release a new version
     steps:
-      - name: Get auth token
-        id: token
-        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
-        with:
-          app-id: ${{ vars.SENTRY_RELEASE_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.SENTRY_RELEASE_BOT_PRIVATE_KEY }}
-      - uses: actions/checkout@v5.0.0
-        with:
-          token: ${{ steps.token.outputs.token }}
-          fetch-depth: 0
-      - name: Prepare release
-        uses: getsentry/action-prepare-release@v1
-        env:
-          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
-        with:
-          version: ${{ github.event.inputs.version }}
-          force: ${{ github.event.inputs.force }}
-          merge_target: ${{ github.event.inputs.merge_target }}
+    - name: Get auth token
+      id: token
+      uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v2
+      with:
+        app-id: ${{ vars.SENTRY_RELEASE_BOT_CLIENT_ID }}
+        private-key: ${{ secrets.SENTRY_RELEASE_BOT_PRIVATE_KEY }}
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      with:
+        token: ${{ steps.token.outputs.token }}
+        fetch-depth: 0
+    - name: Prepare release
+      uses: getsentry/craft@ba01e596c4a4c07692f0de10b0d4fe05f3dd0292 # v2
+      env:
+        GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+      with:
+        version: ${{ inputs.version }}
+        force: ${{ inputs.force }}
+        merge_target: ${{ inputs.merge_target }}

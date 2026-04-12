@@ -1,0 +1,19 @@
+name: Changelog Preview
+on:
+  pull_request_target:
+    types:
+    - opened
+    - synchronize
+    - reopened
+    - edited
+    - labeled
+    - unlabeled
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  changelog-preview:
+    uses: getsentry/craft/.github/workflows/changelog-preview.yml@ba01e596c4a4c07692f0de10b0d4fe05f3dd0292 # v2
+    secrets: inherit

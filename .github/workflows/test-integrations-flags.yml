@@ -17,6 +17,9 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+  actions: read
+  pull-requests: write
+  statuses: write
 env:
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
@@ -29,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7","3.8","3.9","3.12","3.13","3.14","3.14t"]
+        python-version: ["3.7","3.8","3.9","3.10","3.12","3.13","3.14","3.14t"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -38,8 +41,8 @@ jobs:
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
-      - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
@@ -77,21 +80,13 @@ jobs:
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
-      - name: Upload coverage to Codecov
+      - name: Parse and Upload Coverage
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.5.1
+        uses: getsentry/codecov-action@fda17cfc37e16a0cc23f61685813390bfee7daf3 # main
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugins: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
+          junit-xml-pattern: .junitxml
           verbose: true
   check_required_tests:
     name: All Flags tests passed

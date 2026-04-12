@@ -1,5 +1,6 @@
 from __future__ import annotations
 import contextlib
+import re
 from typing import Any, TypeVar, Callable, Awaitable, Iterator
 
 import sentry_sdk
@@ -55,8 +56,12 @@ class AsyncPGIntegration(Integration):
 T = TypeVar("T")
 
 
-def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-    async def _inner(*args: Any, **kwargs: Any) -> T:
+def _normalize_query(query: str) -> str:
+    return re.sub(r"\s+", " ", query).strip()
+
+
+def _wrap_execute(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[T]]":
+    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
         if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
             return await f(*args, **kwargs)
 
@@ -67,7 +72,7 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
         if len(args) > 2:
             return await f(*args, **kwargs)
 
-        query = args[1]
+        query = _normalize_query(args[1])
         with record_sql_queries(
             cursor=None,
             query=query,
@@ -91,18 +96,19 @@ SubCursor = TypeVar("SubCursor", bound=BaseCursor)
 
 @contextlib.contextmanager
 def _record(
-    cursor: SubCursor | None,
+    cursor: "SubCursor | None",
     query: str,
-    params_list: tuple[Any, ...] | None,
+    params_list: "tuple[Any, ...] | None",
     *,
     executemany: bool = False,
-) -> Iterator[Span]:
+) -> "Iterator[Span]":
     integration = sentry_sdk.get_client().get_integration(AsyncPGIntegration)
     if integration is not None and not integration._record_params:
         params_list = None
 
     param_style = "pyformat" if params_list else None
 
+    query = _normalize_query(query)
     with record_sql_queries(
         cursor=cursor,
         query=query,
@@ -116,9 +122,9 @@ def _record(
 
 
 def _wrap_connection_method(
-    f: Callable[..., Awaitable[T]], *, executemany: bool = False
-) -> Callable[..., Awaitable[T]]:
-    async def _inner(*args: Any, **kwargs: Any) -> T:
+    f: "Callable[..., Awaitable[T]]", *, executemany: bool = False
+) -> "Callable[..., Awaitable[T]]":
+    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
         if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
             return await f(*args, **kwargs)
         query = args[1]
@@ -132,9 +138,9 @@ def _wrap_connection_method(
     return _inner
 
 
-def _wrap_cursor_creation(f: Callable[..., T]) -> Callable[..., T]:
+def _wrap_cursor_creation(f: "Callable[..., T]") -> "Callable[..., T]":
     @ensure_integration_enabled(AsyncPGIntegration, f)
-    def _inner(*args: Any, **kwargs: Any) -> T:  # noqa: N807
+    def _inner(*args: "Any", **kwargs: "Any") -> "T":  # noqa: N807
         query = args[1]
         params_list = args[2] if len(args) > 2 else None
 
@@ -153,8 +159,10 @@ def _wrap_cursor_creation(f: Callable[..., T]) -> Callable[..., T]:
     return _inner
 
 
-def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-    async def _inner(*args: Any, **kwargs: Any) -> T:
+def _wrap_connect_addr(
+    f: "Callable[..., Awaitable[T]]",
+) -> "Callable[..., Awaitable[T]]":
+    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
         if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
             return await f(*args, **kwargs)
 
@@ -188,7 +196,7 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
     return _inner
 
 
-def _set_db_data(span: Span, conn: Any) -> None:
+def _set_db_data(span: "Span", conn: "Any") -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
 
     addr = conn._addr

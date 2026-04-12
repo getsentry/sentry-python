@@ -69,20 +69,27 @@ GROUPS = {
     "Common": [
         "common",
     ],
+    "MCP": [
+        "mcp",
+        "fastmcp",
+    ],
+    "Agents": [
+        "openai_agents",
+        "pydantic_ai",
+    ],
+    "AI Workflow": [
+        "langchain-base",
+        "langchain-notiktoken",
+        "langgraph",
+    ],
     "AI": [
         "anthropic",
         "cohere",
         "google_genai",
         "huggingface_hub",
-        "langchain-base",
-        "langchain-notiktoken",
-        "langgraph",
         "litellm",
-        "mcp",
         "openai-base",
         "openai-notiktoken",
-        "openai_agents",
-        "pydantic_ai",
     ],
     "Cloud": [
         "aws_lambda",
@@ -117,6 +124,7 @@ GROUPS = {
     "Network": [
         "grpc",
         "httpx",
+        "pyreqwest",
         "requests",
     ],
     "Tasks": [
@@ -150,10 +158,13 @@ GROUPS = {
     "Misc": [
         "loguru",
         "opentelemetry",
+        "otlp",
         "potel",
         "pure_eval",
         "trytond",
         "typer",
+        "integration_deactivation",
+        "shadowed_module",
     ],
 }
 
@@ -229,6 +240,11 @@ def parse_tox():
             groups = parsed.groupdict()
             raw_python_versions = groups["py_versions"]
             framework = groups["framework"]
+
+            # The -latest env is an alias for the highest version of the
+            # same framework, so merge it with the base framework.
+            if framework.endswith("-latest"):
+                framework = framework[: -len("-latest")]
 
             # collect python versions to test the framework in
             raw_python_versions = set(raw_python_versions.split(","))

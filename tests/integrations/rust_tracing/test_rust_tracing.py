@@ -78,7 +78,7 @@ def test_on_new_span_on_close(sentry_init, capture_events):
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         sentry_first_rust_span = sentry_sdk.get_current_span()
-        _, rust_first_rust_span = rust_tracing.spans[3]
+        rust_first_rust_span = rust_tracing.spans[3]
 
         assert sentry_first_rust_span == rust_first_rust_span
 
@@ -120,24 +120,22 @@ def test_nested_on_new_span_on_close(sentry_init, capture_events):
 
         rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
         sentry_first_rust_span = sentry_sdk.get_current_span()
-        _, rust_first_rust_span = rust_tracing.spans[3]
+        rust_first_rust_span = rust_tracing.spans[3]
 
         # Use a different `index_arg` value for the inner span to help
         # distinguish the two at the end of the test
         rust_tracing.new_span(RustTracingLevel.Info, 5, index_arg=9)
         sentry_second_rust_span = sentry_sdk.get_current_span()
-        rust_parent_span, rust_second_rust_span = rust_tracing.spans[5]
+        rust_second_rust_span = rust_tracing.spans[5]
 
         assert rust_second_rust_span == sentry_second_rust_span
-        assert rust_parent_span == sentry_first_rust_span
-        assert rust_parent_span == rust_first_rust_span
-        assert rust_parent_span != rust_second_rust_span
 
         rust_tracing.close_span(5)
 
         # Ensure the current sentry span was moved back to the parent
         sentry_span_after_close = sentry_sdk.get_current_span()
         assert sentry_span_after_close == sentry_first_rust_span
+        assert sentry_span_after_close == rust_first_rust_span
 
         rust_tracing.close_span(3)
 

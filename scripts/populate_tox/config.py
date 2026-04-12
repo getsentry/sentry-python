@@ -18,6 +18,9 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio"],
             "<0.50": ["httpx<0.28.0"],
+            # tokenizers dropped Python 3.8 support, but didn't update package metadata.
+            # https://github.com/huggingface/tokenizers/commit/f4c9fd7f402fc794df8f1b547a95ee5305f9fe62
+            "py3.8": ["tokenizers<0.20.4"],
         },
         "python": ">=3.8",
     },
@@ -74,7 +77,7 @@ TEST_SUITE_CONFIG = {
     "chalice": {
         "package": "chalice",
         "deps": {
-            "*": ["pytest-chalice"],
+            "*": ["pytest-chalice", "setuptools<82"],
         },
         "num_versions": 2,
     },
@@ -103,6 +106,7 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
+            "py3.14,py3.14t": ["coverage==7.11.0"],
         },
     },
     "dramatiq": {
@@ -121,7 +125,8 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "python-multipart",
                 "requests",
-                "anyio<4",
+                "anyio>=3,<5",
+                "jinja2",
             ],
             # There's an incompatibility between FastAPI's TestClient, which is
             # actually Starlette's TestClient, which is actually httpx's Client.
@@ -131,6 +136,7 @@ TEST_SUITE_CONFIG = {
             # FastAPI versions we use older httpx which still supports the
             # deprecated argument.
             "<0.110.1": ["httpx<0.28.0"],
+            "<0.80": ["anyio<4"],
             "py3.6": ["aiocontextvars"],
         },
     },
@@ -169,7 +175,8 @@ TEST_SUITE_CONFIG = {
     "httpx": {
         "package": "httpx",
         "deps": {
-            "*": ["anyio<4.0.0"],
+            "*": ["anyio>=3,<5"],
+            "<0.24": ["anyio<4"],
             ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
             ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
             ">=0.19,<0.21": ["pytest-httpx==0.14.0"],
@@ -199,7 +206,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "tiktoken", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -212,7 +219,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -234,7 +241,13 @@ TEST_SUITE_CONFIG = {
     "litestar": {
         "package": "litestar",
         "deps": {
-            "*": ["pytest-asyncio", "python-multipart", "requests", "cryptography"],
+            "*": [
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "cryptography",
+                "sniffio",
+            ],
             "<2.7": ["httpx<0.28"],
         },
     },
@@ -244,6 +257,12 @@ TEST_SUITE_CONFIG = {
     },
     "mcp": {
         "package": "mcp",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
+    "fastmcp": {
+        "package": "fastmcp",
         "deps": {
             "*": ["pytest-asyncio"],
         },
@@ -292,11 +311,22 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio"],
         },
+        "python": ">=3.10",
+    },
+    "pyreqwest": {
+        "package": "pyreqwest",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.11",
     },
     "pymongo": {
         "package": "pymongo",
         "deps": {
             "*": ["mockupdb"],
+        },
+        "python": {
+            "<3.6": "<3.7",
         },
     },
     "pyramid": {
@@ -322,7 +352,10 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
-        "python": ">=3.9",
+        "python": {
+            ">0.0,<2.52.0": ">=3.9",
+            ">=2.52.0": ">=3.10",
+        },
         "num_versions": 2,
     },
     "redis": {
@@ -352,6 +385,9 @@ TEST_SUITE_CONFIG = {
             ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
             "py3.6,py3.7": ["fakeredis!=2.26.0"],
         },
+        "python": {
+            "<0.13": "<3.7",
+        },
     },
     "sanic": {
         "package": "sanic",
@@ -369,6 +405,9 @@ TEST_SUITE_CONFIG = {
     },
     "sqlalchemy": {
         "package": "sqlalchemy",
+        "python": {
+            "<1.4": "<3.10",
+        },
     },
     "starlette": {
         "package": "starlette",

@@ -463,10 +463,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
         {
             "category": "query",
             "data": {},
-            "message": "SELECT pg_advisory_unlock_all();\n"
-            "CLOSE ALL;\n"
-            "UNLISTEN *;\n"
-            "RESET ALL;",
+            "message": "SELECT pg_advisory_unlock_all(); CLOSE ALL; UNLISTEN *; RESET ALL;",
             "type": "default",
         },
         {
@@ -478,10 +475,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
         {
             "category": "query",
             "data": {},
-            "message": "SELECT pg_advisory_unlock_all();\n"
-            "CLOSE ALL;\n"
-            "UNLISTEN *;\n"
-            "RESET ALL;",
+            "message": "SELECT pg_advisory_unlock_all(); CLOSE ALL; UNLISTEN *; RESET ALL;",
             "type": "default",
         },
     ]
@@ -786,3 +780,79 @@ async def test_span_origin(sentry_init, capture_events):
 
     for span in event["spans"]:
         assert span["origin"] == "auto.db.asyncpg"
+
+
+@pytest.mark.asyncio
+async def test_multiline_query_description_normalized(sentry_init, capture_events):
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        conn: Connection = await connect(PG_CONNECTION_URI)
+        await conn.execute(
+            """
+            SELECT
+                id,
+                name
+            FROM
+                users
+            WHERE
+                name = 'Alice'
+            """
+        )
+        await conn.close()
+
+    (event,) = events
+
+    spans = [
+        s
+        for s in event["spans"]
+        if s["op"] == "db" and "SELECT" in s.get("description", "")
+    ]
+    assert len(spans) == 1
+    assert spans[0]["description"] == "SELECT id, name FROM users WHERE name = 'Alice'"
+
+
+@pytest.mark.asyncio
+async def test_before_send_transaction_sees_normalized_description(
+    sentry_init, capture_events
+):
+    def before_send_transaction(event, hint):
+        for span in event.get("spans", []):
+            desc = span.get("description", "")
+            if "SELECT id, name FROM users" in desc:
+                span["description"] = "filtered"
+        return event
+
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+        before_send_transaction=before_send_transaction,
+    )
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        conn: Connection = await connect(PG_CONNECTION_URI)
+        await conn.execute(
+            """
+            SELECT
+                id,
+                name
+            FROM
+                users
+            """
+        )
+        await conn.close()
+
+    (event,) = events
+    spans = [
+        s
+        for s in event["spans"]
+        if s["op"] == "db" and "filtered" in s.get("description", "")
+    ]
+
+    assert len(spans) == 1
+    assert spans[0]["description"] == "filtered"

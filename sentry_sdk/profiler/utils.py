@@ -63,15 +63,12 @@ MAX_STACK_DEPTH = 128
 
 if PY311:
 
-    def get_frame_name(frame):
-        # type: (FrameType) -> str
+    def get_frame_name(frame: "FrameType") -> str:
         return frame.f_code.co_qualname
 
 else:
 
-    def get_frame_name(frame):
-        # type: (FrameType) -> str
-
+    def get_frame_name(frame: "FrameType") -> str:
         f_code = frame.f_code
         co_varnames = f_code.co_varnames
 
@@ -113,13 +110,11 @@ else:
         return name
 
 
-def frame_id(raw_frame):
-    # type: (FrameType) -> FrameId
+def frame_id(raw_frame: "FrameType") -> "FrameId":
     return (raw_frame.f_code.co_filename, raw_frame.f_lineno, get_frame_name(raw_frame))
 
 
-def extract_frame(fid, raw_frame, cwd):
-    # type: (FrameId, FrameType, str) -> ProcessedFrame
+def extract_frame(fid: "FrameId", raw_frame: "FrameType", cwd: str) -> "ProcessedFrame":
     abs_path = raw_frame.f_code.co_filename
 
     try:
@@ -148,12 +143,11 @@ def extract_frame(fid, raw_frame, cwd):
 
 
 def extract_stack(
-    raw_frame,  # type: Optional[FrameType]
-    cache,  # type: LRUCache
-    cwd,  # type: str
-    max_stack_depth=MAX_STACK_DEPTH,  # type: int
-):
-    # type: (...) -> ExtractedStack
+    raw_frame: "Optional[FrameType]",
+    cache: "LRUCache",
+    cwd: str,
+    max_stack_depth: int = MAX_STACK_DEPTH,
+) -> "ExtractedStack":
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -163,7 +157,7 @@ def extract_stack(
     only the first `MAX_STACK_DEPTH` frames will be returned.
     """
 
-    raw_frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
+    raw_frames: "Deque[FrameType]" = deque(maxlen=max_stack_depth)
 
     while raw_frame is not None:
         f_back = raw_frame.f_back

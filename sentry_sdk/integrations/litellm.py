@@ -1,3 +1,4 @@
+import copy
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -7,6 +8,8 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
     truncate_and_annotate_messages,
+    transform_openai_content_part,
+    truncate_and_annotate_embedding_inputs,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -14,17 +17,17 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
+    from typing import Any, Dict, List
     from datetime import datetime
 
 try:
     import litellm  # type: ignore[import-not-found]
+    from litellm import input_callback, success_callback, failure_callback
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
 
-def _get_metadata_dict(kwargs):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+def _get_metadata_dict(kwargs: "Dict[str, Any]") -> "Dict[str, Any]":
     """Get the metadata dictionary from the kwargs."""
     litellm_params = kwargs.setdefault("litellm_params", {})
 
@@ -36,8 +39,34 @@ def _get_metadata_dict(kwargs):
     return metadata
 
 
-def _input_callback(kwargs):
-    # type: (Dict[str, Any]) -> None
+def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, Any]]":
+    """
+    Convert the message parts from OpenAI format to the `gen_ai.request.messages` format
+    using the OpenAI-specific transformer (LiteLLM uses OpenAI's message format).
+
+    Deep copies messages to avoid mutating original kwargs.
+    """
+    # Deep copy to avoid mutating original messages from kwargs
+    messages = copy.deepcopy(messages)
+
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if isinstance(content, (list, tuple)):
+            transformed = []
+            for item in content:
+                if isinstance(item, dict):
+                    result = transform_openai_content_part(item)
+                    # If transformation succeeded, use the result; otherwise keep original
+                    transformed.append(result if result is not None else item)
+                else:
+                    transformed.append(item)
+            message["content"] = transformed
+    return messages
+
+
+def _input_callback(kwargs: "Dict[str, Any]") -> None:
     """Handle the start of a request."""
     integration = sentry_sdk.get_client().get_integration(LiteLLMIntegration)
 
@@ -77,15 +106,43 @@ def _input_callback(kwargs):
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
-    # Record messages if allowed
-    messages = kwargs.get("messages", [])
-    if messages and should_send_default_pii() and integration.include_prompts:
-        scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(messages, span, scope)
-        if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+    # Record input/messages if allowed
+    if should_send_default_pii() and integration.include_prompts:
+        if operation == "embeddings":
+            # For embeddings, look for the 'input' parameter
+            embedding_input = kwargs.get("input")
+            if embedding_input:
+                scope = sentry_sdk.get_current_scope()
+                # Normalize to list format
+                input_list = (
+                    embedding_input
+                    if isinstance(embedding_input, list)
+                    else [embedding_input]
+                )
+                messages_data = truncate_and_annotate_embedding_inputs(
+                    input_list, span, scope
+                )
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                        messages_data,
+                        unpack=False,
+                    )
+        else:
+            # For chat, look for the 'messages' parameter
+            messages = kwargs.get("messages", [])
+            if messages:
+                scope = sentry_sdk.get_current_scope()
+                messages = _convert_message_parts(messages)
+                messages_data = truncate_and_annotate_messages(messages, span, scope)
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
 
     # Record other parameters
     params = {
@@ -113,8 +170,12 @@ def _input_callback(kwargs):
             set_data_normalized(span, f"gen_ai.litellm.{key}", value)
 
 
-def _success_callback(kwargs, completion_response, start_time, end_time):
-    # type: (Dict[str, Any], Any, datetime, datetime) -> None
+def _success_callback(
+    kwargs: "Dict[str, Any]",
+    completion_response: "Any",
+    start_time: "datetime",
+    end_time: "datetime",
+) -> None:
     """Handle successful completion."""
 
     span = _get_metadata_dict(kwargs).get("_sentry_span")
@@ -173,8 +234,12 @@ def _success_callback(kwargs, completion_response, start_time, end_time):
         span.__exit__(None, None, None)
 
 
-def _failure_callback(kwargs, exception, start_time, end_time):
-    # type: (Dict[str, Any], Exception, datetime, datetime) -> None
+def _failure_callback(
+    kwargs: "Dict[str, Any]",
+    exception: Exception,
+    start_time: "datetime",
+    end_time: "datetime",
+) -> None:
     """Handle request failure."""
     span = _get_metadata_dict(kwargs).get("_sentry_span")
     if span is None:
@@ -241,22 +306,20 @@ class LiteLLMIntegration(Integration):
     identifier = "litellm"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (LiteLLMIntegration, bool) -> None
+    def __init__(self: "LiteLLMIntegration", include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """Set up LiteLLM callbacks for monitoring."""
-        litellm.input_callback = litellm.input_callback or []
+        litellm.input_callback = input_callback or []
         if _input_callback not in litellm.input_callback:
             litellm.input_callback.append(_input_callback)
 
-        litellm.success_callback = litellm.success_callback or []
+        litellm.success_callback = success_callback or []
         if _success_callback not in litellm.success_callback:
             litellm.success_callback.append(_success_callback)
 
-        litellm.failure_callback = litellm.failure_callback or []
+        litellm.failure_callback = failure_callback or []
         if _failure_callback not in litellm.failure_callback:
             litellm.failure_callback.append(_failure_callback)

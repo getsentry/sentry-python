@@ -15,18 +15,15 @@ PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
 
 
-def with_metaclass(meta, *bases):
-    # type: (Any, *Any) -> Any
+def with_metaclass(meta: "Any", *bases: "Any") -> "Any":
     class MetaClass(type):
-        def __new__(metacls, name, this_bases, d):
-            # type: (Any, Any, Any, Any) -> Any
+        def __new__(metacls: "Any", name: "Any", this_bases: "Any", d: "Any") -> "Any":
             return meta(name, bases, d)
 
     return type.__new__(MetaClass, "temporary_class", (), {})
 
 
-def check_uwsgi_thread_support():
-    # type: () -> bool
+def check_uwsgi_thread_support() -> bool:
     # We check two things here:
     #
     # 1. uWSGI doesn't run in threaded mode by default -- issue a warning if
@@ -46,8 +43,7 @@ def check_uwsgi_thread_support():
 
     from sentry_sdk.consts import FALSE_VALUES
 
-    def enabled(option):
-        # type: (str) -> bool
+    def enabled(option: str) -> bool:
         value = opt.get(option, False)
         if isinstance(value, bool):
             return value

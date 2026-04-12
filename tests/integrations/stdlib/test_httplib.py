@@ -1,21 +1,46 @@
 import os
 import datetime
 from http.client import HTTPConnection, HTTPSConnection
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
+from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import urlopen
 from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message, start_transaction, continue_trace
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
-from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
-from tests.conftest import ApproxDict, create_mock_http_server
+from tests.conftest import ApproxDict, create_mock_http_server, get_free_port
 
 PORT = create_mock_http_server()
+
+
+class MockProxyRequestHandler(BaseHTTPRequestHandler):
+    def do_CONNECT(self):
+        self.send_response(200, "Connection Established")
+        self.end_headers()
+
+        self.rfile.readline()
+
+        response = b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+        self.wfile.write(response)
+        self.wfile.flush()
+
+
+def create_mock_proxy_server():
+    proxy_port = get_free_port()
+    proxy_server = HTTPServer(("localhost", proxy_port), MockProxyRequestHandler)
+    proxy_thread = Thread(target=proxy_server.serve_forever)
+    proxy_thread.daemon = True
+    proxy_thread.start()
+    return proxy_port
+
+
+PROXY_PORT = create_mock_proxy_server()
 
 
 def test_crumb_capture(sentry_init, capture_events):
@@ -187,6 +212,7 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
     sentry_init(traces_sample_rate=1.0)
 
     headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
         "baggage": (
             "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
@@ -194,7 +220,7 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
         ),
     }
 
-    transaction = Transaction.continue_from_headers(headers)
+    transaction = continue_trace(headers)
 
     with start_transaction(
         transaction=transaction,
@@ -239,7 +265,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
 
     sentry_init(traces_sample_rate=0.5, release="foo")
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
-        transaction = Transaction.continue_from_headers({})
+        transaction = continue_trace({})
 
     with start_transaction(transaction=transaction, name="Head SDK tx") as transaction:
         HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
@@ -351,7 +377,7 @@ def test_option_trace_propagation_targets(
         )
     }
 
-    transaction = Transaction.continue_from_headers(headers)
+    transaction = continue_trace(headers)
 
     with start_transaction(
         transaction=transaction,
@@ -642,3 +668,25 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
     span = transaction["spans"][0]
     assert span["op"] == "http.client"
     assert span["description"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
+
+
+@pytest.mark.parametrize("tunnel_port", [8080, None])
+def test_proxy_http_tunnel(sentry_init, capture_events, tunnel_port):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        conn = HTTPConnection("localhost", PROXY_PORT)
+        conn.set_tunnel("api.example.com", tunnel_port)
+        conn.request("GET", "/foo")
+        conn.getresponse()
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    port_modifier = f":{tunnel_port}" if tunnel_port else ""
+    assert span["description"] == f"GET http://api.example.com{port_modifier}/foo"
+    assert span["data"]["url"] == f"http://api.example.com{port_modifier}/foo"
+    assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
+    assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
+    assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT

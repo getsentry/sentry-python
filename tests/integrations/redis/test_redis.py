@@ -154,7 +154,7 @@ def test_pii_data_sent(sentry_init, capture_events):
     assert spans[3]["description"] == "DEL 'somekey1' 'somekey2'"
 
 
-def test_data_truncation(sentry_init, capture_events):
+def test_no_data_truncation_by_default(sentry_init, capture_events):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
@@ -172,10 +172,8 @@ def test_data_truncation(sentry_init, capture_events):
     (event,) = events
     spans = event["spans"]
     assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' '%s..." % (
-        long_string[: 1024 - len("...") - len("SET 'somekey1' '")],
-    )
-    assert spans[1]["description"] == "SET 'somekey2' '%s'" % (short_string,)
+    assert spans[0]["description"] == f"SET 'somekey1' '{long_string}'"
+    assert spans[1]["description"] == f"SET 'somekey2' '{short_string}'"
 
 
 def test_data_truncation_custom(sentry_init, capture_events):

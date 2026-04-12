@@ -7,6 +7,20 @@ sure we support everything we claim to.
 This `populate_tox.py` script is responsible for picking reasonable versions to
 test automatically and generating parts of `tox.ini` to capture this.
 
+## Running the script
+
+You require a free-threaded interpreter with pip installed to run the script. With
+a recent version of `uv` you can directly run the script with the following
+command:
+
+```
+uv run --python 3.14t \
+  --with pip \
+  --with-requirements scripts/populate_tox/requirements.txt \
+  --with-editable . \
+  python scripts/populate_tox/populate_tox.py
+```
+
 ## How it works
 
 There is a template in this directory called `tox.jinja` which contains a

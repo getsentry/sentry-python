@@ -47,10 +47,10 @@ class NoOpIntegration(Integration):
     identifier = "noop"
 
     @staticmethod
-    def setup_once():  # type: () -> None
+    def setup_once() -> None:
         pass
 
-    def __eq__(self, __value):  # type: (object) -> bool
+    def __eq__(self, __value: object) -> bool:
         """
         All instances of NoOpIntegration should be considered equal to each other.
         """

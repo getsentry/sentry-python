@@ -16,6 +16,8 @@ from sentry_sdk.scope import (
     use_isolation_scope,
     use_scope,
     should_send_default_pii,
+    register_external_propagation_context,
+    remove_external_propagation_context,
 )
 
 
@@ -971,3 +973,102 @@ def test_handle_error_on_token_reset_isolation_scope(error_cls, scope_manager):
 
                 mock_capture.assert_called_once()
                 mock_current_scope.reset.assert_called_once_with(mock_current_token)
+
+
+def test_trace_context_tracing(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+
+    with sentry_sdk.start_transaction(name="trx") as transaction:
+        with sentry_sdk.start_span(op="span1"):
+            with sentry_sdk.start_span(op="span2") as span:
+                trace_context = sentry_sdk.get_current_scope().get_trace_context()
+
+    assert trace_context["trace_id"] == transaction.trace_id
+    assert trace_context["span_id"] == span.span_id
+    assert trace_context["parent_span_id"] == span.parent_span_id
+    assert "dynamic_sampling_context" in trace_context
+
+
+def test_trace_context_external_tracing(sentry_init):
+    sentry_init()
+
+    def external_propagation_context():
+        return ("trace_id_foo", "span_id_bar")
+
+    register_external_propagation_context(external_propagation_context)
+
+    scope = sentry_sdk.get_current_scope()
+
+    trace_context = scope.get_trace_context()
+    assert trace_context["trace_id"] == "trace_id_foo"
+    assert trace_context["span_id"] == "span_id_bar"
+
+    headers = list(scope.iter_trace_propagation_headers())
+    assert not headers
+
+    remove_external_propagation_context()
+
+
+def test_trace_context_without_performance(sentry_init):
+    sentry_init()
+
+    with sentry_sdk.isolation_scope() as isolation_scope:
+        trace_context = sentry_sdk.get_current_scope().get_trace_context()
+
+    propagation_context = isolation_scope._propagation_context
+    assert propagation_context is not None
+    assert trace_context["trace_id"] == propagation_context.trace_id
+    assert trace_context["span_id"] == propagation_context.span_id
+    assert trace_context["parent_span_id"] == propagation_context.parent_span_id
+    assert "dynamic_sampling_context" in trace_context
+
+
+def test_conversation_id_set_get():
+    """Test that set_conversation_id and get_conversation_id work correctly."""
+    scope = Scope()
+    assert scope.get_conversation_id() is None
+
+    scope.set_conversation_id("test-conv-123")
+    assert scope.get_conversation_id() == "test-conv-123"
+
+
+def test_conversation_id_remove():
+    """Test that remove_conversation_id clears the conversation ID."""
+    scope = Scope()
+    scope.set_conversation_id("test-conv-456")
+    assert scope.get_conversation_id() == "test-conv-456"
+
+    scope.remove_conversation_id()
+    assert scope.get_conversation_id() is None
+
+
+def test_conversation_id_overwrite():
+    """Test that set_conversation_id overwrites existing value."""
+    scope = Scope()
+    scope.set_conversation_id("first-conv")
+    scope.set_conversation_id("second-conv")
+    assert scope.get_conversation_id() == "second-conv"
+
+
+def test_conversation_id_copy():
+    """Test that conversation_id is preserved when scope is copied."""
+    scope1 = Scope()
+    scope1.set_conversation_id("copy-test-conv")
+
+    scope2 = copy.copy(scope1)
+    assert scope2.get_conversation_id() == "copy-test-conv"
+
+    # Modifying copy should not affect original
+    scope2.set_conversation_id("modified-conv")
+    assert scope1.get_conversation_id() == "copy-test-conv"
+    assert scope2.get_conversation_id() == "modified-conv"
+
+
+def test_conversation_id_clear():
+    """Test that conversation_id is cleared when scope.clear() is called."""
+    scope = Scope()
+    scope.set_conversation_id("clear-test-conv")
+    assert scope.get_conversation_id() == "clear-test-conv"
+
+    scope.clear()
+    assert scope.get_conversation_id() is None

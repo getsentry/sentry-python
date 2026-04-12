@@ -9,11 +9,8 @@ fi
 SCRIPT_DIR="$( dirname "$0" )"
 cd $SCRIPT_DIR/..
 
-OLD_VERSION="${1}"
-NEW_VERSION="${2}"
-
-echo "Current version: $OLD_VERSION"
-echo "Bumping version: $NEW_VERSION"
+echo "Current version: $CRAFT_OLD_VERSION"
+echo "Bumping version: $CRAFT_NEW_VERSION"
 
 function replace() {
     ! grep "$2" $3
@@ -21,6 +18,6 @@ function replace() {
     grep "$2" $3  # verify that replacement was successful
 }
 
-replace "version=\"$OLD_VERSION\"" "version=\"$NEW_VERSION\"" ./setup.py
-replace "VERSION = \"$OLD_VERSION\"" "VERSION = \"$NEW_VERSION\"" ./sentry_sdk/consts.py
-replace "release = \"$OLD_VERSION\"" "release = \"$NEW_VERSION\"" ./docs/conf.py
+replace "version=\"$CRAFT_OLD_VERSION\"" "version=\"$CRAFT_NEW_VERSION\"" ./setup.py
+replace "VERSION = \"$CRAFT_OLD_VERSION\"" "VERSION = \"$CRAFT_NEW_VERSION\"" ./sentry_sdk/consts.py
+replace "release = \"$CRAFT_OLD_VERSION\"" "release = \"$CRAFT_NEW_VERSION\"" ./docs/conf.py

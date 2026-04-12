@@ -1,13 +1,20 @@
 import asyncio
 import inspect
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
+
+if sys.version_info >= (3, 8):
+    from unittest.mock import AsyncMock
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.asyncio import AsyncioIntegration, patch_asyncio
+from sentry_sdk.integrations.asyncio import (
+    AsyncioIntegration,
+    patch_asyncio,
+    enable_asyncio_integration,
+)
 
 try:
     from contextvars import Context, ContextVar
@@ -17,6 +24,11 @@ except ImportError:
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
+)
+
+
+minimum_python_39 = pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="Test requires Python >= 3.9"
 )
 
 
@@ -67,7 +79,16 @@ async def test_create_task(
 
     with sentry_sdk.start_transaction(name="test_transaction_for_create_task"):
         with sentry_sdk.start_span(op="root", name="not so important"):
-            tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
+            foo_task = asyncio.create_task(foo())
+            bar_task = asyncio.create_task(bar())
+
+            if hasattr(foo_task.get_coro(), "__name__"):
+                assert foo_task.get_coro().__name__ == "foo"
+            if hasattr(bar_task.get_coro(), "__name__"):
+                assert bar_task.get_coro().__name__ == "bar"
+
+            tasks = [foo_task, bar_task]
+
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
     sentry_sdk.flush()
@@ -220,6 +241,7 @@ def test_patch_asyncio(mock_get_running_loop):
     Test that the patch_asyncio function will patch the task factory.
     """
     mock_loop = mock_get_running_loop.return_value
+    mock_loop.get_task_factory.return_value._is_sentry_task_factory = False
 
     patch_asyncio()
 
@@ -269,6 +291,7 @@ def test_sentry_task_factory_with_factory(mock_get_running_loop):
 
     # The original task factory will be mocked out here, let's retrieve the value for later
     orig_task_factory = mock_loop.get_task_factory.return_value
+    orig_task_factory._is_sentry_task_factory = False
 
     # Retieve sentry task factory (since it is an inner function within patch_asyncio)
     sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
@@ -331,6 +354,7 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
 
     # The original task factory will be mocked out here, let's retrieve the value for later
     orig_task_factory = mock_loop.get_task_factory.return_value
+    orig_task_factory._is_sentry_task_factory = False
 
     # Retieve sentry task factory (since it is an inner function within patch_asyncio)
     sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
@@ -377,3 +401,283 @@ async def test_span_origin(
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.function.asyncio"
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_task_spans_false(
+    sentry_init,
+    capture_events,
+    uninstall_integration,
+):
+    uninstall_integration("asyncio")
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            AsyncioIntegration(task_spans=False),
+        ],
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test_no_spans"):
+        tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+
+    sentry_sdk.flush()
+
+    (transaction_event,) = events
+
+    assert not transaction_event["spans"]
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_enable_asyncio_integration_with_task_spans_false(
+    sentry_init,
+    capture_events,
+    uninstall_integration,
+):
+    """
+    Test that enable_asyncio_integration() helper works with task_spans=False.
+    """
+    uninstall_integration("asyncio")
+
+    sentry_init(traces_sample_rate=1.0)
+
+    assert "asyncio" not in sentry_sdk.get_client().integrations
+
+    enable_asyncio_integration(task_spans=False)
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+    assert sentry_sdk.get_client().integrations["asyncio"].task_spans is False
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    sentry_sdk.flush()
+
+    (transaction,) = events
+    assert not transaction["spans"]
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_delayed_enable_integration(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    assert "asyncio" not in sentry_sdk.get_client().integrations
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert not transaction["spans"]
+
+    enable_asyncio_integration()
+
+    events = capture_events()
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert transaction["spans"]
+    assert transaction["spans"][0]["origin"] == "auto.function.asyncio"
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_delayed_enable_integration_with_options(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    assert "asyncio" not in sentry_sdk.get_client().integrations
+
+    mock_init = MagicMock(return_value=None)
+    mock_setup_once = MagicMock()
+    with patch(
+        "sentry_sdk.integrations.asyncio.AsyncioIntegration.__init__", mock_init
+    ):
+        with patch(
+            "sentry_sdk.integrations.asyncio.AsyncioIntegration.setup_once",
+            mock_setup_once,
+        ):
+            enable_asyncio_integration("arg", kwarg="kwarg")
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+    mock_init.assert_called_once_with("arg", kwarg="kwarg")
+    mock_setup_once.assert_called_once()
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_delayed_enable_enabled_integration(sentry_init, uninstall_integration):
+    # Ensure asyncio integration is not already installed from previous tests
+    uninstall_integration("asyncio")
+
+    integration = AsyncioIntegration()
+    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+
+    # Get the task factory after initial setup - it should be Sentry's
+    loop = asyncio.get_running_loop()
+    task_factory_before = loop.get_task_factory()
+    assert getattr(task_factory_before, "_is_sentry_task_factory", False) is True
+
+    enable_asyncio_integration()
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+
+    # The task factory should be the same (loop not re-patched)
+    task_factory_after = loop.get_task_factory()
+    assert task_factory_before is task_factory_after
+
+
+@minimum_python_38
+@pytest.mark.asyncio
+async def test_delayed_enable_integration_after_disabling(sentry_init, capture_events):
+    sentry_init(disabled_integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
+
+    assert "asyncio" not in sentry_sdk.get_client().integrations
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert not transaction["spans"]
+
+    enable_asyncio_integration()
+
+    events = capture_events()
+
+    assert "asyncio" in sentry_sdk.get_client().integrations
+
+    with sentry_sdk.start_transaction(name="test"):
+        await asyncio.create_task(foo())
+
+    assert len(events) == 1
+    (transaction,) = events
+    assert transaction["spans"]
+    assert transaction["spans"][0]["origin"] == "auto.function.asyncio"
+
+
+@minimum_python_39
+@pytest.mark.asyncio(loop_scope="module")
+async def test_internal_tasks_not_wrapped(sentry_init, capture_events):
+    from sentry_sdk.utils import mark_sentry_task_internal
+
+    sentry_init(integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    # Create a user task that should be wrapped
+    async def user_task():
+        await asyncio.sleep(0.01)
+        return "user_result"
+
+    # Create an internal task that should NOT be wrapped
+    async def internal_task():
+        await asyncio.sleep(0.01)
+        return "internal_result"
+
+    with sentry_sdk.start_transaction(name="test_transaction"):
+        user_task_obj = asyncio.create_task(user_task())
+
+        with mark_sentry_task_internal():
+            internal_task_obj = asyncio.create_task(internal_task())
+
+        user_result = await user_task_obj
+        internal_result = await internal_task_obj
+
+    assert user_result == "user_result"
+    assert internal_result == "internal_result"
+
+    assert len(events) == 1
+    transaction = events[0]
+
+    user_spans = []
+    internal_spans = []
+
+    for span in transaction.get("spans", []):
+        if "user_task" in span.get("description", ""):
+            user_spans.append(span)
+        elif "internal_task" in span.get("description", ""):
+            internal_spans.append(span)
+
+    assert len(user_spans) > 0, (
+        f"User task should have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
+    )
+    assert len(internal_spans) == 0, (
+        f"Internal task should NOT have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
+    )
+
+
+@minimum_python_38
+def test_loop_close_patching(sentry_init):
+    sentry_init(integrations=[AsyncioIntegration()])
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        with patch("asyncio.get_running_loop", return_value=loop):
+            assert not hasattr(loop, "_sentry_flush_patched")
+            AsyncioIntegration.setup_once()
+            assert hasattr(loop, "_sentry_flush_patched")
+            assert loop._sentry_flush_patched is True
+
+    finally:
+        if not loop.is_closed():
+            loop.close()
+
+
+@minimum_python_38
+def test_loop_close_flushes_async_transport(sentry_init):
+    from sentry_sdk.transport import ASYNC_TRANSPORT_AVAILABLE, AsyncHttpTransport
+
+    if not ASYNC_TRANSPORT_AVAILABLE:
+        pytest.skip("httpcore[asyncio] not installed")
+
+    sentry_init(integrations=[AsyncioIntegration()])
+
+    # Save the current event loop to restore it later
+    try:
+        original_loop = asyncio.get_event_loop()
+    except RuntimeError:
+        original_loop = None
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        with patch("asyncio.get_running_loop", return_value=loop):
+            AsyncioIntegration.setup_once()
+
+        mock_client = Mock()
+        mock_transport = Mock(spec=AsyncHttpTransport)
+        mock_client.transport = mock_transport
+        mock_client.close_async = AsyncMock(return_value=None)
+
+        with patch("sentry_sdk.get_client", return_value=mock_client):
+            loop.close()
+
+        mock_client.close_async.assert_called_once()
+        mock_client.close_async.assert_awaited_once()
+
+    finally:
+        if not loop.is_closed():
+            loop.close()
+        if original_loop:
+            asyncio.set_event_loop(original_loop)

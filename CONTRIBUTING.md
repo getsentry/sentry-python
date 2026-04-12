@@ -4,18 +4,63 @@ We welcome contributions to `sentry-python` by the community.
 
 This file outlines the process to contribute to the SDK itself. For contributing to the documentation, please see the [Contributing to Docs](https://docs.sentry.io/contributing/) page.
 
+## Table of Contents
+
+- [How to Report a Problem](#how-to-report-a-problem)
+- [Submitting Changes](#submitting-changes)
+- [Development Environment](#development-environment)
+- [Running Tests](#running-tests)
+- [Debugging](#debugging)
+- [Adding a New Integration](#adding-a-new-integration)
+- [Releasing a New Version](#releasing-a-new-version)
+- [Contributing to Sentry AWS Lambda Layer](#contributing-to-sentry-aws-lambda-layer)
+
 ## How to Report a Problem
 
 Please search the [issue tracker](https://github.com/getsentry/sentry-python/issues) before creating a new issue (a problem or an improvement request). Please also ask in our [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr) before submitting a new issue. There are a ton of great people in our Discord community ready to help you!
 
 ## Submitting Changes
 
+### Before You Start
+
+1. **Find or create an issue.** Every contribution must be tied to a GitHub issue. If one doesn't exist, open one describing the problem or feature.
+2. **Discuss your approach with a maintainer.** Comment on the issue and wait for a maintainer to respond before you start working. This avoids wasted effort on both sides.
+3. **Check the assignee.** If the issue is already assigned to someone else, coordinate with them in the issue before starting work.
+
+PRs that don't meet these requirements will be automatically closed. See [Automated Checks](#automated-checks) below.
+
+### Making Your Contribution
+
 - Fork the `sentry-python` repo and prepare your changes.
 - Add tests for your changes to `tests/`.
 - Run tests and make sure all of them pass.
-- Submit a pull request, referencing any issues your changes address. Please follow our [commit message format](https://develop.sentry.dev/commit-messages/#commit-message-format) when naming your pull request.
+- Submit a pull request, referencing the issue(s) your changes address. Please follow our [commit message format](https://develop.sentry.dev/commit-messages/#commit-message-format) when naming your pull request.
 
-We will review your pull request as soon as possible. Thank you for contributing!
+### Pull Request Requirements
+
+All PRs must be created as **drafts**. Non-draft PRs will be automatically converted to draft. Mark your PR as "Ready for review" once:
+
+- CI passes
+- The PR description is complete (what, why, and links to relevant issues)
+- You've personally reviewed your own changes
+
+A PR should do one thing well. Don't mix functional changes with unrelated refactors or cleanup. Smaller, focused PRs are easier to review, reason about, and revert if needed.
+
+For the full set of PR standards, see the [code submission standard](https://develop.sentry.dev/sdk/getting-started/standards/code-submission/#pull-requests).
+
+### AI Use
+
+You are welcome to use whatever tools you prefer for making a contribution. However, any changes you propose have to be reviewed and tested by you, a human, first, before you submit a pull request with them for the Sentry team to review. If we feel like that didn't happen, we will close the PR outright. For example, we won't review visibly AI-generated PRs from an agent instructed to look for and "fix" open issues in the repo.
+
+### Automated Checks
+
+To maintain the quality of contributions, we use automated workflows that enforce the following rules for PRs from non-maintainers:
+
+- **Issue reference required.** Your PR body must reference a GitHub issue in the `getsentry` organization (e.g. `#123`, `getsentry/sentry#456`, or a full GitHub issue URL).
+- **Prior discussion required.** The referenced issue must show a conversation between you and a maintainer. Opening the issue counts as participation — but a maintainer must have also responded.
+- **Respect existing assignees.** If the referenced issue is assigned to someone other than you, the PR will be closed. Coordinate in the issue first.
+
+PRs that don't meet these criteria are automatically closed and labeled `violating-contribution-guidelines`. If your PR was closed by mistake, comment on the issue to discuss with a maintainer and then open a new PR.
 
 ## Development Environment
 
@@ -106,30 +151,129 @@ In general, you use
 tox -p auto -o -e <tox_env> -- <pytest_args>
 ```
 
+## Debugging
+
+Normal Python breakpoints using `breakpoint()` will drop you into `pdb` by default.
+To inspect C applications like uWSGI or extension module code at runtime, `lldb` is useful.
+For example, to debug a Django application that interfaces with uWSGI, build uWSGI with debug symbols using
+
+```bash
+CFLAGS="-g -O0" python uwsgiconfig.py --build
+```
+
+and then run the Django app with `lldb` using a command analogous to the following (with paths updated)
+
+```bash
+lldb -- ../../uwsgi/uwsgi --pythonpath "$PWD/.venv/lib/python3.14/site-packages" \
+  --http :8000 \
+  --module mysite.wsgi:application \
+  --home "$PWD/.venv" \
+  --need-app \
+```
+
+### Troubleshooting "module not found" error in relation to the `sentry-sdk` when it's installed in editable mode
+
+If you are trying to debug a Django applicaton such as that described above, and have the Sentry SDK installed in editable mode in the Django project, you will likely encounter this error because the editable package is not being found in the uWSGI's python path. To fix this, the above command needs to be updated to include a `--pythonpath` argument that passes in where your local `sentry-python` codebase is:
+
+```bash
+lldb -- ../../uwsgi/uwsgi --pythonpath "$PWD/.venv/lib/python3.14/site-packages" \
+  --pythonpath "<path-to-local-sentry-python-directory>" \
+  --http :8000 \
+  --module mysite.wsgi:application \
+  --home "$PWD/.venv" \
+  --need-app \
+```
+
+
 ## Adding a New Integration
 
-1. Write the integration.
-   - Instrument all application instances by default. Prefer global signals/patches.
-   - Don't make the user pass anything to your integration for anything to work. Aim for zero configuration.
-   - Everybody monkeypatches. That means you don't need to feel bad about it.
-   - Make sure your changes don't break end user contracts. The SDK should never alter the expected behavior of the underlying library or framework from the user's perspective and it shouldn't have any side effects.
-   - Be defensive. Don't assume the code you're patching will stay the same forever, especially if it's an internal function. Allow for future variability whenever it makes sense.
-   - Avoid registering a new client or the like. The user drives the client, and the client owns integrations.
-   - Allow the user to turn off the integration by changing the client. Check `sentry_sdk.get_client().get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
+### SDK Contract
 
-2. Write tests.
-   - Consider the minimum versions supported, and document in `_MIN_VERSIONS` in `integrations/__init__.py`.
-   - Create a new folder in `tests/integrations/`, with an `__init__` file that skips the entire suite if the package is not installed.
-   - Add the test suite to the script generating our test matrix. See [`scripts/populate_tox/README.md`](https://github.com/getsentry/sentry-python/blob/master/scripts/populate_tox/README.md#add-a-new-test-suite).
+The SDK runs as part of users' applications. Users do not expect their application to crash, the SDK to mutate object references, the SDK to swallow their exceptions, leaked file descriptors to eat their memory, SDK-initiated database requests, or the SDK to alter the signature of functions or coroutines.
 
-3. Update package metadata.
-   - We use `extras_require` in `setup.py` to communicate minimum version requirements for integrations. People can use this in combination with tools like Poetry or Pipenv to detect conflicts between our supported versions and their used versions programmatically.
+So this means you should write the ugly code in the library to work around this?
+Well, there's another consequence of running on thousands of applications. Maintenance burden is higher than for application code, because all code paths of the SDK are hit across the enormous variety of applications the SDK finds itself in. The diversity includes different CPython versions, permutations of package versions, and operating systems.
+And once something you write is out there, you cannot change or remove it from the SDK without good reason (https://develop.sentry.dev/sdk/processes/breaking_changes/#introducing-breaking-changes).
 
-     Do not set upper bounds on version requirements as people are often faster in adopting new versions of a web framework than we are in adding them to the test matrix or our package metadata.
+What's the concrete advice when writing a new integration?
 
-4. Write the [docs](https://github.com/getsentry/sentry-docs). Follow the structure of [existing integration docs](https://docs.sentry.io/platforms/python/integrations/). And, please **make sure to add your integration to the table in `python/integrations/index.md`** (people often forget this step 🙂).
+### Requirements
 
-5. Merge docs after new version has been released. The docs are built and deployed after each merge, so your changes should go live in a few minutes.
+1. Are you supporting a product feature? Then ensure that product expectations are clearly documented in the [develop docs](https://develop.sentry.dev/sdk/). Requirements for a given Insight Module must be available under https://develop.sentry.dev/sdk/telemetry/traces/modules/.
+
+2. Confirm that all span, breadcrumb, log or metric attributes are defined in https://github.com/getsentry/sentry-conventions.
+
+3. Ensure that the **semantics** of the attribute are clear. If the attribute is not uniquely defined, do not add it.
+- For instance, do not attach a request model to an agent invocation span. On the other hand, a default request model can be well-defined.
+
+### Code
+
+0. Document why you're patching or hooking into something.
+  - Even if it's just to say that you're creating and managing a certain type of span in the patch, that's valuable.
+  - It should be clear what span is created and exited where and which patches apply which attributes on a given span.
+
+1. Do you even need to add this attribute on this span?
+  - Be intentional with supporting product features. Only add what's necessary, or **be very sure that your addition provides value**. Decisions about what data lives on what types of spans are hard to undo, and limits future design space.
+
+2. Avoid setting arbitrary objects.
+  - In line with the point above, prefer using an include-list of valuable entries when setting a dictionary attribute. Otherwise, tests will break again and again.
+
+3. Instrument all application instances by default. Prefer global signals/patches.
+  - Patching instances is just harder. Your patches may unexpectedly not apply to some instances, or unexpectedly be applied multiple times.
+
+4. Don't make the user pass anything to your integration for anything to work. Aim for zero configuration.
+  - Users tend to only consult the documentation when something goes wrong. So the default values for integration options must lead to the best out-of-the-box experience for the majority of users.
+
+5. Re-use code, but only when it makes sense.
+  - Think about future evolution of the library and your integration.
+  - If you're patching two internal methods that are similar but will diverge with time, don't force a common patch.
+  - If the shared SDK logic will diverge for two patches, just don't force them through a common path in the first place.
+  - If your shared code path has a bunch of conditionals today or will have a ton of conditionals in the future, that's the sign to not stick to DRY.
+
+6. Be explicit.
+  - You're developing against a library, and that library uses specific types.
+  - If you use `hasattr()` or `getattr()` to gate logic, you must verify the code path for all types that have this attribute (and Python has duck typing).
+  - If you use `type().__name__` to gate logic, you must verify the behavior for all types with a given name (and Python has duck typing).
+  - So just use `isinstance()`.
+
+7. Heuristics will bite you later.
+  - If something you write is best-effort, make sure there are no better alternatives.
+
+8. Obsess about the unhappy path.
+  - Users are interested in seeing what went wrong when something doesn't work. The code in the `except` block should not be an afterthought.
+  - Let exceptions bubble-up as far as possible when reporting unhandled exceptions.
+  - Preserve the user's original exception. Python chains exceptions when code in a `except` block throws, so if a `except` block in the SDK throws, the SDK exception takes the foreground ([#5188](https://github.com/getsentry/sentry-python/issues/5188)).
+  - Please don't report exceptions that are caught further up in the library's call chain as unhandled.
+
+9. Make sure your changes don't break end user contracts. The SDK should never alter the expected behavior of the underlying library or framework from the user's perspective and it shouldn't have any side effects.
+  - For example, it shouldn't open new connections or evaluate lazy queries early.
+
+10. Be defensive, but don't add dead code.
+  - Don't assume the code you're patching will stay the same forever, especially if it's an internal function. Allow for future variability whenever it makes sense.
+  - Dead code adds cognitive overhead when reasoning about code, so don't account for impossible scenarios.
+
+11. Write tests, but don't write mocks.
+  - Aim for end-to-end tests, not unit tests.
+  - Don't call private SDK stuff directly, just use the patched library in a way that triggers the patch.
+  - Mocks are _very expensive_ to maintain, particularly when testing patches for fast-moving libraries.
+  - Consider the minimum versions supported, and document in `_MIN_VERSIONS` in `integrations/__init__.py`.
+  - Create a new folder in `tests/integrations/`, with an `__init__` file that skips the entire suite if the package is not installed.
+  - Add the test suite to the script generating our test matrix. See [`scripts/populate_tox/README.md`](https://github.com/getsentry/sentry-python/blob/master/scripts/populate_tox/README.md#add-a-new-test-suite).
+
+12. Be careful patching decorators
+  - Does the library's decorator apply to sync or async functions?
+  - Some decorators can be applied to classes and functions, and both with and without arguments. Make sure you handle and test all applicable cases.
+
+13. Avoid registering a new client or the like. The user drives the client, and the client owns integrations.
+
+14. Allow the user to turn off the integration by changing the client. Check `sentry_sdk.get_client().get_integration(MyIntegration)` from within your signal handlers or patches to see if your integration is still active before you do anything impactful (such as sending an event). If it's not active, the patch my be no-op.
+
+### Document
+
+1. Write the [docs](https://github.com/getsentry/sentry-docs). Follow the structure of [existing integration docs](https://docs.sentry.io/platforms/python/integrations/). And, please **make sure to add your integration to the table in `python/integrations/index.md`** (people often forget this step 🙂).
+
+2. Merge docs after new version has been released. The docs are built and deployed after each merge, so your changes should go live in a few minutes.
+
 
 ## Releasing a New Version
 
