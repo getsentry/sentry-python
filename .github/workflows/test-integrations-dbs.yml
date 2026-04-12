@@ -56,6 +56,24 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 3306:3306
+    env:
+      SENTRY_PYTHON_TEST_MYSQL_HOST: ${{ matrix.python-version == '3.6' && 'mysql' || 'localhost' }}
+      SENTRY_PYTHON_TEST_MYSQL_USER: root
+      SENTRY_PYTHON_TEST_MYSQL_PASSWORD: root
+      SENTRY_PYTHON_TEST_MYSQL_DB: test
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
@@ -73,6 +91,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test aiomysql
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aiomysql"
       - name: Test asyncpg
         run: |
           set -x # print commands that are executed

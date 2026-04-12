@@ -39,6 +39,27 @@
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
 
     {% endif %}
+    {% if needs_mysql %}
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 3306:3306
+    env:
+      SENTRY_PYTHON_TEST_MYSQL_HOST: {% raw %}${{ matrix.python-version == '3.6' && 'mysql' || 'localhost' }}{% endraw %}
+      SENTRY_PYTHON_TEST_MYSQL_USER: root
+      SENTRY_PYTHON_TEST_MYSQL_PASSWORD: root
+      SENTRY_PYTHON_TEST_MYSQL_DB: test
+
+    {% endif %}
     # Use Docker container only for Python 3.6
     {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
     steps:
