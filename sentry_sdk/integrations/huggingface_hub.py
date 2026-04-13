@@ -1,6 +1,7 @@
-import sys
 import inspect
+import sys
 from functools import wraps
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
@@ -8,14 +9,11 @@ from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     reraise,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterable
@@ -53,8 +51,6 @@ class HuggingfaceHubIntegration(Integration):
 
 
 def _capture_exception(exc: "Any") -> None:
-    set_span_errored()
-
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -131,7 +127,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
                 _capture_exception(e)
-                span.__exit__(None, None, None)
+                span.__exit__(*exc_info)
             reraise(*exc_info)
 
         # Output attributes
