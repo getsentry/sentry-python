@@ -4,6 +4,8 @@ from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk._werkzeug import _get_headers
+from sentry_sdk.integrations.wsgi import get_client_ip, get_request_url
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue, logger
 
@@ -256,8 +258,6 @@ def _get_request_attributes(
     """
     Return span attributes related to the HTTP request from the WSGI environ.
     """
-    from sentry_sdk._werkzeug import _get_headers
-    from sentry_sdk.integrations.wsgi import get_client_ip, get_request_url
 
     attributes: "Dict[str, Any]" = {}
 
