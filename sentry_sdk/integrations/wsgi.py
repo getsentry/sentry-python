@@ -157,15 +157,15 @@ class SentryWsgiMiddleware:
                                 custom_sampling_context={"wsgi_environ": environ},
                             )
 
-                    with capture_internal_exceptions():
-                        for attr, value in _get_request_attributes(
-                            environ, self.use_x_forwarded_for
-                        ).items():
-                            scope.set_attribute(attr, value)
-
                     span_ctx = span_ctx or nullcontext()
 
                     with span_ctx as span:
+                        with capture_internal_exceptions():
+                            for attr, value in _get_request_attributes(
+                                environ, self.use_x_forwarded_for
+                            ).items():
+                                span.set_attribute(attr, value)
+
                         try:
                             response = self.app(
                                 environ,
