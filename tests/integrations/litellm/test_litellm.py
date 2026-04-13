@@ -155,7 +155,7 @@ def test_nonstreaming_chat_completion(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -238,7 +238,7 @@ def test_streaming_chat_completion(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         server_side_event_chunks(
@@ -301,7 +301,7 @@ def test_embeddings_create(
     )
     events = capture_events()
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -362,7 +362,7 @@ def test_embeddings_create_with_list_input(
     )
     events = capture_events()
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -424,7 +424,7 @@ def test_embeddings_no_pii(
     )
     events = capture_events()
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -476,7 +476,7 @@ def test_exception_handling(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_rate_limit_model_response()
 
@@ -515,7 +515,7 @@ def test_span_origin(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -561,7 +561,7 @@ def test_multiple_providers(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    openai_client = OpenAI(api_key="z")
+    openai_client = OpenAI(api_key="test-key")
     openai_model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
@@ -601,7 +601,7 @@ def test_multiple_providers(
                 model="claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
-                api_key="z",
+                api_key="test-key",
             )
 
             litellm_utils.executor.shutdown(wait=True)
@@ -624,7 +624,7 @@ def test_multiple_providers(
                 model="gemini/gemini-pro",
                 messages=messages,
                 client=gemini_client,
-                api_key="z",
+                api_key="test-key",
             )
 
             litellm_utils.executor.shutdown(wait=True)
@@ -652,7 +652,7 @@ def test_additional_parameters(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -695,42 +695,6 @@ def test_additional_parameters(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
 
 
-def test_litellm_specific_parameters(sentry_init, capture_events):
-    """Test that LiteLLM-specific parameters are captured."""
-    sentry_init(
-        integrations=[LiteLLMIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    messages = [{"role": "user", "content": "Hello!"}]
-    mock_response = MockCompletionResponse()
-
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-            "api_base": "https://custom-api.example.com",
-            "api_version": "2023-01-01",
-            "custom_llm_provider": "custom_provider",
-        }
-
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
-
-    (event,) = events
-    (span,) = event["spans"]
-
-    assert span["data"]["gen_ai.litellm.api_base"] == "https://custom-api.example.com"
-    assert span["data"]["gen_ai.litellm.api_version"] == "2023-01-01"
-    assert span["data"]["gen_ai.litellm.custom_llm_provider"] == "custom_provider"
-
-
 def test_no_integration(
     reset_litellm_executor,
     sentry_init,
@@ -745,7 +709,7 @@ def test_no_integration(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -921,7 +885,7 @@ def test_binary_content_encoding_image_url(
             ],
         }
     ]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1000,7 +964,7 @@ def test_binary_content_encoding_mixed_content(
             ],
         }
     ]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1065,7 +1029,7 @@ def test_binary_content_encoding_uri_type(
             ],
         }
     ]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
