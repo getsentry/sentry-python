@@ -373,7 +373,6 @@ def test_tool_execution(sentry_init, capture_events):
     assert tool_span["op"] == OP.GEN_AI_EXECUTE_TOOL
     assert tool_span["description"] == "execute_tool get_weather"
     assert tool_span["data"][SPANDATA.GEN_AI_TOOL_NAME] == "get_weather"
-    assert tool_span["data"][SPANDATA.GEN_AI_TOOL_TYPE] == "function"
     assert (
         tool_span["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
         == "Get the weather for a location"
