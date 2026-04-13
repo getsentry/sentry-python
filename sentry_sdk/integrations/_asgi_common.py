@@ -132,6 +132,8 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
 
     client = asgi_scope.get("client")
     if client and should_send_default_pii():
-        attributes["client.address"] = _get_ip(asgi_scope)
+        ip = _get_ip(asgi_scope)
+        attributes["client.address"] = ip
+        attributes["user.ip_address"] = ip
 
     return attributes

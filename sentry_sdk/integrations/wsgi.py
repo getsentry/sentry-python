@@ -9,11 +9,14 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
+    _get_request_attributes,
     nullcontext,
 )
 from sentry_sdk.scope import should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
+from sentry_sdk.traces import StreamedSpan, SegmentSource
 from sentry_sdk.tracing import Transaction, TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -22,7 +25,18 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterator, Optional, Protocol, Tuple, TypeVar
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Iterator,
+        Optional,
+        Protocol,
+        Tuple,
+        TypeVar,
+        Union,
+    )
 
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.utils import ExcInfo
@@ -42,6 +56,7 @@ if TYPE_CHECKING:
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
+_DEFAULT_TRANSACTION_NAME = "generic WSGI request"
 
 
 def wsgi_decoding_dance(s: str, charset: str = "utf-8", errors: str = "replace") -> str:
@@ -94,6 +109,9 @@ class SentryWsgiMiddleware:
         if _wsgi_middleware_applied.get(False):
             return self.app(environ, start_response)
 
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
+
         _wsgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as scope:
@@ -108,34 +126,71 @@ class SentryWsgiMiddleware:
                         )
 
                     method = environ.get("REQUEST_METHOD", "").upper()
-                    transaction = None
-                    if method in self.http_methods_to_capture:
-                        transaction = continue_trace(
-                            environ,
-                            op=OP.HTTP_SERVER,
-                            name="generic WSGI request",
-                            source=TransactionSource.ROUTE,
-                            origin=self.span_origin,
-                        )
 
-                    transaction_context = (
-                        sentry_sdk.start_transaction(
-                            transaction,
-                            custom_sampling_context={"wsgi_environ": environ},
-                        )
-                        if transaction is not None
-                        else nullcontext()
-                    )
-                    with transaction_context:
+                    span_ctx: "ContextManager[Union[Transaction, StreamedSpan, None]]" = None
+                    if method in self.http_methods_to_capture:
+                        if span_streaming:
+                            sentry_sdk.traces.continue_trace(
+                                dict(_get_headers(environ))
+                            )
+                            scope.set_custom_sampling_context({"wsgi_environ": scope})
+
+                            span_ctx = sentry_sdk.traces.start_span(
+                                name=_DEFAULT_TRANSACTION_NAME,
+                                attributes={
+                                    "sentry.span.source": SegmentSource.ROUTE,
+                                    "sentry.origin": self.span_origin,
+                                    "sentry.op": OP.HTTP_SERVER,
+                                },
+                            )
+                        else:
+                            transaction = continue_trace(
+                                environ,
+                                op=OP.HTTP_SERVER,
+                                name=_DEFAULT_TRANSACTION_NAME,
+                                source=TransactionSource.ROUTE,
+                                origin=self.span_origin,
+                            )
+
+                            span_ctx = sentry_sdk.start_transaction(
+                                transaction,
+                                custom_sampling_context={"wsgi_environ": environ},
+                            )
+
+                    with capture_internal_exceptions():
+                        for attr, value in _get_request_attributes(
+                            environ, self.use_x_forwarded_for
+                        ).items():
+                            scope.set_attribute(attr, value)
+
+                    span_ctx = span_ctx or nullcontext()
+
+                    with span_ctx as span:
                         try:
                             response = self.app(
                                 environ,
-                                partial(
-                                    _sentry_start_response, start_response, transaction
-                                ),
+                                partial(_sentry_start_response, start_response, span),
                             )
                         except BaseException:
                             reraise(*_capture_exception())
+                        finally:
+                            if isinstance(span, StreamedSpan):
+                                already_set = (
+                                    span.name != _DEFAULT_TRANSACTION_NAME
+                                    and span.get_attributes().get("sentry.span.source")
+                                    in [
+                                        SegmentSource.COMPONENT.value,
+                                        SegmentSource.ROUTE.value,
+                                        SegmentSource.CUSTOM.value,
+                                    ]
+                                )
+                                if not already_set:
+                                    with capture_internal_exceptions():
+                                        span.name = _DEFAULT_TRANSACTION_NAME
+                                        span.set_attribute(
+                                            "sentry.span.source",
+                                            SegmentSource.ROUTE.value,
+                                        )
         finally:
             _wsgi_middleware_applied.set(False)
 
@@ -167,15 +222,19 @@ class SentryWsgiMiddleware:
 
 def _sentry_start_response(
     old_start_response: "StartResponse",
-    transaction: "Optional[Transaction]",
+    span: "Optional[Union[Transaction, StreamedSpan]]",
     status: str,
     response_headers: "WsgiResponseHeaders",
     exc_info: "Optional[WsgiExcInfo]" = None,
 ) -> "WsgiResponseIter":  # type: ignore[type-var]
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
-        if transaction is not None:
-            transaction.set_http_status(status_int)
+        if span is not None:
+            if isinstance(span, StreamedSpan):
+                span.status = "error" if status_int >= 400 else "ok"
+                span.set_attribute("http.response.status_code", status_int)
+            else:
+                span.set_http_status(status_int)
 
     if exc_info is None:
         # The Django Rest Framework WSGI test client, and likely other

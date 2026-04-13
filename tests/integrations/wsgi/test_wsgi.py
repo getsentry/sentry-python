@@ -139,26 +139,50 @@ def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_transaction_with_error(
     sentry_init,
     crashing_app,
     capture_events,
+    capture_items,
     DictionaryContaining,  # noqa:N803
+    span_streaming,
 ):
     def dogpark(environ, start_response):
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
-    events = capture_events()
+
+    if span_streaming:
+        items = capture_items("event", "span")
+    else:
+        events = capture_events()
 
     with pytest.raises(ValueError):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
-    error_event, envelope = events
+    sentry_sdk.flush()
 
-    assert error_event["transaction"] == "generic WSGI request"
+    if span_streaming:
+        assert len(items) == 2
+        assert items[0].type == "event"
+        assert items[1].type == "span"
+
+        error_event = items[0].payload
+        span_item = items[1].payload
+    else:
+        error_event, envelope = events
+
+        assert error_event["transaction"] == "generic WSGI request"
+
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "ValueError"
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
@@ -168,15 +192,20 @@ def test_transaction_with_error(
         == "Fetch aborted. The ball was not returned."
     )
 
-    assert envelope["type"] == "transaction"
+    if span_streaming:
+        assert span_item["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+        assert span_item["span_id"] == error_event["contexts"]["trace"]["span_id"]
+        assert span_item["status"] == "error"
+    else:
+        assert envelope["type"] == "transaction"
 
-    # event trace context is a subset of envelope trace context
-    assert envelope["contexts"]["trace"] == DictionaryContaining(
-        error_event["contexts"]["trace"]
-    )
-    assert envelope["contexts"]["trace"]["status"] == "internal_error"
-    assert envelope["transaction"] == error_event["transaction"]
-    assert envelope["request"] == error_event["request"]
+        # event trace context is a subset of envelope trace context
+        assert envelope["contexts"]["trace"] == DictionaryContaining(
+            error_event["contexts"]["trace"]
+        )
+        assert envelope["contexts"]["trace"]["status"] == "internal_error"
+        assert envelope["transaction"] == error_event["transaction"]
+        assert envelope["request"] == error_event["request"]
 
 
 def test_transaction_no_error(
