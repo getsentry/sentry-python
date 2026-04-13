@@ -375,8 +375,10 @@ class SentryAsgiMiddleware:
                                 )
                                 with capture_internal_exceptions():
                                     if not already_set:
-                                        name, source = self._get_segment_name_and_source(
-                                            self.transaction_style, scope
+                                        name, source = (
+                                            self._get_segment_name_and_source(
+                                                self.transaction_style, scope
+                                            )
                                         )
                                         span.name = name
                                         span.set_attribute("sentry.span.source", source)
