@@ -182,7 +182,8 @@ def _success_callback(
 ) -> None:
     """Handle successful completion."""
 
-    span = _get_metadata_dict(kwargs).get("_sentry_span")
+    metadata = _get_metadata_dict(kwargs)
+    span = metadata.get("_sentry_span")
     if span is None:
         return
 
@@ -242,7 +243,9 @@ def _success_callback(
             or "complete_streaming_response" in kwargs
             or "async_complete_streaming_response" in kwargs
         ):
-            span.__exit__(None, None, None)
+            span = metadata.pop("_sentry_span", None)
+            if span is not None:
+                span.__exit__(None, None, None)
 
 
 async def _async_success_callback(
