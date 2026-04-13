@@ -66,6 +66,7 @@ _DEFAULT_INTEGRATIONS = [
 
 _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
+    "sentry_sdk.integrations.aiomysql.AioMySQLIntegration",
     "sentry_sdk.integrations.anthropic.AnthropicIntegration",
     "sentry_sdk.integrations.ariadne.AriadneIntegration",
     "sentry_sdk.integrations.arq.ArqIntegration",
@@ -117,6 +118,7 @@ del _generate_default_integrations_iterator
 
 _MIN_VERSIONS = {
     "aiohttp": (3, 4),
+    "aiomysql": (0, 1, 1),
     "anthropic": (0, 16),
     "ariadne": (0, 20),
     "arq": (0, 23),

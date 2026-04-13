@@ -1,154 +1,208 @@
 # -*- coding: utf-8 -*-
-"""
-Adapted from module sentry_sdk.integrations.asyncpg
-"""
 from __future__ import annotations
-import contextlib
-from typing import Any, TypeVar, Callable, Awaitable, Iterator
+
+from typing import Any, TypeVar, Callable, Awaitable
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
-from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
-  ensure_integration_enabled,
-  parse_version,
-  capture_internal_exceptions,
+    capture_internal_exceptions,
+    parse_version,
 )
 
 try:
-  import aiomysql  # type: ignore[import-not-found]
-  from aiomysql.connection import Connection, Cursor  # type: ignore
+    import aiomysql  # type: ignore[import-untyped]
+    from aiomysql.cursors import Cursor  # type: ignore[import-untyped]
 except ImportError:
-  raise DidNotEnable("aiomysql not installed.")
+    raise DidNotEnable("aiomysql not installed.")
 
 
 class AioMySQLIntegration(Integration):
-  identifier = "aiomysql"
-  origin = f"auto.db.{identifier}"
-  _record_params = False
+    identifier = "aiomysql"
+    origin = f"auto.db.{identifier}"
+    _record_params = False
 
-  def __init__(self, *, record_params: bool = False):
-    AioMySQLIntegration._record_params = record_params
+    def __init__(self, *, record_params: bool = False):
+        AioMySQLIntegration._record_params = record_params
 
-  @staticmethod
-  def setup_once() -> None:
-    aiomysql_version = parse_version(aiomysql.__version__)
-    _check_minimum_version(AioMySQLIntegration, aiomysql_version)
+    @staticmethod
+    def setup_once() -> None:
+        aiomysql_version = parse_version(aiomysql.__version__)
+        _check_minimum_version(AioMySQLIntegration, aiomysql_version)
 
-    aiomysql.Connection.query = _wrap_execute(
-      aiomysql.Connection.query,
-    )
-
-    aiomysql.connect = _wrap_connect(aiomysql.connect)
+        Cursor.execute = _wrap_execute(Cursor.execute)
+        Cursor.executemany = _wrap_executemany(Cursor.executemany)
+        aiomysql.connect = _wrap_connect(aiomysql.connect)
 
 
 T = TypeVar("T")
 
 
+def _normalize_query(query: str | bytes | bytearray) -> str:
+    if isinstance(query, (bytes, bytearray)):
+        query = query.decode("utf-8", errors="replace")
+    return " ".join(query.split())
+
+
 def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-  async def _inner(*args: Any, **kwargs: Any) -> T:
-    if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
-      return await f(*args, **kwargs)
+    """Wrap Cursor.execute to capture SQL queries."""
 
-    conn = args[0]
-    query = args[1]  # В aiomysql запрос передается первым аргументом
-    with record_sql_queries(
-      cursor=None,
-      query=query,
-      params_list=None,
-      paramstyle=None,
-      executemany=False,
-      span_origin=AioMySQLIntegration.origin,
-    ) as span:
-      res = await f(*args, **kwargs)
-      span.set_data("db.affected_rows", res)
+    async def _inner(*args: Any, **kwargs: Any) -> T:
+        if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
+            return await f(*args, **kwargs)
 
-    with capture_internal_exceptions():
-      add_query_source(span)
+        cursor = args[0]
 
-    return res
+        # Skip if flagged by executemany (avoids double-recording).
+        # Do NOT reset the flag here — it must stay True for the entire
+        # duration of executemany, which may call execute multiple times
+        # in a loop (non-INSERT fallback). Only _wrap_executemany's
+        # finally block should clear it.
+        if getattr(cursor, "_sentry_skip_next_execute", False):
+            return await f(*args, **kwargs)
 
-  return _inner
+        query = args[1] if len(args) > 1 else kwargs.get("query", "")
+        query_str = _normalize_query(query)
+        params = args[2] if len(args) > 2 else kwargs.get("args")
 
+        conn = _get_connection(cursor)
 
-SubCursor = TypeVar("SubCursor", bound=Cursor)
-
-
-@contextlib.contextmanager
-def _record(
-  cursor: SubCursor | None,
-  query: str,
-  params_list: tuple[Any, ...] | None,
-  *,
-  executemany: bool = False,
-) -> Iterator[Span]:
-  integration = sentry_sdk.get_client().get_integration(AioMySQLIntegration)
-  if integration is not None and not integration._record_params:
-    params_list = None
-
-  param_style = "pyformat" if params_list else None
-
-  with record_sql_queries(
-    cursor=cursor,
-    query=query,
-    params_list=params_list,
-    paramstyle=param_style,
-    executemany=executemany,
-    record_cursor_repr=cursor is not None,
-    span_origin=AioMySQLIntegration.origin,
-  ) as span:
-    yield span
-
-
-def _wrap_connect(f: Callable[..., T]) -> Callable[..., T]:
-  def _inner(*args: Any, **kwargs: Any) -> T:
-    if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
-      return f(*args, **kwargs)
-
-    host = kwargs.get("host", "localhost")
-    port = kwargs.get("port") or 3306
-    user = kwargs.get("user")
-    db = kwargs.get("db")
-
-    with sentry_sdk.start_span(
-      op=OP.DB,
-      name="connect",
-      origin=AioMySQLIntegration.origin,
-    ) as span:
-      span.set_data(SPANDATA.DB_SYSTEM, "mysql")
-      span.set_data(SPANDATA.SERVER_ADDRESS, host)
-      span.set_data(SPANDATA.SERVER_PORT, port)
-      span.set_data(SPANDATA.DB_NAME, db)
-      span.set_data(SPANDATA.DB_USER, user)
-
-      with capture_internal_exceptions():
-        sentry_sdk.add_breadcrumb(
-          message="connect", category="query", data=span._data
+        integration = sentry_sdk.get_client().get_integration(
+            AioMySQLIntegration
         )
-      res = f(*args, **kwargs)
+        params_list = params if integration and integration._record_params else None
+        param_style = "pyformat" if params_list else None
 
-    return res
+        with record_sql_queries(
+            cursor=None,
+            query=query_str,
+            params_list=params_list,
+            paramstyle=param_style,
+            executemany=False,
+            span_origin=AioMySQLIntegration.origin,
+        ) as span:
+            if conn:
+                _set_db_data(span, conn)
+            res = await f(*args, **kwargs)
 
-  return _inner
+        with capture_internal_exceptions():
+            add_query_source(span)
+
+        return res
+
+    return _inner
 
 
-def _set_db_data(span: Span, conn: Any) -> None:
-  span.set_data(SPANDATA.DB_SYSTEM, "mysql")
+def _wrap_executemany(
+    f: Callable[..., Awaitable[T]]
+) -> Callable[..., Awaitable[T]]:
+    """Wrap Cursor.executemany to capture SQL queries."""
 
-  host = conn.host
-  if host:
-    span.set_data(SPANDATA.SERVER_ADDRESS, host)
+    async def _inner(*args: Any, **kwargs: Any) -> T:
+        if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
+            return await f(*args, **kwargs)
 
-  port = conn.port
-  if port:
-    span.set_data(SPANDATA.SERVER_PORT, port)
+        cursor = args[0]
+        query = args[1] if len(args) > 1 else kwargs.get("query", "")
+        query_str = _normalize_query(query)
+        seq_of_params = args[2] if len(args) > 2 else kwargs.get("args")
 
-  database = conn.db
-  if database:
-    span.set_data(SPANDATA.DB_NAME, database)
+        conn = _get_connection(cursor)
 
-  user = conn.user
-  if user:
-    span.set_data(SPANDATA.DB_USER, user)
+        integration = sentry_sdk.get_client().get_integration(
+            AioMySQLIntegration
+        )
+        params_list = (
+            seq_of_params if integration and integration._record_params else None
+        )
+        param_style = "pyformat" if params_list else None
+
+        # Prevent double-recording: _do_execute_many calls self.execute internally
+        cursor._sentry_skip_next_execute = True
+        try:
+            with record_sql_queries(
+                cursor=None,
+                query=query_str,
+                params_list=params_list,
+                paramstyle=param_style,
+                executemany=True,
+                span_origin=AioMySQLIntegration.origin,
+            ) as span:
+                if conn:
+                    _set_db_data(span, conn)
+                res = await f(*args, **kwargs)
+
+            with capture_internal_exceptions():
+                add_query_source(span)
+
+            return res
+        finally:
+            cursor._sentry_skip_next_execute = False
+
+    return _inner
+
+
+def _get_connection(cursor: Any) -> Any:
+    """Get the underlying connection from a cursor."""
+    return getattr(cursor, "_connection", None)
+
+
+def _wrap_connect(
+    f: Callable[..., Awaitable[T]]
+) -> Callable[..., Awaitable[T]]:
+    """Wrap aiomysql.connect to capture connection spans."""
+
+    async def _inner(*args: Any, **kwargs: Any) -> T:
+        if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
+            return await f(*args, **kwargs)
+
+        host = kwargs.get("host", "localhost")
+        port = kwargs.get("port") or 3306
+        user = kwargs.get("user")
+        db = kwargs.get("db") or kwargs.get("database")
+
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            name="connect",
+            origin=AioMySQLIntegration.origin,
+        ) as span:
+            span.set_data(SPANDATA.DB_SYSTEM, "mysql")
+            span.set_data(SPANDATA.SERVER_ADDRESS, host)
+            span.set_data(SPANDATA.SERVER_PORT, port)
+            span.set_data(SPANDATA.DB_NAME, db)
+            span.set_data(SPANDATA.DB_USER, user)
+
+            with capture_internal_exceptions():
+                sentry_sdk.add_breadcrumb(
+                    message="connect",
+                    category="query",
+                    data=span._data,
+                )
+            res = await f(*args, **kwargs)
+
+        return res
+
+    return _inner
+
+
+def _set_db_data(span: Any, conn: Any) -> None:
+    """Set database-related span data from connection object."""
+    span.set_data(SPANDATA.DB_SYSTEM, "mysql")
+
+    host = getattr(conn, "host", None)
+    if host:
+        span.set_data(SPANDATA.SERVER_ADDRESS, host)
+
+    port = getattr(conn, "port", None)
+    if port:
+        span.set_data(SPANDATA.SERVER_PORT, port)
+
+    database = getattr(conn, "db", None)
+    if database:
+        span.set_data(SPANDATA.DB_NAME, database)
+
+    user = getattr(conn, "user", None)
+    if user:
+        span.set_data(SPANDATA.DB_USER, user)
