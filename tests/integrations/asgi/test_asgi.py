@@ -164,55 +164,117 @@ def test_invalid_transaction_style(asgi3_app):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 async def test_capture_transaction(
     sentry_init,
     asgi3_app,
     capture_events,
+    capture_items,
+    span_streaming,
 ):
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
     app = SentryAsgiMiddleware(asgi3_app)
 
     async with TestClient(app) as client:
-        events = capture_events()
+        if span_streaming:
+            items = capture_items("span")
+        else:
+            events = capture_events()
         await client.get("/some_url?somevalue=123")
 
-    (transaction_event,) = events
+    sentry_sdk.flush()
 
-    assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "/some_url"
-    assert transaction_event["transaction_info"] == {"source": "url"}
-    assert transaction_event["contexts"]["trace"]["op"] == "http.server"
-    assert transaction_event["request"] == {
-        "headers": {
-            "host": "localhost",
-            "remote-addr": "127.0.0.1",
-            "user-agent": "ASGI-Test-Client",
-        },
-        "method": "GET",
-        "query_string": "somevalue=123",
-        "url": "http://localhost/some_url",
-    }
+    if span_streaming:
+        assert len(items) == 1
+        span = items[0].payload
+
+        assert span["is_segment"] is True
+        assert span["name"] == "/some_url"
+
+        assert span["attributes"]["sentry.span.source"] == "url"
+        assert span["attributes"]["sentry.op"] == "http.server"
+
+        assert span["attributes"]["url.full"] == "http://localhost/some_url"
+        assert span["attributes"]["network.protocol.name"] == "http"
+        assert span["attributes"]["http.request.method"] == "GET"
+        assert span["attributes"]["http.query"] == "somevalue=123"
+        assert span["attributes"]["http.request.header.host"] == "localhost"
+        assert span["attributes"]["http.request.header.remote-addr"] == "127.0.0.1"
+        assert (
+            span["attributes"]["http.request.header.user-agent"] == "ASGI-Test-Client"
+        )
+
+    else:
+        (transaction_event,) = events
+
+        assert transaction_event["type"] == "transaction"
+        assert transaction_event["transaction"] == "/some_url"
+        assert transaction_event["transaction_info"] == {"source": "url"}
+        assert transaction_event["contexts"]["trace"]["op"] == "http.server"
+        assert transaction_event["request"] == {
+            "headers": {
+                "host": "localhost",
+                "remote-addr": "127.0.0.1",
+                "user-agent": "ASGI-Test-Client",
+            },
+            "method": "GET",
+            "query_string": "somevalue=123",
+            "url": "http://localhost/some_url",
+        }
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 async def test_capture_transaction_with_error(
     sentry_init,
     asgi3_app_with_error,
     capture_events,
+    capture_items,
     DictionaryContaining,  # noqa: N803
+    span_streaming,
 ):
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
     app = SentryAsgiMiddleware(asgi3_app_with_error)
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("event", "span")
+    else:
+        events = capture_events()
+
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
             await client.get("/some_url")
 
-    (
-        error_event,
-        transaction_event,
-    ) = events
+    sentry_sdk.flush()
+
+    if span_streaming:
+        assert len(items) == 2
+        assert items[0].type == "event"
+        assert items[1].type == "span"
+
+        error_event = items[0].payload
+        span_item = items[1].payload
+    else:
+        (error_event, transaction_event) = events
 
     assert error_event["transaction"] == "/some_url"
     assert error_event["transaction_info"] == {"source": "url"}
@@ -222,45 +284,94 @@ async def test_capture_transaction_with_error(
     assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "asgi"
 
-    assert transaction_event["type"] == "transaction"
-    assert transaction_event["contexts"]["trace"] == DictionaryContaining(
-        error_event["contexts"]["trace"]
-    )
-    assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
-    assert transaction_event["transaction"] == error_event["transaction"]
-    assert transaction_event["request"] == error_event["request"]
+    if span_streaming:
+        assert span_item["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+        assert span_item["span_id"] == error_event["contexts"]["trace"]["span_id"]
+        assert span_item.get("parent_span_id") == error_event["contexts"]["trace"].get(
+            "parent_span_id"
+        )
+        assert span_item["status"] == "error"
+
+    else:
+        assert transaction_event["type"] == "transaction"
+        assert transaction_event["contexts"]["trace"] == DictionaryContaining(
+            error_event["contexts"]["trace"]
+        )
+        assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
+        assert transaction_event["transaction"] == error_event["transaction"]
+        assert transaction_event["request"] == error_event["request"]
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 async def test_has_trace_if_performance_enabled(
     sentry_init,
     asgi3_app_with_error_and_msg,
     capture_events,
+    capture_items,
+    span_streaming,
 ):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
-            events = capture_events()
+            if span_streaming:
+                items = capture_items("event", "span")
+            else:
+                events = capture_events()
             await client.get("/")
 
-    msg_event, error_event, transaction_event = events
+    sentry_sdk.flush()
 
-    assert msg_event["contexts"]["trace"]
-    assert "trace_id" in msg_event["contexts"]["trace"]
+    if span_streaming:
+        msg_event, error_event, span = items
 
-    assert error_event["contexts"]["trace"]
-    assert "trace_id" in error_event["contexts"]["trace"]
+        assert msg_event.type == "event"
+        msg_event = msg_event.payload
+        assert msg_event["contexts"]["trace"]
+        assert "trace_id" in msg_event["contexts"]["trace"]
 
-    assert transaction_event["contexts"]["trace"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
+        assert error_event.type == "event"
+        error_event = error_event.payload
+        assert error_event["contexts"]["trace"]
+        assert "trace_id" in error_event["contexts"]["trace"]
 
-    assert (
-        error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
-        == msg_event["contexts"]["trace"]["trace_id"]
-    )
+        assert span.type == "span"
+        span = span.payload
+        assert span["trace_id"] is not None
+
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == msg_event["contexts"]["trace"]["trace_id"]
+            == span["trace_id"]
+        )
+
+    else:
+        msg_event, error_event, transaction_event = events
+
+        assert msg_event["contexts"]["trace"]
+        assert "trace_id" in msg_event["contexts"]["trace"]
+
+        assert error_event["contexts"]["trace"]
+        assert "trace_id" in error_event["contexts"]["trace"]
+
+        assert transaction_event["contexts"]["trace"]
+        assert "trace_id" in transaction_event["contexts"]["trace"]
+
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == transaction_event["contexts"]["trace"]["trace_id"]
+            == msg_event["contexts"]["trace"]["trace_id"]
+        )
 
 
 @pytest.mark.asyncio
@@ -286,13 +397,24 @@ async def test_has_trace_if_performance_disabled(
     assert "trace_id" in error_event["contexts"]["trace"]
 
 
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 @pytest.mark.asyncio
 async def test_trace_from_headers_if_performance_enabled(
     sentry_init,
     asgi3_app_with_error_and_msg,
     capture_events,
+    capture_items,
+    span_streaming,
 ):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -300,23 +422,50 @@ async def test_trace_from_headers_if_performance_enabled(
 
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
-            events = capture_events()
+            if span_streaming:
+                items = capture_items("event", "span")
+            else:
+                events = capture_events()
             await client.get("/", headers={"sentry-trace": sentry_trace_header})
 
-    msg_event, error_event, transaction_event = events
+    sentry_sdk.flush()
 
-    assert msg_event["contexts"]["trace"]
-    assert "trace_id" in msg_event["contexts"]["trace"]
+    if span_streaming:
+        msg_event, error_event, span = items
 
-    assert error_event["contexts"]["trace"]
-    assert "trace_id" in error_event["contexts"]["trace"]
+        assert msg_event.type == "event"
+        msg_event = msg_event.payload
+        assert msg_event["contexts"]["trace"]
+        assert "trace_id" in msg_event["contexts"]["trace"]
 
-    assert transaction_event["contexts"]["trace"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
+        assert error_event.type == "event"
+        error_event = error_event.payload
+        assert error_event["contexts"]["trace"]
+        assert "trace_id" in error_event["contexts"]["trace"]
 
-    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
-    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
-    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert span.type == "span"
+        span = span.payload
+        assert span["trace_id"] is not None
+
+        assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert span["trace_id"] == trace_id
+
+    else:
+        msg_event, error_event, transaction_event = events
+
+        assert msg_event["contexts"]["trace"]
+        assert "trace_id" in msg_event["contexts"]["trace"]
+
+        assert error_event["contexts"]["trace"]
+        assert "trace_id" in error_event["contexts"]["trace"]
+
+        assert transaction_event["contexts"]["trace"]
+        assert "trace_id" in transaction_event["contexts"]["trace"]
+
+        assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
 @pytest.mark.asyncio
@@ -348,10 +497,25 @@ async def test_trace_from_headers_if_performance_disabled(
 
 
 @pytest.mark.asyncio
-async def test_websocket(sentry_init, asgi3_ws_app, capture_events, request):
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
-
-    events = capture_events()
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
+async def test_websocket(
+    sentry_init,
+    asgi3_ws_app,
+    capture_events,
+    capture_items,
+    request,
+    span_streaming,
+):
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
 
     asgi3_ws_app = SentryAsgiMiddleware(asgi3_ws_app)
 
@@ -359,21 +523,48 @@ async def test_websocket(sentry_init, asgi3_ws_app, capture_events, request):
 
     with pytest.raises(ValueError):
         client = TestClient(asgi3_ws_app)
+        if span_streaming:
+            items = capture_items("event", "span")
+        else:
+            events = capture_events()
         async with client.websocket_connect(request_url) as ws:
             await ws.receive_text()
 
-    msg_event, error_event, transaction_event = events
+    sentry_sdk.flush()
 
-    assert msg_event["transaction"] == request_url
-    assert msg_event["transaction_info"] == {"source": "url"}
-    assert msg_event["message"] == "Some message to the world!"
+    if span_streaming:
+        msg_event, error_event, span = items
 
-    (exc,) = error_event["exception"]["values"]
-    assert exc["type"] == "ValueError"
-    assert exc["value"] == "Oh no"
+        assert msg_event.type == "event"
+        msg_event = msg_event.payload
+        assert msg_event["transaction"] == request_url
+        assert msg_event["transaction_info"] == {"source": "url"}
+        assert msg_event["message"] == "Some message to the world!"
 
-    assert transaction_event["transaction"] == request_url
-    assert transaction_event["transaction_info"] == {"source": "url"}
+        assert error_event.type == "event"
+        error_event = error_event.payload
+        (exc,) = error_event["exception"]["values"]
+        assert exc["type"] == "ValueError"
+        assert exc["value"] == "Oh no"
+
+        assert span.type == "span"
+        span = span.payload
+        assert span["name"] == request_url
+        assert span["attributes"]["sentry.span.source"] == "url"
+
+    else:
+        msg_event, error_event, transaction_event = events
+
+        assert msg_event["transaction"] == request_url
+        assert msg_event["transaction_info"] == {"source": "url"}
+        assert msg_event["message"] == "Some message to the world!"
+
+        (exc,) = error_event["exception"]["values"]
+        assert exc["type"] == "ValueError"
+        assert exc["value"] == "Oh no"
+
+        assert transaction_event["transaction"] == request_url
+        assert transaction_event["transaction_info"] == {"source": "url"}
 
 
 @pytest.mark.asyncio
@@ -431,17 +622,29 @@ async def test_auto_session_tracking_with_aggregates(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 @pytest.mark.asyncio
 async def test_transaction_style(
     sentry_init,
     asgi3_app,
     capture_events,
+    capture_items,
     url,
     transaction_style,
     expected_transaction,
     expected_source,
+    span_streaming,
 ):
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
     scope = {
@@ -451,13 +654,26 @@ async def test_transaction_style(
     }
 
     async with TestClient(app, scope=scope) as client:
-        events = capture_events()
+        if span_streaming:
+            items = capture_items("span")
+        else:
+            events = capture_events()
         await client.get(url)
 
-    (transaction_event,) = events
+    sentry_sdk.flush()
 
-    assert transaction_event["transaction"] == expected_transaction
-    assert transaction_event["transaction_info"] == {"source": expected_source}
+    if span_streaming:
+        assert len(items) == 1
+        span = items[0].payload
+
+        assert span["name"] == expected_transaction
+        assert span["attributes"]["sentry.span.source"] == expected_source
+
+    else:
+        (transaction_event,) = events
+
+        assert transaction_event["transaction"] == expected_transaction
+        assert transaction_event["transaction_info"] == {"source": expected_source}
 
 
 def mock_asgi2_app():
@@ -622,6 +838,10 @@ def test_get_headers():
         ),
     ],
 )
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 async def test_transaction_name(
     sentry_init,
     request_url,
@@ -630,28 +850,47 @@ async def test_transaction_name(
     expected_transaction_source,
     asgi3_app,
     capture_envelopes,
+    capture_items,
+    span_streaming,
 ):
     """
     Tests that the transaction name is something meaningful.
     """
     sentry_init(
         traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
 
-    envelopes = capture_envelopes()
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        envelopes = capture_envelopes()
 
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
     async with TestClient(app) as client:
         await client.get(request_url)
 
-    (transaction_envelope,) = envelopes
-    transaction_event = transaction_envelope.get_transaction_event()
+    if span_streaming:
+        sentry_sdk.flush()
 
-    assert transaction_event["transaction"] == expected_transaction_name
-    assert (
-        transaction_event["transaction_info"]["source"] == expected_transaction_source
-    )
+        assert len(items) == 1
+        span = items[0].payload
+
+        assert span["name"] == expected_transaction_name
+        assert span["attributes"]["sentry.span.source"] == expected_transaction_source
+
+    else:
+        (transaction_envelope,) = envelopes
+        transaction_event = transaction_envelope.get_transaction_event()
+
+        assert transaction_event["transaction"] == expected_transaction_name
+        assert (
+            transaction_event["transaction_info"]["source"]
+            == expected_transaction_source
+        )
 
 
 @pytest.mark.asyncio
@@ -672,6 +911,10 @@ async def test_transaction_name(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 async def test_transaction_name_in_traces_sampler(
     sentry_init,
     request_url,
@@ -679,6 +922,7 @@ async def test_transaction_name_in_traces_sampler(
     expected_transaction_name,
     expected_transaction_source,
     asgi3_app,
+    span_streaming,
 ):
     """
     Tests that a custom traces_sampler has a meaningful transaction name.
@@ -686,17 +930,28 @@ async def test_transaction_name_in_traces_sampler(
     """
 
     def dummy_traces_sampler(sampling_context):
-        assert (
-            sampling_context["transaction_context"]["name"] == expected_transaction_name
-        )
-        assert (
-            sampling_context["transaction_context"]["source"]
-            == expected_transaction_source
-        )
+        if span_streaming:
+            assert sampling_context["span_context"]["name"] == expected_transaction_name
+            assert (
+                sampling_context["span_context"]["attributes"]["sentry.span.source"]
+                == expected_transaction_source
+            )
+        else:
+            assert (
+                sampling_context["transaction_context"]["name"]
+                == expected_transaction_name
+            )
+            assert (
+                sampling_context["transaction_context"]["source"]
+                == expected_transaction_source
+            )
 
     sentry_init(
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
 
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
@@ -706,17 +961,44 @@ async def test_transaction_name_in_traces_sampler(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 async def test_custom_transaction_name(
-    sentry_init, asgi3_custom_transaction_app, capture_events
+    sentry_init,
+    asgi3_custom_transaction_app,
+    capture_events,
+    capture_items,
+    span_streaming,
 ):
-    sentry_init(traces_sample_rate=1.0)
-    events = capture_events()
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
     app = SentryAsgiMiddleware(asgi3_custom_transaction_app)
 
     async with TestClient(app) as client:
+        if span_streaming:
+            items = capture_items("span")
+        else:
+            events = capture_events()
         await client.get("/test")
 
-    (transaction_event,) = events
-    assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "foobar"
-    assert transaction_event["transaction_info"] == {"source": "custom"}
+    sentry_sdk.flush()
+
+    if span_streaming:
+        assert len(items) == 1
+        span = items[0].payload
+
+        assert span["is_segment"] is True
+        assert span["name"] == "foobar"
+        assert span["attributes"]["sentry.span.source"] == "custom"
+
+    else:
+        (transaction_event,) = events
+        assert transaction_event["type"] == "transaction"
+        assert transaction_event["transaction"] == "foobar"
+        assert transaction_event["transaction_info"] == {"source": "custom"}
