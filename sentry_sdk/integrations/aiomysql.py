@@ -154,14 +154,19 @@ def _wrap_connect(
 ) -> Callable[..., Awaitable[T]]:
     """Wrap aiomysql.connect to capture connection spans."""
 
-    async def _inner(*args: Any, **kwargs: Any) -> T:
-        if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
-            return await f(*args, **kwargs)
+    async def _inner(
+        host: str = "localhost",
+        user: Any = None,
+        password: Any = "",
+        db: Any = None,
+        port: int = 3306,
+        *args: Any,
+        **kwargs: Any,
+    ) -> T:
+        call_args = (host, user, password, db, port, *args)
 
-        host = kwargs.get("host", "localhost")
-        port = kwargs.get("port") or 3306
-        user = kwargs.get("user")
-        db = kwargs.get("db") or kwargs.get("database")
+        if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
+            return await f(*call_args, **kwargs)
 
         with sentry_sdk.start_span(
             op=OP.DB,
@@ -180,7 +185,7 @@ def _wrap_connect(
                     category="query",
                     data=span._data,
                 )
-            res = await f(*args, **kwargs)
+            res = await f(*call_args, **kwargs)
 
         return res
 
