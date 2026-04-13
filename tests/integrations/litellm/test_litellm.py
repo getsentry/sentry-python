@@ -680,6 +680,7 @@ def test_additional_parameters(
 
 
 def test_no_integration(
+    reset_litellm_executor,
     sentry_init,
     capture_events,
     get_model_response,
