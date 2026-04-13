@@ -14,7 +14,11 @@ if TYPE_CHECKING:
     from typing import Any
 
 try:
-    from pydantic_ai._tool_manager import ToolManager  # type: ignore
+    try:
+        from pydantic_ai.tool_manager import ToolManager  # type: ignore
+    except ImportError:
+        from pydantic_ai._tool_manager import ToolManager  # type: ignore
+
     from pydantic_ai.exceptions import ToolRetryError  # type: ignore
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")

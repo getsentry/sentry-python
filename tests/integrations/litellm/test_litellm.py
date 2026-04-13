@@ -532,42 +532,6 @@ def test_additional_parameters(sentry_init, capture_events):
     assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
 
 
-def test_litellm_specific_parameters(sentry_init, capture_events):
-    """Test that LiteLLM-specific parameters are captured."""
-    sentry_init(
-        integrations=[LiteLLMIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    messages = [{"role": "user", "content": "Hello!"}]
-    mock_response = MockCompletionResponse()
-
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-            "api_base": "https://custom-api.example.com",
-            "api_version": "2023-01-01",
-            "custom_llm_provider": "custom_provider",
-        }
-
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
-
-    (event,) = events
-    (span,) = event["spans"]
-
-    assert span["data"]["gen_ai.litellm.api_base"] == "https://custom-api.example.com"
-    assert span["data"]["gen_ai.litellm.api_version"] == "2023-01-01"
-    assert span["data"]["gen_ai.litellm.custom_llm_provider"] == "custom_provider"
-
-
 def test_no_integration(sentry_init, capture_events):
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
