@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import Literal
 
-    from sentry_sdk._types import Attributes
     from sentry_sdk.utils import AnnotatedValue
 
 
@@ -112,7 +111,7 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
     """
     Return attributes related to the HTTP request from the ASGI scope.
     """
-    attributes: "Attributes" = {}
+    attributes: "dict[str, Any]" = {}
 
     ty = asgi_scope["type"]
     if ty in ("http", "websocket"):

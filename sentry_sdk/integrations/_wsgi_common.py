@@ -217,6 +217,7 @@ def _filter_headers(
     if should_send_default_pii():
         return headers
 
+    substitute: "Union[AnnotatedValue, str]"
     if use_annotated_value:
         substitute = AnnotatedValue.removed_because_over_size_limit()
     else:
