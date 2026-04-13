@@ -146,7 +146,7 @@ def _wrap_executemany(
 
 def _get_connection(cursor: Any) -> Any:
     """Get the underlying connection from a cursor."""
-    return getattr(cursor, "_connection", None)
+    return getattr(cursor, "connection", None)
 
 
 def _wrap_connect(
