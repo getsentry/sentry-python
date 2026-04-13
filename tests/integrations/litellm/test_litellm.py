@@ -679,7 +679,12 @@ def test_additional_parameters(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
 
 
-def test_no_integration(sentry_init, capture_events, get_model_response, nonstreaming_chat_completions_model_response):
+def test_no_integration(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
         traces_sample_rate=1.0,
