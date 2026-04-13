@@ -307,10 +307,13 @@ class SentryAsgiMiddleware:
                             else nullcontext()
                         )
 
-                    for attribute, value in _get_request_attributes(scope).items():
-                        sentry_scope.set_attribute(attribute, value)
-
                     with span_ctx as span:
+                        if isinstance(span, StreamedSpan):
+                            for attribute, value in _get_request_attributes(
+                                scope
+                            ).items():
+                                span.set_attribute(attribute, value)
+
                         try:
 
                             async def _sentry_wrapped_send(
