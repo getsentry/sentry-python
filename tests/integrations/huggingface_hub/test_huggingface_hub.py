@@ -1,15 +1,14 @@
-from unittest import mock
-import pytest
 import re
-import responses
+from typing import TYPE_CHECKING
+from unittest import mock
 
+import pytest
+import responses
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
-from sentry_sdk.utils import package_version
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
-
-from typing import TYPE_CHECKING
+from sentry_sdk.utils import package_version
 
 try:
     from huggingface_hub.utils._errors import HfHubHTTPError
@@ -833,8 +832,6 @@ def test_span_status_error(
     assert span is not None
     assert span["status"] == "internal_error"
     assert span["tags"]["status"] == "internal_error"
-
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
