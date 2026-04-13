@@ -128,38 +128,6 @@ class MockCompletionResponse:
         self.created = 1234567890
 
 
-class MockEmbeddingData:
-    def __init__(self, embedding=None):
-        self.embedding = embedding or [0.1, 0.2, 0.3]
-        self.index = 0
-        self.object = "embedding"
-
-
-class MockEmbeddingResponse:
-    def __init__(self, model="text-embedding-ada-002", data=None, usage=None):
-        self.model = model
-        self.data = data or [MockEmbeddingData()]
-        self.usage = usage or MockUsage(
-            prompt_tokens=5, completion_tokens=0, total_tokens=5
-        )
-        self.object = "list"
-
-    def model_dump(self):
-        return {
-            "model": self.model,
-            "data": [
-                {"embedding": d.embedding, "index": d.index, "object": d.object}
-                for d in self.data
-            ],
-            "usage": {
-                "prompt_tokens": self.usage.prompt_tokens,
-                "completion_tokens": self.usage.completion_tokens,
-                "total_tokens": self.usage.total_tokens,
-            },
-            "object": self.object,
-        }
-
-
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -313,7 +281,13 @@ def test_streaming_chat_completion(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-def test_embeddings_create(sentry_init, capture_events, clear_litellm_cache):
+def test_embeddings_create(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    openai_embedding_model_response,
+    clear_litellm_cache,
+):
     """
     Test that litellm.embedding() calls are properly instrumented.
 
@@ -327,20 +301,24 @@ def test_embeddings_create(sentry_init, capture_events, clear_litellm_cache):
     )
     events = capture_events()
 
-    mock_response = MockEmbeddingResponse()
+    client = OpenAI(api_key="test-key")
 
-    # Mock within the test to ensure proper ordering with cache clearing
-    with mock.patch(
-        "litellm.openai_chat_completions.make_sync_openai_embedding_request"
-    ) as mock_http:
-        # The function returns (headers, response)
-        mock_http.return_value = ({}, mock_response)
+    model_response = get_model_response(
+        openai_embedding_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
 
+    with mock.patch.object(
+        client.embeddings._client._client,
+        "send",
+        return_value=model_response,
+    ):
         with start_transaction(name="litellm test"):
             response = litellm.embedding(
                 model="text-embedding-ada-002",
                 input="Hello, world!",
-                api_key="test-key",  # Provide a fake API key to avoid authentication errors
+                client=client,
             )
             # Allow time for callbacks to complete (they may run in separate threads)
             time.sleep(0.1)
@@ -351,8 +329,13 @@ def test_embeddings_create(sentry_init, capture_events, clear_litellm_cache):
         (event,) = events
 
         assert event["type"] == "transaction"
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
+        spans = list(
+            x
+            for x in event["spans"]
+            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+        )
+        assert len(spans) == 1
+        span = spans[0]
 
         assert span["op"] == OP.GEN_AI_EMBEDDINGS
         assert span["description"] == "embeddings text-embedding-ada-002"
@@ -365,7 +348,11 @@ def test_embeddings_create(sentry_init, capture_events, clear_litellm_cache):
 
 
 def test_embeddings_create_with_list_input(
-    sentry_init, capture_events, clear_litellm_cache
+    sentry_init,
+    capture_events,
+    get_model_response,
+    openai_embedding_model_response,
+    clear_litellm_cache,
 ):
     """Test embedding with list input."""
     sentry_init(
@@ -375,20 +362,24 @@ def test_embeddings_create_with_list_input(
     )
     events = capture_events()
 
-    mock_response = MockEmbeddingResponse()
+    client = OpenAI(api_key="test-key")
 
-    # Mock within the test to ensure proper ordering with cache clearing
-    with mock.patch(
-        "litellm.openai_chat_completions.make_sync_openai_embedding_request"
-    ) as mock_http:
-        # The function returns (headers, response)
-        mock_http.return_value = ({}, mock_response)
+    model_response = get_model_response(
+        openai_embedding_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
 
+    with mock.patch.object(
+        client.embeddings._client._client,
+        "send",
+        return_value=model_response,
+    ):
         with start_transaction(name="litellm test"):
             response = litellm.embedding(
                 model="text-embedding-ada-002",
                 input=["First text", "Second text", "Third text"],
-                api_key="test-key",  # Provide a fake API key to avoid authentication errors
+                client=client,
             )
             # Allow time for callbacks to complete (they may run in separate threads)
             time.sleep(0.1)
@@ -399,8 +390,13 @@ def test_embeddings_create_with_list_input(
         (event,) = events
 
         assert event["type"] == "transaction"
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
+        spans = list(
+            x
+            for x in event["spans"]
+            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+        )
+        assert len(spans) == 1
+        span = spans[0]
 
         assert span["op"] == OP.GEN_AI_EMBEDDINGS
         assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
@@ -413,7 +409,13 @@ def test_embeddings_create_with_list_input(
         ]
 
 
-def test_embeddings_no_pii(sentry_init, capture_events, clear_litellm_cache):
+def test_embeddings_no_pii(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    openai_embedding_model_response,
+    clear_litellm_cache,
+):
     """Test that PII is not captured when disabled."""
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=True)],
@@ -422,20 +424,24 @@ def test_embeddings_no_pii(sentry_init, capture_events, clear_litellm_cache):
     )
     events = capture_events()
 
-    mock_response = MockEmbeddingResponse()
+    client = OpenAI(api_key="test-key")
 
-    # Mock within the test to ensure proper ordering with cache clearing
-    with mock.patch(
-        "litellm.openai_chat_completions.make_sync_openai_embedding_request"
-    ) as mock_http:
-        # The function returns (headers, response)
-        mock_http.return_value = ({}, mock_response)
+    model_response = get_model_response(
+        openai_embedding_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
 
+    with mock.patch.object(
+        client.embeddings._client._client,
+        "send",
+        return_value=model_response,
+    ):
         with start_transaction(name="litellm test"):
             response = litellm.embedding(
                 model="text-embedding-ada-002",
                 input="Hello, world!",
-                api_key="test-key",  # Provide a fake API key to avoid authentication errors
+                client=client,
             )
             # Allow time for callbacks to complete (they may run in separate threads)
             time.sleep(0.1)
@@ -446,8 +452,13 @@ def test_embeddings_no_pii(sentry_init, capture_events, clear_litellm_cache):
         (event,) = events
 
         assert event["type"] == "transaction"
-        assert len(event["spans"]) == 1
-        (span,) = event["spans"]
+        spans = list(
+            x
+            for x in event["spans"]
+            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+        )
+        assert len(spans) == 1
+        span = spans[0]
 
         assert span["op"] == OP.GEN_AI_EMBEDDINGS
         # Check that embeddings input is NOT captured when PII is disabled
