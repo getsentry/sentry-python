@@ -153,11 +153,11 @@ async def _run_single_turn_streamed(
 
     try:
         result = await original_run_single_turn_streamed(*args, **kwargs)
-    except Exception as exc:
+    except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             if span is not None and span.timestamp is None:
-                set_span_errored(span, exc)
+                set_span_errored(span)
                 end_invoke_agent_span(context_wrapper, agent)
             _close_streaming_workflow_span(agent)
         reraise(*exc_info)
