@@ -157,7 +157,7 @@ def test_nonstreaming_chat_completion(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -239,7 +239,7 @@ async def test_async_nonstreaming_chat_completion(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -323,7 +323,7 @@ def test_streaming_chat_completion(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         server_side_event_chunks(
@@ -395,7 +395,7 @@ async def test_async_streaming_chat_completion(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         async_iterator(
@@ -461,7 +461,7 @@ def test_embeddings_create(
     )
     events = capture_events()
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -528,7 +528,7 @@ async def test_async_embeddings_create(
     )
     events = capture_events()
 
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -590,7 +590,7 @@ def test_embeddings_create_with_list_input(
     )
     events = capture_events()
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -653,7 +653,7 @@ async def test_async_embeddings_create_with_list_input(
     )
     events = capture_events()
 
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -716,7 +716,7 @@ def test_embeddings_no_pii(
     )
     events = capture_events()
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -773,7 +773,7 @@ async def test_async_embeddings_no_pii(
     )
     events = capture_events()
 
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         openai_embedding_model_response,
@@ -826,7 +826,7 @@ def test_exception_handling(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_rate_limit_model_response()
 
@@ -862,7 +862,7 @@ async def test_async_exception_handling(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_rate_limit_model_response()
 
@@ -901,7 +901,7 @@ def test_span_origin(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -947,7 +947,7 @@ def test_multiple_providers(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    openai_client = OpenAI(api_key="z")
+    openai_client = OpenAI(api_key="test-key")
     openai_model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
@@ -987,7 +987,7 @@ def test_multiple_providers(
                 model="claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
-                api_key="z",
+                api_key="test-key",
             )
 
             litellm_utils.executor.shutdown(wait=True)
@@ -1010,7 +1010,7 @@ def test_multiple_providers(
                 model="gemini/gemini-pro",
                 messages=messages,
                 client=gemini_client,
-                api_key="z",
+                api_key="test-key",
             )
 
             litellm_utils.executor.shutdown(wait=True)
@@ -1041,7 +1041,7 @@ async def test_async_multiple_providers(
 
     messages = [{"role": "user", "content": "Hello!"}]
 
-    openai_client = AsyncOpenAI(api_key="z")
+    openai_client = AsyncOpenAI(api_key="test-key")
     openai_model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
         serialize_pydantic=True,
@@ -1082,7 +1082,7 @@ async def test_async_multiple_providers(
                 model="claude-3-opus-20240229",
                 messages=messages,
                 client=anthropic_client,
-                api_key="z",
+                api_key="test-key",
             )
 
             await GLOBAL_LOGGING_WORKER.flush()
@@ -1106,7 +1106,7 @@ async def test_async_multiple_providers(
                 model="gemini/gemini-pro",
                 messages=messages,
                 client=gemini_client,
-                api_key="z",
+                api_key="test-key",
             )
 
             await GLOBAL_LOGGING_WORKER.flush()
@@ -1135,7 +1135,7 @@ def test_additional_parameters(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1193,7 +1193,7 @@ async def test_async_additional_parameters(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1287,7 +1287,7 @@ def test_no_integration(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1334,7 +1334,7 @@ async def test_async_no_integration(
     events = capture_events()
 
     messages = [{"role": "user", "content": "Hello!"}]
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1511,7 +1511,7 @@ def test_binary_content_encoding_image_url(
             ],
         }
     ]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1589,7 +1589,7 @@ async def test_async_binary_content_encoding_image_url(
             ],
         }
     ]
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1669,7 +1669,7 @@ def test_binary_content_encoding_mixed_content(
             ],
         }
     ]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1736,7 +1736,7 @@ async def test_async_binary_content_encoding_mixed_content(
             ],
         }
     ]
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1802,7 +1802,7 @@ def test_binary_content_encoding_uri_type(
             ],
         }
     ]
-    client = OpenAI(api_key="z")
+    client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,
@@ -1874,7 +1874,7 @@ async def test_async_binary_content_encoding_uri_type(
             ],
         }
     ]
-    client = AsyncOpenAI(api_key="z")
+    client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
         nonstreaming_chat_completions_model_response,

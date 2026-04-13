@@ -159,16 +159,6 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         if value is not None:
             set_data_normalized(span, attribute, value)
 
-    # Record LiteLLM-specific parameters
-    litellm_params = {
-        "api_base": kwargs.get("api_base"),
-        "api_version": kwargs.get("api_version"),
-        "custom_llm_provider": kwargs.get("custom_llm_provider"),
-    }
-    for key, value in litellm_params.items():
-        if value is not None:
-            set_data_normalized(span, f"gen_ai.litellm.{key}", value)
-
 
 async def _async_input_callback(kwargs: "Dict[str, Any]") -> None:
     return _input_callback(kwargs)
