@@ -347,10 +347,10 @@ def capture_items(monkeypatch):
                     continue
 
                 if item.type in ("metric", "log", "span"):
-                    for json in item.payload.json["items"]:
-                        t = {k: v for k, v in json.items() if k != "attributes"}
+                    for i in item.payload.json["items"]:
+                        t = {k: v for k, v in i.items() if k != "attributes"}
                         t["attributes"] = {
-                            k: v["value"] for k, v in json["attributes"].items()
+                            k: v["value"] for k, v in i["attributes"].items()
                         }
                         telemetry.append(UnwrappedItem(type=item.type, payload=t))
                 else:
