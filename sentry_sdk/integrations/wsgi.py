@@ -15,7 +15,7 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.scope import should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import StreamedSpan, SegmentSource
-from sentry_sdk.tracing import Transaction, TransactionSource
+from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
@@ -127,13 +127,13 @@ class SentryWsgiMiddleware:
 
                     method = environ.get("REQUEST_METHOD", "").upper()
 
-                    span_ctx: "ContextManager[Union[Transaction, StreamedSpan, None]]" = None
+                    span_ctx: "Optional[ContextManager[Union[Span, StreamedSpan, None]]]" = None
                     if method in self.http_methods_to_capture:
                         if span_streaming:
                             sentry_sdk.traces.continue_trace(
                                 dict(_get_headers(environ))
                             )
-                            scope.set_custom_sampling_context({"wsgi_environ": scope})
+                            scope.set_custom_sampling_context({"wsgi_environ": environ})
 
                             span_ctx = sentry_sdk.traces.start_span(
                                 name=_DEFAULT_TRANSACTION_NAME,
@@ -222,7 +222,7 @@ class SentryWsgiMiddleware:
 
 def _sentry_start_response(
     old_start_response: "StartResponse",
-    span: "Optional[Union[Transaction, StreamedSpan]]",
+    span: "Optional[Union[Span, StreamedSpan]]",
     status: str,
     response_headers: "WsgiResponseHeaders",
     exc_info: "Optional[WsgiExcInfo]" = None,
