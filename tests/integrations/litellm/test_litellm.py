@@ -33,6 +33,7 @@ from sentry_sdk.integrations.litellm import (
 from sentry_sdk.utils import package_version
 
 from openai import OpenAI, AsyncOpenAI
+from openai.types import CompletionUsage
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -165,6 +166,11 @@ def test_nonstreaming_chat_completion(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -252,6 +258,11 @@ async def test_async_nonstreaming_chat_completion(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -919,6 +930,11 @@ def test_span_origin(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -969,6 +985,11 @@ def test_multiple_providers(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1068,6 +1089,11 @@ async def test_async_multiple_providers(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1168,6 +1194,11 @@ def test_additional_parameters(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1231,6 +1262,11 @@ async def test_async_additional_parameters(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1294,6 +1330,11 @@ def test_no_integration(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1346,6 +1387,11 @@ async def test_async_no_integration(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1528,6 +1574,11 @@ def test_binary_content_encoding_image_url(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1611,6 +1662,11 @@ async def test_async_binary_content_encoding_image_url(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1696,6 +1752,11 @@ def test_binary_content_encoding_mixed_content(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1768,6 +1829,11 @@ async def test_async_binary_content_encoding_mixed_content(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1839,6 +1905,11 @@ def test_binary_content_encoding_uri_type(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
@@ -1916,6 +1987,11 @@ async def test_async_binary_content_encoding_uri_type(
             response_model="gpt-3.5-turbo",
             message_content="Test response",
             created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
