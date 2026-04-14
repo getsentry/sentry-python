@@ -9,7 +9,6 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
-    _get_request_attributes,
     nullcontext,
 )
 from sentry_sdk.scope import should_send_default_pii, use_isolation_scope
@@ -160,11 +159,12 @@ class SentryWsgiMiddleware:
                     span_ctx = span_ctx or nullcontext()
 
                     with span_ctx as span:
-                        with capture_internal_exceptions():
-                            for attr, value in _get_request_attributes(
-                                environ, self.use_x_forwarded_for
-                            ).items():
-                                span.set_attribute(attr, value)
+                        if isinstance(span, StreamedSpan):
+                            with capture_internal_exceptions():
+                                for attr, value in _get_request_attributes(
+                                    environ, self.use_x_forwarded_for
+                                ).items():
+                                    span.set_attribute(attr, value)
 
                         try:
                             response = self.app(
@@ -385,3 +385,47 @@ def _make_wsgi_event_processor(
         return event
 
     return event_processor
+
+
+def _get_request_attributes(
+    environ: "Dict[str, str]",
+    use_x_forwarded_for: bool = False,
+) -> "Dict[str, Any]":
+    """
+    Return span attributes related to the HTTP request from the WSGI environ.
+    """
+    attributes: "dict[str, Any]" = {}
+
+    method = environ.get("REQUEST_METHOD")
+    if method:
+        attributes["http.request.method"] = method.upper()
+
+    headers = _filter_headers(dict(_get_headers(environ)), use_annotated_value=False)
+    for header, value in headers.items():
+        attributes[f"http.request.header.{header.lower()}"] = value
+
+    query_string = environ.get("QUERY_STRING")
+    if query_string:
+        attributes["http.query"] = query_string
+
+    attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
+
+    url_scheme = environ.get("wsgi.url_scheme")
+    if url_scheme:
+        attributes["network.protocol.name"] = url_scheme
+
+    server_name = environ.get("SERVER_NAME")
+    if server_name:
+        attributes["server.address"] = server_name
+
+    server_port = environ.get("SERVER_PORT")
+    if server_port:
+        attributes["server.port"] = server_port
+
+    if should_send_default_pii():
+        client_ip = get_client_ip(environ)
+        if client_ip:
+            attributes["client.address"] = client_ip
+            attributes["user.ip_address"] = client_ip
+
+    return attributes
