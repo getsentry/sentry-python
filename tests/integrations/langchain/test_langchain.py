@@ -171,7 +171,7 @@ def test_langchain_text_completion(
     assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
 
 
-def test_langchain_chat(
+def test_langchain_chat_with_run_name(
     sentry_init,
     capture_events,
     get_model_response,
@@ -194,7 +194,12 @@ def test_langchain_chat(
         request_headers["X-Stainless-Raw-Response"] = "True"
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="response-model-id",
+            response_content="the model response",
+            created=10000000,
+        ),
         serialize_pydantic=True,
         request_headers=request_headers,
     )
