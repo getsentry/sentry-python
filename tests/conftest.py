@@ -7,6 +7,7 @@ import warnings
 import brotli
 import gzip
 import io
+from dataclasses import dataclass
 from threading import Thread
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -52,6 +53,18 @@ try:
     import openai
 except ImportError:
     openai = None
+
+
+try:
+    import anthropic
+except ImportError:
+    anthropic = None
+
+
+try:
+    import google
+except ImportError:
+    google = None
 
 
 from tests import _warning_recorder, _warning_recorder_mgr
@@ -316,6 +329,52 @@ def capture_envelopes(monkeypatch):
         monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
 
         return envelopes
+
+    return inner
+
+
+@dataclass
+class UnwrappedItem:
+    type: str
+    payload: dict
+
+
+@pytest.fixture
+def capture_items(monkeypatch):
+    """
+    Capture envelope payload, unfurling individual items.
+
+    Makes it easier to work with both events and attribute-based telemetry in
+    one test.
+    """
+
+    def inner(*types):
+        telemetry = []
+        test_client = sentry_sdk.get_client()
+        old_capture_envelope = test_client.transport.capture_envelope
+
+        def append_envelope(envelope):
+            for item in envelope:
+                if types and item.type not in types:
+                    continue
+
+                if item.type in ("metric", "log", "span"):
+                    for i in item.payload.json["items"]:
+                        t = {k: v for k, v in i.items() if k != "attributes"}
+                        t["attributes"] = {
+                            k: v["value"] for k, v in i["attributes"].items()
+                        }
+                        telemetry.append(UnwrappedItem(type=item.type, payload=t))
+                else:
+                    telemetry.append(
+                        UnwrappedItem(type=item.type, payload=item.payload.json)
+                    )
+
+            return old_capture_envelope(envelope)
+
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
+
+        return telemetry
 
     return inner
 
@@ -1050,7 +1109,12 @@ def get_model_response():
         )
 
         if serialize_pydantic:
-            response_content = json.dumps(response_content.model_dump()).encode("utf-8")
+            response_content = json.dumps(
+                response_content.model_dump(
+                    by_alias=True,
+                    exclude_none=True,
+                )
+            ).encode("utf-8")
 
         response = HttpxResponse(
             200,
@@ -1061,6 +1125,185 @@ def get_model_response():
         return response
 
     return inner
+
+
+@pytest.fixture
+def get_rate_limit_model_response():
+    def inner(request_headers=None):
+        if request_headers is None:
+            request_headers = {}
+
+        model_request = HttpxRequest(
+            "POST",
+            "/responses",
+            headers=request_headers,
+        )
+
+        response = HttpxResponse(
+            429,
+            request=model_request,
+        )
+
+        return response
+
+    return inner
+
+
+@pytest.fixture
+def streaming_chat_completions_model_response():
+    return [
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        role="assistant"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="Tes"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="t r"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="esp"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="ons"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="e"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(),
+                    finish_reason="stop",
+                ),
+            ],
+            usage=openai.types.CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+    ]
+
+
+@pytest.fixture
+def nonstreaming_chat_completions_model_response():
+    return openai.types.chat.ChatCompletion(
+        id="chatcmpl-test",
+        choices=[
+            openai.types.chat.chat_completion.Choice(
+                index=0,
+                finish_reason="stop",
+                message=openai.types.chat.ChatCompletionMessage(
+                    role="assistant", content="Test response"
+                ),
+            )
+        ],
+        created=1234567890,
+        model="gpt-3.5-turbo",
+        object="chat.completion",
+        usage=openai.types.CompletionUsage(
+            prompt_tokens=10,
+            completion_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+
+@pytest.fixture
+def openai_embedding_model_response():
+    return openai.types.CreateEmbeddingResponse(
+        data=[
+            openai.types.Embedding(
+                embedding=[0.1, 0.2, 0.3],
+                index=0,
+                object="embedding",
+            )
+        ],
+        model="text-embedding-ada-002",
+        object="list",
+        usage=openai.types.create_embedding_response.Usage(
+            prompt_tokens=5,
+            total_tokens=5,
+        ),
+    )
 
 
 @pytest.fixture
@@ -1098,6 +1341,54 @@ def nonstreaming_responses_model_response():
                 reasoning_tokens=5,
             ),
             total_tokens=30,
+        ),
+    )
+
+
+@pytest.fixture
+def nonstreaming_anthropic_model_response():
+    return anthropic.types.Message(
+        id="msg_123",
+        type="message",
+        role="assistant",
+        model="claude-3-opus-20240229",
+        content=[
+            anthropic.types.TextBlock(
+                type="text",
+                text="Hello, how can I help you?",
+            )
+        ],
+        stop_reason="end_turn",
+        stop_sequence=None,
+        usage=anthropic.types.Usage(
+            input_tokens=10,
+            output_tokens=20,
+        ),
+    )
+
+
+@pytest.fixture
+def nonstreaming_google_genai_model_response():
+    return google.genai.types.GenerateContentResponse(
+        response_id="resp_123",
+        candidates=[
+            google.genai.types.Candidate(
+                content=google.genai.types.Content(
+                    role="model",
+                    parts=[
+                        google.genai.types.Part(
+                            text="Hello, how can I help you?",
+                        )
+                    ],
+                ),
+                finish_reason="STOP",
+            )
+        ],
+        model_version="gemini/gemini-pro",
+        usage_metadata=google.genai.types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=20,
+            total_token_count=30,
         ),
     )
 

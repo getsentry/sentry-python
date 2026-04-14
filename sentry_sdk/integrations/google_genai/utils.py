@@ -597,7 +597,6 @@ def _create_tool_span(tool_name: str, tool_doc: "Optional[str]") -> "Span":
         origin=ORIGIN,
     )
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
-    span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
     if tool_doc:
         span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
     return span

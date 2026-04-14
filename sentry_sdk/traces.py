@@ -259,6 +259,7 @@ class StreamedSpan:
         self._name: str = name
         self._active: bool = active
         self._attributes: "Attributes" = {}
+
         if attributes:
             for attribute, value in attributes.items():
                 self.set_attribute(attribute, value)
@@ -287,7 +288,6 @@ class StreamedSpan:
         self._span_id: "Optional[str]" = None
 
         self._status = SpanStatus.OK.value
-        self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
         self._update_active_thread()
 

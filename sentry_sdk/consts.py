@@ -636,12 +636,6 @@ class SPANDATA:
     Example: "rainy, 57°F"
     """
 
-    GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
-    """
-    The type of tool being used.
-    Example: "function"
-    """
-
     GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
     """
     The number of tokens in the input.
@@ -1492,4 +1486,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.57.0"
+VERSION = "2.58.0"
