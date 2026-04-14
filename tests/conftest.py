@@ -1266,7 +1266,11 @@ def streaming_chat_completions_model_response():
 @pytest.fixture
 def nonstreaming_chat_completions_model_response():
     def inner(
-        response_id: str, response_model: str, message_content: str, created: int
+        response_id: str,
+        response_model: str,
+        message_content: str,
+        created: int,
+        usage: openai.types.CompletionUsage,
     ):
         return openai.types.chat.ChatCompletion(
             id=response_id,
@@ -1282,11 +1286,7 @@ def nonstreaming_chat_completions_model_response():
             created=created,
             model=response_model,
             object="chat.completion",
-            usage=openai.types.CompletionUsage(
-                prompt_tokens=10,
-                completion_tokens=20,
-                total_tokens=30,
-            ),
+            usage=usage,
         )
 
     return inner
