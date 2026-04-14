@@ -69,9 +69,7 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
 
         conn = _get_connection(cursor)
 
-        integration = sentry_sdk.get_client().get_integration(
-            AioMySQLIntegration
-        )
+        integration = sentry_sdk.get_client().get_integration(AioMySQLIntegration)
         params_list = params if integration and integration._record_params else None
         param_style = "pyformat" if params_list else None
 
@@ -95,9 +93,7 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
     return _inner
 
 
-def _wrap_executemany(
-    f: Callable[..., Awaitable[T]]
-) -> Callable[..., Awaitable[T]]:
+def _wrap_executemany(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
     """Wrap Cursor.executemany to capture SQL queries."""
 
     async def _inner(*args: Any, **kwargs: Any) -> T:
@@ -111,9 +107,7 @@ def _wrap_executemany(
 
         conn = _get_connection(cursor)
 
-        integration = sentry_sdk.get_client().get_integration(
-            AioMySQLIntegration
-        )
+        integration = sentry_sdk.get_client().get_integration(AioMySQLIntegration)
         params_list = (
             seq_of_params if integration and integration._record_params else None
         )
@@ -149,9 +143,7 @@ def _get_connection(cursor: Any) -> Any:
     return getattr(cursor, "connection", None)
 
 
-def _wrap_connect(
-    f: Callable[..., Awaitable[T]]
-) -> Callable[..., Awaitable[T]]:
+def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
     """Wrap aiomysql.connect to capture connection spans."""
 
     async def _inner(
