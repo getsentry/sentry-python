@@ -8,6 +8,10 @@ on:
 
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -54,7 +58,7 @@ jobs:
           # This will also trigger "make dist" that creates the Python packages
           make aws-lambda-layer
       - name: Upload Python Packages
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: artifact-build_lambda_layer
           path: |
@@ -76,7 +80,7 @@ jobs:
           make apidocs
           cd docs/_build && zip -r gh-pages ./
 
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: artifact-docs
           path: |
