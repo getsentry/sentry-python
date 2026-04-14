@@ -128,10 +128,10 @@ def test_nonstreaming_chat_completion_no_prompts(
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
@@ -237,10 +237,10 @@ def test_nonstreaming_chat_completion(
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
@@ -328,10 +328,10 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     client = AsyncOpenAI(api_key="z")
     client.chat.completions._post = mock.AsyncMock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
@@ -435,10 +435,10 @@ async def test_nonstreaming_chat_completion_async(
     client = AsyncOpenAI(api_key="z")
     client.chat.completions._post = AsyncMock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
@@ -1888,10 +1888,10 @@ def test_span_origin_nonstreaming_chat(
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
@@ -1919,10 +1919,10 @@ async def test_span_origin_nonstreaming_chat_async(
     client = AsyncOpenAI(api_key="z")
     client.chat.completions._post = AsyncMock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
@@ -3686,10 +3686,10 @@ def test_empty_tools_in_chat_completion(
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
@@ -3740,10 +3740,10 @@ def test_openai_message_role_mapping(
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
@@ -3780,10 +3780,10 @@ def test_openai_message_truncation(
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(
         return_value=nonstreaming_chat_completions_model_response(
-            response_id="chatcmpl-test",
+            response_id="chat-id",
             response_model="gpt-3.5-turbo",
-            message_content="Test response",
-            created=1234567890,
+            message_content="the model response",
+            created=10000000,
         )
     )
 
