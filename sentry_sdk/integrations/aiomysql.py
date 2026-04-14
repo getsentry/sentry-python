@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
 
 try:
     import aiomysql  # type: ignore[import-untyped]
+    from aiomysql.connection import Connection  # type: ignore[import-untyped]
     from aiomysql.cursors import Cursor  # type: ignore[import-untyped]
 except ImportError:
     raise DidNotEnable("aiomysql not installed.")
@@ -34,7 +35,13 @@ class AioMySQLIntegration(Integration):
 
         Cursor.execute = _wrap_execute(Cursor.execute)
         Cursor.executemany = _wrap_executemany(Cursor.executemany)
-        aiomysql.connect = _wrap_connect(aiomysql.connect)
+
+        # Patch Connection._connect — this catches ALL connections:
+        #   - aiomysql.connect()
+        #   - aiomysql.create_pool() (pool.py does `from .connection import connect`
+        #     which ultimately calls Connection._connect)
+        #   - Reconnects
+        Connection._connect = _wrap_connect(Connection._connect)
 
 
 T = TypeVar("T")
@@ -144,21 +151,11 @@ def _get_connection(cursor: Any) -> Any:
 
 
 def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-    """Wrap aiomysql.connect to capture connection spans."""
+    """Wrap Connection._connect to capture connection spans."""
 
-    async def _inner(
-        host: str = "localhost",
-        user: Any = None,
-        password: Any = "",
-        db: Any = None,
-        port: int = 3306,
-        *args: Any,
-        **kwargs: Any,
-    ) -> T:
-        call_args = (host, user, password, db, port, *args)
-
+    async def _inner(self: "Connection") -> T:
         if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
-            return await f(*call_args, **kwargs)
+            return await f(self)
 
         with sentry_sdk.start_span(
             op=OP.DB,
@@ -166,10 +163,10 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             origin=AioMySQLIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.DB_SYSTEM, "mysql")
-            span.set_data(SPANDATA.SERVER_ADDRESS, host)
-            span.set_data(SPANDATA.SERVER_PORT, port)
-            span.set_data(SPANDATA.DB_NAME, db)
-            span.set_data(SPANDATA.DB_USER, user)
+            span.set_data(SPANDATA.SERVER_ADDRESS, self.host)
+            span.set_data(SPANDATA.SERVER_PORT, self.port)
+            span.set_data(SPANDATA.DB_NAME, self.db)
+            span.set_data(SPANDATA.DB_USER, self.user)
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
@@ -177,7 +174,7 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
                     category="query",
                     data=span._data,
                 )
-            res = await f(*call_args, **kwargs)
+            res = await f(self)
 
         return res
 
@@ -189,17 +186,17 @@ def _set_db_data(span: Any, conn: Any) -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "mysql")
 
     host = getattr(conn, "host", None)
-    if host:
+    if host is not None:
         span.set_data(SPANDATA.SERVER_ADDRESS, host)
 
     port = getattr(conn, "port", None)
-    if port:
+    if port is not None:
         span.set_data(SPANDATA.SERVER_PORT, port)
 
     database = getattr(conn, "db", None)
-    if database:
+    if database is not None:
         span.set_data(SPANDATA.DB_NAME, database)
 
     user = getattr(conn, "user", None)
-    if user:
+    if user is not None:
         span.set_data(SPANDATA.DB_USER, user)

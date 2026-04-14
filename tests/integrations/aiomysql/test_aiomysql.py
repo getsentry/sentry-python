@@ -9,18 +9,19 @@ docker run --rm --name some-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=
 The tests use the following credentials to establish a database connection.
 """
 
-import os
-import datetime
 from contextlib import contextmanager
+import datetime
+import os
 from unittest import mock
+import warnings
 
 import aiomysql
 import pytest
 import pytest_asyncio
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.integrations.aiomysql import AioMySQLIntegration
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations.aiomysql import AioMySQLIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
 
@@ -65,9 +66,12 @@ async def _clean_mysql():
     )
     try:
         async with conn.cursor() as cur:
-            await cur.execute(f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DB}`")
-            await cur.execute(f"USE `{MYSQL_DB}`")
-            await cur.execute("DROP TABLE IF EXISTS users")
+            # Suppress MySQL warnings about unknown tables / existing databases
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", Warning)
+                await cur.execute(f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DB}`")
+                await cur.execute(f"USE `{MYSQL_DB}`")
+                await cur.execute("DROP TABLE IF EXISTS users")
             await cur.execute(
                 """
                 CREATE TABLE users(
@@ -416,12 +420,19 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
     query_crumbs = [c for c in crumbs if c["category"] == "query"]
     assert len(query_crumbs) >= 2  # INSERT + SELECT
 
+    # Verify connect spans were created for pool connections
+    connect_crumbs = [c for c in crumbs if c.get("message") == "connect"]
+    assert len(connect_crumbs) >= pool_size  # One connect span per pooled connection
+    for crumb in connect_crumbs:
+        assert crumb["data"]["db.system"] == "mysql"
+        assert crumb["data"]["server.address"] == MYSQL_HOST
+
 
 @pytest.mark.asyncio
 async def test_query_source_disabled(sentry_init, capture_events):
     sentry_options = {
         "integrations": [AioMySQLIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
     }
@@ -460,7 +471,7 @@ async def test_query_source_enabled(
 ):
     sentry_options = {
         "integrations": [AioMySQLIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
@@ -497,7 +508,7 @@ async def test_query_source_enabled(
 async def test_query_source(sentry_init, capture_events):
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
@@ -546,7 +557,7 @@ async def test_query_source(sentry_init, capture_events):
 async def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
@@ -592,7 +603,7 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 async def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
     sentry_init(
         integrations=[AioMySQLIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
