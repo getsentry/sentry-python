@@ -225,7 +225,7 @@ def test_langchain_chat_with_run_name(
 
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
     assert len(chat_spans) == 1
-    assert chat_spans[0]["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+    assert chat_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
 
 
 @pytest.mark.skipif(
