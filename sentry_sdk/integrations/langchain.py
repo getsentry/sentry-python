@@ -348,7 +348,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             pipeline_name = kwargs.get("name")
             if pipeline_name:
-                span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, pipeline_name)
+                span.set_data(SPANDATA.GEN_AI_FUNCTION_ID, pipeline_name)
 
             if model:
                 span.set_data(
