@@ -714,7 +714,7 @@ class Scope:
     def set_custom_sampling_context(
         self, custom_sampling_context: "dict[str, Any]"
     ) -> None:
-        self.get_active_propagation_context()._set_custom_sampling_context(
+        self.get_current_scope().get_active_propagation_context()._set_custom_sampling_context(
             custom_sampling_context
         )
 
