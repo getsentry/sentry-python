@@ -162,11 +162,7 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             name="connect",
             origin=AioMySQLIntegration.origin,
         ) as span:
-            span.set_data(SPANDATA.DB_SYSTEM, "mysql")
-            span.set_data(SPANDATA.SERVER_ADDRESS, self.host)
-            span.set_data(SPANDATA.SERVER_PORT, self.port)
-            span.set_data(SPANDATA.DB_NAME, self.db)
-            span.set_data(SPANDATA.DB_USER, self.user)
+            _set_db_data(span, self)
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
