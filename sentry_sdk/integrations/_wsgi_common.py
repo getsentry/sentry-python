@@ -258,8 +258,7 @@ def _get_request_attributes(
     """
     Return span attributes related to the HTTP request from the WSGI environ.
     """
-
-    attributes: "Dict[str, Any]" = {}
+    attributes: "dict[str, Any]" = {}
 
     method = environ.get("REQUEST_METHOD")
     if method:
