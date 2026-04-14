@@ -420,7 +420,10 @@ def _get_request_attributes(
 
     server_port = environ.get("SERVER_PORT")
     if server_port:
-        attributes["server.port"] = server_port
+        try:
+            attributes["server.port"] = int(server_port)
+        except ValueError:
+            pass
 
     if should_send_default_pii():
         client_ip = get_client_ip(environ)
