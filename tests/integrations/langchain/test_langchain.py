@@ -252,7 +252,7 @@ def test_langchain_tool_call_with_run_name(
     tx = events[0]
     tool_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
     assert len(tool_spans) == 1
-    assert tool_spans[0]["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+    assert tool_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
 
 
 @pytest.mark.skipif(
