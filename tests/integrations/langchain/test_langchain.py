@@ -655,7 +655,7 @@ def test_langchain_openai_tools_agent(
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
 
-    assert invoke_agent_span["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
@@ -858,7 +858,7 @@ def test_langchain_openai_tools_agent_with_config(
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
 
-    assert invoke_agent_span["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
@@ -1060,7 +1060,7 @@ def test_langchain_openai_tools_agent_stream(
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
 
-    assert invoke_agent_span["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
@@ -1263,7 +1263,7 @@ def test_langchain_openai_tools_agent_stream_with_config(
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
 
-    assert invoke_agent_span["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
