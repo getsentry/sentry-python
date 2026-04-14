@@ -199,6 +199,11 @@ def test_langchain_chat_with_run_name(
             response_model="response-model-id",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         ),
         serialize_pydantic=True,
         request_headers=request_headers,

@@ -132,6 +132,11 @@ def test_nonstreaming_chat_completion_no_prompts(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
@@ -241,6 +246,11 @@ def test_nonstreaming_chat_completion(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
@@ -332,6 +342,11 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
@@ -439,6 +454,11 @@ async def test_nonstreaming_chat_completion_async(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
@@ -1892,6 +1912,11 @@ def test_span_origin_nonstreaming_chat(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
@@ -1923,6 +1948,11 @@ async def test_span_origin_nonstreaming_chat_async(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
@@ -3690,6 +3720,11 @@ def test_empty_tools_in_chat_completion(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
@@ -3744,6 +3779,11 @@ def test_openai_message_role_mapping(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
@@ -3784,6 +3824,11 @@ def test_openai_message_truncation(
             response_model="gpt-3.5-turbo",
             message_content="the model response",
             created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
     )
 
