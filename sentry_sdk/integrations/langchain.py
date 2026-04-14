@@ -644,7 +644,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             run_name = kwargs.get("name")
             if run_name:
                 span.set_data(
-                    SPANDATA.GEN_AI_PIPELINE_NAME,
+                    SPANDATA.GEN_AI_FUNCTION_ID,
                     run_name,
                 )
 
