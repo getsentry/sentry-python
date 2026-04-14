@@ -82,7 +82,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         provider = "unknown"
 
     call_type = kwargs.get("call_type", None)
-    if call_type == "embedding":
+    if call_type == "embedding" or call_type == "aembedding":
         operation = "embeddings"
     else:
         operation = "chat"
@@ -159,15 +159,9 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         if value is not None:
             set_data_normalized(span, attribute, value)
 
-    # Record LiteLLM-specific parameters
-    litellm_params = {
-        "api_base": kwargs.get("api_base"),
-        "api_version": kwargs.get("api_version"),
-        "custom_llm_provider": kwargs.get("custom_llm_provider"),
-    }
-    for key, value in litellm_params.items():
-        if value is not None:
-            set_data_normalized(span, f"gen_ai.litellm.{key}", value)
+
+async def _async_input_callback(kwargs: "Dict[str, Any]") -> None:
+    return _input_callback(kwargs)
 
 
 def _success_callback(
@@ -178,7 +172,8 @@ def _success_callback(
 ) -> None:
     """Handle successful completion."""
 
-    span = _get_metadata_dict(kwargs).get("_sentry_span")
+    metadata = _get_metadata_dict(kwargs)
+    span = metadata.get("_sentry_span")
     if span is None:
         return
 
@@ -230,8 +225,31 @@ def _success_callback(
             )
 
     finally:
-        # Always finish the span and clean up
-        span.__exit__(None, None, None)
+        is_streaming = kwargs.get("stream")
+        # Callback is fired multiple times when streaming a response.
+        # Streaming flag checked at https://github.com/BerriAI/litellm/blob/33c3f13443eaf990ac8c6e3da78bddbc2b7d0e7a/litellm/litellm_core_utils/litellm_logging.py#L1603
+        if (
+            is_streaming is not True
+            or "complete_streaming_response" in kwargs
+            or "async_complete_streaming_response" in kwargs
+        ):
+            span = metadata.pop("_sentry_span", None)
+            if span is not None:
+                span.__exit__(None, None, None)
+
+
+async def _async_success_callback(
+    kwargs: "Dict[str, Any]",
+    completion_response: "Any",
+    start_time: "datetime",
+    end_time: "datetime",
+) -> None:
+    return _success_callback(
+        kwargs,
+        completion_response,
+        start_time,
+        end_time,
+    )
 
 
 def _failure_callback(
@@ -315,10 +333,14 @@ class LiteLLMIntegration(Integration):
         litellm.input_callback = input_callback or []
         if _input_callback not in litellm.input_callback:
             litellm.input_callback.append(_input_callback)
+        if _async_input_callback not in litellm.input_callback:
+            litellm.input_callback.append(_async_input_callback)
 
         litellm.success_callback = success_callback or []
         if _success_callback not in litellm.success_callback:
             litellm.success_callback.append(_success_callback)
+        if _async_success_callback not in litellm.success_callback:
+            litellm.success_callback.append(_async_success_callback)
 
         litellm.failure_callback = failure_callback or []
         if _failure_callback not in litellm.failure_callback:

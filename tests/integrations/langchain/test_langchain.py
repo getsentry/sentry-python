@@ -163,7 +163,7 @@ def test_langchain_text_completion(
     assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
 
 
-def test_langchain_chat(
+def test_langchain_chat_with_run_name(
     sentry_init,
     capture_events,
     get_model_response,
@@ -186,7 +186,12 @@ def test_langchain_chat(
         request_headers["X-Stainless-Raw-Response"] = "True"
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="response-model-id",
+            response_content="the model response",
+            created=10000000,
+        ),
         serialize_pydantic=True,
         request_headers=request_headers,
     )
@@ -212,10 +217,10 @@ def test_langchain_chat(
 
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
     assert len(chat_spans) == 1
-    assert chat_spans[0]["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+    assert chat_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
 
 
-def test_langchain_tool(
+def test_langchain_tool_call_with_run_name(
     sentry_init,
     capture_events,
 ):
@@ -239,7 +244,7 @@ def test_langchain_tool(
     tx = events[0]
     tool_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
     assert len(tool_spans) == 1
-    assert tool_spans[0]["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
+    assert tool_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
 
 
 @pytest.mark.skipif(
