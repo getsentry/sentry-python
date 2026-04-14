@@ -197,7 +197,7 @@ def test_langchain_chat_with_run_name(
         nonstreaming_chat_completions_model_response(
             response_id="chat-id",
             response_model="response-model-id",
-            response_content="the model response",
+            message_content="the model response",
             created=10000000,
         ),
         serialize_pydantic=True,
