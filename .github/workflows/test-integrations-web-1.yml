@@ -105,6 +105,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: coverage.xml
           junit-xml-pattern: .junitxml
+          base-branch: master
           verbose: true
   check_required_tests:
     name: All Web 1 tests passed

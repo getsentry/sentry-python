@@ -237,6 +237,9 @@ TEST_SUITE_CONFIG = {
     },
     "litellm": {
         "package": "litellm",
+        "deps": {
+            "*": ["anthropic", "google-genai", "pytest-asyncio"],
+        },
     },
     "litestar": {
         "package": "litestar",
