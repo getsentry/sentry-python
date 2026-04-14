@@ -486,6 +486,12 @@ class SPANDATA:
     Example: "Hello!"
     """
 
+    GEN_AI_FUNCTION_ID = "gen_ai.function_id"
+    """
+    Framework-specific tracing label for the execution of a function or other unit of execution in a generative AI system.
+    Example: "my-awesome-function"
+    """
+
     GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
     """
     The name of the operation being performed.
@@ -634,12 +640,6 @@ class SPANDATA:
     """
     The output of the tool being used.
     Example: "rainy, 57°F"
-    """
-
-    GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
-    """
-    The type of tool being used.
-    Example: "function"
     """
 
     GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
@@ -1492,4 +1492,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.57.0"
+VERSION = "2.58.0"

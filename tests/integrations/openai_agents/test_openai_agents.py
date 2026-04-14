@@ -1274,8 +1274,6 @@ async def test_tool_execution_span(
     assert tool_span["data"]["gen_ai.tool.input"] == '{"message": "hello"}'
     assert tool_span["data"]["gen_ai.tool.name"] == "simple_test_tool"
     assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
-    assert tool_span["data"]["gen_ai.tool.type"] == "function"
-
     assert ai_client_span2["description"] == "chat gpt-4"
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
@@ -1896,17 +1894,13 @@ async def test_mcp_tool_execution_spans(
     # Find the MCP execute_tool span
     mcp_tool_span = None
     for span in spans:
-        if (
-            span.get("description") == "execute_tool test_mcp_tool"
-            and span.get("data", {}).get("gen_ai.tool.type") == "mcp"
-        ):
+        if span.get("description") == "execute_tool test_mcp_tool":
             mcp_tool_span = span
             break
 
     # Verify the MCP tool span was created
     assert mcp_tool_span is not None, "MCP execute_tool span was not created"
     assert mcp_tool_span["description"] == "execute_tool test_mcp_tool"
-    assert mcp_tool_span["data"]["gen_ai.tool.type"] == "mcp"
     assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
     assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "search term"}'
     assert (
@@ -2028,17 +2022,13 @@ async def test_mcp_tool_execution_with_error(
     # Find the MCP execute_tool span with error
     mcp_tool_span = None
     for span in spans:
-        if (
-            span.get("description") == "execute_tool failing_mcp_tool"
-            and span.get("data", {}).get("gen_ai.tool.type") == "mcp"
-        ):
+        if span.get("description") == "execute_tool failing_mcp_tool":
             mcp_tool_span = span
             break
 
     # Verify the MCP tool span was created with error status
     assert mcp_tool_span is not None, "MCP execute_tool span was not created"
     assert mcp_tool_span["description"] == "execute_tool failing_mcp_tool"
-    assert mcp_tool_span["data"]["gen_ai.tool.type"] == "mcp"
     assert mcp_tool_span["data"]["gen_ai.tool.name"] == "failing_mcp_tool"
     assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "test"}'
     assert mcp_tool_span["data"]["gen_ai.tool.output"] is None
@@ -2158,17 +2148,13 @@ async def test_mcp_tool_execution_without_pii(
     # Find the MCP execute_tool span
     mcp_tool_span = None
     for span in spans:
-        if (
-            span.get("description") == "execute_tool test_mcp_tool"
-            and span.get("data", {}).get("gen_ai.tool.type") == "mcp"
-        ):
+        if span.get("description") == "execute_tool test_mcp_tool":
             mcp_tool_span = span
             break
 
     # Verify the MCP tool span was created but without input/output
     assert mcp_tool_span is not None, "MCP execute_tool span was not created"
     assert mcp_tool_span["description"] == "execute_tool test_mcp_tool"
-    assert mcp_tool_span["data"]["gen_ai.tool.type"] == "mcp"
     assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
 
     # Verify input and output are not included when send_default_pii is False
