@@ -15,8 +15,9 @@ except ImportError:
     Omit = None
 
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
-from openai.types import CreateEmbeddingResponse, Embedding
-from openai.types.chat import ChatCompletionChunk
+from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
+from openai.types.chat import ChatCompletionMessage, ChatCompletionChunk
+from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
