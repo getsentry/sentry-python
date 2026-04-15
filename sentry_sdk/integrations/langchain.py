@@ -346,9 +346,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "text_completion")
 
-            pipeline_name = kwargs.get("name")
-            if pipeline_name:
-                span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, pipeline_name)
+            run_name = kwargs.get("name")
+            if run_name:
+                span.set_data(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
 
             if model:
                 span.set_data(
