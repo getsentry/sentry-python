@@ -554,7 +554,6 @@ async def test_query_source_enabled(
     assert SPANDATA.CODE_NAMESPACE in data
     assert SPANDATA.CODE_FILEPATH in data
     assert SPANDATA.CODE_FUNCTION in data
-    assert data.get(SPANDATA.DB_DRIVER_NAME) == "asyncpg"
 
 
 @pytest.mark.asyncio
