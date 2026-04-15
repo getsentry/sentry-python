@@ -553,7 +553,7 @@ def _patch_producer_publish() -> None:
             # method will still work.
             kwargs_headers = {}
 
-        task_name = kwargs_headers.get("task")
+        task_name = kwargs_headers.get("task") or "<unknown Celery task>"
         task_id = kwargs_headers.get("id")
         retries = kwargs_headers.get("retries")
 
