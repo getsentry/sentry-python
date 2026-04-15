@@ -192,7 +192,7 @@ def _split_gen_ai_spans(
     if "spans" not in event_opt:
         return None
 
-    spans = event_opt["spans"]
+    spans: "Any" = event_opt["spans"]
     if isinstance(spans, AnnotatedValue):
         spans = spans.value
 
