@@ -62,6 +62,167 @@ LANGCHAIN_VERSION = package_version("langchain")
 LANGCHAIN_OPENAI_VERSION = package_version("langchain-openai")
 
 
+@pytest.fixture
+def streaming_chat_completions_model_responses():
+    def inner():
+        yield [
+            ChatCompletionChunk(
+                id="chatcmpl-turn-1",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    Choice(
+                        index=0,
+                        delta=ChoiceDelta(role="assistant"),
+                        finish_reason=None,
+                    ),
+                ],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-turn-1",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    Choice(
+                        index=0,
+                        delta=ChoiceDelta(
+                            tool_calls=[
+                                ChoiceDeltaToolCall(
+                                    index=0,
+                                    id="call_BbeyNhCKa6kYLYzrD40NGm3b",
+                                    type="function",
+                                    function=ChoiceDeltaToolCallFunction(
+                                        name="get_word_length",
+                                        arguments="",
+                                    ),
+                                ),
+                            ],
+                        ),
+                        finish_reason=None,
+                    ),
+                ],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-turn-1",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    Choice(
+                        index=0,
+                        delta=ChoiceDelta(
+                            tool_calls=[
+                                ChoiceDeltaToolCall(
+                                    index=0,
+                                    function=ChoiceDeltaToolCallFunction(
+                                        arguments='{"word": "eudca"}',
+                                    ),
+                                ),
+                            ],
+                        ),
+                        finish_reason=None,
+                    ),
+                ],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-turn-1",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    Choice(
+                        index=0,
+                        delta=ChoiceDelta(content="5"),
+                        finish_reason=None,
+                    ),
+                ],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-turn-1",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    Choice(
+                        index=0,
+                        delta=ChoiceDelta(),
+                        finish_reason="function_call",
+                    ),
+                ],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-turn-1",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[],
+                usage=CompletionUsage(
+                    prompt_tokens=142,
+                    completion_tokens=50,
+                    total_tokens=192,
+                ),
+            ),
+        ]
+
+        yield [
+            ChatCompletionChunk(
+                id="chatcmpl-turn-2",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    Choice(
+                        index=0,
+                        delta=ChoiceDelta(role="assistant"),
+                        finish_reason=None,
+                    ),
+                ],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-turn-2",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    Choice(
+                        index=0,
+                        delta=ChoiceDelta(content="The word eudca has 5 letters."),
+                        finish_reason=None,
+                    ),
+                ],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-turn-2",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[
+                    Choice(
+                        index=0,
+                        delta=ChoiceDelta(),
+                        finish_reason="stop",
+                    ),
+                ],
+            ),
+            ChatCompletionChunk(
+                id="chatcmpl-turn-2",
+                object="chat.completion.chunk",
+                created=10000000,
+                model="gpt-3.5-turbo",
+                choices=[],
+                usage=CompletionUsage(
+                    prompt_tokens=89,
+                    completion_tokens=28,
+                    total_tokens=117,
+                ),
+            ),
+        ]
+
+    return inner
+
+
 @tool
 def get_word_length(word: str) -> int:
     """Returns the length of a word."""
@@ -556,30 +717,16 @@ def test_tool_execution_span(
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
-        (True, True),
         (True, False),
         (False, True),
         (False, False),
     ],
 )
-@pytest.mark.parametrize(
-    "system_instructions_content",
-    [
-        "You are very powerful assistant, but don't know current events",
-        ["You are a helpful assistant.", "Be concise and clear."],
-        [
-            {"type": "text", "text": "You are a helpful assistant."},
-            {"type": "text", "text": "Be concise and clear."},
-        ],
-    ],
-    ids=["string", "list", "blocks"],
-)
-def test_langchain_openai_tools_agent(
+def test_langchain_openai_tools_agent_no_prompts(
     sentry_init,
     capture_events,
     send_default_pii,
     include_prompts,
-    system_instructions_content,
     request,
     get_model_response,
     server_side_event_chunks,
@@ -600,7 +747,7 @@ def test_langchain_openai_tools_agent(
         [
             (
                 "system",
-                system_instructions_content,
+                "You are very powerful assistant, but don't know current events",
             ),
             ("user", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -677,68 +824,184 @@ def test_langchain_openai_tools_agent(
         assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
         assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
-    if send_default_pii and include_prompts:
-        assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
-        assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get("data", {})
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
+    assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
+    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
 
-        param_id = request.node.callspec.id
-        if "string" in param_id:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are very powerful assistant, but don't know current events",
-                }
-            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-        else:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are a helpful assistant.",
-                },
-                {
-                    "type": "text",
-                    "content": "Be concise and clear.",
-                },
-            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+    # Verify tool calls are NOT recorded when PII is disabled
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get("data", {}), (
+        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+        f"and include_prompts={include_prompts}"
+    )
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get("data", {}), (
+        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+        f"and include_prompts={include_prompts}"
+    )
 
-        assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    # Verify finish_reasons is always an array of strings
+    assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+        "function_call"
+    ]
+    assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
 
-        # Verify tool calls are recorded when PII is enabled
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
-            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+    # Verify that available tools are always recorded regardless of PII settings
+    for chat_span in chat_spans:
+        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+        assert tools_data is not None, (
+            "Available tools should always be recorded regardless of PII settings"
         )
-        tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
-        if isinstance(tool_calls_data, str):
-            assert "get_word_length" in tool_calls_data
-        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
-            # Check if tool calls contain expected function name
-            tool_call_str = str(tool_calls_data)
-            assert "get_word_length" in tool_call_str
+        assert "get_word_length" in tools_data
+
+
+@pytest.mark.parametrize(
+    "system_instructions_content",
+    [
+        "You are very powerful assistant, but don't know current events",
+        ["You are a helpful assistant.", "Be concise and clear."],
+        [
+            {"type": "text", "text": "You are a helpful assistant."},
+            {"type": "text", "text": "Be concise and clear."},
+        ],
+    ],
+    ids=["string", "list", "blocks"],
+)
+def test_langchain_openai_tools_agent(
+    sentry_init,
+    capture_events,
+    system_instructions_content,
+    request,
+    get_model_response,
+    server_side_event_chunks,
+    streaming_chat_completions_model_responses,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                system_instructions_content,
+            ),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    model_responses = streaming_chat_completions_model_responses()
+
+    tool_response = get_model_response(
+        server_side_event_chunks(
+            next(model_responses),
+            include_event_type=False,
+        )
+    )
+
+    final_response = get_model_response(
+        server_side_event_chunks(
+            next(model_responses),
+            include_event_type=False,
+        )
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        with start_transaction():
+            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    assert tx["contexts"]["trace"]["origin"] == "manual"
+
+    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
+
+    assert len(chat_spans) == 2
+
+    assert invoke_agent_span["origin"] == "auto.ai.langchain"
+    assert chat_spans[0]["origin"] == "auto.ai.langchain"
+    assert chat_spans[1]["origin"] == "auto.ai.langchain"
+    assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+    # We can't guarantee anything about the "shape" of the langchain execution graph
+    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
+
+    # Token usage is only available in newer versions of langchain (v0.2+)
+    # where usage_metadata is supported on AIMessageChunk
+    if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+
+    if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
+        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+        assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+
+    assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
+    assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+    param_id = request.node.callspec.id
+    if "string" in param_id:
+        assert [
+            {
+                "type": "text",
+                "content": "You are very powerful assistant, but don't know current events",
+            }
+        ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
     else:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get("data", {})
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
-        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
-        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
+        assert [
+            {
+                "type": "text",
+                "content": "You are a helpful assistant.",
+            },
+            {
+                "type": "text",
+                "content": "Be concise and clear.",
+            },
+        ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
 
-        # Verify tool calls are NOT recorded when PII is disabled
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
-            "data", {}
-        ), (
-            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-            f"and include_prompts={include_prompts}"
-        )
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
-            "data", {}
-        ), (
-            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-            f"and include_prompts={include_prompts}"
-        )
+    assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+    # Verify tool calls are recorded when PII is enabled
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
+        "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+    )
+    tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+    if isinstance(tool_calls_data, str):
+        assert "get_word_length" in tool_calls_data
+    elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+        # Check if tool calls contain expected function name
+        tool_call_str = str(tool_calls_data)
+        assert "get_word_length" in tool_call_str
 
     # Verify finish_reasons is always an array of strings
     assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
