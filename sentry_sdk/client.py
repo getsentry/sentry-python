@@ -188,16 +188,16 @@ def _serialized_v1_span_to_serialized_v2_span(
 
 def _split_gen_ai_spans(
     event_opt: "Event",
-) -> "tuple[List[Dict[str, object]], List[Dict[str, object]]]":
+) -> "Optional[tuple[List[Dict[str, object]], List[Dict[str, object]]]]":
     if "spans" not in event_opt:
-        return [], []
+        return None
 
     spans = event_opt["spans"]
     if isinstance(spans, AnnotatedValue):
         spans = spans.value
 
     if not isinstance(spans, Iterable):
-        return [], []
+        return None
 
     non_gen_ai_spans = []
     gen_ai_spans = []
@@ -1035,12 +1035,15 @@ class _Client(BaseClient):
             if isinstance(profile, Profile):
                 envelope.add_profile(profile.to_json(event_opt, self.options))
 
-            non_gen_ai_spans, gen_ai_spans = _split_gen_ai_spans(event_opt)
+            split_spans = _split_gen_ai_spans(event_opt)
+            if split_spans is None or not split_spans[1]:
+                envelope.add_transaction(event_opt)
+            else:
+                non_gen_ai_spans, gen_ai_spans = split_spans
 
-            event_opt["spans"] = non_gen_ai_spans
-            envelope.add_transaction(event_opt)
+                event_opt["spans"] = non_gen_ai_spans
+                envelope.add_transaction(event_opt)
 
-            if gen_ai_spans:
                 envelope.add_item(
                     Item(
                         type=SpanBatcher.TYPE,
