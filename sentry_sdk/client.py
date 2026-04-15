@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
 import warnings
+import json
 
 from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk._metrics_batcher import MetricsBatcher
@@ -27,10 +28,10 @@ from sentry_sdk.utils import (
     get_before_send_metric,
     has_logs_enabled,
     has_metrics_enabled,
-    serialize_attribute,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
+from sentry_sdk.traces import SpanStatus
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import (
     HttpTransportCore,
@@ -39,6 +40,7 @@ from sentry_sdk.transport import (
 )
 from sentry_sdk.consts import (
     SPANDATA,
+    SPANSTATUS,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -97,7 +99,7 @@ def _serialized_v1_span_to_serialized_v2_span(
 ) -> "dict[str, Any]":
     # See SpanBatcher._to_transport_format() for analogous population of all entries except "attributes".
     res: "dict[str, Any]" = {
-        "status": "ok",
+        "status": SpanStatus.OK.value,
         "is_segment": False,
     }
 
@@ -133,7 +135,7 @@ def _serialized_v1_span_to_serialized_v2_span(
     if "parent_span_id" in span:
         res["parent_span_id"] = span["parent_span_id"]
 
-    if "status" in span and span["status"] != "ok":
+    if "status" in span and span["status"] != SPANSTATUS.OK:
         res["status"] = "error"
 
     attributes: "Dict[str, Any]" = {}
@@ -180,8 +182,58 @@ def _serialized_v1_span_to_serialized_v2_span(
         if "version" in sdk_info:
             attributes["sentry.sdk.version"] = sdk_info["version"]
 
-    if attributes:
-        res["attributes"] = {k: serialize_attribute(v) for k, v in attributes.items()}
+    for key, value in attributes.items():
+        serialized_value = serialize(value)
+        if isinstance(serialized_value, bool):
+            res.setdefault("attributes", {})[key] = {
+                "value": serialized_value,
+                "type": "boolean",
+            }
+            continue
+
+        if isinstance(serialized_value, int):
+            res.setdefault("attributes", {})[key] = {
+                "value": serialized_value,
+                "type": "integer",
+            }
+            continue
+
+        if isinstance(serialized_value, float):
+            res.setdefault("attributes", {})[key] = {
+                "value": serialized_value,
+                "type": "double",
+            }
+            continue
+
+        if isinstance(serialized_value, str):
+            res.setdefault("attributes", {})[key] = {
+                "value": serialized_value,
+                "type": "string",
+            }
+            continue
+
+        if isinstance(serialized_value, list):
+            if not serialized_value:
+                res.setdefault("attributes", {})[key] = {"value": [], "type": "array"}
+
+            ty = type(serialized_value[0])
+            if ty in (int, str, bool, float) and all(
+                type(v) is ty for v in serialized_value
+            ):
+                res.setdefault("attributes", {})[key] = {
+                    "value": serialized_value,
+                    "type": "array",
+                }
+
+            continue
+
+        # Types returned when the serializer for V1 span attributes recurses into some container types.
+        if isinstance(serialized_value, (dict, list)):
+            res.setdefault("attributes", {})[key] = {
+                "value": json.dumps(serialized_value),
+                "type": "string",
+            }
+            continue
 
     return res
 
