@@ -735,7 +735,6 @@ def test_langchain_openai_tools_agent_no_prompts(
     capture_events,
     send_default_pii,
     include_prompts,
-    request,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
