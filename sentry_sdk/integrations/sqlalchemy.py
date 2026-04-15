@@ -138,7 +138,7 @@ def _set_db_data(span: "Span", conn: "Any") -> None:
         span.set_data(SPANDATA.DB_SYSTEM, db_system)
 
     try:
-        driver = conn.engine.driver
+        driver = conn.dialect.driver
         if driver:
             span.set_data(SPANDATA.DB_DRIVER_NAME, driver)
     except Exception:
