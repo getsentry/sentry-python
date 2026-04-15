@@ -49,6 +49,7 @@ CRUMBS_CONNECT = {
             "db.name": PG_NAME,
             "db.system": "postgresql",
             "db.user": PG_USER,
+            "db.driver.name": "asyncpg",
             "server.address": PG_HOST,
             "server.port": PG_PORT,
         }
@@ -553,6 +554,7 @@ async def test_query_source_enabled(
     assert SPANDATA.CODE_NAMESPACE in data
     assert SPANDATA.CODE_FILEPATH in data
     assert SPANDATA.CODE_FUNCTION in data
+    assert data.get(SPANDATA.DB_DRIVER_NAME) == "asyncpg"
 
 
 @pytest.mark.asyncio
