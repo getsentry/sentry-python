@@ -682,7 +682,7 @@ def test_messaging_destination_name_default_exchange(
     capture_items,
 ):
     celery_app = init_celery(
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
@@ -719,7 +719,7 @@ def test_messaging_destination_name_nondefault_exchange(
     behavior.
     """
     celery_app = init_celery(
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
@@ -744,7 +744,7 @@ def test_messaging_destination_name_nondefault_exchange(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_messaging_id(span_streaming, init_celery, capture_events, capture_items):
     celery = init_celery(
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -768,7 +768,7 @@ def test_messaging_id(span_streaming, init_celery, capture_events, capture_items
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_retry_count_zero(span_streaming, init_celery, capture_events, capture_items):
     celery = init_celery(
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -797,7 +797,7 @@ def test_retry_count_nonzero(
     mock_request.retries = 3
 
     celery = init_celery(
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -824,7 +824,7 @@ def test_messaging_system(
     system, span_streaming, init_celery, capture_events, capture_items
 ):
     celery = init_celery(
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -862,7 +862,7 @@ def test_producer_span_data(
 
     sentry_init(
         integrations=[CeleryIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
@@ -937,7 +937,7 @@ def tests_span_origin_consumer(
     span_streaming, init_celery, capture_events, capture_items
 ):
     celery = init_celery(
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     celery.conf.broker_url = "redis://example.com"  # noqa: E231
@@ -977,7 +977,7 @@ def tests_span_origin_producer(
 
     sentry_init(
         integrations=[CeleryIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
@@ -1027,7 +1027,7 @@ def test_send_task_wrapped(
 ):
     sentry_init(
         integrations=[CeleryIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
