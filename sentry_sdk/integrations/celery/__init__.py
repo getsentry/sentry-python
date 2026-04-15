@@ -329,9 +329,6 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            span: "Optional[Union[Span, StreamedSpan]]" = None
-            span_ctx: "Optional[Union[Span, StreamedSpan]]" = None
-
             custom_sampling_context = {
                 "celery_job": {
                     "task": task.name,
@@ -344,6 +341,9 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
 
             scope.set_custom_sampling_context(custom_sampling_context)
             scope.set_transaction_name(task.name, source=TransactionSource.TASK)
+
+            span: "Union[Span, StreamedSpan]"
+            span_ctx: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
@@ -376,9 +376,6 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                         span,
                         custom_sampling_context=custom_sampling_context,
                     )
-
-            if span is None or span_ctx is None:
-                return f(*args, **kwargs)
 
             with span_ctx:
                 return f(*args, **kwargs)
