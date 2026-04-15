@@ -12,7 +12,7 @@ from sentry_sdk.integrations.celery.beat import (
     _patch_redbeat_apply_async,
     _setup_celery_beat_signals,
 )
-from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
+from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch, NoOpMgr
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span, TransactionSource
@@ -242,14 +242,6 @@ def _update_celery_task_headers(
                     updated_headers["headers"][key] = value
 
     return updated_headers
-
-
-class NoOpMgr:
-    def __enter__(self) -> None:
-        return None
-
-    def __exit__(self, exc_type: "Any", exc_value: "Any", traceback: "Any") -> None:
-        return None
 
 
 def _wrap_task_run(f: "F") -> "F":
