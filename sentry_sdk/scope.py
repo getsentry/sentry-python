@@ -898,13 +898,13 @@ class Scope:
         if (
             isinstance(span, StreamedSpan)
             and not isinstance(span, NoOpStreamedSpan)
-            and span._is_segment
+            and span._is_segment()
         ):
             self._transaction = span.name
             if span._attributes.get("sentry.span.source"):
-                self._transaction_info["source"] = span._attributes[
-                    "sentry.span.source"
-                ]
+                self._transaction_info["source"] = str(
+                    span._attributes["sentry.span.source"]
+                )
 
     @property
     def profile(self) -> "Optional[Profile]":
