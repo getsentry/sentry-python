@@ -93,10 +93,10 @@ SDK_INFO: "SDKInfo" = {
 
 
 def _serialized_v1_span_to_serialized_v2_span(
-    span: "Dict[str, Any]", event: "Event"
+    span: "dict[str, Any]", event: "Event"
 ) -> "dict[str, Any]":
     # See SpanBatcher._to_transport_format() for analogous population of all entries except "attributes".
-    res: "Dict[str, Any]" = {
+    res: "dict[str, Any]" = {
         "status": "ok",
         "is_segment": False,
     }
