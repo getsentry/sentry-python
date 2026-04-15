@@ -418,9 +418,13 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
         try:
             span: "Union[Span, StreamedSpan]"
             if span_streaming:
-                span = sentry_sdk.traces.start_span(name=task.name)
-                span.set_attribute("sentry.op", OP.QUEUE_PROCESS)
-                span.set_attribute("sentry.origin", CeleryIntegration.origin)
+                span = sentry_sdk.traces.start_span(
+                    name=task.name,
+                    attributes={
+                        "sentry.op": OP.QUEUE_PROCESS,
+                        "sentry.origin": CeleryIntegration.origin,
+                    },
+                )
             else:
                 span = sentry_sdk.start_span(
                     op=OP.QUEUE_PROCESS,
@@ -565,9 +569,13 @@ def _patch_producer_publish() -> None:
         span: "Union[StreamedSpan, Span, None]" = None
         if span_streaming:
             if sentry_sdk.get_current_span() is not None:
-                span = sentry_sdk.traces.start_span(name=task_name)
-                span.set_attribute("sentry.op", OP.QUEUE_PUBLISH)
-                span.set_attribute("sentry.origin", CeleryIntegration.origin)
+                span = sentry_sdk.traces.start_span(
+                    name=task_name,
+                    attributes={
+                        "sentry.op": OP.QUEUE_PUBLISH,
+                        "sentry.origin": CeleryIntegration.origin,
+                    },
+                )
         else:
             span = sentry_sdk.start_span(
                 op=OP.QUEUE_PUBLISH,
