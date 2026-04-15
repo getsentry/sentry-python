@@ -150,6 +150,7 @@ _MIN_VERSIONS = {
     "openfeature": (0, 7, 1),
     "pydantic_ai": (1, 0, 0),
     "pymongo": (3, 5, 0),
+    "pyreqwest": (0, 11, 6),
     "quart": (0, 16, 0),
     "ray": (2, 7, 0),
     "requests": (2, 0, 0),

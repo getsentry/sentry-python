@@ -95,7 +95,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # estimate the attributes separately.
         estimate = 210
         for value in item._attributes.values():
-            estimate += 7
+            estimate += 50
 
             if isinstance(value, str):
                 estimate += len(value)

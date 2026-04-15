@@ -814,6 +814,71 @@ class TestRedactBlobMessageParts:
         assert result[1]["content"] == "I see the image."  # Unchanged
         assert result[2]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
 
+    def test_redacts_single_blob_within_image_url_content(self):
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "text": "How many ponies do you see in the image?",
+                        "type": "text",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/jpeg;base64,/9j/4AAQSkZJRg=="},
+                    },
+                ],
+            }
+        ]
+
+        original_blob_content = messages[0]["content"][1]
+
+        result = redact_blob_message_parts(messages)
+
+        assert messages[0]["content"][1] == original_blob_content
+
+        assert (
+            result[0]["content"][0]["text"]
+            == "How many ponies do you see in the image?"
+        )
+        assert result[0]["content"][0]["type"] == "text"
+        assert result[0]["content"][1]["type"] == "image_url"
+        assert result[0]["content"][1]["image_url"]["url"] == BLOB_DATA_SUBSTITUTE
+
+    def test_does_not_redact_image_url_content_with_non_blobs(self):
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "text": "How many ponies do you see in the image?",
+                        "type": "text",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "https://example.com/image.jpg"},
+                    },
+                ],
+            }
+        ]
+
+        original_blob_content = messages[0]["content"][1]
+
+        result = redact_blob_message_parts(messages)
+
+        assert messages[0]["content"][1] == original_blob_content
+
+        assert (
+            result[0]["content"][0]["text"]
+            == "How many ponies do you see in the image?"
+        )
+        assert result[0]["content"][0]["type"] == "text"
+        assert result[0]["content"][1]["type"] == "image_url"
+        assert (
+            result[0]["content"][1]["image_url"]["url"]
+            == "https://example.com/image.jpg"
+        )
+
     def test_no_blobs_returns_original_list(self):
         """Test that messages without blobs are returned as-is (performance optimization)"""
         messages = [

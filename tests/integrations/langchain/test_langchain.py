@@ -153,12 +153,14 @@ def test_langchain_text_completion(
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
     ]
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
-    assert llm_span["description"] == "generate_text gpt-3.5-turbo"
+    assert llm_span["description"] == "text_completion gpt-3.5-turbo"
     assert llm_span["data"]["gen_ai.system"] == "openai"
     assert llm_span["data"]["gen_ai.pipeline.name"] == "my-snazzy-pipeline"
     assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
@@ -1294,12 +1296,14 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
     ]
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
-    assert llm_span["data"]["gen_ai.operation.name"] == "generate_text"
+    assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
     assert llm_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "my_pipeline"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
@@ -2010,12 +2014,14 @@ def test_langchain_response_model_extraction(
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
     ]
     assert len(llm_spans) > 0
 
     llm_span = llm_spans[0]
-    assert llm_span["data"]["gen_ai.operation.name"] == "generate_text"
+    assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
 
     if expected_model is not None:
         assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["data"]
@@ -2311,7 +2317,9 @@ def test_langchain_ai_system_detection(
     assert tx["type"] == "transaction"
 
     llm_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.generate_text"
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
     ]
     assert len(llm_spans) > 0
 

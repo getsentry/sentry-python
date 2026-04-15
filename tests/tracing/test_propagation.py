@@ -3,7 +3,7 @@ import pytest
 
 
 def test_standalone_span_iter_headers(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.start_span(op="test") as span:
         with pytest.raises(StopIteration):
@@ -12,7 +12,7 @@ def test_standalone_span_iter_headers(sentry_init):
 
 
 def test_span_in_span_iter_headers(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.start_span(op="test"):
         with sentry_sdk.start_span(op="test2") as span_inner:
@@ -22,7 +22,7 @@ def test_span_in_span_iter_headers(sentry_init):
 
 
 def test_span_in_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.start_transaction(op="test"):
         with sentry_sdk.start_span(op="test2") as span:
@@ -31,7 +31,7 @@ def test_span_in_transaction(sentry_init):
 
 
 def test_span_in_span_in_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.start_transaction(op="test"):
         with sentry_sdk.start_span(op="test2"):

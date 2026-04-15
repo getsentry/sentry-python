@@ -3,6 +3,7 @@ import json
 from copy import deepcopy
 
 import sentry_sdk
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue, logger
 
@@ -211,16 +212,19 @@ def _is_json_content_type(ct: "Optional[str]") -> bool:
 
 def _filter_headers(
     headers: "Mapping[str, str]",
+    use_annotated_value: bool = True,
 ) -> "Mapping[str, Union[AnnotatedValue, str]]":
     if should_send_default_pii():
         return headers
 
+    substitute: "Union[AnnotatedValue, str]"
+    if use_annotated_value:
+        substitute = AnnotatedValue.removed_because_over_size_limit()
+    else:
+        substitute = SENSITIVE_DATA_SUBSTITUTE
+
     return {
-        k: (
-            v
-            if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
-            else AnnotatedValue.removed_because_over_size_limit()
-        )
+        k: (v if k.upper().replace("-", "_") not in SENSITIVE_HEADERS else substitute)
         for k, v in headers.items()
     }
 
