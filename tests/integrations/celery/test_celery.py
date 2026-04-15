@@ -240,18 +240,14 @@ def test_transaction_events(
             assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
             assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
-        span_items = [item.payload for item in items]
-        process_span, execution_span, submit_span, submission_span = span_items
+        process_span, execution_span, submit_span, submission_span = [
+            item.payload for item in items
+        ]
 
         assert execution_span["name"] == "dummy_task"
+        assert execution_span["is_segment"] is True
         assert execution_span["attributes"]["sentry.span.source"] == "task"
         assert execution_span["trace_id"] == span.trace_id
-
-        assert submit_span["name"] == "dummy_task"
-        assert submit_span["trace_id"] == span.trace_id
-        assert submit_span["attributes"]["sentry.origin"] == "auto.queue.celery"
-        assert submit_span["parent_span_id"] == span.span_id
-
         if task_fails:
             assert execution_span["status"] == "error"
         else:
@@ -260,6 +256,18 @@ def test_transaction_events(
         assert process_span["name"] == "dummy_task"
         assert process_span["trace_id"] == span.trace_id
         assert process_span["attributes"]["sentry.op"] == "queue.process"
+        assert process_span["parent_span_id"] == execution_span["span_id"]
+
+        assert submission_span["name"] == "submission"
+        assert submission_span["is_segment"] is True
+
+        assert submit_span["name"] == "dummy_task"
+        assert submit_span["attributes"]["sentry.op"] == "queue.submit.celery"
+        assert submit_span["attributes"]["sentry.origin"] == "auto.queue.celery"
+        assert (
+            submit_span["parent_span_id"] == submission_span["span_id"] == span.span_id
+        )
+        assert submit_span["trace_id"] == span.trace_id
 
     else:
         events = capture_events()

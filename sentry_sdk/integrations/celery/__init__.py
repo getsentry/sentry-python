@@ -353,6 +353,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                     sentry_sdk.traces.continue_trace(headers)
                     span = sentry_sdk.traces.start_span(
                         name=task.name,
+                        parent_span=None,  # make this a segment
                         attributes={
                             "sentry.origin": CeleryIntegration.origin,
                             "sentry.span.source": TransactionSource.TASK.value,
@@ -552,9 +553,10 @@ def _patch_producer_publish() -> None:
             # method will still work.
             kwargs_headers = {}
 
-        if "task" not in kwargs_headers:
-            # filter out heartbeat and other internal Celery events
-            return original_publish(self, *args, **kwargs)
+        # XXX[ivana]: check whether this is needed with the parent checks
+        # if "task" not in kwargs_headers:
+        #    # filter out heartbeat and other internal Celery events
+        #    return original_publish(self, *args, **kwargs)
 
         task_name = kwargs_headers.get("task")
         task_id = kwargs_headers.get("id")
