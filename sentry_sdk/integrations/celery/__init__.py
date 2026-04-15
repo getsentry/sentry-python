@@ -339,8 +339,6 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                 }
             }
 
-            scope.set_transaction_name(task.name, source=TransactionSource.TASK)
-
             span: "Union[Span, StreamedSpan]"
             span_ctx: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
 

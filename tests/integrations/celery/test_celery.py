@@ -522,7 +522,7 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     celery_invocation,
     DictionaryContaining,  # noqa:N803
 ):
-    traces_sampler = mock.Mock()
+    traces_sampler = mock.Mock(return_value=1.0)
     celery = init_celery(
         traces_sampler=traces_sampler,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
