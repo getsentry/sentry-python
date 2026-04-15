@@ -84,6 +84,7 @@ if TYPE_CHECKING:
 
 _client_init_debug = ContextVar("client_init_debug")
 
+
 SDK_INFO: "SDKInfo" = {
     "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
     "version": VERSION,
