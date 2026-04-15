@@ -27,6 +27,7 @@ from sentry_sdk.utils import (
     get_before_send_metric,
     has_logs_enabled,
     has_metrics_enabled,
+    serialize_attribute,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -56,6 +57,74 @@ from sentry_sdk.profiler.transaction_profiler import (
 )
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
+from sentry_sdk.envelope import Item, PayloadRef
+
+
+_ISO_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+def _iso_to_epoch(iso_str: str) -> float:
+    return (
+        datetime.strptime(iso_str, _ISO_TIMESTAMP_FORMAT)
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+    )
+
+
+def _v1_span_to_v2(span: "Dict[str, Any]", event: "Dict[str, Any]") -> "Dict[str, Any]":
+    rv: "Dict[str, Any]" = {
+        "trace_id": span["trace_id"],
+        "span_id": span["span_id"],
+        "name": span.get("description") or "",
+        "is_segment": False,
+        "start_timestamp": _iso_to_epoch(span["start_timestamp"]),
+        "status": "ok",
+    }
+
+    if span.get("timestamp"):
+        rv["end_timestamp"] = _iso_to_epoch(span["timestamp"])
+
+    if span.get("parent_span_id"):
+        rv["parent_span_id"] = span["parent_span_id"]
+
+    status = span.get("status")
+    if status and status != "ok":
+        rv["status"] = "error"
+
+    attributes: "Dict[str, Any]" = {}
+
+    if span.get("op"):
+        attributes["sentry.op"] = span["op"]
+    if span.get("origin"):
+        attributes["sentry.origin"] = span["origin"]
+
+    for key, value in (span.get("data") or {}).items():
+        attributes[key] = value
+    for key, value in (span.get("tags") or {}).items():
+        attributes[key] = value
+
+    trace_context = event.get("contexts", {}).get("trace", {})
+    sdk_info = event.get("sdk", {})
+
+    if event.get("release"):
+        attributes["sentry.release"] = event["release"]
+    if event.get("environment"):
+        attributes["sentry.environment"] = event["environment"]
+    if event.get("transaction"):
+        attributes["sentry.segment.name"] = event["transaction"]
+
+    if trace_context.get("span_id"):
+        attributes["sentry.segment.id"] = trace_context["span_id"]
+    if sdk_info.get("name"):
+        attributes["sentry.sdk.name"] = sdk_info["name"]
+    if sdk_info.get("version"):
+        attributes["sentry.sdk.version"] = sdk_info["version"]
+
+    if attributes:
+        rv["attributes"] = {k: serialize_attribute(v) for k, v in attributes.items()}
+
+    return rv
+
 
 if TYPE_CHECKING:
     from typing import Any
@@ -72,7 +141,7 @@ if TYPE_CHECKING:
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.traces import StreamedSpan
-    from sentry_sdk.transport import Transport, Item
+    from sentry_sdk.transport import Transport, Item, PayloadRef
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher
     from sentry_sdk.utils import Dsn
@@ -912,7 +981,39 @@ class _Client(BaseClient):
         if is_transaction:
             if isinstance(profile, Profile):
                 envelope.add_profile(profile.to_json(event_opt, self.options))
-            envelope.add_transaction(event_opt)
+
+            nonstreamed_spans = []
+            streamed_spans = []
+            for span in event_opt.get("spans") or []:
+                span_op = span.get("op")
+                if span_op is not None and span_op.startswith("gen_ai."):
+                    streamed_spans.append(span)
+                else:
+                    nonstreamed_spans.append(span)
+
+            if nonstreamed_spans:
+                event_opt["spans"] = nonstreamed_spans
+                envelope.add_transaction(event_opt)
+
+            if streamed_spans:
+                envelope.add_item(
+                    Item(
+                        type=SpanBatcher.TYPE,
+                        content_type=SpanBatcher.CONTENT_TYPE,
+                        headers={
+                            "item_count": len(streamed_spans),
+                        },
+                        payload=PayloadRef(
+                            json={
+                                "items": [
+                                    _v1_span_to_v2(span, event)
+                                    for span in streamed_spans
+                                ]
+                            },
+                        ),
+                    )
+                )
+
         elif is_checkin:
             envelope.add_checkin(event_opt)
         else:
