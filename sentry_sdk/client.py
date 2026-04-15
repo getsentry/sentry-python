@@ -71,7 +71,15 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric, EventDataCategory
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        SDKInfo,
+        Log,
+        Metric,
+        EventDataCategory,
+        SerializedAttributeValue,
+    )
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
@@ -92,6 +100,56 @@ SDK_INFO: "SDKInfo" = {
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
+
+
+def _serialized_v1_attribute_to_serialized_v2_attribute(
+    attribute_value: "Any",
+) -> "Optional[SerializedAttributeValue]":
+    if isinstance(attribute_value, bool):
+        return {
+            "value": attribute_value,
+            "type": "boolean",
+        }
+
+    if isinstance(attribute_value, int):
+        return {
+            "value": attribute_value,
+            "type": "integer",
+        }
+
+    if isinstance(attribute_value, float):
+        return {
+            "value": attribute_value,
+            "type": "double",
+        }
+
+    if isinstance(attribute_value, str):
+        return {
+            "value": attribute_value,
+            "type": "string",
+        }
+
+    if isinstance(attribute_value, list):
+        if not attribute_value:
+            return {"value": [], "type": "array"}
+
+        ty = type(attribute_value[0])
+        if ty in (int, str, bool, float) and all(
+            type(v) is ty for v in attribute_value
+        ):
+            return {
+                "value": attribute_value,
+                "type": "array",
+            }
+
+    # Types returned when the serializer for V1 span attributes recurses into some container types.
+    if isinstance(attribute_value, (dict, list)):
+        return {
+            "value": json.dumps(attribute_value),
+            "type": "string",
+        }
+
+    return None
 
 
 def _serialized_v1_span_to_serialized_v2_span(
@@ -182,58 +240,14 @@ def _serialized_v1_span_to_serialized_v2_span(
         if "version" in sdk_info:
             attributes["sentry.sdk.version"] = sdk_info["version"]
 
+    if not attributes:
+        return res
+
+    res["attributes"] = {}
     for key, value in attributes.items():
-        serialized_value = serialize(value)
-        if isinstance(serialized_value, bool):
-            res.setdefault("attributes", {})[key] = {
-                "value": serialized_value,
-                "type": "boolean",
-            }
-            continue
-
-        if isinstance(serialized_value, int):
-            res.setdefault("attributes", {})[key] = {
-                "value": serialized_value,
-                "type": "integer",
-            }
-            continue
-
-        if isinstance(serialized_value, float):
-            res.setdefault("attributes", {})[key] = {
-                "value": serialized_value,
-                "type": "double",
-            }
-            continue
-
-        if isinstance(serialized_value, str):
-            res.setdefault("attributes", {})[key] = {
-                "value": serialized_value,
-                "type": "string",
-            }
-            continue
-
-        if isinstance(serialized_value, list):
-            if not serialized_value:
-                res.setdefault("attributes", {})[key] = {"value": [], "type": "array"}
-
-            ty = type(serialized_value[0])
-            if ty in (int, str, bool, float) and all(
-                type(v) is ty for v in serialized_value
-            ):
-                res.setdefault("attributes", {})[key] = {
-                    "value": serialized_value,
-                    "type": "array",
-                }
-
-            continue
-
-        # Types returned when the serializer for V1 span attributes recurses into some container types.
-        if isinstance(serialized_value, (dict, list)):
-            res.setdefault("attributes", {})[key] = {
-                "value": json.dumps(serialized_value),
-                "type": "string",
-            }
-            continue
+        res["attributes"][key] = _serialized_v1_attribute_to_serialized_v2_attribute(
+            value
+        )
 
     return res
 
