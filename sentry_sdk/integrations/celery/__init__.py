@@ -339,7 +339,6 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                 }
             }
 
-            scope.set_custom_sampling_context(custom_sampling_context)
             scope.set_transaction_name(task.name, source=TransactionSource.TASK)
 
             span: "Union[Span, StreamedSpan]"
@@ -351,6 +350,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                 headers = args[3].get("headers") or {}
                 if span_streaming:
                     sentry_sdk.traces.continue_trace(headers)
+                    scope.set_custom_sampling_context(custom_sampling_context)
                     span = sentry_sdk.traces.start_span(
                         name=task.name,
                         parent_span=None,  # make this a segment
@@ -552,11 +552,6 @@ def _patch_producer_publish() -> None:
             # does not overwrite kwargs["headers"], so the original publish
             # method will still work.
             kwargs_headers = {}
-
-        # XXX[ivana]: check whether this is needed with the parent checks
-        # if "task" not in kwargs_headers:
-        #    # filter out heartbeat and other internal Celery events
-        #    return original_publish(self, *args, **kwargs)
 
         task_name = kwargs_headers.get("task")
         task_id = kwargs_headers.get("id")

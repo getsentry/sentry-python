@@ -515,13 +515,18 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     assert celery_invocation(dummy_task, 1, 1)[0].wait() == 1
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_traces_sampler_gets_task_info_in_sampling_context(
+    span_streaming,
     init_celery,
     celery_invocation,
     DictionaryContaining,  # noqa:N803
 ):
     traces_sampler = mock.Mock()
-    celery = init_celery(traces_sampler=traces_sampler)
+    celery = init_celery(
+        traces_sampler=traces_sampler,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     @celery.task(name="dog_walk")
     def walk_dogs(x, y):
@@ -618,13 +623,17 @@ def test_baggage_propagation(init_celery):
             )
 
 
-def test_sentry_propagate_traces_override(init_celery):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_sentry_propagate_traces_override(span_streaming, init_celery):
     """
     Test if the `sentry-propagate-traces` header given to `apply_async`
     overrides the `propagate_traces` parameter in the integration constructor.
     """
     celery = init_celery(
-        propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
+        propagate_traces=True,
+        traces_sample_rate=1.0,
+        release="abcdef",
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     @celery.task(name="dummy_task", bind=True)
@@ -632,21 +641,38 @@ def test_sentry_propagate_traces_override(init_celery):
         trace_id = get_current_span().trace_id
         return trace_id
 
-    with start_transaction() as transaction:
-        transaction_trace_id = transaction.trace_id
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="parent") as span:
+            parent_trace_id = span.trace_id
 
-        # should propagate trace
-        task_transaction_id = dummy_task.apply_async(
-            args=("some message",),
-        ).get()
-        assert transaction_trace_id == task_transaction_id
+            # should propagate trace
+            task_trace_id = dummy_task.apply_async(
+                args=("some message",),
+            ).get()
+            assert parent_trace_id == task_trace_id
 
-        # should NOT propagate trace (overrides `propagate_traces` parameter in integration constructor)
-        task_transaction_id = dummy_task.apply_async(
-            args=("another message",),
-            headers={"sentry-propagate-traces": False},
-        ).get()
-        assert transaction_trace_id != task_transaction_id
+            # should NOT propagate trace
+            task_trace_id = dummy_task.apply_async(
+                args=("another message",),
+                headers={"sentry-propagate-traces": False},
+            ).get()
+            assert parent_trace_id != task_trace_id
+    else:
+        with start_transaction() as transaction:
+            transaction_trace_id = transaction.trace_id
+
+            # should propagate trace
+            task_trace_id = dummy_task.apply_async(
+                args=("some message",),
+            ).get()
+            assert transaction_trace_id == task_trace_id
+
+            # should NOT propagate trace
+            task_trace_id = dummy_task.apply_async(
+                args=("another message",),
+                headers={"sentry-propagate-traces": False},
+            ).get()
+            assert transaction_trace_id != task_trace_id
 
 
 def test_apply_async_manually_span(sentry_init):
@@ -1001,11 +1027,12 @@ def tests_span_origin_producer(
 
         sentry_sdk.flush()
 
+        parent = items.pop(-1).payload
+        assert parent["name"] == "custom parent"
+        assert parent["attributes"]["sentry.origin"] == "manual"
+
         for item in items:
-            if item.payload["name"] != "custom parent":
-                assert (
-                    item.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
-                )
+            assert item.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
     else:
         events = capture_events()
 
@@ -1078,11 +1105,17 @@ def test_send_task_wrapped(
 
     if span_streaming:
         submit_span, outer = [item.payload for item in items]
+
         assert outer["name"] == "custom parent"
         assert outer["is_segment"] is True
+
         assert submit_span["name"] == "very_creative_task_name"
         assert submit_span["attributes"]["sentry.op"] == "queue.submit.celery"
         assert submit_span["trace_id"] == outer_span.trace_id
+        assert (
+            submit_span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
+        )
+
     else:
         (event,) = events
         assert event["type"] == "transaction"
@@ -1094,14 +1127,18 @@ def test_send_task_wrapped(
         assert span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
 
 
-def test_user_custom_headers_accessible_in_task(init_celery):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_user_custom_headers_accessible_in_task(span_streaming, init_celery):
     """
     Regression test for https://github.com/getsentry/sentry-python/issues/5566
 
     User-provided custom headers passed to apply_async() must be accessible
     via task.request.headers on the worker side.
     """
-    celery = init_celery(traces_sample_rate=1.0)
+    celery = init_celery(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     @celery.task(name="custom_headers_task", bind=True)
     def custom_headers_task(self):
@@ -1113,8 +1150,12 @@ def test_user_custom_headers_accessible_in_task(init_celery):
         "tenant_id": "tenant-42",
     }
 
-    with start_transaction(name="test"):
-        result = custom_headers_task.apply_async(headers=custom_headers)
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="test"):
+            result = custom_headers_task.apply_async(headers=custom_headers)
+    else:
+        with start_transaction(name="test"):
+            result = custom_headers_task.apply_async(headers=custom_headers)
 
     received_headers = result.get()
     for key, value in custom_headers.items():
