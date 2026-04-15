@@ -1115,8 +1115,6 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
     capture_events,
     send_default_pii,
     include_prompts,
-    system_instructions_content,
-    request,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
@@ -1136,7 +1134,7 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
         [
             (
                 "system",
-                system_instructions_content,
+                "You are very powerful assistant, but don't know current events",
             ),
             ("user", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -1417,7 +1415,6 @@ def test_langchain_openai_tools_agent_stream(
 def test_langchain_openai_tools_agent_stream_with_config(
     sentry_init,
     capture_events,
-    system_instructions_content,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
