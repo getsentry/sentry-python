@@ -2,7 +2,7 @@ import os
 import uuid
 import random
 import socket
-from collections.abc import Mapping
+from collections.abc import Mapping, Iterable
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
@@ -58,73 +58,7 @@ from sentry_sdk.profiler.transaction_profiler import (
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.envelope import Item, PayloadRef
-
-
-_ISO_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
-
-
-def _iso_to_epoch(iso_str: str) -> float:
-    return (
-        datetime.strptime(iso_str, _ISO_TIMESTAMP_FORMAT)
-        .replace(tzinfo=timezone.utc)
-        .timestamp()
-    )
-
-
-def _v1_span_to_v2(span: "Dict[str, Any]", event: "Dict[str, Any]") -> "Dict[str, Any]":
-    rv: "Dict[str, Any]" = {
-        "trace_id": span["trace_id"],
-        "span_id": span["span_id"],
-        "name": span.get("description") or "",
-        "is_segment": False,
-        "start_timestamp": _iso_to_epoch(span["start_timestamp"]),
-        "status": "ok",
-    }
-
-    if span.get("timestamp"):
-        rv["end_timestamp"] = _iso_to_epoch(span["timestamp"])
-
-    if span.get("parent_span_id"):
-        rv["parent_span_id"] = span["parent_span_id"]
-
-    status = span.get("status")
-    if status and status != "ok":
-        rv["status"] = "error"
-
-    attributes: "Dict[str, Any]" = {}
-
-    if span.get("op"):
-        attributes["sentry.op"] = span["op"]
-    if span.get("origin"):
-        attributes["sentry.origin"] = span["origin"]
-
-    for key, value in (span.get("data") or {}).items():
-        attributes[key] = value
-    for key, value in (span.get("tags") or {}).items():
-        attributes[key] = value
-
-    trace_context = event.get("contexts", {}).get("trace", {})
-    sdk_info = event.get("sdk", {})
-
-    if event.get("release"):
-        attributes["sentry.release"] = event["release"]
-    if event.get("environment"):
-        attributes["sentry.environment"] = event["environment"]
-    if event.get("transaction"):
-        attributes["sentry.segment.name"] = event["transaction"]
-
-    if trace_context.get("span_id"):
-        attributes["sentry.segment.id"] = trace_context["span_id"]
-    if sdk_info.get("name"):
-        attributes["sentry.sdk.name"] = sdk_info["name"]
-    if sdk_info.get("version"):
-        attributes["sentry.sdk.version"] = sdk_info["version"]
-
-    if attributes:
-        rv["attributes"] = {k: serialize_attribute(v) for k, v in attributes.items()}
-
-    return rv
-
+from sentry_sdk.utils import datetime_from_isoformat
 
 if TYPE_CHECKING:
     from typing import Any
@@ -150,12 +84,130 @@ if TYPE_CHECKING:
 
 _client_init_debug = ContextVar("client_init_debug")
 
-
 SDK_INFO: "SDKInfo" = {
     "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
+
+
+def _serialized_v1_span_to_serialized_v2_span(
+    span: "Dict[str, Any]", event: "Event"
+) -> "dict[str, Any]":
+    # See SpanBatcher._to_transport_format() for analogous population of all entries except "attributes".
+    res: "Dict[str, Any]" = {
+        "status": "ok",
+        "is_segment": False,
+    }
+
+    if "trace_id" in span:
+        res["trace_id"] = span["trace_id"]
+
+    if "span_id" in span:
+        res["span_id"] = span["span_id"]
+
+    if "description" in span:
+        res["name"] = span["description"]
+
+    if "start_timestamp" in span:
+        start_timestamp = None
+        try:
+            start_timestamp = datetime_from_isoformat(span["start_timestamp"])
+        except Exception:
+            pass
+
+        if start_timestamp is not None:
+            res["start_timestamp"] = start_timestamp.timestamp()
+
+    if "timestamp" in span:
+        end_timestamp = None
+        try:
+            end_timestamp = datetime_from_isoformat(span["timestamp"])
+        except Exception:
+            pass
+
+        if end_timestamp is not None:
+            res["end_timestamp"] = end_timestamp.timestamp()
+
+    if "parent_span_id" in span:
+        res["parent_span_id"] = span["parent_span_id"]
+
+    if "status" in span and span["status"] != "ok":
+        res["status"] = "error"
+
+    attributes: "Dict[str, Any]" = {}
+
+    if "op" in span:
+        attributes["sentry.op"] = span["op"]
+    if "origin" in span:
+        attributes["sentry.origin"] = span["origin"]
+
+    span_data = span.get("data")
+    if isinstance(span_data, dict):
+        attributes.update(span_data)
+
+    span_tags = span.get("tags")
+    if isinstance(span_tags, dict):
+        attributes.update(span_tags)
+
+    # See Scope._apply_user_attributes_to_telemetry() for user attributes.
+    user = event.get("user")
+    if isinstance(user, dict):
+        if "id" in user:
+            attributes["user.id"] = user["id"]
+        if "username" in user:
+            attributes["user.name"] = user["username"]
+        if "email" in user:
+            attributes["user.email"] = user["email"]
+
+    # See Scope.set_global_attributes() for release, environment, and SDK metadata.
+    if "release" in event:
+        attributes["sentry.release"] = event["release"]
+    if "environment" in event:
+        attributes["sentry.environment"] = event["environment"]
+    if "transaction" in event:
+        attributes["sentry.segment.name"] = event["transaction"]
+
+    trace_context = event.get("contexts", {}).get("trace", {})
+    if "span_id" in trace_context:
+        attributes["sentry.segment.id"] = trace_context["span_id"]
+
+    sdk_info = event.get("sdk")
+    if isinstance(sdk_info, dict):
+        if "name" in sdk_info:
+            attributes["sentry.sdk.name"] = sdk_info["name"]
+        if "version" in sdk_info:
+            attributes["sentry.sdk.version"] = sdk_info["version"]
+
+    if attributes:
+        res["attributes"] = {k: serialize_attribute(v) for k, v in attributes.items()}
+
+    return res
+
+
+def _split_gen_ai_spans(
+    event_opt: "Event",
+) -> "tuple[List[Dict[str, object]], List[Dict[str, object]]]":
+    if "spans" not in event_opt:
+        return [], []
+
+    spans = event_opt["spans"]
+    if isinstance(spans, AnnotatedValue):
+        spans = spans.value
+
+    if not isinstance(spans, Iterable):
+        return [], []
+
+    non_gen_ai_spans = []
+    gen_ai_spans = []
+    for span in spans:
+        span_op = span.get("op")
+        if isinstance(span_op, str) and span_op.startswith("gen_ai."):
+            gen_ai_spans.append(span)
+        else:
+            non_gen_ai_spans.append(span)
+
+    return non_gen_ai_spans, gen_ai_spans
 
 
 def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
@@ -982,32 +1034,27 @@ class _Client(BaseClient):
             if isinstance(profile, Profile):
                 envelope.add_profile(profile.to_json(event_opt, self.options))
 
-            nonstreamed_spans = []
-            streamed_spans = []
-            for span in event_opt.get("spans") or []:
-                span_op = span.get("op")
-                if span_op is not None and span_op.startswith("gen_ai."):
-                    streamed_spans.append(span)
-                else:
-                    nonstreamed_spans.append(span)
+            non_gen_ai_spans, gen_ai_spans = _split_gen_ai_spans(event_opt)
 
-            if nonstreamed_spans:
-                event_opt["spans"] = nonstreamed_spans
-                envelope.add_transaction(event_opt)
+            event_opt["spans"] = non_gen_ai_spans
+            envelope.add_transaction(event_opt)
 
-            if streamed_spans:
+            if gen_ai_spans:
                 envelope.add_item(
                     Item(
                         type=SpanBatcher.TYPE,
                         content_type=SpanBatcher.CONTENT_TYPE,
                         headers={
-                            "item_count": len(streamed_spans),
+                            "item_count": len(gen_ai_spans),
                         },
                         payload=PayloadRef(
                             json={
                                 "items": [
-                                    _v1_span_to_v2(span, event)
-                                    for span in streamed_spans
+                                    _serialized_v1_span_to_serialized_v2_span(
+                                        span, event
+                                    )
+                                    for span in gen_ai_spans
+                                    if isinstance(span, dict)
                                 ]
                             },
                         ),
