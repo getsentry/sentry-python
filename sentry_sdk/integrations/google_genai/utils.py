@@ -31,7 +31,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     safe_serialize,
 )
-from google.genai.types import GenerateContentConfig, Part, Content
+from google.genai.types import GenerateContentConfig, Part, Content, PartDict
 from itertools import chain
 
 if TYPE_CHECKING:
@@ -46,6 +46,18 @@ if TYPE_CHECKING:
         EmbedContentResponse,
         ContentUnion,
     )
+
+_is_PIL_available = False
+try:
+    from PIL import Image as PILImage  # type: ignore[import-not-found]
+
+    _is_PIL_available = True
+except ImportError:
+    pass
+
+# Keys to use when checking to see if a dict provided by the user
+# is Part-like (as opposed to a Content or multi-turn conversation entry).
+_PART_DICT_KEYS = PartDict.__optional_keys__
 
 
 class UsageData(TypedDict):
@@ -169,12 +181,23 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
     if isinstance(contents, str):
         return [{"role": "user", "content": contents}]
 
-    # Handle list case - process each item (non-recursive, flatten at top level)
+    # Handle list case
     if isinstance(contents, list):
-        for item in contents:
-            item_messages = extract_contents_messages(item)
-            messages.extend(item_messages)
-        return messages
+        if contents and all(_is_part_like(item) for item in contents):
+            # All items are parts — merge into a single multi-part user message
+            content_parts = []
+            for item in contents:
+                part = _extract_part_from_item(item)
+                if part is not None:
+                    content_parts.append(part)
+
+            return [{"role": "user", "content": content_parts}]
+        else:
+            # Multi-turn conversation or mixed content types
+            for item in contents:
+                item_messages = extract_contents_messages(item)
+                messages.extend(item_messages)
+            return messages
 
     # Handle dictionary case (ContentDict)
     if isinstance(contents, dict):
@@ -206,11 +229,21 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
             # Add tool messages
             messages.extend(tool_messages)
         elif "text" in contents:
-            # Simple text in dict
             messages.append(
                 {
-                    "role": role or "user",
+                    "role": role,
                     "content": [{"text": contents["text"], "type": "text"}],
+                }
+            )
+        elif "inline_data" in contents:
+            # The "data" will always be bytes (or bytes within a string),
+            # so if this is present, it's safe to automatically substitute with the placeholder
+            messages.append(
+                {
+                    "inline_data": {
+                        "mime_type": contents["inline_data"].get("mime_type", ""),
+                        "data": BLOB_DATA_SUBSTITUTE,
+                    }
                 }
             )
 
@@ -248,15 +281,10 @@ def extract_contents_messages(contents: "ContentListUnion") -> "List[Dict[str, A
             return [{"role": "user", "content": [part_result]}]
 
     # Handle PIL.Image.Image
-    try:
-        from PIL import Image as PILImage  # type: ignore[import-not-found]
-
-        if isinstance(contents, PILImage.Image):
-            blob_part = _extract_pil_image(contents)
-            if blob_part:
-                return [{"role": "user", "content": [blob_part]}]
-    except ImportError:
-        pass
+    if _is_PIL_available and isinstance(contents, PILImage.Image):
+        blob_part = _extract_pil_image(contents)
+        if blob_part:
+            return [{"role": "user", "content": [blob_part]}]
 
     # Handle File object
     if hasattr(contents, "uri") and hasattr(contents, "mime_type"):
@@ -310,11 +338,9 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
         if result is not None:
             # For inline_data with bytes data, substitute the content
             if "inline_data" in part:
-                inline_data = part["inline_data"]
-                if isinstance(inline_data, dict) and isinstance(
-                    inline_data.get("data"), bytes
-                ):
-                    result["content"] = BLOB_DATA_SUBSTITUTE
+                # inline_data.data will always be bytes, or a string containing base64-encoded bytes,
+                # so can automatically substitute without further checks
+                result["content"] = BLOB_DATA_SUBSTITUTE
             return result
 
         return None
@@ -357,18 +383,11 @@ def _extract_part_content(part: "Any") -> "Optional[dict[str, Any]]":
             if mime_type is None:
                 mime_type = ""
 
-            # Handle both bytes (binary data) and str (base64-encoded data)
-            if isinstance(data, bytes):
-                content = BLOB_DATA_SUBSTITUTE
-            else:
-                # For non-bytes data (e.g., base64 strings), use as-is
-                content = data
-
             return {
                 "type": "blob",
                 "modality": get_modality_from_mime_type(mime_type),
                 "mime_type": mime_type,
-                "content": content,
+                "content": BLOB_DATA_SUBSTITUTE,
             }
 
     return None
@@ -429,25 +448,78 @@ def _extract_tool_message_from_part(part: "Any") -> "Optional[dict[str, Any]]":
 
 def _extract_pil_image(image: "Any") -> "Optional[dict[str, Any]]":
     """Extract blob part from PIL.Image.Image."""
-    try:
-        from PIL import Image as PILImage
-
-        if not isinstance(image, PILImage.Image):
-            return None
-
-        # Get format, default to JPEG
-        format_str = image.format or "JPEG"
-        suffix = format_str.lower()
-        mime_type = f"image/{suffix}"
-
-        return {
-            "type": "blob",
-            "modality": get_modality_from_mime_type(mime_type),
-            "mime_type": mime_type,
-            "content": BLOB_DATA_SUBSTITUTE,
-        }
-    except Exception:
+    if not _is_PIL_available or not isinstance(image, PILImage.Image):
         return None
+
+    # Get format, default to JPEG
+    format_str = image.format or "JPEG"
+    suffix = format_str.lower()
+    mime_type = f"image/{suffix}"
+
+    return {
+        "type": "blob",
+        "modality": get_modality_from_mime_type(mime_type),
+        "mime_type": mime_type,
+        "content": BLOB_DATA_SUBSTITUTE,
+    }
+
+
+def _is_part_like(item: "Any") -> bool:
+    """Check if item is a part-like value (PartUnionDict) rather than a Content/multi-turn entry."""
+    if isinstance(item, (str, Part)):
+        return True
+    if isinstance(item, (list, Content)):
+        return False
+    if isinstance(item, dict):
+        if "role" in item or "parts" in item:
+            return False
+        # Part objects that came in as plain dicts
+        return bool(_PART_DICT_KEYS & item.keys())
+    # File objects
+    if hasattr(item, "uri"):
+        return True
+    # PIL.Image
+    if _is_PIL_available and isinstance(item, PILImage.Image):
+        return True
+    return False
+
+
+def _extract_part_from_item(item: "Any") -> "Optional[dict[str, Any]]":
+    """Convert a single part-like item to a content part dict."""
+    if isinstance(item, str):
+        return {"text": item, "type": "text"}
+
+    # Handle bare inline_data dicts directly to preserve the raw format
+    if isinstance(item, dict) and "inline_data" in item:
+        return {
+            "inline_data": {
+                "mime_type": item["inline_data"].get("mime_type", ""),
+                "data": BLOB_DATA_SUBSTITUTE,
+            }
+        }
+
+    # For other dicts and Part objects, use existing _extract_part_content
+    result = _extract_part_content(item)
+    if result is not None:
+        return result
+
+    # PIL.Image
+    if _is_PIL_available and isinstance(item, PILImage.Image):
+        return _extract_pil_image(item)
+
+    # File objects
+    if hasattr(item, "uri") and hasattr(item, "mime_type"):
+        file_uri = getattr(item, "uri", None)
+        mime_type = getattr(item, "mime_type", None) or ""
+        if file_uri is not None:
+            return {
+                "type": "uri",
+                "modality": get_modality_from_mime_type(mime_type),
+                "mime_type": mime_type,
+                "uri": file_uri,
+            }
+
+    return None
 
 
 def extract_contents_text(contents: "ContentListUnion") -> "Optional[str]":
