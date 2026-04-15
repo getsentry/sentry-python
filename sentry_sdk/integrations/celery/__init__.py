@@ -283,7 +283,7 @@ def _wrap_task_run(f: "F") -> "F":
 
         span_mgr: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
         if span_streaming:
-            if not task_started_from_beat:
+            if not task_started_from_beat and sentry_sdk.get_current_span() is not None:
                 span_mgr = sentry_sdk.traces.start_span(
                     name=task_name,
                     attributes={
@@ -329,8 +329,21 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            transaction: "Optional[Union[Span, StreamedSpan]]" = None
+            span: "Optional[Union[Span, StreamedSpan]]" = None
             span_ctx: "Optional[Union[Span, StreamedSpan]]" = None
+
+            custom_sampling_context = {
+                "celery_job": {
+                    "task": task.name,
+                    # for some reason, args[1] is a list if non-empty but a
+                    # tuple if empty
+                    "args": list(args[1]),
+                    "kwargs": args[2],
+                }
+            }
+
+            scope.set_custom_sampling_context(custom_sampling_context)
+            scope.set_transaction_name(task.name, source=TransactionSource.TASK)
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
@@ -338,7 +351,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                 headers = args[3].get("headers") or {}
                 if span_streaming:
                     sentry_sdk.traces.continue_trace(headers)
-                    transaction = sentry_sdk.traces.start_span(
+                    span = sentry_sdk.traces.start_span(
                         name=task.name,
                         attributes={
                             "sentry.origin": CeleryIntegration.origin,
@@ -347,32 +360,24 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                         },
                     )
 
-                    span_ctx = transaction
+                    span_ctx = span
 
                 else:
-                    transaction = continue_trace(
+                    span = continue_trace(
                         headers,
                         op=OP.QUEUE_TASK_CELERY,
                         name=task.name,
                         source=TransactionSource.TASK,
                         origin=CeleryIntegration.origin,
                     )
-                    transaction.set_status(SPANSTATUS.OK)
+                    span.set_status(SPANSTATUS.OK)
 
                     span_ctx = sentry_sdk.start_transaction(
-                        transaction,
-                        custom_sampling_context={
-                            "celery_job": {
-                                "task": task.name,
-                                # for some reason, args[1] is a list if non-empty but a
-                                # tuple if empty
-                                "args": list(args[1]),
-                                "kwargs": args[2],
-                            }
-                        },
+                        span,
+                        custom_sampling_context=custom_sampling_context,
                     )
 
-            if transaction is None or span_ctx is None:
+            if span is None or span_ctx is None:
                 return f(*args, **kwargs)
 
             with span_ctx:
@@ -557,17 +562,21 @@ def _patch_producer_publish() -> None:
         routing_key = kwargs.get("routing_key")
         exchange = kwargs.get("exchange")
 
-        span: "Union[StreamedSpan, Span]"
+        span: "Union[StreamedSpan, Span, None]" = None
         if span_streaming:
-            span = sentry_sdk.traces.start_span(name=task_name)
-            span.set_attribute("sentry.op", OP.QUEUE_PUBLISH)
-            span.set_attribute("sentry.origin", CeleryIntegration.origin)
+            if sentry_sdk.get_current_span() is not None:
+                span = sentry_sdk.traces.start_span(name=task_name)
+                span.set_attribute("sentry.op", OP.QUEUE_PUBLISH)
+                span.set_attribute("sentry.origin", CeleryIntegration.origin)
         else:
             span = sentry_sdk.start_span(
                 op=OP.QUEUE_PUBLISH,
                 name=task_name,
                 origin=CeleryIntegration.origin,
             )
+
+        if span is None:
+            return original_publish(self, *args, **kwargs)
 
         with span:
             if isinstance(span, StreamedSpan):
