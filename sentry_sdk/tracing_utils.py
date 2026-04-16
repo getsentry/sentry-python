@@ -231,7 +231,7 @@ def _should_be_included(
 
 
 def add_source(
-    span: Union["sentry_sdk.tracing.Span", "sentry_sdk.traces.StreamedSpan"],
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
     project_root: "Optional[str]",
     in_app_include: "Optional[list[str]]",
     in_app_exclude: "Optional[list[str]]",
@@ -367,10 +367,10 @@ def add_http_request_source_for_streamed_span(
     if not should_add_request_source:
         return
 
-    try:
+    if span.start_timestamp_monotonic_ns is not None:
         elapsed = nanosecond_time() - span.start_timestamp_monotonic_ns
         end_timestamp = span.start_timestamp + timedelta(microseconds=elapsed / 1000)
-    except (AttributeError, TypeError):
+    else:
         end_timestamp = datetime.now(timezone.utc)
 
     duration = end_timestamp - span.start_timestamp
