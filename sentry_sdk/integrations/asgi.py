@@ -33,8 +33,8 @@ from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     Transaction,
     TransactionSource,
+    Span,
 )
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
     event_from_exception,
@@ -47,6 +47,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     qualname_from_function,
 )
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 

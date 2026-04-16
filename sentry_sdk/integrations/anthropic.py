@@ -59,6 +59,8 @@ try:
 except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
+from sentry_sdk.tracing import Span
+
 if TYPE_CHECKING:
     from typing import (
         Any,

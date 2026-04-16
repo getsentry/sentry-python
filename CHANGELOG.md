@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.52.0a9
+
+This is an alpha release for internal testing.
+
 ## 2.58.0
 
 ### New Features ✨
@@ -234,17 +238,17 @@
 
   ```python
   import sentry_sdk
-  
+
   sentry_sdk.init(...)
-  
+
   sentry_sdk.set_attribute("my.attribute", "my value")
-  
+
   # This metric will have "my.attribute" set
   sentry_sdk.metrics.count("counter", 1)
-  
+
   # Remove the attribute
   sentry_sdk.remove_attribute("my.attribute")
-  
+
   # This log will not have "my.attribute" set
   sentry_sdk.logger.info("An info log")
   ```
