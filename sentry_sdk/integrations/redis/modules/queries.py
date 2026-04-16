@@ -46,24 +46,33 @@ def _get_db_span_description(
 def _set_db_data_on_span(
     span: "Union[Span, StreamedSpan]", connection_params: "dict[str, Any]"
 ) -> None:
-    if isinstance(span, StreamedSpan):
-        set_on_span = span.set_attribute
-    else:
-        set_on_span = span.set_data
-
-    set_on_span(SPANDATA.DB_SYSTEM, "redis")
-
     db = connection_params.get("db")
-    if db is not None:
-        set_on_span(SPANDATA.DB_NAME, str(db))
-
     host = connection_params.get("host")
-    if host is not None:
-        set_on_span(SPANDATA.SERVER_ADDRESS, host)
-
     port = connection_params.get("port")
-    if port is not None:
-        set_on_span(SPANDATA.SERVER_PORT, port)
+
+    if isinstance(span, StreamedSpan):
+        span.set_attribute("db.system.name", "redis")
+
+        if db is not None:
+            span.set_attribute("db.namespace", str(db))
+
+        if host is not None:
+            span.set_attribute(SPANDATA.SERVER_ADDRESS, host)
+
+        if port is not None:
+            span.set_attribute(SPANDATA.SERVER_PORT, port)
+
+    else:
+        span.set_data(SPANDATA.DB_SYSTEM, "redis")
+
+        if db is not None:
+            span.set_data(SPANDATA.DB_NAME, str(db))
+
+        if host is not None:
+            span.set_data(SPANDATA.SERVER_ADDRESS, host)
+
+        if port is not None:
+            span.set_data(SPANDATA.SERVER_PORT, port)
 
 
 def _set_db_data(
