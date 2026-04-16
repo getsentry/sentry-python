@@ -1,4 +1,4 @@
-import asyncio
+import inspect
 from copy import deepcopy
 from functools import wraps
 
@@ -73,7 +73,7 @@ def patch_get_request_handler() -> None:
         if (
             dependant
             and dependant.call is not None
-            and not asyncio.iscoroutinefunction(dependant.call)
+            and not inspect.iscoroutinefunction(dependant.call)
         ):
             old_call = dependant.call
 
