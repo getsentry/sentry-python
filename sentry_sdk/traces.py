@@ -278,12 +278,9 @@ class StreamedSpan:
         self._start_timestamp = datetime.now(timezone.utc)
         self._timestamp: "Optional[datetime]" = None
 
-        try:
-            # profiling depends on this value and requires that
-            # it is measured in nanoseconds
-            self._start_timestamp_monotonic_ns = nanosecond_time()
-        except AttributeError:
-            self._start_timestamp_monotonic_ns = None
+        # profiling depends on this value and requires that
+        # it is measured in nanoseconds
+        self._start_timestamp_monotonic_ns = nanosecond_time()
 
         self._span_id: "Optional[str]" = None
 
