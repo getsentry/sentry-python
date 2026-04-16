@@ -283,7 +283,7 @@ class StreamedSpan:
             # it is measured in nanoseconds
             self._start_timestamp_monotonic_ns = nanosecond_time()
         except AttributeError:
-            pass
+            self._start_timestamp_monotonic_ns = None
 
         self._span_id: "Optional[str]" = None
 
@@ -385,12 +385,12 @@ class StreamedSpan:
                 )
 
         if self._timestamp is None:
-            try:
+            if self._start_timestamp_monotonic_ns is not None:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
                 self._timestamp = self._start_timestamp + timedelta(
                     microseconds=elapsed / 1000
                 )
-            except AttributeError:
+            else:
                 self._timestamp = datetime.now(timezone.utc)
 
         client = sentry_sdk.get_client()
