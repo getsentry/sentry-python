@@ -486,7 +486,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
 async def test_query_source_disabled(sentry_init, capture_events):
     sentry_options = {
         "integrations": [AsyncPGIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
     }
@@ -524,7 +524,7 @@ async def test_query_source_enabled(
 ):
     sentry_options = {
         "integrations": [AsyncPGIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
@@ -560,7 +560,7 @@ async def test_query_source_enabled(
 async def test_query_source(sentry_init, capture_events):
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
@@ -610,7 +610,7 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
     """
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
@@ -656,7 +656,7 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
 async def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
@@ -701,7 +701,7 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 async def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
