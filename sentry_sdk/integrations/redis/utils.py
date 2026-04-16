@@ -112,10 +112,7 @@ def _set_pipeline_data(
     is_transaction: bool,
     commands_seq: "Sequence[Any]",
 ) -> None:
-    if isinstance(span, StreamedSpan):
-        span.set_attribute("redis.is_cluster", is_cluster)
-        span.set_attribute("redis.transaction", is_transaction)
-    else:
+    if isinstance(span, Span):
         span.set_tag("redis.is_cluster", is_cluster)
         span.set_tag("redis.transaction", is_transaction)
 
@@ -129,12 +126,8 @@ def _set_pipeline_data(
 
     if isinstance(span, StreamedSpan):
         span.set_attribute(
-            "redis.commands.count",
+            "db.redis.pipeline_length",
             len(commands_seq),
-        )
-        span.set_attribute(
-            "redis.commands.first_ten",
-            commands,
         )
     else:
         span.set_data(
