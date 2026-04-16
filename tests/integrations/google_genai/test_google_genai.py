@@ -124,14 +124,14 @@ def create_test_config(
     ],
 )
 def test_nonstreaming_generate_content(
-    sentry_init, capture_events, send_default_pii, include_prompts, mock_genai_client
+    sentry_init, capture_items, send_default_pii, include_prompts, mock_genai_client
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     # Mock the HTTP response at the _api_client.request() level
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -146,38 +146,37 @@ def test_nonstreaming_generate_content(
             mock_genai_client.models.generate_content(
                 model="gemini-1.5-flash", contents="Tell me a joke", config=config
             )
-    assert len(events) == 1
-    (event,) = events
 
-    assert event["type"] == "transaction"
+    (event,) = (item.payload for item in items if item.type == "transaction")
     assert event["transaction"] == "google_genai"
 
-    assert len(event["spans"]) == 1
-    chat_span = event["spans"][0]
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(spans) == 1
+    chat_span = next(item.payload for item in items if item.type == "span")
 
     # Check chat span
-    assert chat_span["op"] == OP.GEN_AI_CHAT
-    assert chat_span["description"] == "chat gemini-1.5-flash"
-    assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
-    assert chat_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert chat_span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert chat_span["name"] == "chat gemini-1.5-flash"
+    assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
 
     if send_default_pii and include_prompts:
         # Response text is stored as a JSON array
-        response_text = chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        response_text = chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         # Parse the JSON array
         response_texts = json.loads(response_text)
         assert response_texts == ["Hello! How can I help you today?"]
     else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_span["attributes"]
 
     # Check token usage
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     # Output tokens now include reasoning tokens: candidates_token_count (20) + thoughts_token_count (3) = 23
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
 
 
 @pytest.mark.parametrize("generate_content_config", (False, True))
@@ -210,7 +209,7 @@ def test_nonstreaming_generate_content(
 )
 def test_generate_content_with_system_instruction(
     sentry_init,
-    capture_events,
+    capture_items,
     mock_genai_client,
     generate_content_config,
     system_instructions,
@@ -221,7 +220,7 @@ def test_generate_content_with_system_instruction(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -243,16 +242,15 @@ def test_generate_content_with_system_instruction(
                 config=config,
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
     if expected_texts is None:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["data"]
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["attributes"]
         return
 
     # (PII is enabled and include_prompts is True in this test)
     system_instructions = json.loads(
-        invoke_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        invoke_span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
     )
 
     assert system_instructions == [
@@ -260,12 +258,12 @@ def test_generate_content_with_system_instruction(
     ]
 
 
-def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_client):
+def test_generate_content_with_tools(sentry_init, capture_items, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Create a mock tool function
     def get_weather(location: str) -> str:
@@ -319,18 +317,17 @@ def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_cli
                 model="gemini-1.5-flash", contents="What's the weather?", config=config
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
     # Check that tools are recorded (data is serialized as a string)
-    tools_data_str = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+    tools_data_str = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
     # Parse the JSON string to verify content
     tools_data = json.loads(tools_data_str)
     assert len(tools_data) == 2
 
     # The order of tools may not be guaranteed, so sort by name and description for comparison
     sorted_tools = sorted(
-        tools_data, key=lambda t: (t.get("name", ""), t.get("description", ""))
+        tools_data, key=lambda t: (t.get("name", ""), t.get("name", ""))
     )
 
     # The function tool
@@ -342,13 +339,13 @@ def test_generate_content_with_tools(sentry_init, capture_events, mock_genai_cli
     assert sorted_tools[1]["description"] == "Get weather information (tool object)"
 
 
-def test_tool_execution(sentry_init, capture_events):
+def test_tool_execution(sentry_init, capture_items):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Create a mock tool function
     def get_weather(location: str) -> str:
@@ -366,25 +363,25 @@ def test_tool_execution(sentry_init, capture_events):
 
     assert result == "The weather in San Francisco is sunny"
 
-    (event,) = events
-    assert len(event["spans"]) == 1
-    tool_span = event["spans"][0]
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(spans) == 1
+    tool_span = next(item.payload for item in items if item.type == "span")
 
-    assert tool_span["op"] == OP.GEN_AI_EXECUTE_TOOL
-    assert tool_span["description"] == "execute_tool get_weather"
-    assert tool_span["data"][SPANDATA.GEN_AI_TOOL_NAME] == "get_weather"
+    assert tool_span["attributes"]["sentry.op"] == OP.GEN_AI_EXECUTE_TOOL
+    assert tool_span["name"] == "execute_tool get_weather"
+    assert tool_span["attributes"][SPANDATA.GEN_AI_TOOL_NAME] == "get_weather"
     assert (
-        tool_span["data"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
+        tool_span["attributes"][SPANDATA.GEN_AI_TOOL_DESCRIPTION]
         == "Get the weather for a location"
     )
 
 
-def test_error_handling(sentry_init, capture_events, mock_genai_client):
+def test_error_handling(sentry_init, capture_items, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("event", "transaction")
 
     # Mock an error at the HTTP level
     with mock.patch.object(
@@ -399,8 +396,8 @@ def test_error_handling(sentry_init, capture_events, mock_genai_client):
                 )
 
     # Should have both transaction and error events
-    assert len(events) == 2
-    error_event, transaction_event = events
+    assert len([item for item in items if item.type == "transaction"]) == 1
+    (error_event,) = (item.payload for item in items if item.type == "event")
 
     assert error_event["level"] == "error"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
@@ -408,14 +405,14 @@ def test_error_handling(sentry_init, capture_events, mock_genai_client):
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "google_genai"
 
 
-def test_streaming_generate_content(sentry_init, capture_events, mock_genai_client):
+def test_streaming_generate_content(sentry_init, capture_items, mock_genai_client):
     """Test streaming with generate_content_stream, verifying chunk accumulation."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Create streaming chunks - simulating a multi-chunk response
     # Chunk 1: First part of text with partial usage metadata
@@ -497,40 +494,41 @@ def test_streaming_generate_content(sentry_init, capture_events, mock_genai_clie
     assert collected_chunks[1].candidates[0].content.parts[0].text == "How can I "
     assert collected_chunks[2].candidates[0].content.parts[0].text == "help you today?"
 
-    (event,) = events
-
-    assert len(event["spans"]) == 1
-    chat_span = event["spans"][0]
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(spans) == 1
+    chat_span = next(item.payload for item in items if item.type == "span")
 
     # Check that streaming flag is set on both spans
-    assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
     # Verify accumulated response text (all chunks combined)
     expected_full_text = "Hello! How can I help you today?"
     # Response text is stored as a JSON string
-    chat_response_text = json.loads(chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])
+    chat_response_text = json.loads(
+        chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    )
     assert chat_response_text == [expected_full_text]
 
     # Verify finish reasons (only the final chunk has a finish reason)
     # When there's a single finish reason, it's stored as a plain string (not JSON)
-    assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in chat_span["data"]
-    assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
-    assert chat_span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
+    assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in chat_span["attributes"]
+    assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
+    assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
 
     # Verify model name
-    assert chat_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
 
 
-def test_span_origin(sentry_init, capture_events, mock_genai_client):
+def test_span_origin(sentry_init, capture_items, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span", "transaction")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -543,22 +541,21 @@ def test_span_origin(sentry_init, capture_events, mock_genai_client):
                 model="gemini-1.5-flash", contents="Test origin", config=config
             )
 
-    (event,) = events
-
+    (event,) = (item.payload for item in items if item.type == "transaction")
     assert event["contexts"]["trace"]["origin"] == "manual"
-    for span in event["spans"]:
-        assert span["origin"] == "auto.ai.google_genai"
+
+    spans = [item.payload for item in items if item.type == "span"]
+    for span in spans:
+        assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
 
 
-def test_response_without_usage_metadata(
-    sentry_init, capture_events, mock_genai_client
-):
+def test_response_without_usage_metadata(sentry_init, capture_items, mock_genai_client):
     """Test handling of responses without usage metadata"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Response without usage metadata
     response_json = {
@@ -584,23 +581,22 @@ def test_response_without_usage_metadata(
                 model="gemini-1.5-flash", contents="Test", config=config
             )
 
-    (event,) = events
-    chat_span = event["spans"][0]
+    chat_span = next(item.payload for item in items if item.type == "span")
 
     # Usage data should not be present
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in chat_span["data"]
-    assert SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS not in chat_span["data"]
-    assert SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS not in chat_span["data"]
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in chat_span["attributes"]
+    assert SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS not in chat_span["attributes"]
+    assert SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS not in chat_span["attributes"]
 
 
-def test_multiple_candidates(sentry_init, capture_events, mock_genai_client):
+def test_multiple_candidates(sentry_init, capture_items, mock_genai_client):
     """Test handling of multiple response candidates"""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Response with multiple candidates
     multi_candidate_json = {
@@ -638,12 +634,11 @@ def test_multiple_candidates(sentry_init, capture_events, mock_genai_client):
                 model="gemini-1.5-flash", contents="Generate multiple", config=config
             )
 
-    (event,) = events
-    chat_span = event["spans"][0]
+    chat_span = next(item.payload for item in items if item.type == "span")
 
     # Should capture all responses
     # Response text is stored as a JSON string when there are multiple responses
-    response_text = chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    response_text = chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     if isinstance(response_text, str) and response_text.startswith("["):
         # It's a JSON array
         response_list = json.loads(response_text)
@@ -654,18 +649,18 @@ def test_multiple_candidates(sentry_init, capture_events, mock_genai_client):
 
     # Finish reasons are serialized as JSON
     finish_reasons = json.loads(
-        chat_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS]
+        chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS]
     )
     assert finish_reasons == ["STOP", "MAX_TOKENS"]
 
 
-def test_all_configuration_parameters(sentry_init, capture_events, mock_genai_client):
+def test_all_configuration_parameters(sentry_init, capture_items, mock_genai_client):
     """Test that all configuration parameters are properly recorded"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -686,26 +681,25 @@ def test_all_configuration_parameters(sentry_init, capture_events, mock_genai_cl
                 model="gemini-1.5-flash", contents="Test all params", config=config
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
     # Check all parameters are recorded
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.8
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.95
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 40
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 2048
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert invoke_span["data"][SPANDATA.GEN_AI_REQUEST_SEED] == 12345
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.8
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.95
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_K] == 40
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 2048
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_SEED] == 12345
 
 
-def test_empty_response(sentry_init, capture_events, mock_genai_client):
+def test_empty_response(sentry_init, capture_items, mock_genai_client):
     """Test handling of minimal response with no content"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Minimal response with empty candidates array
     minimal_response_json = {"candidates": []}
@@ -723,20 +717,20 @@ def test_empty_response(sentry_init, capture_events, mock_genai_client):
     assert response is not None
     assert len(response.candidates) == 0
 
-    (event,) = events
     # Should still create spans even with empty candidates
-    assert len(event["spans"]) == 1
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(spans) == 1
 
 
 def test_response_with_different_id_fields(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test handling of different response ID field names"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Response with response_id and model_version
     response_json = {
@@ -763,20 +757,21 @@ def test_response_with_different_id_fields(
                 model="gemini-1.5-flash", contents="Test", config=create_test_config()
             )
 
-    (event,) = events
-    chat_span = event["spans"][0]
+    chat_span = next(item.payload for item in items if item.type == "span")
 
-    assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "resp-456"
-    assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gemini-1.5-flash-001"
+    assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID] == "resp-456"
+    assert (
+        chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+        == "gemini-1.5-flash-001"
+    )
 
 
-def test_tool_with_async_function(sentry_init, capture_events):
+def test_tool_with_async_function(sentry_init):
     """Test that async tool functions are properly wrapped"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    capture_events()
 
     # Create an async tool function
     async def async_tool(param: str) -> str:
@@ -792,14 +787,14 @@ def test_tool_with_async_function(sentry_init, capture_events):
     assert hasattr(wrapped_async_tool, "__wrapped__")  # Should preserve original
 
 
-def test_contents_as_none(sentry_init, capture_events, mock_genai_client):
+def test_contents_as_none(sentry_init, capture_items, mock_genai_client):
     """Test handling when contents parameter is None"""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -811,22 +806,21 @@ def test_contents_as_none(sentry_init, capture_events, mock_genai_client):
                 model="gemini-1.5-flash", contents=None, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
     # Should handle None contents gracefully
-    messages = invoke_span["data"].get(SPANDATA.GEN_AI_REQUEST_MESSAGES, [])
+    messages = invoke_span["attributes"].get(SPANDATA.GEN_AI_REQUEST_MESSAGES, [])
     # Should only have system message if any, not user message
     assert all(msg["role"] != "user" or msg["content"] is not None for msg in messages)
 
 
-def test_tool_calls_extraction(sentry_init, capture_events, mock_genai_client):
+def test_tool_calls_extraction(sentry_init, capture_items, mock_genai_client):
     """Test extraction of tool/function calls from response"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Response with function calls
     function_call_response_json = {
@@ -875,14 +869,17 @@ def test_tool_calls_extraction(sentry_init, capture_events, mock_genai_client):
                 config=create_test_config(),
             )
 
-    (event,) = events
-    chat_span = event["spans"][0]  # The chat span
+    chat_span = next(
+        item.payload for item in items if item.type == "span"
+    )  # The chat span
 
     # Check that tool calls are extracted and stored
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_span["attributes"]
 
     # Parse the JSON string to verify content
-    tool_calls = json.loads(chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+    tool_calls = json.loads(
+        chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    )
 
     assert len(tool_calls) == 2
 
@@ -902,16 +899,14 @@ def test_tool_calls_extraction(sentry_init, capture_events, mock_genai_client):
     assert json.loads(tool_calls[1]["arguments"]) == {"timezone": "PST"}
 
 
-def test_google_genai_message_truncation(
-    sentry_init, capture_events, mock_genai_client
-):
+def test_google_genai_message_truncation(sentry_init, capture_items, mock_genai_client):
     """Test that large messages are truncated properly in Google GenAI integration."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -930,11 +925,10 @@ def test_google_genai_message_truncation(
                 config=create_test_config(),
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+    invoke_span = next(item.payload for item in items if item.type == "span")
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
 
-    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    messages_data = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
     parsed_messages = json.loads(messages_data)
@@ -980,14 +974,14 @@ EXAMPLE_EMBED_RESPONSE_JSON = {
     ],
 )
 def test_embed_content(
-    sentry_init, capture_events, send_default_pii, include_prompts, mock_genai_client
+    sentry_init, capture_items, send_default_pii, include_prompts, mock_genai_client
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     # Mock the HTTP response at the _api_client.request() level
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
@@ -1006,47 +1000,49 @@ def test_embed_content(
                 ],
             )
 
-    assert len(events) == 1
-    (event,) = events
-
-    assert event["type"] == "transaction"
+    (event,) = (item.payload for item in items if item.type == "transaction")
     assert event["transaction"] == "google_genai_embeddings"
 
     # Should have 1 span for embeddings
-    assert len(event["spans"]) == 1
-    (embed_span,) = event["spans"]
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(spans) == 1
+    (embed_span,) = spans
 
     # Check embeddings span
-    assert embed_span["op"] == OP.GEN_AI_EMBEDDINGS
-    assert embed_span["description"] == "embeddings text-embedding-004"
-    assert embed_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["data"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
-    assert embed_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+    assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert embed_span["name"] == "embeddings text-embedding-004"
+    assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert (
+        embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+    )
 
     # Check input texts if PII is allowed
     if send_default_pii and include_prompts:
-        input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+        input_texts = json.loads(
+            embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        )
         assert input_texts == [
             "What is your name?",
             "What is your favorite color?",
         ]
     else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["data"]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
 
     # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
-        assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
 
 
-def test_embed_content_string_input(sentry_init, capture_events, mock_genai_client):
+def test_embed_content_string_input(sentry_init, capture_items, mock_genai_client):
     """Test embed_content with a single string instead of list."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Mock response with single embedding
     single_embed_response = {
@@ -1074,25 +1070,25 @@ def test_embed_content_string_input(sentry_init, capture_events, mock_genai_clie
                 contents="Single text input",
             )
 
-    (event,) = events
-    (embed_span,) = event["spans"]
+    spans = [item.payload for item in items if item.type == "span"]
+    (embed_span,) = spans
 
     # Check that single string is handled correctly
-    input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+    input_texts = json.loads(embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
     assert input_texts == ["Single text input"]
     # Should use token_count from statistics (5), not billable_character_count (10)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
-        assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
 
 
-def test_embed_content_error_handling(sentry_init, capture_events, mock_genai_client):
+def test_embed_content_error_handling(sentry_init, capture_items, mock_genai_client):
     """Test error handling in embed_content."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "event")
 
     # Mock an error at the HTTP level
     with mock.patch.object(
@@ -1108,8 +1104,8 @@ def test_embed_content_error_handling(sentry_init, capture_events, mock_genai_cl
                 )
 
     # Should have both transaction and error events
-    assert len(events) == 2
-    error_event, _ = events
+    assert len([item for item in items if item.type == "transaction"]) == 1
+    (error_event,) = (item.payload for item in items if item.type == "event")
 
     assert error_event["level"] == "error"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
@@ -1118,14 +1114,14 @@ def test_embed_content_error_handling(sentry_init, capture_events, mock_genai_cl
 
 
 def test_embed_content_without_statistics(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test embed_content response without statistics (older package versions)."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Response without statistics (typical for older google-genai versions)
     # Embeddings exist but don't have the statistics field
@@ -1150,21 +1146,21 @@ def test_embed_content_without_statistics(
                 contents=["Test without statistics", "Another test"],
             )
 
-    (event,) = events
-    (embed_span,) = event["spans"]
+    spans = [item.payload for item in items if item.type == "span"]
+    (embed_span,) = spans
 
     # No usage tokens since there are no statistics in older versions
     # This is expected and the integration should handle it gracefully
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["data"]
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["attributes"]
 
 
-def test_embed_content_span_origin(sentry_init, capture_events, mock_genai_client):
+def test_embed_content_span_origin(sentry_init, capture_items, mock_genai_client):
     """Test that embed_content spans have correct origin."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
 
@@ -1177,11 +1173,12 @@ def test_embed_content_span_origin(sentry_init, capture_events, mock_genai_clien
                 contents=["Test origin"],
             )
 
-    (event,) = events
-
+    (event,) = (item.payload for item in items if item.type == "transaction")
     assert event["contexts"]["trace"]["origin"] == "manual"
-    for span in event["spans"]:
-        assert span["origin"] == "auto.ai.google_genai"
+
+    spans = [item.payload for item in items if item.type == "span"]
+    for span in spans:
+        assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
 
 
 @pytest.mark.asyncio
@@ -1195,7 +1192,7 @@ def test_embed_content_span_origin(sentry_init, capture_events, mock_genai_clien
     ],
 )
 async def test_async_embed_content(
-    sentry_init, capture_events, send_default_pii, include_prompts, mock_genai_client
+    sentry_init, capture_items, send_default_pii, include_prompts, mock_genai_client
 ):
     """Test async embed_content method."""
     sentry_init(
@@ -1203,7 +1200,7 @@ async def test_async_embed_content(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     # Mock the async HTTP response
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
@@ -1222,42 +1219,44 @@ async def test_async_embed_content(
                 ],
             )
 
-    assert len(events) == 1
-    (event,) = events
-
-    assert event["type"] == "transaction"
+    (event,) = (item.payload for item in items if item.type == "transaction")
     assert event["transaction"] == "google_genai_embeddings_async"
 
     # Should have 1 span for embeddings
-    assert len(event["spans"]) == 1
-    (embed_span,) = event["spans"]
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(spans) == 1
+    (embed_span,) = spans
 
     # Check embeddings span
-    assert embed_span["op"] == OP.GEN_AI_EMBEDDINGS
-    assert embed_span["description"] == "embeddings text-embedding-004"
-    assert embed_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-    assert embed_span["data"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
-    assert embed_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+    assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+    assert embed_span["name"] == "embeddings text-embedding-004"
+    assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert (
+        embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+    )
 
     # Check input texts if PII is allowed
     if send_default_pii and include_prompts:
-        input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+        input_texts = json.loads(
+            embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        )
         assert input_texts == [
             "What is your name?",
             "What is your favorite color?",
         ]
     else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["data"]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
 
     # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
-        assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
 
 
 @pytest.mark.asyncio
 async def test_async_embed_content_string_input(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test async embed_content with a single string instead of list."""
     sentry_init(
@@ -1265,7 +1264,7 @@ async def test_async_embed_content_string_input(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Mock response with single embedding
     single_embed_response = {
@@ -1293,28 +1292,28 @@ async def test_async_embed_content_string_input(
                 contents="Single text input",
             )
 
-    (event,) = events
-    (embed_span,) = event["spans"]
+    spans = [item.payload for item in items if item.type == "span"]
+    (embed_span,) = spans
 
     # Check that single string is handled correctly
-    input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+    input_texts = json.loads(embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
     assert input_texts == ["Single text input"]
     # Should use token_count from statistics (5), not billable_character_count (10)
     # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
-        assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+    if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+        assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
 
 
 @pytest.mark.asyncio
 async def test_async_embed_content_error_handling(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test error handling in async embed_content."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "event")
 
     # Mock an error at the HTTP level
     with mock.patch.object(
@@ -1330,8 +1329,8 @@ async def test_async_embed_content_error_handling(
                 )
 
     # Should have both transaction and error events
-    assert len(events) == 2
-    error_event, _ = events
+    assert len([item for item in items if item.type == "transaction"]) == 1
+    (error_event,) = (item.payload for item in items if item.type == "event")
 
     assert error_event["level"] == "error"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
@@ -1341,14 +1340,14 @@ async def test_async_embed_content_error_handling(
 
 @pytest.mark.asyncio
 async def test_async_embed_content_without_statistics(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test async embed_content response without statistics (older package versions)."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     # Response without statistics (typical for older google-genai versions)
     # Embeddings exist but don't have the statistics field
@@ -1373,24 +1372,24 @@ async def test_async_embed_content_without_statistics(
                 contents=["Test without statistics", "Another test"],
             )
 
-    (event,) = events
-    (embed_span,) = event["spans"]
+    spans = [item.payload for item in items if item.type == "span"]
+    (embed_span,) = spans
 
     # No usage tokens since there are no statistics in older versions
     # This is expected and the integration should handle it gracefully
-    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["data"]
+    assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["attributes"]
 
 
 @pytest.mark.asyncio
 async def test_async_embed_content_span_origin(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test that async embed_content spans have correct origin."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
 
@@ -1403,16 +1402,17 @@ async def test_async_embed_content_span_origin(
                 contents=["Test origin"],
             )
 
-    (event,) = events
-
+    (event,) = [item.payload for item in items if item.type == "transaction"]
     assert event["contexts"]["trace"]["origin"] == "manual"
-    for span in event["spans"]:
-        assert span["origin"] == "auto.ai.google_genai"
+
+    spans = [item.payload for item in items if item.type == "span"]
+    for span in spans:
+        assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
 
 
 # Integration tests for generate_content with different input message formats
 def test_generate_content_with_content_object(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test generate_content with Content object input."""
     sentry_init(
@@ -1420,7 +1420,7 @@ def test_generate_content_with_content_object(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1437,10 +1437,9 @@ def test_generate_content_with_content_object(
                 model="gemini-1.5-flash", contents=content, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
     assert messages[0]["content"] == [
@@ -1449,7 +1448,7 @@ def test_generate_content_with_content_object(
 
 
 def test_generate_content_with_dict_format(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test generate_content with dict format input (ContentDict)."""
     sentry_init(
@@ -1457,7 +1456,7 @@ def test_generate_content_with_dict_format(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1472,10 +1471,9 @@ def test_generate_content_with_dict_format(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
     assert messages[0]["content"] == [
@@ -1483,16 +1481,14 @@ def test_generate_content_with_dict_format(
     ]
 
 
-def test_generate_content_with_file_data(
-    sentry_init, capture_events, mock_genai_client
-):
+def test_generate_content_with_file_data(sentry_init, capture_items, mock_genai_client):
     """Test generate_content with file_data (external file reference)."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1516,10 +1512,9 @@ def test_generate_content_with_file_data(
                 model="gemini-1.5-flash", contents=content, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
     assert len(messages[0]["content"]) == 2
@@ -1534,7 +1529,7 @@ def test_generate_content_with_file_data(
 
 
 def test_generate_content_with_inline_data(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test generate_content with inline_data (binary data)."""
     sentry_init(
@@ -1542,7 +1537,7 @@ def test_generate_content_with_inline_data(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1565,10 +1560,9 @@ def test_generate_content_with_inline_data(
                 model="gemini-1.5-flash", contents=content, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
     assert len(messages[0]["content"]) == 2
@@ -1580,7 +1574,7 @@ def test_generate_content_with_inline_data(
 
 
 def test_generate_content_with_function_response(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test generate_content with function_response (tool result)."""
     sentry_init(
@@ -1588,7 +1582,7 @@ def test_generate_content_with_function_response(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1622,10 +1616,9 @@ def test_generate_content_with_function_response(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     # First message is user message
     assert messages[0]["role"] == "tool"
@@ -1635,7 +1628,7 @@ def test_generate_content_with_function_response(
 
 
 def test_generate_content_with_mixed_string_and_content(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test generate_content with mixed string and Content objects in list."""
     sentry_init(
@@ -1643,7 +1636,7 @@ def test_generate_content_with_mixed_string_and_content(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1668,10 +1661,9 @@ def test_generate_content_with_mixed_string_and_content(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     # User message
     assert messages[0]["role"] == "user"
@@ -1679,7 +1671,7 @@ def test_generate_content_with_mixed_string_and_content(
 
 
 def test_generate_content_with_part_object_directly(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test generate_content with Part object directly (not wrapped in Content)."""
     sentry_init(
@@ -1687,7 +1679,7 @@ def test_generate_content_with_part_object_directly(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1702,17 +1694,16 @@ def test_generate_content_with_part_object_directly(
                 model="gemini-1.5-flash", contents=part, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
     assert messages[0]["content"] == [{"text": "Direct Part object", "type": "text"}]
 
 
 def test_generate_content_with_list_of_dicts(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """
     Test generate_content with list of dict format inputs.
@@ -1726,7 +1717,7 @@ def test_generate_content_with_list_of_dicts(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1745,17 +1736,16 @@ def test_generate_content_with_list_of_dicts(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
     assert messages[0]["content"] == [{"text": "Second user message", "type": "text"}]
 
 
 def test_generate_content_with_dict_inline_data(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     """Test generate_content with dict format containing inline_data."""
     sentry_init(
@@ -1763,7 +1753,7 @@ def test_generate_content_with_dict_inline_data(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1784,10 +1774,9 @@ def test_generate_content_with_dict_inline_data(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
     assert len(messages[0]["content"]) == 2
@@ -1801,14 +1790,14 @@ def test_generate_content_with_dict_inline_data(
 
 
 def test_generate_content_without_parts_property_inline_data(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1825,10 +1814,9 @@ def test_generate_content_without_parts_property_inline_data(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     assert len(messages) == 1
 
@@ -1845,14 +1833,14 @@ def test_generate_content_without_parts_property_inline_data(
 
 
 def test_generate_content_without_parts_property_inline_data_and_binary_data_within_string(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init, capture_items, mock_genai_client
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -1874,10 +1862,9 @@ def test_generate_content_without_parts_property_inline_data_and_binary_data_wit
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+    invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages = json.loads(invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
 
@@ -2162,7 +2149,9 @@ def test_extract_contents_messages_dict_inline_data():
     """Test extract_contents_messages with dict containing inline_data"""
     content_dict = {
         "role": "user",
-        "parts": [{"inline_data": {"data": b"binary_data", "mime_type": "image/gif"}}],
+        "parts": [
+            {"inline_data": {"attributes": b"binary_data", "mime_type": "image/gif"}}
+        ],
     }
     result = extract_contents_messages(content_dict)
 
