@@ -170,7 +170,6 @@ def test_span_templates_ai_dicts(sentry_init, capture_items):
         item.payload for item in items if item.type == "span"
     )
 
-    assert agent_span["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
     assert (
         agent_span["name"]
         == "invoke_agent test_decorator.test_span_templates_ai_dicts.<locals>.my_agent"
@@ -190,7 +189,6 @@ def test_span_templates_ai_dicts(sentry_init, capture_items):
         "thread.name": mock.ANY,
     }
 
-    assert tool_span["attributes"]["sentry.op"] == "gen_ai.execute_tool"
     assert (
         tool_span["name"]
         == "execute_tool test_decorator.test_span_templates_ai_dicts.<locals>.my_tool"
@@ -214,7 +212,6 @@ def test_span_templates_ai_dicts(sentry_init, capture_items):
     }
     assert "gen_ai.tool.description" not in tool_span["attributes"]
 
-    assert chat_span["attributes"]["sentry.op"] == "gen_ai.chat"
     assert chat_span["name"] == "chat my-gpt-4o-mini"
     assert chat_span["attributes"] == {
         "gen_ai.operation.name": "chat",
@@ -243,9 +240,9 @@ def test_span_templates_ai_dicts(sentry_init, capture_items):
     }
 
 
-def test_span_templates_ai_objects(sentry_init, capture_events):
+def test_span_templates_ai_objects(sentry_init, capture_items):
     sentry_init(traces_sample_rate=1.0)
-    events = capture_events()
+    items = capture_items("span")
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2):
@@ -292,40 +289,54 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
     with sentry_sdk.start_transaction(name="test-transaction"):
         my_agent()
 
-    (event,) = events
-    (agent_span, tool_span, chat_span) = event["spans"]
+    (agent_span, tool_span, chat_span) = (
+        item.payload for item in items if item.type == "span"
+    )
 
-    assert agent_span["op"] == "gen_ai.invoke_agent"
     assert (
-        agent_span["description"]
+        agent_span["name"]
         == "invoke_agent test_decorator.test_span_templates_ai_objects.<locals>.my_agent"
     )
-    assert agent_span["data"] == {
+    assert agent_span["attributes"] == {
         "gen_ai.agent.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_agent",
         "gen_ai.operation.name": "invoke_agent",
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.invoke_agent",
+        "sentry.origin": "manual",
+        "sentry.release": mock.ANY,
+        "sentry.sdk.name": "sentry.python",
+        "sentry.sdk.version": mock.ANY,
+        "sentry.segment.id": mock.ANY,
+        "sentry.segment.name": "test-transaction",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
 
-    assert tool_span["op"] == "gen_ai.execute_tool"
     assert (
-        tool_span["description"]
+        tool_span["name"]
         == "execute_tool test_decorator.test_span_templates_ai_objects.<locals>.my_tool"
     )
-    assert tool_span["data"] == {
+    assert tool_span["attributes"] == {
         "gen_ai.tool.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_tool",
         "gen_ai.tool.description": "This is a tool function.",
         "gen_ai.operation.name": "execute_tool",
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 20,
         "gen_ai.usage.total_tokens": 30,
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.execute_tool",
+        "sentry.origin": "manual",
+        "sentry.release": mock.ANY,
+        "sentry.sdk.name": "sentry.python",
+        "sentry.sdk.version": mock.ANY,
+        "sentry.segment.id": mock.ANY,
+        "sentry.segment.name": "test-transaction",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
 
-    assert chat_span["op"] == "gen_ai.chat"
-    assert chat_span["description"] == "chat my-gpt-4o-mini"
-    assert chat_span["data"] == {
+    assert chat_span["name"] == "chat my-gpt-4o-mini"
+    assert chat_span["attributes"] == {
         "gen_ai.operation.name": "chat",
         "gen_ai.request.frequency_penalty": 1.0,
         "gen_ai.request.max_tokens": 100,
@@ -339,6 +350,14 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
         "gen_ai.usage.input_tokens": 11,
         "gen_ai.usage.output_tokens": 22,
         "gen_ai.usage.total_tokens": 33,
+        "sentry.environment": "production",
+        "sentry.op": "gen_ai.chat",
+        "sentry.origin": "manual",
+        "sentry.release": mock.ANY,
+        "sentry.sdk.name": "sentry.python",
+        "sentry.sdk.version": mock.ANY,
+        "sentry.segment.id": mock.ANY,
+        "sentry.segment.name": "test-transaction",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
