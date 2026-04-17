@@ -258,7 +258,9 @@ class StreamedSpan:
     ):
         self._name: str = name
         self._active: bool = active
-        self._attributes: "Attributes" = {}
+        self._attributes: "Attributes" = {
+            "sentry.origin": "manual",
+        }
 
         if attributes:
             for attribute, value in attributes.items():
