@@ -1,6 +1,7 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import safe_repr
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
@@ -47,7 +48,7 @@ def update_execute_tool_span(
         span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     if should_send_default_pii():
-        span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
+        span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, safe_repr(result))
 
     # Add conversation ID from agent
     conv_id = getattr(agent, "_sentry_conversation_id", None)

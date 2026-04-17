@@ -12,7 +12,7 @@ from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import set_span_errored
-from sentry_sdk.utils import event_from_exception, safe_serialize
+from sentry_sdk.utils import event_from_exception, safe_serialize, safe_repr
 from sentry_sdk.ai._openai_completions_api import _transform_system_instructions
 from sentry_sdk.ai._openai_responses_api import (
     _is_system_instruction,
@@ -231,7 +231,7 @@ def _create_mcp_execute_tool_spans(
                         SPANDATA.GEN_AI_TOOL_INPUT, output.arguments
                     )
                     execute_tool_span.set_data(
-                        SPANDATA.GEN_AI_TOOL_OUTPUT, output.output
+                        SPANDATA.GEN_AI_TOOL_OUTPUT, safe_repr(output.output)
                     )
                 if output.error:
                     execute_tool_span.set_status(SPANSTATUS.INTERNAL_ERROR)

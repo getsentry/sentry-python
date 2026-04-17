@@ -21,7 +21,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import _get_value, set_span_errored
-from sentry_sdk.utils import capture_internal_exceptions, logger
+from sentry_sdk.utils import capture_internal_exceptions, logger, safe_repr
 
 if TYPE_CHECKING:
     from typing import (
@@ -688,7 +688,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span = span_data.span
 
             if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_TOOL_OUTPUT, safe_repr(output)
+                )
 
             self._exit_span(span_data, run_id)
 
