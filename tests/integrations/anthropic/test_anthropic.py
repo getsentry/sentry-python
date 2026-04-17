@@ -97,6 +97,7 @@ def test_nonstreaming_create_message(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -171,6 +172,7 @@ async def test_nonstreaming_create_message_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = AsyncAnthropic(api_key="z")
@@ -287,6 +289,7 @@ def test_streaming_create_message(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -395,6 +398,7 @@ def test_streaming_create_message_close(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -498,6 +502,7 @@ def test_streaming_create_message_api_error(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -614,6 +619,7 @@ def test_stream_messages(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -723,6 +729,7 @@ def test_stream_messages_close(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -831,6 +838,7 @@ def test_stream_messages_api_error(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -953,6 +961,7 @@ async def test_streaming_create_message_async(
         traces_sample_rate=1.0,
         default_integrations=False,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1064,6 +1073,7 @@ async def test_streaming_create_message_async_close(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1170,6 +1180,7 @@ async def test_streaming_create_message_async_api_error(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1290,6 +1301,7 @@ async def test_stream_message_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1400,6 +1412,7 @@ async def test_stream_messages_async_api_error(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1510,6 +1523,7 @@ async def test_stream_messages_async_close(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1666,6 +1680,7 @@ def test_streaming_create_message_with_input_json_delta(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1815,6 +1830,7 @@ def test_stream_messages_with_input_json_delta(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1972,6 +1988,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2129,6 +2146,7 @@ async def test_stream_message_with_input_json_delta_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2188,6 +2206,7 @@ async def test_stream_message_with_input_json_delta_async(
 
 def test_exception_message_create(sentry_init, capture_items):
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("event", "transaction")
 
     client = Anthropic(api_key="z")
@@ -2210,6 +2229,7 @@ def test_exception_message_create(sentry_init, capture_items):
 
 def test_span_status_error(sentry_init, capture_items):
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("event", "span")
 
     with start_transaction(name="anthropic"):
@@ -2236,6 +2256,7 @@ def test_span_status_error(sentry_init, capture_items):
 @pytest.mark.asyncio
 async def test_span_status_error_async(sentry_init, capture_items):
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("event", "span")
 
     with start_transaction(name="anthropic"):
@@ -2262,6 +2283,7 @@ async def test_span_status_error_async(sentry_init, capture_items):
 @pytest.mark.asyncio
 async def test_exception_message_create_async(sentry_init, capture_items):
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("event", "transaction")
 
     client = AsyncAnthropic(api_key="z")
@@ -2286,6 +2308,7 @@ def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2316,6 +2339,7 @@ async def test_span_origin_async(sentry_init, capture_items):
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2379,6 +2403,7 @@ def test_set_output_data_with_input_json_delta(sentry_init):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with start_transaction(name="test"):
@@ -2429,6 +2454,7 @@ def test_anthropic_message_role_mapping(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2475,6 +2501,7 @@ def test_anthropic_message_truncation(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2525,6 +2552,7 @@ async def test_anthropic_message_truncation_async(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2585,6 +2613,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -2671,6 +2700,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = AsyncAnthropic(api_key="z")
@@ -2800,6 +2830,7 @@ def test_streaming_create_message_with_system_prompt(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2930,6 +2961,7 @@ def test_stream_messages_with_system_prompt(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -3062,6 +3094,7 @@ async def test_stream_message_with_system_prompt_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -3194,6 +3227,7 @@ async def test_streaming_create_message_with_system_prompt_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -3269,6 +3303,7 @@ def test_system_prompt_with_complex_structure(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3522,6 +3557,7 @@ def test_message_with_base64_image(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3572,6 +3608,7 @@ def test_message_with_url_image(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3615,6 +3652,7 @@ def test_message_with_file_image(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3659,6 +3697,7 @@ def test_message_with_base64_pdf(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3703,6 +3742,7 @@ def test_message_with_url_pdf(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3746,6 +3786,7 @@ def test_message_with_file_document(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3790,6 +3831,7 @@ def test_message_with_mixed_content(sentry_init, capture_items):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3872,6 +3914,7 @@ def test_message_with_multiple_images_different_formats(sentry_init, capture_ite
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3946,6 +3989,7 @@ def test_binary_content_not_stored_when_pii_disabled(sentry_init, capture_items)
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -3984,6 +4028,7 @@ def test_binary_content_not_stored_when_prompts_disabled(sentry_init, capture_it
         integrations=[AnthropicIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
@@ -4019,6 +4064,7 @@ def test_binary_content_not_stored_when_prompts_disabled(sentry_init, capture_it
 def test_cache_tokens_nonstreaming(sentry_init, capture_items):
     """Test cache read/write tokens are tracked for non-streaming responses."""
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
 
@@ -4067,6 +4113,7 @@ def test_input_tokens_include_cache_write_nonstreaming(sentry_init, capture_item
               cache_creation_input_tokens=2846, cache_read_input_tokens=0)
     """
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
 
@@ -4115,6 +4162,7 @@ def test_input_tokens_include_cache_read_nonstreaming(sentry_init, capture_items
               cache_creation_input_tokens=0, cache_read_input_tokens=2846)
     """
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
 
@@ -4192,6 +4240,7 @@ def test_input_tokens_include_cache_read_streaming(
     )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("transaction", "span")
 
     with mock.patch.object(
@@ -4258,6 +4307,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
     )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("transaction", "span")
 
     with mock.patch.object(
@@ -4291,6 +4341,7 @@ def test_input_tokens_unchanged_without_caching(sentry_init, capture_items):
         Usage(input_tokens=20, output_tokens=12)
     """
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("transaction", "span")
     client = Anthropic(api_key="z")
 
@@ -4359,6 +4410,7 @@ def test_cache_tokens_streaming(
     )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("transaction", "span")
 
     with mock.patch.object(
@@ -4419,6 +4471,7 @@ def test_stream_messages_cache_tokens(
     )
 
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
+    _experiments = ({"gen_ai_as_v2_spans": True},)
     items = capture_items("transaction", "span")
 
     with mock.patch.object(
