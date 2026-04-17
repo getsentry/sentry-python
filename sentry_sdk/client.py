@@ -1113,10 +1113,14 @@ class _Client(BaseClient):
 
         envelope = Envelope(headers=headers)
 
-        if is_transaction:
+        if is_transaction and not self.options["_experiments"].get(
+            "gen_ai_as_v2_spans", False
+        ):
             if isinstance(profile, Profile):
                 envelope.add_profile(profile.to_json(event_opt, self.options))
 
+            envelope.add_transaction(event_opt)
+        elif is_transaction:
             split_spans = _split_gen_ai_spans(event_opt)
             if split_spans is None or not split_spans[1]:
                 envelope.add_transaction(event_opt)
