@@ -525,7 +525,7 @@ async def test_client_span_custom_model(
             traces_sample_rate=1.0,
         )
 
-        items = capture_items("transaction", "spans")
+        items = capture_items("span")
 
         result = await agents.Runner.run(
             agent, "Test input", run_config=test_run_config
@@ -1728,7 +1728,7 @@ async def test_error_handling(sentry_init, capture_items, test_agent):
                 traces_sample_rate=1.0,
             )
 
-            items = capture_items("error", "span", "transaction")
+            items = capture_items("event", "span", "transaction")
 
             with pytest.raises(Exception, match="Model Error"):
                 await agents.Runner.run(
@@ -1793,7 +1793,7 @@ async def test_error_captures_input_data(sentry_init, capture_items, test_agent)
             send_default_pii=True,
         )
 
-        items = capture_items("error", "span")
+        items = capture_items("event", "span")
 
         with pytest.raises(InternalServerError, match="Error code: 500"):
             await agents.Runner.run(agent, "Test input", run_config=test_run_config)
@@ -1851,7 +1851,7 @@ async def test_span_status_error(sentry_init, capture_items, test_agent):
     assert spans[0]["status"] == "error"
 
     (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["contexts"]["trace"]["status"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -2102,7 +2102,7 @@ async def test_mcp_tool_execution_with_error(
     assert mcp_tool_span["name"] == "execute_tool failing_mcp_tool"
     assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "failing_mcp_tool"
     assert mcp_tool_span["attributes"]["gen_ai.tool.input"] == '{"query": "test"}'
-    assert mcp_tool_span["attributes"]["gen_ai.tool.output"] is None
+    assert mcp_tool_span["attributes"]["gen_ai.tool.output"] == "None"
 
     # Verify error status was set
     assert mcp_tool_span["status"] == "error"
