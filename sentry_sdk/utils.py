@@ -159,7 +159,7 @@ def get_git_revision() -> "Optional[str]":
                 .strip()
                 .decode("utf-8")
             )
-    except (OSError, IOError, FileNotFoundError):
+    except OSError:
         return None
 
     return revision
@@ -492,7 +492,7 @@ def get_lines_from_file(
     if loader is not None and hasattr(loader, "get_source"):
         try:
             source_str: "Optional[str]" = loader.get_source(module)
-        except (ImportError, IOError):
+        except (ImportError, OSError):
             source_str = None
         if source_str is not None:
             source = source_str.splitlines()
@@ -500,7 +500,7 @@ def get_lines_from_file(
     if source is None:
         try:
             source = linecache.getlines(filename)
-        except (OSError, IOError):
+        except OSError:
             return [], None, []
 
     if not source:

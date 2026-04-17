@@ -327,12 +327,9 @@ class Span:
         elif isinstance(start_timestamp, float):
             start_timestamp = datetime.fromtimestamp(start_timestamp, timezone.utc)
         self.start_timestamp = start_timestamp
-        try:
-            # profiling depends on this value and requires that
-            # it is measured in nanoseconds
-            self._start_timestamp_monotonic_ns = nanosecond_time()
-        except AttributeError:
-            pass
+        # profiling depends on this value and requires that
+        # it is measured in nanoseconds
+        self._start_timestamp_monotonic_ns = nanosecond_time()
 
         #: End timestamp of span
         self.timestamp: "Optional[datetime]" = None
@@ -661,18 +658,15 @@ class Span:
             # This span is already finished, ignore.
             return None
 
-        try:
-            if end_timestamp:
-                if isinstance(end_timestamp, float):
-                    end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
-                self.timestamp = end_timestamp
-            else:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-                self.timestamp = self.start_timestamp + timedelta(
-                    microseconds=elapsed / 1000
-                )
-        except AttributeError:
-            self.timestamp = datetime.now(timezone.utc)
+        if end_timestamp:
+            if isinstance(end_timestamp, float):
+                end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
+            self.timestamp = end_timestamp
+        else:
+            elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+            self.timestamp = self.start_timestamp + timedelta(
+                microseconds=elapsed / 1000
+            )
 
         scope = scope or sentry_sdk.get_current_scope()
 
