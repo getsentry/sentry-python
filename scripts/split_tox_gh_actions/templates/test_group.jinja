@@ -1,4 +1,6 @@
   test-{{ lowercase_group }}:
+    needs: changes
+    if: needs.changes.outputs.has_code_changes == 'true'
     name: {{ group }}
     timeout-minutes: 30
     runs-on: {% raw %}${{ matrix.os }}{% endraw %}
