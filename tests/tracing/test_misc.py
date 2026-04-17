@@ -647,11 +647,11 @@ class TestConversationIdPropagation:
         assert span_data.get("gen_ai.conversation.id") == "conv-ai-op-test"
 
     def test_conversation_id_propagates_to_span_with_gen_ai_op(
-        self, sentry_init, capture_events
+        self, sentry_init, capture_items
     ):
         """Span with gen_ai.* op should get conversation_id."""
         sentry_init(traces_sample_rate=1.0)
-        events = capture_events()
+        items = capture_items("span")
 
         scope = sentry_sdk.get_current_scope()
         scope.set_conversation_id("conv-gen-ai-op-test")
@@ -660,8 +660,8 @@ class TestConversationIdPropagation:
             with start_span(op="gen_ai.invoke_agent"):
                 pass
 
-        (event,) = events
-        span_data = event["spans"][0]["data"]
+        spans = [item.payload for item in items if item.type == "span"]
+        span_data = spans[0]["attributes"]
         assert span_data.get("gen_ai.conversation.id") == "conv-gen-ai-op-test"
 
     def test_conversation_id_not_propagated_to_non_ai_span(
