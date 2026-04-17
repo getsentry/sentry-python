@@ -855,10 +855,9 @@ def test_request_source_disabled_span_streaming(
 
     http_span = _get_http_client_span(items)
 
-    assert SPANDATA.CODE_LINENO not in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE not in http_span["attributes"]
-    assert SPANDATA.CODE_FILEPATH not in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
+    assert "code.line.number" not in http_span["attributes"]
+    assert "code.file.path" not in http_span["attributes"]
+    assert "code.function.name" not in http_span["attributes"]
 
 
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
@@ -899,10 +898,9 @@ def test_request_source_enabled_span_streaming(
 
     http_span = _get_http_client_span(items)
 
-    assert SPANDATA.CODE_LINENO in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert SPANDATA.CODE_FILEPATH in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert "code.line.number" in http_span["attributes"]
+    assert "code.file.path" in http_span["attributes"]
+    assert "code.function.name" in http_span["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -935,26 +933,21 @@ def test_request_source_span_streaming(
 
     http_span = _get_http_client_span(items)
 
-    assert SPANDATA.CODE_LINENO in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert SPANDATA.CODE_FILEPATH in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert "code.line.number" in http_span["attributes"]
+    assert "code.file.path" in http_span["attributes"]
+    assert "code.function.name" in http_span["attributes"]
 
-    assert type(http_span["attributes"][SPANDATA.CODE_LINENO]) == int
-    assert http_span["attributes"][SPANDATA.CODE_LINENO] > 0
-    assert (
-        http_span["attributes"][SPANDATA.CODE_NAMESPACE]
-        == "tests.integrations.httpx.test_httpx"
-    )
-    assert http_span["attributes"][SPANDATA.CODE_FILEPATH].endswith(
+    assert type(http_span["attributes"]["code.line.number"]) == int
+    assert http_span["attributes"]["code.line.number"] > 0
+    assert http_span["attributes"]["code.file.path"].endswith(
         "tests/integrations/httpx/test_httpx.py"
     )
 
-    is_relative_path = http_span["attributes"][SPANDATA.CODE_FILEPATH][0] != os.sep
+    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
     assert is_relative_path
 
     assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
+        http_span["attributes"]["code.function.name"]
         == "test_request_source_span_streaming"
     )
 
@@ -998,27 +991,25 @@ def test_request_source_with_module_in_search_path_span_streaming(
 
     http_span = _get_http_client_span(items)
 
-    assert SPANDATA.CODE_LINENO in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert SPANDATA.CODE_FILEPATH in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert "code.line.number" in http_span["attributes"]
+    assert "code.file.path" in http_span["attributes"]
+    assert "code.function.name" in http_span["attributes"]
 
-    assert type(http_span["attributes"][SPANDATA.CODE_LINENO]) == int
-    assert http_span["attributes"][SPANDATA.CODE_LINENO] > 0
-    assert http_span["attributes"][SPANDATA.CODE_NAMESPACE] == "httpx_helpers.helpers"
-    assert http_span["attributes"][SPANDATA.CODE_FILEPATH] == "httpx_helpers/helpers.py"
+    assert type(http_span["attributes"]["code.line.number"]) == int
+    assert http_span["attributes"]["code.line.number"] > 0
+    assert http_span["attributes"]["code.file.path"] == "httpx_helpers/helpers.py"
 
-    is_relative_path = http_span["attributes"][SPANDATA.CODE_FILEPATH][0] != os.sep
+    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
     assert is_relative_path
 
     if asyncio.iscoroutinefunction(httpx_client.get):
         assert (
-            http_span["attributes"][SPANDATA.CODE_FUNCTION]
+            http_span["attributes"]["code.function.name"]
             == "async_get_request_with_client"
         )
     else:
         assert (
-            http_span["attributes"][SPANDATA.CODE_FUNCTION] == "get_request_with_client"
+            http_span["attributes"]["code.function.name"] == "get_request_with_client"
         )
 
 
@@ -1053,10 +1044,9 @@ def test_no_request_source_if_duration_too_short_span_streaming(
 
     http_span = _get_http_client_span(items)
 
-    assert SPANDATA.CODE_LINENO not in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE not in http_span["attributes"]
-    assert SPANDATA.CODE_FILEPATH not in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
+    assert "code.line.number" not in http_span["attributes"]
+    assert "code.file.path" not in http_span["attributes"]
+    assert "code.function.name" not in http_span["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -1090,26 +1080,21 @@ def test_request_source_if_duration_over_threshold_span_streaming(
 
     http_span = _get_http_client_span(items)
 
-    assert SPANDATA.CODE_LINENO in http_span["attributes"]
-    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
-    assert SPANDATA.CODE_FILEPATH in http_span["attributes"]
-    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
+    assert "code.line.number" in http_span["attributes"]
+    assert "code.file.path" in http_span["attributes"]
+    assert "code.function.name" in http_span["attributes"]
 
-    assert type(http_span["attributes"][SPANDATA.CODE_LINENO]) == int
-    assert http_span["attributes"][SPANDATA.CODE_LINENO] > 0
-    assert (
-        http_span["attributes"][SPANDATA.CODE_NAMESPACE]
-        == "tests.integrations.httpx.test_httpx"
-    )
-    assert http_span["attributes"][SPANDATA.CODE_FILEPATH].endswith(
+    assert type(http_span["attributes"]["code.line.number"]) == int
+    assert http_span["attributes"]["code.line.number"] > 0
+    assert http_span["attributes"]["code.file.path"].endswith(
         "tests/integrations/httpx/test_httpx.py"
     )
 
-    is_relative_path = http_span["attributes"][SPANDATA.CODE_FILEPATH][0] != os.sep
+    is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
     assert is_relative_path
 
     assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
+        http_span["attributes"]["code.function.name"]
         == "test_request_source_if_duration_over_threshold_span_streaming"
     )
 
@@ -1143,3 +1128,73 @@ def test_span_origin_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert http_span["attributes"]["sentry.origin"] == "auto.http.httpx"
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_http_url_attributes_span_streaming(
+    sentry_init, capture_items, httpx_client, httpx_mock
+):
+    httpx_mock.add_response()
+
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?foo=bar#frag"
+
+    if asyncio.iscoroutinefunction(httpx_client.get):
+        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+    else:
+        httpx_client.get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    assert http_span["attributes"]["http.request.method"] == "GET"
+    assert http_span["attributes"]["url.full"] == "http://example.com/"
+    assert http_span["attributes"]["url.query"] == "foo=bar"
+    assert http_span["attributes"]["url.fragment"] == "frag"
+    assert http_span["attributes"]["http.response.status_code"] == 200
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_http_url_attributes_no_query_or_fragment_span_streaming(
+    sentry_init, capture_items, httpx_client, httpx_mock
+):
+    httpx_mock.add_response()
+
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/"
+
+    if asyncio.iscoroutinefunction(httpx_client.get):
+        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+    else:
+        httpx_client.get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    assert http_span["attributes"]["http.request.method"] == "GET"
+    assert http_span["attributes"]["url.full"] == "http://example.com/"
+    assert "url.query" not in http_span["attributes"]
+    assert "url.fragment" not in http_span["attributes"]
+    assert http_span["attributes"]["http.response.status_code"] == 200

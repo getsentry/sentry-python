@@ -278,17 +278,14 @@ def add_source(
             if isinstance(span, LegacySpan):
                 span.set_data(SPANDATA.CODE_LINENO, lineno)
             else:
-                span.set_attribute(SPANDATA.CODE_LINENO, lineno)
+                span.set_attribute("code.line.number", lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
-        if namespace is not None:
-            if isinstance(span, LegacySpan):
-                span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
-            else:
-                span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
+        if namespace is not None and isinstance(span, LegacySpan):
+            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -303,7 +300,7 @@ def add_source(
                 span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
             else:
                 if in_app_path is not None:
-                    span.set_attribute(SPANDATA.CODE_FILEPATH, in_app_path)
+                    span.set_attribute("code.file.path", in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -314,7 +311,7 @@ def add_source(
             if isinstance(span, LegacySpan):
                 span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
             else:
-                span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+                span.set_attribute("code.function.name", frame.f_code.co_name)
 
 
 def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
@@ -347,18 +344,23 @@ def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
     )
 
 
-def add_http_request_source_for_streamed_span(
-    span: "sentry_sdk.traces.StreamedSpan",
+def add_http_request_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
 ) -> None:
     """
-    Adds OTel compatible source code information to a span for an outgoing HTTP request.
-
-    This is intended to be used with StreamedSpans, not legacy Spans.
-
-    StreamedSpans need to have this information added before the span finishes, which
-    is why some of the checks that exist in `add_http_request_source` are not present here.
+    Adds OTel compatible source code information to a span for an outgoing HTTP request
     """
     client = sentry_sdk.get_client()
+
+    if isinstance(span, LegacySpan):
+        if not client.is_active():
+            return
+
+        # In the StreamedSpan case, we need to add the extra span information before
+        # the span finishes, so it's expected that this will be None. In the LegacySpan case,
+        # it should already be finished.
+        if span.timestamp is None:
+            return
 
     if span.start_timestamp is None:
         return
@@ -367,43 +369,21 @@ def add_http_request_source_for_streamed_span(
     if not should_add_request_source:
         return
 
-    if span.start_timestamp_monotonic_ns is not None:
-        elapsed = nanosecond_time() - span.start_timestamp_monotonic_ns
-        end_timestamp = span.start_timestamp + timedelta(microseconds=elapsed / 1000)
+    if span.timestamp is None:
+        if (
+            isinstance(span, sentry_sdk.traces.StreamedSpan)
+            and span.start_timestamp_monotonic_ns is not None
+        ):
+            elapsed = nanosecond_time() - span.start_timestamp_monotonic_ns
+            end_timestamp = span.start_timestamp + timedelta(
+                microseconds=elapsed / 1000
+            )
+        else:
+            end_timestamp = datetime.now(timezone.utc)
     else:
-        end_timestamp = datetime.now(timezone.utc)
+        end_timestamp = span.timestamp
 
     duration = end_timestamp - span.start_timestamp
-    threshold = client.options.get("http_request_source_threshold_ms", 0)
-    slow_query = duration / timedelta(milliseconds=1) > threshold
-
-    if not slow_query:
-        return
-
-    add_source(
-        span=span,
-        project_root=client.options["project_root"],
-        in_app_include=client.options.get("in_app_include"),
-        in_app_exclude=client.options.get("in_app_exclude"),
-    )
-
-
-def add_http_request_source(span: "sentry_sdk.tracing.Span") -> None:
-    """
-    Adds OTel compatible source code information to a span for an outgoing HTTP request
-    """
-    client = sentry_sdk.get_client()
-    if not client.is_active():
-        return
-
-    if span.timestamp is None or span.start_timestamp is None:
-        return
-
-    should_add_request_source = client.options.get("enable_http_request_source", True)
-    if not should_add_request_source:
-        return
-
-    duration = span.timestamp - span.start_timestamp
     threshold = client.options.get("http_request_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 

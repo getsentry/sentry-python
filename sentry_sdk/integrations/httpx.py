@@ -1,13 +1,10 @@
 import sentry_sdk
-from sentry_sdk import start_span as legacy_start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.traces import start_span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
-    add_http_request_source_for_streamed_span,
-    should_propagate_trace,
     add_http_request_source,
+    should_propagate_trace,
     add_sentry_baggage_to_headers,
     has_span_streaming_enabled,
 )
@@ -61,7 +58,7 @@ def _install_httpx_client() -> None:
             parsed_url = parse_url(str(request.url), sanitize=False)
 
         if is_span_streaming_enabled:
-            with start_span(
+            with sentry_sdk.traces.start_span(
                 name="%s %s"
                 % (
                     request.method,
@@ -70,15 +67,15 @@ def _install_httpx_client() -> None:
                 attributes={
                     "sentry.op": OP.HTTP_CLIENT,
                     "sentry.origin": HttpxIntegration.origin,
-                    SPANDATA.HTTP_METHOD: request.method,
+                    "http.request.method": request.method,
                 },
-            ) as segment:
+            ) as streamed_span:
                 attributes: "Attributes" = {}
 
                 if parsed_url is not None:
-                    attributes["url"] = parsed_url.url
-                    attributes[SPANDATA.HTTP_QUERY] = parsed_url.query
-                    attributes[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+                    attributes["url.full"] = parsed_url.url
+                    attributes["url.query"] = parsed_url.query
+                    attributes["url.fragment"] = parsed_url.fragment
 
                 if should_propagate_trace(client, str(request.url)):
                     for (
@@ -98,17 +95,17 @@ def _install_httpx_client() -> None:
 
                 rv = real_send(self, request, **kwargs)
 
-                segment.status = "error" if rv.status_code >= 400 else "ok"
-                attributes[SPANDATA.HTTP_STATUS_CODE] = rv.status_code
+                streamed_span.status = "error" if rv.status_code >= 400 else "ok"
+                attributes["http.response.status_code"] = rv.status_code
 
-                segment.set_attributes(attributes)
+                streamed_span.set_attributes(attributes)
 
                 # Needs to happen within the context manager as we want to attach the
                 # final data before the span finishes and is sent for ingesting.
                 with capture_internal_exceptions():
-                    add_http_request_source_for_streamed_span(segment)
+                    add_http_request_source(streamed_span)
         else:
-            with legacy_start_span(
+            with sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
                 name="%s %s"
                 % (
@@ -168,7 +165,7 @@ def _install_httpx_async_client() -> None:
             parsed_url = parse_url(str(request.url), sanitize=False)
 
         if is_span_streaming_enabled:
-            with start_span(
+            with sentry_sdk.traces.start_span(
                 name="%s %s"
                 % (
                     request.method,
@@ -177,15 +174,17 @@ def _install_httpx_async_client() -> None:
                 attributes={
                     "sentry.op": OP.HTTP_CLIENT,
                     "sentry.origin": HttpxIntegration.origin,
-                    SPANDATA.HTTP_METHOD: request.method,
+                    "http.request.method": request.method,
                 },
-            ) as segment:
+            ) as streamed_span:
                 attributes: "Attributes" = {}
 
                 if parsed_url is not None:
-                    attributes["url"] = parsed_url.url
-                    attributes[SPANDATA.HTTP_QUERY] = parsed_url.query
-                    attributes[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+                    attributes["url.full"] = parsed_url.url
+                    if parsed_url.query:
+                        attributes["url.query"] = parsed_url.query
+                    if parsed_url.fragment:
+                        attributes["url.fragment"] = parsed_url.fragment
 
                 if should_propagate_trace(client, str(request.url)):
                     for (
@@ -205,17 +204,17 @@ def _install_httpx_async_client() -> None:
 
                 rv = await real_send(self, request, **kwargs)
 
-                segment.status = "error" if rv.status_code >= 400 else "ok"
-                attributes[SPANDATA.HTTP_STATUS_CODE] = rv.status_code
+                streamed_span.status = "error" if rv.status_code >= 400 else "ok"
+                attributes["http.response.status_code"] = rv.status_code
 
-                segment.set_attributes(attributes)
+                streamed_span.set_attributes(attributes)
 
                 # Needs to happen within the context manager as we want to attach the
                 # final data before the span finishes and is sent for ingesting.
                 with capture_internal_exceptions():
-                    add_http_request_source_for_streamed_span(segment)
+                    add_http_request_source(streamed_span)
         else:
-            with legacy_start_span(
+            with sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
                 name="%s %s"
                 % (
