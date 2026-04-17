@@ -130,7 +130,6 @@ def test_nonstreaming_generate_content(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -220,7 +219,6 @@ def test_generate_content_with_system_instruction(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -264,7 +262,6 @@ def test_generate_content_with_tools(sentry_init, capture_items, mock_genai_clie
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -347,7 +344,6 @@ def test_tool_execution(sentry_init, capture_items):
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -384,7 +380,6 @@ def test_error_handling(sentry_init, capture_items, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event", "transaction")
 
@@ -416,7 +411,6 @@ def test_streaming_generate_content(sentry_init, capture_items, mock_genai_clien
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -533,7 +527,6 @@ def test_span_origin(sentry_init, capture_items, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span", "transaction")
 
@@ -561,7 +554,6 @@ def test_response_without_usage_metadata(sentry_init, capture_items, mock_genai_
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -603,7 +595,6 @@ def test_multiple_candidates(sentry_init, capture_items, mock_genai_client):
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -668,7 +659,6 @@ def test_all_configuration_parameters(sentry_init, capture_items, mock_genai_cli
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -708,7 +698,6 @@ def test_empty_response(sentry_init, capture_items, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -740,7 +729,6 @@ def test_response_with_different_id_fields(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -783,7 +771,6 @@ def test_tool_with_async_function(sentry_init):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Create an async tool function
@@ -806,7 +793,6 @@ def test_contents_as_none(sentry_init, capture_items, mock_genai_client):
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -833,7 +819,6 @@ def test_tool_calls_extraction(sentry_init, capture_items, mock_genai_client):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -920,7 +905,6 @@ def test_google_genai_message_truncation(sentry_init, capture_items, mock_genai_
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -996,7 +980,6 @@ def test_embed_content(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1058,7 +1041,6 @@ def test_embed_content_string_input(sentry_init, capture_items, mock_genai_clien
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1105,7 +1087,6 @@ def test_embed_content_error_handling(sentry_init, capture_items, mock_genai_cli
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "event")
 
@@ -1139,7 +1120,6 @@ def test_embed_content_without_statistics(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1179,7 +1159,6 @@ def test_embed_content_span_origin(sentry_init, capture_items, mock_genai_client
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1220,7 +1199,6 @@ async def test_async_embed_content(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1285,7 +1263,6 @@ async def test_async_embed_content_string_input(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1335,7 +1312,6 @@ async def test_async_embed_content_error_handling(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "event")
 
@@ -1370,7 +1346,6 @@ async def test_async_embed_content_without_statistics(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1413,7 +1388,6 @@ async def test_async_embed_content_span_origin(
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1445,7 +1419,6 @@ def test_generate_content_with_content_object(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1482,7 +1455,6 @@ def test_generate_content_with_dict_format(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1515,7 +1487,6 @@ def test_generate_content_with_file_data(sentry_init, capture_items, mock_genai_
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1565,7 +1536,6 @@ def test_generate_content_with_inline_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1611,7 +1581,6 @@ def test_generate_content_with_function_response(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1666,7 +1635,6 @@ def test_generate_content_with_mixed_string_and_content(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1710,7 +1678,6 @@ def test_generate_content_with_part_object_directly(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1749,7 +1716,6 @@ def test_generate_content_with_list_of_dicts(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1786,7 +1752,6 @@ def test_generate_content_with_dict_inline_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1831,7 +1796,6 @@ def test_generate_content_without_parts_property_inline_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1875,7 +1839,6 @@ def test_generate_content_without_parts_property_inline_data_and_binary_data_wit
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 

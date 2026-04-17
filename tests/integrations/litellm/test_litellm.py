@@ -152,7 +152,6 @@ def test_nonstreaming_chat_completion(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -234,7 +233,6 @@ async def test_async_nonstreaming_chat_completion(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -318,7 +316,6 @@ def test_streaming_chat_completion(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -389,7 +386,6 @@ async def test_async_streaming_chat_completion(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -456,7 +452,6 @@ def test_embeddings_create(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -526,7 +521,6 @@ async def test_async_embeddings_create(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -591,7 +585,6 @@ def test_embeddings_create_with_list_input(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -654,7 +647,6 @@ async def test_async_embeddings_create_with_list_input(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -717,7 +709,6 @@ def test_embeddings_no_pii(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -774,7 +765,6 @@ async def test_async_embeddings_no_pii(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -825,7 +815,6 @@ def test_exception_handling(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event")
 
@@ -864,7 +853,6 @@ async def test_async_exception_handling(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event")
 
@@ -906,7 +894,6 @@ def test_span_origin(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -954,7 +941,6 @@ def test_multiple_providers(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction")
 
@@ -1050,7 +1036,6 @@ async def test_async_multiple_providers(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1147,7 +1132,6 @@ def test_additional_parameters(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1207,7 +1191,6 @@ async def test_async_additional_parameters(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1267,7 +1250,6 @@ def test_no_integration(
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1314,7 +1296,6 @@ async def test_async_no_integration(
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1357,7 +1338,6 @@ def test_response_without_usage(sentry_init, capture_items):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1399,7 +1379,6 @@ def test_integration_setup(sentry_init):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Check that callbacks are registered
@@ -1414,7 +1393,6 @@ def test_litellm_message_truncation(sentry_init, capture_items):
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1481,7 +1459,6 @@ def test_binary_content_encoding_image_url(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1561,7 +1538,6 @@ async def test_async_binary_content_encoding_image_url(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1642,7 +1618,6 @@ def test_binary_content_encoding_mixed_content(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1711,7 +1686,6 @@ async def test_async_binary_content_encoding_mixed_content(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1781,7 +1755,6 @@ def test_binary_content_encoding_uri_type(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1855,7 +1828,6 @@ async def test_async_binary_content_encoding_uri_type(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
