@@ -364,9 +364,9 @@ def test_span_templates_ai_objects(sentry_init, capture_items):
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_span_templates_ai_pii(sentry_init, capture_events, send_default_pii):
+def test_span_templates_ai_pii(sentry_init, capture_items, send_default_pii):
     sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
-    events = capture_events()
+    items = capture_items("span")
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2, **kwargs):
@@ -396,15 +396,14 @@ def test_span_templates_ai_pii(sentry_init, capture_events, send_default_pii):
     with sentry_sdk.start_transaction(name="test-transaction"):
         my_agent(22, 33, arg1=44, arg2=55)
 
-    (event,) = events
-    (_, tool_span, _) = event["spans"]
+    (_, tool_span, _) = (item.payload for item in items if item.type == "span")
 
     if send_default_pii:
         assert (
-            tool_span["data"]["gen_ai.tool.input"]
+            tool_span["attributes"]["gen_ai.tool.input"]
             == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
         )
-        assert tool_span["data"]["gen_ai.tool.output"] == "'tool_output'"
+        assert tool_span["attributes"]["gen_ai.tool.output"] == "'tool_output'"
     else:
-        assert "gen_ai.tool.input" not in tool_span["data"]
-        assert "gen_ai.tool.output" not in tool_span["data"]
+        assert "gen_ai.tool.input" not in tool_span["attributes"]
+        assert "gen_ai.tool.output" not in tool_span["attributes"]
