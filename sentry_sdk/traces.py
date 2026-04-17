@@ -278,12 +278,9 @@ class StreamedSpan:
         self._start_timestamp = datetime.now(timezone.utc)
         self._timestamp: "Optional[datetime]" = None
 
-        try:
-            # profiling depends on this value and requires that
-            # it is measured in nanoseconds
-            self._start_timestamp_monotonic_ns = nanosecond_time()
-        except AttributeError:
-            pass
+        # profiling depends on this value and requires that
+        # it is measured in nanoseconds
+        self._start_timestamp_monotonic_ns = nanosecond_time()
 
         self._span_id: "Optional[str]" = None
 
@@ -385,12 +382,12 @@ class StreamedSpan:
                 )
 
         if self._timestamp is None:
-            try:
+            if self._start_timestamp_monotonic_ns is not None:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
                 self._timestamp = self._start_timestamp + timedelta(
                     microseconds=elapsed / 1000
                 )
-            except AttributeError:
+            else:
                 self._timestamp = datetime.now(timezone.utc)
 
         client = sentry_sdk.get_client()
@@ -466,6 +463,10 @@ class StreamedSpan:
     @property
     def start_timestamp(self) -> "Optional[datetime]":
         return self._start_timestamp
+
+    @property
+    def start_timestamp_monotonic_ns(self) -> "Optional[int]":
+        return self._start_timestamp_monotonic_ns
 
     @property
     def timestamp(self) -> "Optional[datetime]":
@@ -679,6 +680,10 @@ class NoOpStreamedSpan(StreamedSpan):
 
     @property
     def start_timestamp(self) -> "Optional[datetime]":
+        return None
+
+    @property
+    def start_timestamp_monotonic_ns(self) -> "Optional[int]":
         return None
 
     @property
