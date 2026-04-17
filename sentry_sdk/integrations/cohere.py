@@ -111,7 +111,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         for attr in COLLECTED_CHAT_RESP_ATTRS:
             if hasattr(res, attr):
-                set_data_normalized(span, "ai." + attr, getattr(res, attr))
+                span.set_data("ai." + attr, getattr(res, attr))
 
         if hasattr(res, "meta"):
             if hasattr(res.meta, "billed_units"):
@@ -180,8 +180,8 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
             for k, v in COLLECTED_CHAT_PARAMS.items():
                 if k in kwargs:
-                    set_data_normalized(span, v, kwargs[k])
-            set_data_normalized(span, SPANDATA.AI_STREAMING, False)
+                    span.set_data(v, kwargs[k])
+            span.set_data(SPANDATA.AI_STREAMING, False)
 
             if streaming:
                 old_iterator = res
@@ -212,7 +212,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                 )
                 span.__exit__(None, None, None)
             else:
-                set_data_normalized(span, "unknown_response", True)
+                span.set_data("unknown_response", True)
                 span.__exit__(None, None, None)
             return res
 
@@ -246,7 +246,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     )
 
             if "model" in kwargs:
-                set_data_normalized(span, SPANDATA.AI_MODEL_ID, kwargs["model"])
+                span.set_data(SPANDATA.AI_MODEL_ID, kwargs["model"])
             try:
                 res = f(*args, **kwargs)
             except Exception as e:
