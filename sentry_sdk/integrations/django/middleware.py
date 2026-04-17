@@ -103,7 +103,6 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
                     return old_method(*args, **kwargs)
 
             try:
-                # fails for __call__ of function on Python 2 (see py2.7-django-1.11)
                 sentry_wrapped_method = wraps(old_method)(sentry_wrapped_method)
 
                 # Necessary for Django 3.1
