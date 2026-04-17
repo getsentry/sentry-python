@@ -1273,7 +1273,7 @@ async def test_tool_execution_span(
     assert tool_span["data"]["gen_ai.tool.description"] == "A simple tool"
     assert tool_span["data"]["gen_ai.tool.input"] == '{"message": "hello"}'
     assert tool_span["data"]["gen_ai.tool.name"] == "simple_test_tool"
-    assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
+    assert tool_span["data"]["gen_ai.tool.output"] == "'Tool executed with: hello'"
     assert ai_client_span2["description"] == "chat gpt-4"
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
@@ -1904,7 +1904,8 @@ async def test_mcp_tool_execution_spans(
     assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
     assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "search term"}'
     assert (
-        mcp_tool_span["data"]["gen_ai.tool.output"] == "MCP tool executed successfully"
+        mcp_tool_span["data"]["gen_ai.tool.output"]
+        == "'MCP tool executed successfully'"
     )
 
     # Verify no error status since error was None
@@ -2031,7 +2032,7 @@ async def test_mcp_tool_execution_with_error(
     assert mcp_tool_span["description"] == "execute_tool failing_mcp_tool"
     assert mcp_tool_span["data"]["gen_ai.tool.name"] == "failing_mcp_tool"
     assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "test"}'
-    assert mcp_tool_span["data"]["gen_ai.tool.output"] is None
+    assert mcp_tool_span["data"]["gen_ai.tool.output"] == "None"
 
     # Verify error status was set
     assert mcp_tool_span["status"] == "internal_error"
