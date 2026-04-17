@@ -74,8 +74,10 @@ def _install_httpx_client() -> None:
 
                 if parsed_url is not None:
                     attributes["url.full"] = parsed_url.url
-                    attributes["url.query"] = parsed_url.query
-                    attributes["url.fragment"] = parsed_url.fragment
+                    if parsed_url.query:
+                        attributes["url.query"] = parsed_url.query
+                    if parsed_url.fragment:
+                        attributes["url.fragment"] = parsed_url.fragment
 
                 if should_propagate_trace(client, str(request.url)):
                     for (

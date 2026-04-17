@@ -1,11 +1,9 @@
 import os
-import datetime
 import asyncio
 from unittest import mock
 
 import httpx
 import pytest
-from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
@@ -604,7 +602,8 @@ def test_no_request_source_if_duration_too_short_legacy(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
-        http_request_source_threshold_ms=100,
+        # Threshold so high no real request will ever exceed it
+        http_request_source_threshold_ms=9999999,
     )
 
     events = capture_events()
@@ -612,23 +611,10 @@ def test_no_request_source_if_duration_too_short_legacy(
     url = "http://example.com/"
 
     with start_transaction(name="test_transaction"):
-
-        @contextmanager
-        def fake_start_span(*args, **kwargs):
-            with sentry_sdk.start_span(*args, **kwargs) as span:
-                pass
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
-            yield span
-
-        with mock.patch(
-            "sentry_sdk.integrations.httpx.legacy_start_span",
-            fake_start_span,
-        ):
-            if asyncio.iscoroutinefunction(httpx_client.get):
-                asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-            else:
-                httpx_client.get(url)
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     (event,) = events
 
@@ -656,7 +642,8 @@ def test_request_source_if_duration_over_threshold_legacy(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
-        http_request_source_threshold_ms=100,
+        # Threshold is low so any request will exceed it
+        http_request_source_threshold_ms=0,
     )
 
     events = capture_events()
@@ -664,23 +651,10 @@ def test_request_source_if_duration_over_threshold_legacy(
     url = "http://example.com/"
 
     with start_transaction(name="test_transaction"):
-
-        @contextmanager
-        def fake_start_span(*args, **kwargs):
-            with sentry_sdk.start_span(*args, **kwargs) as span:
-                pass
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
-            yield span
-
-        with mock.patch(
-            "sentry_sdk.integrations.httpx.legacy_start_span",
-            fake_start_span,
-        ):
-            if asyncio.iscoroutinefunction(httpx_client.get):
-                asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-            else:
-                httpx_client.get(url)
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     (event,) = events
 
