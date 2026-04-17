@@ -228,7 +228,7 @@ def _create_mcp_execute_tool_spans(
                 execute_tool_span.set_data(SPANDATA.GEN_AI_TOOL_NAME, output.name)
                 if should_send_default_pii():
                     execute_tool_span.set_data(
-                        SPANDATA.GEN_AI_TOOL_INPUT, output.arguments
+                        SPANDATA.GEN_AI_TOOL_INPUT, safe_repr(output.arguments)
                     )
                     execute_tool_span.set_data(
                         SPANDATA.GEN_AI_TOOL_OUTPUT, safe_repr(output.output)

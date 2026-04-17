@@ -29,7 +29,7 @@ def execute_tool_span(
 
     if should_send_default_pii():
         input = args[1]
-        span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, input)
+        span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, safe_repr(input))
 
     return span
 
