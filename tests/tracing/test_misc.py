@@ -611,11 +611,11 @@ class TestConversationIdPropagation:
     """Tests for conversation_id propagation to AI spans."""
 
     def test_conversation_id_propagates_to_span_with_gen_ai_operation_name(
-        self, sentry_init, capture_events
+        self, sentry_init, capture_items
     ):
         """Span with gen_ai.operation.name data should get conversation_id."""
         sentry_init(traces_sample_rate=1.0)
-        events = capture_events()
+        items = capture_items("span")
 
         scope = sentry_sdk.get_current_scope()
         scope.set_conversation_id("conv-op-name-test")
@@ -624,8 +624,8 @@ class TestConversationIdPropagation:
             with start_span(op="http.client") as span:
                 span.set_data("gen_ai.operation.name", "chat")
 
-        (event,) = events
-        span_data = event["spans"][0]["data"]
+        spans = [item.payload for item in items if item.type == "span"]
+        span_data = spans[0]["data"]
         assert span_data.get("gen_ai.conversation.id") == "conv-op-name-test"
 
     def test_conversation_id_propagates_to_span_with_ai_op(

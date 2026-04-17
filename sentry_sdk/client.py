@@ -245,9 +245,15 @@ def _serialized_v1_span_to_serialized_v2_span(
 
     res["attributes"] = {}
     for key, value in attributes.items():
-        res["attributes"][key] = _serialized_v1_attribute_to_serialized_v2_attribute(
-            value
-        )
+        converted_value = _serialized_v1_attribute_to_serialized_v2_attribute(value)
+        if converted_value is None:
+            continue
+
+        res["attributes"][key] = converted_value
+
+    # Remove redundant attribute, as status is stored in the status field.
+    if "status" in res["attributes"]:
+        del res["attributes"]["status"]
 
     return res
 
@@ -268,6 +274,10 @@ def _split_gen_ai_spans(
     non_gen_ai_spans = []
     gen_ai_spans = []
     for span in spans:
+        if not isinstance(span, dict):
+            non_gen_ai_spans.append(span)
+            continue
+
         span_op = span.get("op")
         if isinstance(span_op, str) and span_op.startswith("gen_ai."):
             gen_ai_spans.append(span)
