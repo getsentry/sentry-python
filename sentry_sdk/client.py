@@ -149,6 +149,12 @@ def _serialized_v1_attribute_to_serialized_v2_attribute(
             "type": "string",
         }
 
+    if attribute_value is None:
+        return {
+            "value": "None",
+            "type": "string",
+        }
+
     return None
 
 
