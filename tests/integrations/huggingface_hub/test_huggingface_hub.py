@@ -480,6 +480,7 @@ def test_text_generation(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -555,6 +556,7 @@ def test_text_generation_streaming(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -631,6 +633,7 @@ def test_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -709,6 +712,7 @@ def test_chat_completion_streaming(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -779,7 +783,7 @@ def test_chat_completion_streaming(
 def test_chat_completion_api_error(
     sentry_init: "Any", capture_items: "Any", mock_hf_api_with_errors: "Any"
 ) -> None:
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, _experiments={"gen_ai_as_v2_spans": True})
     items = capture_items("event", "transaction", "span")
 
     client = get_hf_provider_inference_client()
@@ -838,7 +842,7 @@ def test_chat_completion_api_error(
 def test_span_status_error(
     sentry_init: "Any", capture_items: "Any", mock_hf_api_with_errors: "Any"
 ) -> None:
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, _experiments={"gen_ai_as_v2_spans": True})
     items = capture_items("event", "transaction", "span")
 
     client = get_hf_provider_inference_client()
@@ -881,6 +885,7 @@ def test_chat_completion_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -976,6 +981,7 @@ def test_chat_completion_streaming_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 

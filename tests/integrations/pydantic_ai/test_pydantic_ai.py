@@ -61,6 +61,7 @@ async def test_agent_run_async(sentry_init, capture_items, get_test_agent):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -102,6 +103,7 @@ async def test_agent_run_async_model_error(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("event", "transaction", "span")
@@ -135,6 +137,7 @@ async def test_agent_run_async_usage_data(sentry_init, capture_items, get_test_a
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -179,6 +182,7 @@ def test_agent_run_sync(sentry_init, capture_items, get_test_agent):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -211,6 +215,7 @@ def test_agent_run_sync_model_error(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("event", "transaction", "span")
@@ -244,6 +249,7 @@ async def test_agent_run_stream(sentry_init, capture_items, get_test_agent):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -288,6 +294,7 @@ async def test_agent_run_stream_events(sentry_init, capture_items, get_test_agen
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -322,6 +329,7 @@ async def test_agent_with_tools(sentry_init, capture_items, get_test_agent):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     test_agent = get_test_agent()
@@ -387,6 +395,7 @@ async def test_agent_with_tool_model_retry(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     retries = 0
@@ -470,6 +479,7 @@ async def test_agent_with_tool_validation_error(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     test_agent = get_test_agent()
@@ -534,6 +544,7 @@ async def test_agent_with_tools_streaming(sentry_init, capture_items, get_test_a
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     test_agent = get_test_agent()
@@ -583,6 +594,7 @@ async def test_model_settings(sentry_init, capture_items, get_test_agent_with_se
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -631,6 +643,7 @@ async def test_system_prompt_attribute(
         integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -676,6 +689,7 @@ async def test_error_handling(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -700,6 +714,7 @@ async def test_without_pii(sentry_init, capture_items, get_test_agent):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -729,6 +744,7 @@ async def test_without_pii_tools(sentry_init, capture_items, get_test_agent):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     test_agent = get_test_agent()
@@ -765,6 +781,7 @@ async def test_multiple_agents_concurrent(sentry_init, capture_items, get_test_a
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -799,6 +816,7 @@ async def test_message_history(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -848,6 +866,7 @@ async def test_gen_ai_system(sentry_init, capture_items, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -878,6 +897,7 @@ async def test_include_prompts_false(sentry_init, capture_items, get_test_agent)
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,  # Even with PII enabled, prompts should not be captured
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -907,6 +927,7 @@ async def test_include_prompts_true(sentry_init, capture_items, get_test_agent):
         integrations=[PydanticAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -938,6 +959,7 @@ async def test_include_prompts_false_with_tools(
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     test_agent = get_test_agent()
@@ -975,6 +997,7 @@ async def test_include_prompts_requires_pii(sentry_init, capture_items, get_test
         integrations=[PydanticAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1066,6 +1089,7 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1135,6 +1159,7 @@ async def test_context_cleanup_after_run(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Verify context is not set before run
@@ -1158,6 +1183,7 @@ def test_context_cleanup_after_run_sync(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Verify context is not set before run
@@ -1182,6 +1208,7 @@ async def test_context_cleanup_after_streaming(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Verify context is not set before run
@@ -1208,6 +1235,7 @@ async def test_context_cleanup_on_error(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     test_agent = get_test_agent()
@@ -1242,6 +1270,7 @@ async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Create a second agent
@@ -1297,6 +1326,7 @@ async def test_invoke_agent_with_list_user_prompt(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1347,6 +1377,7 @@ async def test_invoke_agent_with_instructions(
         integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1386,6 +1417,7 @@ async def test_model_name_extraction_with_callable(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Test the utility function directly
@@ -1412,6 +1444,7 @@ async def test_model_name_extraction_fallback_to_str(sentry_init, capture_items)
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Test the utility function directly
@@ -1440,6 +1473,7 @@ async def test_model_settings_object_style(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1475,6 +1509,7 @@ async def test_usage_data_partial(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1508,6 +1543,7 @@ async def test_agent_data_from_scope(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1530,6 +1566,7 @@ async def test_available_tools_without_description(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     test_agent = get_test_agent()
@@ -1564,6 +1601,7 @@ async def test_output_with_tool_calls(sentry_init, capture_items, get_test_agent
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     test_agent = get_test_agent()
@@ -1609,6 +1647,7 @@ async def test_message_formatting_with_different_parts(sentry_init, capture_item
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1657,6 +1696,7 @@ async def test_update_invoke_agent_span_with_none_output(sentry_init, capture_it
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1684,6 +1724,7 @@ async def test_update_ai_client_span_with_none_response(sentry_init, capture_ite
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1709,6 +1750,7 @@ async def test_agent_without_name(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1734,6 +1776,7 @@ async def test_model_response_without_parts(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1764,6 +1807,7 @@ async def test_input_messages_error_handling(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1793,6 +1837,7 @@ async def test_available_tools_error_handling(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1822,6 +1867,7 @@ async def test_set_usage_data_with_none_usage(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1848,6 +1894,7 @@ async def test_set_usage_data_with_partial_fields(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1889,6 +1936,7 @@ async def test_message_parts_with_tool_return(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -1918,6 +1966,7 @@ async def test_message_parts_with_list_content(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1954,6 +2003,7 @@ async def test_output_data_with_text_and_tool_calls(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -1993,6 +2043,7 @@ async def test_output_data_error_handling(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2025,6 +2076,7 @@ async def test_message_with_system_prompt_part(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2060,6 +2112,7 @@ async def test_message_with_instructions(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2094,6 +2147,7 @@ async def test_set_input_messages_without_prompts(sentry_init, capture_items):
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2122,6 +2176,7 @@ async def test_set_output_data_without_prompts(sentry_init, capture_items):
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2149,6 +2204,7 @@ async def test_get_model_name_with_exception_in_callable(sentry_init, capture_it
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Create model with callable name that raises exception
@@ -2172,6 +2228,7 @@ async def test_get_model_name_with_string_model(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Pass a string as model
@@ -2191,6 +2248,7 @@ async def test_get_model_name_with_none(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Pass None
@@ -2212,6 +2270,7 @@ async def test_set_model_data_with_system(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2243,6 +2302,7 @@ async def test_set_model_data_from_agent_scope(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2276,6 +2336,7 @@ async def test_set_model_data_with_none_settings_values(sentry_init, capture_ite
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2308,6 +2369,7 @@ async def test_should_send_prompts_without_pii(sentry_init, capture_items):
         integrations=[PydanticAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Should return False
@@ -2326,6 +2388,7 @@ async def test_set_agent_data_without_agent(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2352,6 +2415,7 @@ async def test_set_agent_data_from_scope(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2384,6 +2448,7 @@ async def test_set_agent_data_without_name(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2414,6 +2479,7 @@ async def test_set_available_tools_without_toolset(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2444,6 +2510,7 @@ async def test_set_available_tools_with_schema(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2483,6 +2550,7 @@ async def test_execute_tool_span_creation(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2509,6 +2577,7 @@ async def test_execute_tool_span_with_mcp_type(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2536,6 +2605,7 @@ async def test_execute_tool_span_without_prompts(sentry_init, capture_items):
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2560,6 +2630,7 @@ async def test_execute_tool_span_with_none_args(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2583,6 +2654,7 @@ async def test_update_execute_tool_span_with_none_span(sentry_init, capture_item
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Update with None span - should not raise
@@ -2607,6 +2679,7 @@ async def test_update_execute_tool_span_with_none_result(sentry_init, capture_it
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2630,6 +2703,7 @@ async def test_tool_execution_without_span_context(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     # Create a simple agent with no tools (won't have function_toolset)
@@ -2661,6 +2735,7 @@ async def test_invoke_agent_span_with_callable_instruction(sentry_init, capture_
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2694,6 +2769,7 @@ async def test_invoke_agent_span_with_string_instructions(sentry_init, capture_i
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2722,6 +2798,7 @@ async def test_ai_client_span_with_streaming_flag(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2749,6 +2826,7 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_items):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     with sentry_sdk.start_transaction(op="test", name="test") as transaction:
@@ -2797,6 +2875,7 @@ async def test_binary_content_encoding_image(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -2827,6 +2906,7 @@ async def test_binary_content_encoding_mixed_content(sentry_init, capture_items)
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -2870,6 +2950,7 @@ async def test_binary_content_in_agent_run(sentry_init, capture_items):
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -2893,7 +2974,11 @@ async def test_binary_content_in_agent_run(sentry_init, capture_items):
 @pytest.mark.asyncio
 async def test_set_usage_data_with_cache_tokens(sentry_init, capture_items):
     """Test that cache_read_tokens and cache_write_tokens are tracked."""
-    sentry_init(integrations=[PydanticAIIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
+    )
 
     items = capture_items("transaction", "span")
 
@@ -2964,6 +3049,7 @@ def test_image_url_base64_content_in_span(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")
@@ -3034,6 +3120,7 @@ async def test_invoke_agent_image_url(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     agent = Agent("test", name="test_image_url_agent")
@@ -3081,6 +3168,7 @@ async def test_tool_description_in_execute_tool_span(sentry_init, capture_items)
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
 
     items = capture_items("transaction", "span")

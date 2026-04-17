@@ -138,6 +138,7 @@ def test_nonstreaming_chat_completion_no_prompts(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -233,6 +234,7 @@ def test_nonstreaming_chat_completion(sentry_init, capture_items, messages, requ
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -312,6 +314,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -407,6 +410,7 @@ async def test_nonstreaming_chat_completion_async(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -502,6 +506,7 @@ def test_streaming_chat_completion_no_prompts(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -621,6 +626,7 @@ def test_streaming_chat_completion_with_usage_in_stream(
         integrations=[OpenAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -701,6 +707,7 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
         integrations=[OpenAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -764,6 +771,7 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         integrations=[OpenAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -829,6 +837,7 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
         integrations=[OpenAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -957,6 +966,7 @@ def test_streaming_chat_completion(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1109,6 +1119,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1280,6 +1291,7 @@ async def test_streaming_chat_completion_async(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1411,7 +1423,11 @@ async def test_streaming_chat_completion_async(
 
 
 def test_bad_chat_completion(sentry_init, capture_items):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
+    )
     items = capture_items("event")
 
     client = OpenAI(api_key="z")
@@ -1429,7 +1445,11 @@ def test_bad_chat_completion(sentry_init, capture_items):
 
 
 def test_span_status_error(sentry_init, capture_items):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
+    )
     items = capture_items("event", "transaction", "span")
 
     with start_transaction(name="test"):
@@ -1454,7 +1474,11 @@ def test_span_status_error(sentry_init, capture_items):
 
 @pytest.mark.asyncio
 async def test_bad_chat_completion_async(sentry_init, capture_items):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
+    )
     items = capture_items("event")
 
     client = AsyncOpenAI(api_key="z")
@@ -1485,6 +1509,7 @@ def test_embeddings_create_no_pii(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1567,6 +1592,7 @@ def test_embeddings_create(sentry_init, capture_items, input, request):
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1638,6 +1664,7 @@ async def test_embeddings_create_async_no_pii(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1721,6 +1748,7 @@ async def test_embeddings_create_async(sentry_init, capture_items, input, reques
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -1789,6 +1817,7 @@ def test_embeddings_create_raises_error(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event")
 
@@ -1817,6 +1846,7 @@ async def test_embeddings_create_raises_error_async(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event")
 
@@ -1837,6 +1867,7 @@ def test_span_origin_nonstreaming_chat(sentry_init, capture_items):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1860,6 +1891,7 @@ async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_items):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1882,6 +1914,7 @@ def test_span_origin_streaming_chat(sentry_init, capture_items):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1945,6 +1978,7 @@ async def test_span_origin_streaming_chat_async(
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2011,6 +2045,7 @@ def test_span_origin_embeddings(sentry_init, capture_items):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2042,6 +2077,7 @@ async def test_span_origin_embeddings_async(sentry_init, capture_items):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2435,6 +2471,7 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_items):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -2557,6 +2594,7 @@ def test_ai_client_span_responses_api(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -2767,6 +2805,7 @@ def test_error_in_responses_api(sentry_init, capture_items):
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event", "transaction", "span")
 
@@ -2873,6 +2912,7 @@ async def test_ai_client_span_responses_async_api(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3158,6 +3198,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3383,6 +3424,7 @@ async def test_error_in_responses_async_api(sentry_init, capture_items):
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event", "transaction", "span")
 
@@ -3510,6 +3552,7 @@ def test_streaming_responses_api(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3586,6 +3629,7 @@ async def test_streaming_responses_api_async(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3649,6 +3693,7 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_items, tools):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3691,6 +3736,7 @@ def test_openai_message_role_mapping(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3721,6 +3767,7 @@ def test_openai_message_truncation(sentry_init, capture_items):
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -3770,6 +3817,7 @@ def test_streaming_chat_completion_ttft(
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3848,6 +3896,7 @@ async def test_streaming_chat_completion_ttft_async(
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3924,6 +3973,7 @@ def test_streaming_responses_api_ttft(
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
@@ -3973,6 +4023,7 @@ async def test_streaming_responses_api_ttft_async(
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("span")
 
