@@ -527,8 +527,6 @@ def string_containing_matcher():
             if not isinstance(test_string, self.valid_types):
                 return False
 
-            # this is safe even in py2 because as of 2.6, `bytes` exists in py2
-            # as an alias for `str`
             if isinstance(test_string, bytes):
                 test_string = test_string.decode()
 
@@ -548,9 +546,8 @@ def _safe_is_equal(x, y):
     Compares two values, preferring to use the first's __eq__ method if it
     exists and is implemented.
 
-    Accounts for py2/py3 differences (like ints in py2 not having a __eq__
-    method), as well as the incomparability of certain types exposed by using
-    raw __eq__ () rather than ==.
+    Accounts for the incomparability of certain types exposed by using raw
+    __eq__ () rather than ==.
     """
 
     # Prefer using __eq__ directly to ensure that examples like
