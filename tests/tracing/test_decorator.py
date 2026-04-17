@@ -122,7 +122,10 @@ async def test_functions_to_trace_signature_unchanged_async(sentry_init):
 
 
 def test_span_templates_ai_dicts(sentry_init, capture_items):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
+    )
     items = capture_items("span")
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
@@ -241,7 +244,10 @@ def test_span_templates_ai_dicts(sentry_init, capture_items):
 
 
 def test_span_templates_ai_objects(sentry_init, capture_items):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"gen_ai_as_v2_spans": True},
+    )
     items = capture_items("span")
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
@@ -365,7 +371,11 @@ def test_span_templates_ai_objects(sentry_init, capture_items):
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
 def test_span_templates_ai_pii(sentry_init, capture_items, send_default_pii):
-    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        _experiments={"gen_ai_as_v2_spans": True},
+    )
     items = capture_items("span")
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
