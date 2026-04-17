@@ -147,7 +147,7 @@ def test_langgraph_integration_init():
     ],
 )
 def test_state_graph_compile(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_items, send_default_pii, include_prompts
 ):
     """Test StateGraph.compile() wrapper creates proper create_agent span."""
     sentry_init(
@@ -155,7 +155,7 @@ def test_state_graph_compile(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
     graph = MockStateGraph()
 
     def original_compile(self, *args, **kwargs):
@@ -171,21 +171,23 @@ def test_state_graph_compile(
     assert compiled_graph is not None
     assert compiled_graph.name == "test_graph"
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
-    agent_spans = [span for span in tx["spans"] if span["op"] == OP.GEN_AI_CREATE_AGENT]
+    spans = [item.payload for item in items if item.type == "span"]
+    agent_spans = [
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_CREATE_AGENT
+    ]
     assert len(agent_spans) == 1
 
     agent_span = agent_spans[0]
-    assert agent_span["description"] == "create_agent test_graph"
-    assert agent_span["origin"] == "auto.ai.langgraph"
-    assert agent_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "create_agent"
-    assert agent_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
-    assert agent_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
-    assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in agent_span["data"]
+    assert agent_span["name"] == "create_agent test_graph"
+    assert agent_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
+    assert agent_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "create_agent"
+    assert agent_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+    assert agent_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in agent_span["attributes"]
 
-    tools_data = agent_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+    tools_data = agent_span["attributes"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
     assert tools_data == ["search_tool", "calculator"]
     assert len(tools_data) == 2
     assert "search_tool" in tools_data
@@ -201,14 +203,14 @@ def test_state_graph_compile(
         (False, False),
     ],
 )
-def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_prompts):
+def test_pregel_invoke(sentry_init, capture_items, send_default_pii, include_prompts):
     """Test Pregel.invoke() wrapper creates proper invoke_agent span."""
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -245,26 +247,26 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
 
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
-    assert invoke_span["description"] == "invoke_agent test_graph"
-    assert invoke_span["origin"] == "auto.ai.langgraph"
-    assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-    assert invoke_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
-    assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+    assert invoke_span["name"] == "invoke_agent test_graph"
+    assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
 
     if send_default_pii and include_prompts:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
 
-        request_messages = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        request_messages = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
 
         if isinstance(request_messages, str):
             import json
@@ -273,11 +275,11 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
         assert len(request_messages) == 1
         assert request_messages[0]["content"] == "Of course! How can I assist you?"
 
-        response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert response_text == expected_assistant_response
 
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
-        tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
+        tool_calls_data = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
         if isinstance(tool_calls_data, str):
             import json
 
@@ -287,9 +289,11 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
         assert tool_calls_data[0]["id"] == "call_test_123"
         assert tool_calls_data[0]["function"]["name"] == "search_tool"
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("attributes", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("attributes", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get(
+            "attributes", {}
+        )
 
 
 @pytest.mark.parametrize(
@@ -301,14 +305,14 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
         (False, False),
     ],
 )
-def test_pregel_ainvoke(sentry_init, capture_events, send_default_pii, include_prompts):
+def test_pregel_ainvoke(sentry_init, capture_items, send_default_pii, include_prompts):
     """Test Pregel.ainvoke() async wrapper creates proper invoke_agent span."""
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
     test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
     pregel = MockPregelInstance("async_graph")
 
@@ -341,30 +345,30 @@ def test_pregel_ainvoke(sentry_init, capture_events, send_default_pii, include_p
     result = asyncio.run(run_test())
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
-    assert invoke_span["description"] == "invoke_agent async_graph"
-    assert invoke_span["origin"] == "auto.ai.langgraph"
-    assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-    assert invoke_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "async_graph"
-    assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "async_graph"
+    assert invoke_span["name"] == "invoke_agent async_graph"
+    assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "async_graph"
+    assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "async_graph"
 
     if send_default_pii and include_prompts:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
 
-        response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert response_text == expected_assistant_response
 
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
-        tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
+        tool_calls_data = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
         if isinstance(tool_calls_data, str):
             import json
 
@@ -374,19 +378,21 @@ def test_pregel_ainvoke(sentry_init, capture_events, send_default_pii, include_p
         assert tool_calls_data[0]["id"] == "call_weather_456"
         assert tool_calls_data[0]["function"]["name"] == "get_weather"
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("attributes", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("attributes", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get(
+            "attributes", {}
+        )
 
 
-def test_pregel_invoke_error(sentry_init, capture_events):
+def test_pregel_invoke_error(sentry_init, capture_items):
     """Test error handling during graph execution."""
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
     test_state = {"messages": [MockMessage("This will fail")]}
     pregel = MockPregelInstance("error_graph")
 
@@ -397,25 +403,26 @@ def test_pregel_invoke_error(sentry_init, capture_events):
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
         wrapped_invoke(pregel, test_state)
 
-    tx = events[0]
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
-    assert invoke_span.get("status") == "internal_error"
-    assert invoke_span.get("tags", {}).get("status") == "internal_error"
+    assert invoke_span.get("status") == "error"
 
 
-def test_pregel_ainvoke_error(sentry_init, capture_events):
+def test_pregel_ainvoke_error(sentry_init, capture_items):
     """Test error handling during async graph execution."""
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
     test_state = {"messages": [MockMessage("This will fail async")]}
     pregel = MockPregelInstance("async_error_graph")
 
@@ -431,24 +438,25 @@ def test_pregel_ainvoke_error(sentry_init, capture_events):
 
     asyncio.run(run_error_test())
 
-    tx = events[0]
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
-    assert invoke_span.get("status") == "internal_error"
-    assert invoke_span.get("tags", {}).get("status") == "internal_error"
+    assert invoke_span.get("status") == "error"
 
 
-def test_span_origin(sentry_init, capture_events):
+def test_span_origin(sentry_init, capture_items):
     """Test that span origins are correctly set."""
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     graph = MockStateGraph()
 
@@ -461,16 +469,17 @@ def test_span_origin(sentry_init, capture_events):
         wrapped_compile = _wrap_state_graph_compile(original_compile)
         wrapped_compile(graph)
 
-    tx = events[0]
+    tx = next(item.payload for item in items if item.type == "transaction")
     assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    for span in tx["spans"]:
-        assert span["origin"] == "auto.ai.langgraph"
+    spans = [item.payload for item in items if item.type == "span"]
+    for span in spans:
+        assert span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
 
 
 @pytest.mark.parametrize("graph_name", ["my_graph", None, ""])
 def test_pregel_invoke_with_different_graph_names(
-    sentry_init, capture_events, graph_name
+    sentry_init, capture_items, graph_name
 ):
     """Test Pregel.invoke() with different graph name scenarios."""
     sentry_init(
@@ -478,7 +487,7 @@ def test_pregel_invoke_with_different_graph_names(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     pregel = MockPregelInstance(graph_name) if graph_name else MockPregelInstance()
     if not graph_name:
@@ -492,25 +501,27 @@ def test_pregel_invoke_with_different_graph_names(
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
         wrapped_invoke(pregel, {"messages": []})
 
-    tx = events[0]
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
 
     if graph_name and graph_name.strip():
-        assert invoke_span["description"] == "invoke_agent my_graph"
-        assert invoke_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == graph_name
-        assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == graph_name
+        assert invoke_span["name"] == "invoke_agent my_graph"
+        assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == graph_name
+        assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == graph_name
     else:
-        assert invoke_span["description"] == "invoke_agent"
-        assert SPANDATA.GEN_AI_PIPELINE_NAME not in invoke_span.get("data", {})
-        assert SPANDATA.GEN_AI_AGENT_NAME not in invoke_span.get("data", {})
+        assert invoke_span["name"] == "invoke_agent"
+        assert SPANDATA.GEN_AI_PIPELINE_NAME not in invoke_span.get("attributes", {})
+        assert SPANDATA.GEN_AI_AGENT_NAME not in invoke_span.get("attributes", {})
 
 
-def test_pregel_invoke_span_includes_usage_data(sentry_init, capture_events):
+def test_pregel_invoke_span_includes_usage_data(sentry_init, capture_items):
     """
     Test that invoke_agent spans include aggregated usage data from context_wrapper.
     This verifies the new functionality added to track token usage in invoke_agent spans.
@@ -519,7 +530,7 @@ def test_pregel_invoke_span_includes_usage_data(sentry_init, capture_events):
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -564,29 +575,29 @@ def test_pregel_invoke_span_includes_usage_data(sentry_init, capture_events):
 
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_agent_span = invoke_spans[0]
 
     # Verify invoke_agent span has usage data
-    assert invoke_agent_span["description"] == "invoke_agent test_graph"
-    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
-    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
-    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
+    assert invoke_agent_span["name"] == "invoke_agent test_graph"
+    assert "gen_ai.usage.input_tokens" in invoke_agent_span["attributes"]
+    assert "gen_ai.usage.output_tokens" in invoke_agent_span["attributes"]
+    assert "gen_ai.usage.total_tokens" in invoke_agent_span["attributes"]
 
     # The usage should match the mock_usage values (aggregated across all calls)
-    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 10
-    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
-    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 30
+    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 10
+    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 30
 
 
-def test_pregel_ainvoke_span_includes_usage_data(sentry_init, capture_events):
+def test_pregel_ainvoke_span_includes_usage_data(sentry_init, capture_items):
     """
     Test that invoke_agent spans include aggregated usage data from context_wrapper.
     This verifies the new functionality added to track token usage in invoke_agent spans.
@@ -595,7 +606,7 @@ def test_pregel_ainvoke_span_includes_usage_data(sentry_init, capture_events):
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -643,29 +654,29 @@ def test_pregel_ainvoke_span_includes_usage_data(sentry_init, capture_events):
     result = asyncio.run(run_test())
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_agent_span = invoke_spans[0]
 
     # Verify invoke_agent span has usage data
-    assert invoke_agent_span["description"] == "invoke_agent test_graph"
-    assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
-    assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
-    assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
+    assert invoke_agent_span["name"] == "invoke_agent test_graph"
+    assert "gen_ai.usage.input_tokens" in invoke_agent_span["attributes"]
+    assert "gen_ai.usage.output_tokens" in invoke_agent_span["attributes"]
+    assert "gen_ai.usage.total_tokens" in invoke_agent_span["attributes"]
 
     # The usage should match the mock_usage values (aggregated across all calls)
-    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 10
-    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
-    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 30
+    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 10
+    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 30
 
 
-def test_pregel_invoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_events):
+def test_pregel_invoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_items):
     """
     Test that invoke_agent spans show aggregated usage across multiple LLM calls
     (e.g., when tools are used and multiple API calls are made).
@@ -674,7 +685,7 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_e
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -730,23 +741,23 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_e
 
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
     invoke_agent_span = invoke_spans[0]
 
     # Verify invoke_agent span has aggregated usage from both API calls
     # Total: 10 + 20 = 30 input tokens, 5 + 15 = 20 output tokens, 15 + 35 = 50 total
-    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 30
-    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
-    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
+    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 30
+    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 50
 
 
-def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_events):
+def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_items):
     """
     Test that invoke_agent spans show aggregated usage across multiple LLM calls
     (e.g., when tools are used and multiple API calls are made).
@@ -755,7 +766,7 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -814,23 +825,23 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_
     result = asyncio.run(run_test())
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
     invoke_agent_span = invoke_spans[0]
 
     # Verify invoke_agent span has aggregated usage from both API calls
     # Total: 10 + 20 = 30 input tokens, 5 + 15 = 20 output tokens, 15 + 35 = 50 total
-    assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 30
-    assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
-    assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
+    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 30
+    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
+    assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 50
 
 
-def test_pregel_invoke_span_includes_response_model(sentry_init, capture_events):
+def test_pregel_invoke_span_includes_response_model(sentry_init, capture_items):
     """
     Test that invoke_agent spans include the response model.
     When an agent makes multiple LLM calls, it should report the last model used.
@@ -839,7 +850,7 @@ def test_pregel_invoke_span_includes_response_model(sentry_init, capture_events)
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -884,23 +895,25 @@ def test_pregel_invoke_span_includes_response_model(sentry_init, capture_events)
 
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_agent_span = invoke_spans[0]
 
     # Verify invoke_agent span has response model
-    assert invoke_agent_span["description"] == "invoke_agent test_graph"
-    assert "gen_ai.response.model" in invoke_agent_span["data"]
-    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    assert invoke_agent_span["name"] == "invoke_agent test_graph"
+    assert "gen_ai.response.model" in invoke_agent_span["attributes"]
+    assert (
+        invoke_agent_span["attributes"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    )
 
 
-def test_pregel_ainvoke_span_includes_response_model(sentry_init, capture_events):
+def test_pregel_ainvoke_span_includes_response_model(sentry_init, capture_items):
     """
     Test that invoke_agent spans include the response model.
     When an agent makes multiple LLM calls, it should report the last model used.
@@ -909,7 +922,7 @@ def test_pregel_ainvoke_span_includes_response_model(sentry_init, capture_events
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -957,23 +970,25 @@ def test_pregel_ainvoke_span_includes_response_model(sentry_init, capture_events
     result = asyncio.run(run_test())
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_agent_span = invoke_spans[0]
 
     # Verify invoke_agent span has response model
-    assert invoke_agent_span["description"] == "invoke_agent test_graph"
-    assert "gen_ai.response.model" in invoke_agent_span["data"]
-    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    assert invoke_agent_span["name"] == "invoke_agent test_graph"
+    assert "gen_ai.response.model" in invoke_agent_span["attributes"]
+    assert (
+        invoke_agent_span["attributes"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    )
 
 
-def test_pregel_invoke_span_uses_last_response_model(sentry_init, capture_events):
+def test_pregel_invoke_span_uses_last_response_model(sentry_init, capture_items):
     """
     Test that when an agent makes multiple LLM calls (e.g., with tools),
     the invoke_agent span reports the last response model used.
@@ -982,7 +997,7 @@ def test_pregel_invoke_span_uses_last_response_model(sentry_init, capture_events
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -1040,22 +1055,24 @@ def test_pregel_invoke_span_uses_last_response_model(sentry_init, capture_events
 
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_agent_span = invoke_spans[0]
 
     # Verify invoke_agent span uses the LAST response model
-    assert "gen_ai.response.model" in invoke_agent_span["data"]
-    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    assert "gen_ai.response.model" in invoke_agent_span["attributes"]
+    assert (
+        invoke_agent_span["attributes"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    )
 
 
-def test_pregel_ainvoke_span_uses_last_response_model(sentry_init, capture_events):
+def test_pregel_ainvoke_span_uses_last_response_model(sentry_init, capture_items):
     """
     Test that when an agent makes multiple LLM calls (e.g., with tools),
     the invoke_agent span reports the last response model used.
@@ -1064,7 +1081,7 @@ def test_pregel_ainvoke_span_uses_last_response_model(sentry_init, capture_event
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     test_state = {
         "messages": [
@@ -1125,19 +1142,21 @@ def test_pregel_ainvoke_span_uses_last_response_model(sentry_init, capture_event
     result = asyncio.run(run_test())
     assert result is not None
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_agent_span = invoke_spans[0]
 
     # Verify invoke_agent span uses the LAST response model
-    assert "gen_ai.response.model" in invoke_agent_span["data"]
-    assert invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    assert "gen_ai.response.model" in invoke_agent_span["attributes"]
+    assert (
+        invoke_agent_span["attributes"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+    )
 
 
 def test_complex_message_parsing():
@@ -1187,14 +1206,14 @@ def test_complex_message_parsing():
     assert result[2]["function_call"]["name"] == "search"
 
 
-def test_extraction_functions_complex_scenario(sentry_init, capture_events):
+def test_extraction_functions_complex_scenario(sentry_init, capture_items):
     """Test extraction functions with complex scenarios including multiple messages and edge cases."""
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     pregel = MockPregelInstance("complex_graph")
     test_state = {"messages": [MockMessage("Complex request", name="user")]}
@@ -1235,21 +1254,23 @@ def test_extraction_functions_complex_scenario(sentry_init, capture_events):
 
     assert result is not None
 
-    tx = events[0]
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["data"]
-    response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
+    response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     assert response_text == "Final response"
 
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
     import json
 
-    tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    tool_calls_data = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
     if isinstance(tool_calls_data, str):
         tool_calls_data = json.loads(tool_calls_data)
 
@@ -1260,14 +1281,14 @@ def test_extraction_functions_complex_scenario(sentry_init, capture_events):
     assert tool_calls_data[1]["function"]["name"] == "calculate"
 
 
-def test_langgraph_message_role_mapping(sentry_init, capture_events):
+def test_langgraph_message_role_mapping(sentry_init, capture_items):
     """Test that Langgraph integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     # Mock a langgraph message with mixed roles
     class MockMessage:
@@ -1297,17 +1318,18 @@ def test_langgraph_message_role_mapping(sentry_init, capture_events):
         )
         wrapped_invoke(pregel, state_data)
 
-    (event,) = events
-    span = event["spans"][0]
+    span = next(item.payload for item in items if item.type == "span")
 
     # Verify that the span was created correctly
-    assert span["op"] == "gen_ai.invoke_agent"
+    assert span["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
 
     # If messages were captured, verify role mapping
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]:
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]:
         import json
 
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        stored_messages = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
 
         # Find messages with specific content to verify role mapping
         ai_message = next(
@@ -1331,7 +1353,7 @@ def test_langgraph_message_role_mapping(sentry_init, capture_events):
         assert "ai" not in roles
 
 
-def test_langgraph_message_truncation(sentry_init, capture_events):
+def test_langgraph_message_truncation(sentry_init, capture_items):
     """Test that large messages are truncated properly in Langgraph integration."""
     import json
 
@@ -1340,7 +1362,7 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -1365,23 +1387,25 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
         result = wrapped_invoke(pregel, test_state)
 
     assert result is not None
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
 
+    spans = [item.payload for item in items if item.type == "span"]
     invoke_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_INVOKE_AGENT
+        span
+        for span in spans
+        if span["attributes"].get("sentry.op") == OP.GEN_AI_INVOKE_AGENT
     ]
     assert len(invoke_spans) > 0
 
     invoke_span = invoke_spans[0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
 
-    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    messages_data = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
     assert len(parsed_messages) == 1
     assert "small message 5" in str(parsed_messages[0])
+
+    (tx,) = (item.payload for item in items if item.type == "transaction")
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
