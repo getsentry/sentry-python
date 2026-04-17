@@ -142,7 +142,7 @@ class MockCompletionResponse:
 def test_nonstreaming_chat_completion(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
@@ -153,7 +153,7 @@ def test_nonstreaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -179,37 +179,36 @@ def test_nonstreaming_chat_completion(
 
             litellm_utils.executor.shutdown(wait=True)
 
-    assert len(events) == 1
-    (event,) = events
-
-    assert event["type"] == "transaction"
+    (event,) = (item.payload for item in items if item.type == "transaction")
     assert event["transaction"] == "litellm test"
 
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "chat gpt-3.5-turbo"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
     if send_default_pii and include_prompts:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -224,7 +223,7 @@ def test_nonstreaming_chat_completion(
 )
 async def test_async_nonstreaming_chat_completion(
     sentry_init,
-    capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
@@ -235,7 +234,7 @@ async def test_async_nonstreaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -262,37 +261,36 @@ async def test_async_nonstreaming_chat_completion(
             await GLOBAL_LOGGING_WORKER.flush()
             await asyncio.sleep(0.5)
 
-    assert len(events) == 1
-    (event,) = events
-
-    assert event["type"] == "transaction"
+    (event,) = (item.payload for item in items if item.type == "transaction")
     assert event["transaction"] == "litellm test"
 
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "chat gpt-3.5-turbo"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
     if send_default_pii and include_prompts:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
 
 
 @pytest.mark.parametrize(
@@ -307,7 +305,7 @@ async def test_async_nonstreaming_chat_completion(
 def test_streaming_chat_completion(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
@@ -319,7 +317,7 @@ def test_streaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -350,20 +348,18 @@ def test_streaming_chat_completion(
 
             streaming_handler.executor.shutdown(wait=True)
 
-    assert len(events) == 1
-    (event,) = events
-
-    assert event["type"] == "transaction"
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["op"] == OP.GEN_AI_CHAT
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -378,7 +374,7 @@ def test_streaming_chat_completion(
 )
 async def test_async_streaming_chat_completion(
     sentry_init,
-    capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
@@ -391,7 +387,7 @@ async def test_async_streaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -425,25 +421,23 @@ async def test_async_streaming_chat_completion(
             await GLOBAL_LOGGING_WORKER.flush()
             await asyncio.sleep(0.5)
 
-    assert len(events) == 1
-    (event,) = events
-
-    assert event["type"] == "transaction"
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["op"] == OP.GEN_AI_CHAT
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
 def test_embeddings_create(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
@@ -459,7 +453,7 @@ def test_embeddings_create(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     client = OpenAI(api_key="test-key")
 
@@ -485,32 +479,34 @@ def test_embeddings_create(
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
-        assert len(events) == 1
-        (event,) = events
 
-        assert event["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
         spans = list(
             x
-            for x in event["spans"]
-            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+            for x in spans
+            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["op"] == OP.GEN_AI_EMBEDDINGS
-        assert span["description"] == "embeddings text-embedding-ada-002"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-ada-002"
+        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["name"] == "embeddings text-embedding-ada-002"
+        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "text-embedding-ada-002"
+        )
         # Check that embeddings input is captured (it's JSON serialized)
-        embeddings_input = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
         assert json.loads(embeddings_input) == ["Hello, world!"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_embeddings_create(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
@@ -526,7 +522,7 @@ async def test_async_embeddings_create(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     client = AsyncOpenAI(api_key="test-key")
 
@@ -553,31 +549,33 @@ async def test_async_embeddings_create(
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
-        assert len(events) == 1
-        (event,) = events
 
-        assert event["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
         spans = list(
             x
-            for x in event["spans"]
-            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+            for x in spans
+            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["op"] == OP.GEN_AI_EMBEDDINGS
-        assert span["description"] == "embeddings text-embedding-ada-002"
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-        assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-ada-002"
+        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["name"] == "embeddings text-embedding-ada-002"
+        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "text-embedding-ada-002"
+        )
         # Check that embeddings input is captured (it's JSON serialized)
-        embeddings_input = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
         assert json.loads(embeddings_input) == ["Hello, world!"]
 
 
 def test_embeddings_create_with_list_input(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
@@ -588,7 +586,7 @@ def test_embeddings_create_with_list_input(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     client = OpenAI(api_key="test-key")
 
@@ -614,22 +612,21 @@ def test_embeddings_create_with_list_input(
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
-        assert len(events) == 1
-        (event,) = events
 
-        assert event["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
         spans = list(
             x
-            for x in event["spans"]
-            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+            for x in spans
+            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["op"] == OP.GEN_AI_EMBEDDINGS
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
         # Check that list of embeddings input is captured (it's JSON serialized)
-        embeddings_input = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
         assert json.loads(embeddings_input) == [
             "First text",
             "Second text",
@@ -640,7 +637,7 @@ def test_embeddings_create_with_list_input(
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_embeddings_create_with_list_input(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
@@ -651,7 +648,7 @@ async def test_async_embeddings_create_with_list_input(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     client = AsyncOpenAI(api_key="test-key")
 
@@ -678,22 +675,21 @@ async def test_async_embeddings_create_with_list_input(
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
-        assert len(events) == 1
-        (event,) = events
 
-        assert event["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
         spans = list(
             x
-            for x in event["spans"]
-            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+            for x in spans
+            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["op"] == OP.GEN_AI_EMBEDDINGS
-        assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
         # Check that list of embeddings input is captured (it's JSON serialized)
-        embeddings_input = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
         assert json.loads(embeddings_input) == [
             "First text",
             "Second text",
@@ -703,7 +699,7 @@ async def test_async_embeddings_create_with_list_input(
 
 def test_embeddings_no_pii(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
@@ -714,7 +710,7 @@ def test_embeddings_no_pii(
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     client = OpenAI(api_key="test-key")
 
@@ -740,27 +736,26 @@ def test_embeddings_no_pii(
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
-        assert len(events) == 1
-        (event,) = events
 
-        assert event["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
         spans = list(
             x
-            for x in event["spans"]
-            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+            for x in spans
+            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
         # Check that embeddings input is NOT captured when PII is disabled
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_embeddings_no_pii(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
@@ -771,7 +766,7 @@ async def test_async_embeddings_no_pii(
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     client = AsyncOpenAI(api_key="test-key")
 
@@ -798,31 +793,30 @@ async def test_async_embeddings_no_pii(
 
         # Response is processed by litellm, so just check it exists
         assert response is not None
-        assert len(events) == 1
-        (event,) = events
 
-        assert event["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
         spans = list(
             x
-            for x in event["spans"]
-            if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+            for x in spans
+            if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
         assert len(spans) == 1
         span = spans[0]
 
-        assert span["op"] == OP.GEN_AI_EMBEDDINGS
+        assert span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
         # Check that embeddings input is NOT captured when PII is disabled
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
 
 def test_exception_handling(
-    reset_litellm_executor, sentry_init, capture_events, get_rate_limit_model_response
+    reset_litellm_executor, sentry_init, capture_items, get_rate_limit_model_response
 ):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("event")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -843,22 +837,24 @@ def test_exception_handling(
                     client=client,
                 )
 
-    # Should have error event and transaction
-    assert len(events) >= 1
     # Find the error event
-    error_events = [e for e in events if e.get("level") == "error"]
+    error_events = [
+        item.payload
+        for item in items
+        if item.type == "event" and item.payload.get("level") == "error"
+    ]
     assert len(error_events) == 1
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_exception_handling(
-    sentry_init, capture_events, get_rate_limit_model_response
+    sentry_init, capture_items, get_rate_limit_model_response
 ):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("event")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -879,17 +875,19 @@ async def test_async_exception_handling(
                     client=client,
                 )
 
-    # Should have error event and transaction
-    assert len(events) >= 1
     # Find the error event
-    error_events = [e for e in events if e.get("level") == "error"]
+    error_events = [
+        item.payload
+        for item in items
+        if item.type == "event" and item.payload.get("level") == "error"
+    ]
     assert len(error_events) == 1
 
 
 def test_span_origin(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -897,7 +895,7 @@ def test_span_origin(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -923,16 +921,17 @@ def test_span_origin(
 
             litellm_utils.executor.shutdown(wait=True)
 
-    (event,) = events
-
+    (event,) = (item.payload for item in items if item.type == "transaction")
     assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.litellm"
+
+    spans = [item.payload for item in items if item.type == "span"]
+    assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.litellm"
 
 
 def test_multiple_providers(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
     nonstreaming_anthropic_model_response,
@@ -943,7 +942,7 @@ def test_multiple_providers(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -1015,18 +1014,19 @@ def test_multiple_providers(
 
             litellm_utils.executor.shutdown(wait=True)
 
+    events = [item.payload for item in items if item.type == "transaction"]
     assert len(events) == 3
 
-    for i in range(3):
-        span = events[i]["spans"][0]
+    spans = [item.payload for item in items if item.type == "span"]
+    for span in spans:
         # The provider should be detected by litellm.get_llm_provider
-        assert SPANDATA.GEN_AI_SYSTEM in span["data"]
+        assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_multiple_providers(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
     nonstreaming_anthropic_model_response,
@@ -1037,7 +1037,7 @@ async def test_async_multiple_providers(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -1112,18 +1112,19 @@ async def test_async_multiple_providers(
             await GLOBAL_LOGGING_WORKER.flush()
             await asyncio.sleep(0.5)
 
+    events = [item.payload for item in items if item.type == "transaction"]
     assert len(events) == 3
 
-    for i in range(3):
-        span = events[i]["spans"][0]
+    spans = [item.payload for item in items if item.type == "span"]
+    for span in spans:
         # The provider should be detected by litellm.get_llm_provider
-        assert SPANDATA.GEN_AI_SYSTEM in span["data"]
+        assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
 
 
 def test_additional_parameters(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1132,7 +1133,7 @@ def test_additional_parameters(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
     client = OpenAI(api_key="test-key")
@@ -1162,26 +1163,27 @@ def test_additional_parameters(
 
             litellm_utils.executor.shutdown(wait=True)
 
-    (event,) = events
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_additional_parameters(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1190,7 +1192,7 @@ async def test_async_additional_parameters(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
     client = AsyncOpenAI(api_key="test-key")
@@ -1221,26 +1223,27 @@ async def test_async_additional_parameters(
             await GLOBAL_LOGGING_WORKER.flush()
             await asyncio.sleep(0.5)
 
-    (event,) = events
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.5
+    assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.5
 
 
 def test_no_integration(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1248,7 +1251,7 @@ def test_no_integration(
     sentry_init(
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
     client = OpenAI(api_key="test-key")
@@ -1273,13 +1276,12 @@ def test_no_integration(
 
             litellm_utils.executor.shutdown(wait=True)
 
-    (event,) = events
-    # Should still have the transaction, but no child spans since integration is off
-    assert event["type"] == "transaction"
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 0
 
@@ -1287,7 +1289,7 @@ def test_no_integration(
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_no_integration(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1295,7 +1297,7 @@ async def test_async_no_integration(
     sentry_init(
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
     client = AsyncOpenAI(api_key="test-key")
@@ -1321,24 +1323,23 @@ async def test_async_no_integration(
             await GLOBAL_LOGGING_WORKER.flush()
             await asyncio.sleep(0.5)
 
-    (event,) = events
-    # Should still have the transaction, but no child spans since integration is off
-    assert event["type"] == "transaction"
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 0
 
 
-def test_response_without_usage(sentry_init, capture_events):
+def test_response_without_usage(sentry_init, capture_items):
     """Test handling of responses without usage information."""
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [{"role": "user", "content": "Hello!"}]
 
@@ -1366,12 +1367,11 @@ def test_response_without_usage(sentry_init, capture_events):
             datetime.now(),
         )
 
-    (event,) = events
-    (span,) = event["spans"]
+    (span,) = (item.payload for item in items if item.type == "span")
 
     # Span should still be created even without usage info
-    assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "chat gpt-3.5-turbo"
+    assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+    assert span["name"] == "chat gpt-3.5-turbo"
 
 
 def test_integration_setup(sentry_init):
@@ -1387,14 +1387,14 @@ def test_integration_setup(sentry_init):
     assert _failure_callback in (litellm.failure_callback or [])
 
 
-def test_litellm_message_truncation(sentry_init, capture_events):
+def test_litellm_message_truncation(sentry_init, capture_items):
     """Test that large messages are truncated properly in LiteLLM integration."""
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -1422,25 +1422,24 @@ def test_litellm_message_truncation(sentry_init, capture_events):
             datetime.now(),
         )
 
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
+        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
     ]
     assert len(chat_spans) > 0
 
     chat_span = chat_spans[0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
 
-    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
     parsed_messages = json.loads(messages_data)
     assert isinstance(parsed_messages, list)
     assert len(parsed_messages) == 1
     assert "small message 5" in str(parsed_messages[0])
+
+    tx = next(item.payload for item in items if item.type == "transaction")
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
@@ -1452,7 +1451,7 @@ IMAGE_DATA_URI = f"data:image/png;base64,{IMAGE_B64}"
 def test_binary_content_encoding_image_url(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1461,7 +1460,7 @@ def test_binary_content_encoding_image_url(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [
         {
@@ -1498,15 +1497,16 @@ def test_binary_content_encoding_image_url(
 
             litellm_utils.executor.shutdown(wait=True)
 
-    (event,) = events
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
-    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     blob_item = next(
         (
@@ -1530,7 +1530,7 @@ def test_binary_content_encoding_image_url(
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_binary_content_encoding_image_url(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1539,7 +1539,7 @@ async def test_async_binary_content_encoding_image_url(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [
         {
@@ -1577,15 +1577,16 @@ async def test_async_binary_content_encoding_image_url(
             await GLOBAL_LOGGING_WORKER.flush()
             await asyncio.sleep(0.5)
 
-    (event,) = events
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
-    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     blob_item = next(
         (
@@ -1609,7 +1610,7 @@ async def test_async_binary_content_encoding_image_url(
 def test_binary_content_encoding_mixed_content(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1618,7 +1619,7 @@ def test_binary_content_encoding_mixed_content(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [
         {
@@ -1656,15 +1657,16 @@ def test_binary_content_encoding_mixed_content(
 
             litellm_utils.executor.shutdown(wait=True)
 
-    (event,) = events
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
-    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     content_items = [
         item for msg in messages_data if "content" in msg for item in msg["content"]
@@ -1676,7 +1678,7 @@ def test_binary_content_encoding_mixed_content(
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_binary_content_encoding_mixed_content(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1685,7 +1687,7 @@ async def test_async_binary_content_encoding_mixed_content(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [
         {
@@ -1724,15 +1726,16 @@ async def test_async_binary_content_encoding_mixed_content(
             await GLOBAL_LOGGING_WORKER.flush()
             await asyncio.sleep(0.5)
 
-    (event,) = events
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
-    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     content_items = [
         item for msg in messages_data if "content" in msg for item in msg["content"]
@@ -1744,7 +1747,7 @@ async def test_async_binary_content_encoding_mixed_content(
 def test_binary_content_encoding_uri_type(
     reset_litellm_executor,
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1753,7 +1756,7 @@ def test_binary_content_encoding_uri_type(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [
         {
@@ -1789,15 +1792,16 @@ def test_binary_content_encoding_uri_type(
 
             litellm_utils.executor.shutdown(wait=True)
 
-    (event,) = events
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
-    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     uri_item = next(
         (
@@ -1816,7 +1820,7 @@ def test_binary_content_encoding_uri_type(
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_binary_content_encoding_uri_type(
     sentry_init,
-    capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
 ):
@@ -1825,7 +1829,7 @@ async def test_async_binary_content_encoding_uri_type(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("transaction", "span")
 
     messages = [
         {
@@ -1862,15 +1866,16 @@ async def test_async_binary_content_encoding_uri_type(
             await GLOBAL_LOGGING_WORKER.flush()
             await asyncio.sleep(0.5)
 
-    (event,) = events
+    spans = [item.payload for item in items if item.type == "span"]
     chat_spans = list(
         x
-        for x in event["spans"]
-        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+        for x in spans
+        if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
     )
     assert len(chat_spans) == 1
     span = chat_spans[0]
-    messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     uri_item = next(
         (
