@@ -1126,23 +1126,21 @@ class _Client(BaseClient):
                 event_opt["spans"] = non_gen_ai_spans
                 envelope.add_transaction(event_opt)
 
+                converted_gen_ai_spans = [
+                    _serialized_v1_span_to_serialized_v2_span(span, event)
+                    for span in gen_ai_spans
+                    if isinstance(span, dict)
+                ]
+
                 envelope.add_item(
                     Item(
                         type=SpanBatcher.TYPE,
                         content_type=SpanBatcher.CONTENT_TYPE,
                         headers={
-                            "item_count": len(gen_ai_spans),
+                            "item_count": len(converted_gen_ai_spans),
                         },
                         payload=PayloadRef(
-                            json={
-                                "items": [
-                                    _serialized_v1_span_to_serialized_v2_span(
-                                        span, event
-                                    )
-                                    for span in gen_ai_spans
-                                    if isinstance(span, dict)
-                                ]
-                            },
+                            json={"items": converted_gen_ai_spans},
                         ),
                     )
                 )
