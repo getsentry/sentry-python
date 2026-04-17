@@ -86,6 +86,7 @@ if TYPE_CHECKING:
             "trace_lifecycle": Optional[Literal["static", "stream"]],
             "ignore_spans": Optional[IgnoreSpansConfig],
             "suppress_asgi_chained_exceptions": Optional[bool],
+            "gen_ai_as_v2_spans": Optional[bool],
         },
         total=False,
     )
