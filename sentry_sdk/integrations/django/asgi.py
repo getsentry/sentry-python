@@ -6,9 +6,7 @@ Since this file contains `async def` it is conditionally imported in
 `django.core.handlers.asgi`.
 """
 
-import asyncio
 import functools
-import inspect
 
 from django.core.handlers.wsgi import WSGIRequest
 
@@ -16,6 +14,10 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations._asgi_common import (
+    _iscoroutinefunction,
+    _markcoroutinefunction,
+)
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -25,30 +27,12 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union, TypeVar
+    from typing import Any, Callable, Union
 
     from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse
 
     from sentry_sdk._types import Event, EventProcessor
-
-    _F = TypeVar("_F", bound=Callable[..., Any])
-
-
-# Python 3.12 deprecates asyncio.iscoroutinefunction() as an alias for
-# inspect.iscoroutinefunction(), whilst also removing the _is_coroutine marker.
-# The latter is replaced with the inspect.markcoroutinefunction decorator.
-# Until 3.12 is the minimum supported Python version, provide a shim.
-# This was copied from https://github.com/django/asgiref/blob/main/asgiref/sync.py
-if hasattr(inspect, "markcoroutinefunction"):
-    iscoroutinefunction = inspect.iscoroutinefunction
-    markcoroutinefunction = inspect.markcoroutinefunction
-else:
-    iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
-
-    def markcoroutinefunction(func: "_F") -> "_F":
-        func._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore
-        return func
 
 
 def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcessor":
@@ -215,15 +199,15 @@ def _asgi_middleware_mixin_factory(
             a thread is not consumed during a whole request.
             Taken from django.utils.deprecation::MiddlewareMixin._async_check
             """
-            if iscoroutinefunction(self.get_response):
-                markcoroutinefunction(self)
+            if _iscoroutinefunction(self.get_response):
+                _markcoroutinefunction(self)
 
         def async_route_check(self) -> bool:
             """
             Function that checks if we are in async mode,
             and if we are forwards the handling of requests to __acall__
             """
-            return iscoroutinefunction(self.get_response)
+            return _iscoroutinefunction(self.get_response)
 
         async def __acall__(self, *args: "Any", **kwargs: "Any") -> "Any":
             f = self._acall_method
