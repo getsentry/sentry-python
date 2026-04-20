@@ -175,6 +175,10 @@ def _serialized_v1_span_to_serialized_v2_span(
 
     if "description" in span:
         res["name"] = span["description"]
+    elif (
+        "op" in span
+    ):  # fallback based on observed downstream fallback for transactions
+        res["name"] = span["op"]
 
     if "start_timestamp" in span:
         start_timestamp = None
