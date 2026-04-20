@@ -11,29 +11,18 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
-    from typing import TypeVar
     from typing import Union
     from typing_extensions import Literal
 
     from sentry_sdk.utils import AnnotatedValue
 
-    _F = TypeVar("_F")
-
-
 # Python 3.12 deprecates asyncio.iscoroutinefunction() as an alias for
-# inspect.iscoroutinefunction(), whilst also removing the _is_coroutine marker.
-# The latter is replaced with inspect.markcoroutinefunction().
-# Until 3.12 is the minimum supported Python version, provide a shim.
-# This was copied from https://github.com/django/asgiref/blob/main/asgiref/sync.py
-if hasattr(inspect, "markcoroutinefunction"):
+# inspect.iscoroutinefunction(). Until 3.12 is the minimum supported Python
+# version, provide a shim.
+if hasattr(inspect, "iscoroutinefunction"):
     _iscoroutinefunction = inspect.iscoroutinefunction
-    _markcoroutinefunction = inspect.markcoroutinefunction
 else:
     _iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
-
-    def _markcoroutinefunction(func: "_F") -> "_F":
-        func._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore[attr-defined]
-        return func
 
 
 def _get_headers(asgi_scope: "Any") -> "Dict[str, str]":
