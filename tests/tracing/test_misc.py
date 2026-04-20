@@ -652,7 +652,6 @@ class TestConversationIdPropagation:
         """Span with gen_ai.* op should get conversation_id."""
         sentry_init(
             traces_sample_rate=1.0,
-            _experiments={"gen_ai_as_v2_spans": True},
         )
         items = capture_items("span")
 
