@@ -465,10 +465,6 @@ class StreamedSpan:
         return self._start_timestamp
 
     @property
-    def start_timestamp_monotonic_ns(self) -> "Optional[int]":
-        return self._start_timestamp_monotonic_ns
-
-    @property
     def timestamp(self) -> "Optional[datetime]":
         return self._timestamp
 
@@ -680,10 +676,6 @@ class NoOpStreamedSpan(StreamedSpan):
 
     @property
     def start_timestamp(self) -> "Optional[datetime]":
-        return None
-
-    @property
-    def start_timestamp_monotonic_ns(self) -> "Optional[int]":
         return None
 
     @property

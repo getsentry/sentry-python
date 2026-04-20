@@ -24,7 +24,6 @@ from sentry_sdk.utils import (
     filename_for_module,
     logger,
     match_regex_list,
-    nanosecond_time,
     qualname_from_function,
     safe_repr,
     to_string,
@@ -369,19 +368,9 @@ def add_http_request_source(
     if not should_add_request_source:
         return
 
-    if span.timestamp is None:
-        if (
-            isinstance(span, sentry_sdk.traces.StreamedSpan)
-            and span.start_timestamp_monotonic_ns is not None
-        ):
-            elapsed = nanosecond_time() - span.start_timestamp_monotonic_ns
-            end_timestamp = span.start_timestamp + timedelta(
-                microseconds=elapsed / 1000
-            )
-        else:
-            end_timestamp = datetime.now(timezone.utc)
-    else:
-        end_timestamp = span.timestamp
+    end_timestamp = (
+        datetime.now(timezone.utc) if span.timestamp is None else span.timestamp
+    )
 
     duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("http_request_source_threshold_ms", 0)
