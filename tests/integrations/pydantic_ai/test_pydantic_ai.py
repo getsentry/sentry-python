@@ -798,6 +798,7 @@ async def test_multiple_agents_concurrent(sentry_init, capture_items, get_test_a
 
     # Verify each transaction is separate
     events = [item.payload for item in items if item.type == "transaction"]
+    assert len(events) == 3
     for i, transaction in enumerate(events):
         assert transaction["transaction"] == "invoke_agent test_agent"
 

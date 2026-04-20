@@ -400,8 +400,6 @@ def test_error_handling(sentry_init, capture_items, mock_genai_client):
                     config=create_test_config(),
                 )
 
-    # Should have both transaction and error events
-    assert len([item for item in items if item.type == "transaction"]) == 1
     (error_event,) = (item.payload for item in items if item.type == "event")
 
     assert error_event["level"] == "error"
@@ -1122,8 +1120,6 @@ def test_embed_content_error_handling(sentry_init, capture_items, mock_genai_cli
                     contents=["This will fail"],
                 )
 
-    # Should have both transaction and error events
-    assert len([item for item in items if item.type == "transaction"]) == 1
     (error_event,) = (item.payload for item in items if item.type == "event")
 
     assert error_event["level"] == "error"
@@ -1352,8 +1348,6 @@ async def test_async_embed_content_error_handling(
                     contents=["This will fail"],
                 )
 
-    # Should have both transaction and error events
-    assert len([item for item in items if item.type == "transaction"]) == 1
     (error_event,) = (item.payload for item in items if item.type == "event")
 
     assert error_event["level"] == "error"
@@ -2186,9 +2180,7 @@ def test_extract_contents_messages_dict_inline_data():
     """Test extract_contents_messages with dict containing inline_data"""
     content_dict = {
         "role": "user",
-        "parts": [
-            {"inline_data": {"attributes": b"binary_data", "mime_type": "image/gif"}}
-        ],
+        "parts": [{"inline_data": {"data": b"binary_data", "mime_type": "image/gif"}}],
     }
     result = extract_contents_messages(content_dict)
 

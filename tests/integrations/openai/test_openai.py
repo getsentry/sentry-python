@@ -1462,8 +1462,8 @@ def test_span_status_error(sentry_init, capture_items):
                 model="some-model", messages=[{"role": "system", "content": "hello"}]
             )
 
-    (event,) = (item.payload for item in items if item.type == "event")
-    assert event["level"] == "error"
+    (error,) = (item.payload for item in items if item.type == "event")
+    assert error["level"] == "error"
 
     spans = [item.payload for item in items if item.type == "span"]
     assert spans[0]["status"] == "error"
@@ -1964,8 +1964,8 @@ def test_span_origin_streaming_chat(sentry_init, capture_items):
 
         "".join(map(lambda x: x.choices[0].delta.content, response_stream))
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["contexts"]["trace"]["origin"] == "manual"
+    (event,) = (item.payload for item in items if item.type == "transaction")
+    assert event["contexts"]["trace"]["origin"] == "manual"
 
     spans = [item.payload for item in items if item.type == "span"]
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"

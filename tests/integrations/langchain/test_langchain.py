@@ -897,7 +897,7 @@ def test_langchain_error(sentry_init, capture_items):
     with start_transaction(), pytest.raises(ValueError):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
-    error = next(item.payload for item in items if item.type == "event")
+    (error,) = (item.payload for item in items if item.type == "event")
     assert error["level"] == "error"
 
 
@@ -939,7 +939,7 @@ def test_span_status_error(sentry_init, capture_items):
         with pytest.raises(ValueError):
             list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
-    error = next(item.payload for item in items if item.type == "event")
+    (error,) = (item.payload for item in items if item.type == "event")
     assert error["level"] == "error"
 
     spans = [item.payload for item in items if item.type == "span"]

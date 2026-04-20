@@ -204,9 +204,7 @@ async def test_agent_invocation_span_no_pii(
         span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
     )
 
-    transactions = [item.payload for item in items if item.type == "transaction"]
-    assert len(transactions) == 1
-    transaction = transactions[0]
+    (transaction,) = (item.payload for item in items if item.type == "transaction")
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
@@ -354,9 +352,7 @@ async def test_agent_invocation_span(
         assert result is not None
         assert result.final_output == "Hello, how can I help you?"
 
-    transactions = [item.payload for item in items if item.type == "transaction"]
-    assert len(transactions) == 1
-    transaction = transactions[0]
+    (transaction,) = (item.payload for item in items if item.type == "transaction")
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
@@ -583,9 +579,7 @@ def test_agent_invocation_span_sync_no_pii(
         assert result is not None
         assert result.final_output == "Hello, how can I help you?"
 
-    transactions = [item.payload for item in items if item.type == "transaction"]
-    assert len(transactions) == 1
-    transaction = transactions[0]
+    (transaction,) = (item.payload for item in items if item.type == "transaction")
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
@@ -739,9 +733,7 @@ def test_agent_invocation_span_sync(
         assert result is not None
         assert result.final_output == "Hello, how can I help you?"
 
-    transactions = [item.payload for item in items if item.type == "transaction"]
-    assert len(transactions) == 1
-    transaction = transactions[0]
+    (transaction,) = (item.payload for item in items if item.type == "transaction")
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
@@ -1208,9 +1200,7 @@ async def test_tool_execution_span(
             run_config=test_run_config,
         )
 
-    transactions = [item.payload for item in items if item.type == "transaction"]
-    assert len(transactions) == 1
-    transaction = transactions[0]
+    (transaction,) = (item.payload for item in items if item.type == "transaction")
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
@@ -1700,9 +1690,7 @@ async def test_model_behavior_error(sentry_init, capture_items, test_agent):
                     run_config=test_run_config,
                 )
 
-    transactions = [item.payload for item in items if item.type == "transaction"]
-    assert len(transactions) == 1
-    transaction = transactions[0]
+    (transaction,) = (item.payload for item in items if item.type == "transaction")
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
@@ -1747,16 +1735,12 @@ async def test_error_handling(sentry_init, capture_items, test_agent):
                     test_agent, "Test input", run_config=test_run_config
                 )
 
-    error_events = [item.payload for item in items if item.type == "event"]
-    assert len(error_events) == 1
-    error_event = error_events[0]
+    (error_event,) = (item.payload for item in items if item.type == "event")
     assert error_event["exception"]["values"][0]["type"] == "Exception"
     assert error_event["exception"]["values"][0]["value"] == "Model Error"
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "openai_agents"
 
-    transactions = [item.payload for item in items if item.type == "transaction"]
-    assert len(transactions) == 1
-    transaction = transactions[0]
+    (transaction,) = (item.payload for item in items if item.type == "transaction")
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
@@ -1811,9 +1795,7 @@ async def test_error_captures_input_data(sentry_init, capture_items, test_agent)
         with pytest.raises(InternalServerError, match="Error code: 500"):
             await agents.Runner.run(agent, "Test input", run_config=test_run_config)
 
-    error_events = [item.payload for item in items if item.type == "event"]
-    assert len(error_events) == 1
-    error_event = error_events[0]
+    (error_event,) = (item.payload for item in items if item.type == "event")
     assert error_event["exception"]["values"][0]["type"] == "InternalServerError"
     assert error_event["exception"]["values"][0]["value"] == "Error code: 500"
 
@@ -3574,9 +3556,7 @@ async def test_no_conversation_id_when_not_provided(
 
         assert result is not None
 
-    transactions = [item.payload for item in items if item.type == "transaction"]
-    assert len(transactions) == 1
-    transaction = transactions[0]
+    (transaction,) = (item.payload for item in items if item.type == "transaction")
 
     spans = [item.payload for item in items if item.type == "span"]
     invoke_agent_span = next(

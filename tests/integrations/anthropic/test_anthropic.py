@@ -3725,7 +3725,7 @@ def test_message_with_base64_pdf(sentry_init, capture_items):
                     "source": {
                         "type": "base64",
                         "media_type": "application/pdf",
-                        "attributes": "JVBERi0xLjQKJeLj...base64pdfdata",
+                        "data": "JVBERi0xLjQKJeLj...base64pdfdata",
                     },
                 },
             ],
@@ -3859,7 +3859,7 @@ def test_message_with_mixed_content(sentry_init, capture_items):
                     "source": {
                         "type": "base64",
                         "media_type": "image/png",
-                        "attributes": "iVBORw0KGgo...base64imagedata",
+                        "data": "iVBORw0KGgo...base64imagedata",
                     },
                 },
                 {
@@ -3874,7 +3874,7 @@ def test_message_with_mixed_content(sentry_init, capture_items):
                     "source": {
                         "type": "base64",
                         "media_type": "application/pdf",
-                        "attributes": "JVBERi0xLjQK...base64pdfdata",
+                        "data": "JVBERi0xLjQK...base64pdfdata",
                     },
                 },
                 {"type": "text", "text": "Please provide a detailed analysis."},
@@ -3941,7 +3941,7 @@ def test_message_with_multiple_images_different_formats(sentry_init, capture_ite
                     "source": {
                         "type": "base64",
                         "media_type": "image/jpeg",
-                        "attributes": "base64data1...",
+                        "data": "base64data1...",
                     },
                 },
                 {
@@ -4017,7 +4017,7 @@ def test_binary_content_not_stored_when_pii_disabled(sentry_init, capture_items)
                     "source": {
                         "type": "base64",
                         "media_type": "image/jpeg",
-                        "attributes": "base64encodeddatahere...",
+                        "data": "base64encodeddatahere...",
                     },
                 },
             ],
@@ -4056,7 +4056,7 @@ def test_binary_content_not_stored_when_prompts_disabled(sentry_init, capture_it
                     "source": {
                         "type": "base64",
                         "media_type": "image/jpeg",
-                        "attributes": "base64encodeddatahere...",
+                        "data": "base64encodeddatahere...",
                     },
                 },
             ],
@@ -4106,7 +4106,7 @@ def test_cache_tokens_nonstreaming(sentry_init, capture_items):
             model="claude-3-5-sonnet-20241022",
         )
 
-    (span,) = [item.payload for item in items if item.type == "span"]
+    (span,) = (item.payload for item in items if item.type == "span")
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
@@ -4158,7 +4158,7 @@ def test_input_tokens_include_cache_write_nonstreaming(sentry_init, capture_item
             model="claude-sonnet-4-20250514",
         )
 
-    (span,) = [item.payload for item in items if item.type == "span"]
+    (span,) = (item.payload for item in items if item.type == "span")
 
     # input_tokens should be total: 19 (non-cached) + 2846 (cache_write) = 2865
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
@@ -4281,7 +4281,7 @@ def test_input_tokens_include_cache_read_streaming(
             ):
                 pass
 
-    (span,) = [item.payload for item in items if item.type == "span"]
+    (span,) = (item.payload for item in items if item.type == "span")
 
     # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
@@ -4351,7 +4351,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
                 for event in stream:
                     pass
 
-    (span,) = [item.payload for item in items if item.type == "span"]
+    (span,) = (item.payload for item in items if item.type == "span")
 
     # input_tokens should be total: 19 + 2846 = 2865
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
@@ -4396,7 +4396,7 @@ def test_input_tokens_unchanged_without_caching(sentry_init, capture_items):
             model="claude-sonnet-4-20250514",
         )
 
-    (span,) = [item.payload for item in items if item.type == "span"]
+    (span,) = (item.payload for item in items if item.type == "span")
 
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
@@ -4460,7 +4460,7 @@ def test_cache_tokens_streaming(
             ):
                 pass
 
-    (span,) = [item.payload for item in items if item.type == "span"]
+    (span,) = (item.payload for item in items if item.type == "span")
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -4524,7 +4524,7 @@ def test_stream_messages_cache_tokens(
                 for event in stream:
                     pass
 
-    (span,) = [item.payload for item in items if item.type == "span"]
+    (span,) = (item.payload for item in items if item.type == "span")
     # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
     assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
