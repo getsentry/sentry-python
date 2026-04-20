@@ -480,7 +480,6 @@ def test_text_generation(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -556,7 +555,6 @@ def test_text_generation_streaming(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -633,7 +631,6 @@ def test_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -712,7 +709,6 @@ def test_chat_completion_streaming(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -885,7 +881,6 @@ def test_chat_completion_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -981,7 +976,6 @@ def test_chat_completion_streaming_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 

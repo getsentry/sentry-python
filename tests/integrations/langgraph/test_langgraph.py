@@ -154,7 +154,6 @@ def test_state_graph_compile(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     graph = MockStateGraph()
@@ -210,7 +209,6 @@ def test_pregel_invoke(sentry_init, capture_items, send_default_pii, include_pro
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -313,7 +311,6 @@ def test_pregel_ainvoke(sentry_init, capture_items, send_default_pii, include_pr
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
@@ -394,7 +391,6 @@ def test_pregel_invoke_error(sentry_init, capture_items):
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     test_state = {"messages": [MockMessage("This will fail")]}
@@ -425,7 +421,6 @@ def test_pregel_ainvoke_error(sentry_init, capture_items):
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
     test_state = {"messages": [MockMessage("This will fail async")]}
@@ -460,7 +455,6 @@ def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -492,7 +486,6 @@ def test_pregel_invoke_with_different_graph_names(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -536,7 +529,6 @@ def test_pregel_invoke_span_includes_usage_data(sentry_init, capture_items):
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -613,7 +605,6 @@ def test_pregel_ainvoke_span_includes_usage_data(sentry_init, capture_items):
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -693,7 +684,6 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_i
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -775,7 +765,6 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(sentry_init, capture_
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -860,7 +849,6 @@ def test_pregel_invoke_span_includes_response_model(sentry_init, capture_items):
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -933,7 +921,6 @@ def test_pregel_ainvoke_span_includes_response_model(sentry_init, capture_items)
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1009,7 +996,6 @@ def test_pregel_invoke_span_uses_last_response_model(sentry_init, capture_items)
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1094,7 +1080,6 @@ def test_pregel_ainvoke_span_uses_last_response_model(sentry_init, capture_items
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1227,7 +1212,6 @@ def test_extraction_functions_complex_scenario(sentry_init, capture_items):
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1303,7 +1287,6 @@ def test_langgraph_message_role_mapping(sentry_init, capture_items):
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1378,7 +1361,6 @@ def test_langgraph_message_truncation(sentry_init, capture_items):
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 

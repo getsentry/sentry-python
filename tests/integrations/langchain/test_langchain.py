@@ -108,7 +108,6 @@ def test_langchain_text_completion(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -217,7 +216,6 @@ def test_langchain_create_agent(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -338,7 +336,6 @@ def test_tool_execution_span(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -531,7 +528,6 @@ def test_langchain_openai_tools_agent(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -869,7 +865,6 @@ def test_langchain_error(sentry_init, capture_items):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event", "transaction", "span")
 
@@ -908,7 +903,6 @@ def test_span_status_error(sentry_init, capture_items):
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("event", "transaction", "span")
 
@@ -1036,7 +1030,6 @@ def test_langchain_callback_manager(sentry_init):
     sentry_init(
         integrations=[LangchainIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     local_manager = BaseCallbackManager(handlers=[])
 
@@ -1069,7 +1062,6 @@ def test_langchain_callback_manager_with_sentry_callback(sentry_init):
     sentry_init(
         integrations=[LangchainIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     sentry_callback = SentryLangchainCallback(0, False)
     local_manager = BaseCallbackManager(handlers=[sentry_callback])
@@ -1102,7 +1094,6 @@ def test_langchain_callback_list(sentry_init):
     sentry_init(
         integrations=[LangchainIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     local_callbacks = []
 
@@ -1135,7 +1126,6 @@ def test_langchain_callback_list_existing_callback(sentry_init):
     sentry_init(
         integrations=[LangchainIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     sentry_callback = SentryLangchainCallback(0, False)
     local_callbacks = [sentry_callback]
@@ -1173,7 +1163,6 @@ def test_langchain_message_role_mapping(sentry_init, capture_items):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1311,7 +1300,6 @@ def test_langchain_message_truncation(sentry_init, capture_items):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1404,7 +1392,6 @@ def test_langchain_embeddings_sync(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1483,7 +1470,6 @@ def test_langchain_embeddings_embed_query(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1558,7 +1544,6 @@ async def test_langchain_embeddings_async(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1631,7 +1616,6 @@ async def test_langchain_embeddings_aembed_query(sentry_init, capture_items):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1693,7 +1677,6 @@ def test_langchain_embeddings_no_model_name(sentry_init, capture_items):
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1779,7 +1762,6 @@ def test_langchain_embeddings_multiple_providers(sentry_init, capture_items):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1837,7 +1819,6 @@ def test_langchain_embeddings_error_handling(sentry_init, capture_items):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1878,7 +1859,6 @@ def test_langchain_embeddings_multiple_calls(sentry_init, capture_items):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1942,7 +1922,6 @@ def test_langchain_embeddings_span_hierarchy(sentry_init, capture_items):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -1996,7 +1975,6 @@ def test_langchain_embeddings_with_list_and_string_inputs(sentry_init, capture_i
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2061,7 +2039,6 @@ def test_langchain_response_model_extraction(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 
@@ -2367,7 +2344,6 @@ def test_langchain_ai_system_detection(
     sentry_init(
         integrations=[LangchainIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"gen_ai_as_v2_spans": True},
     )
     items = capture_items("transaction", "span")
 

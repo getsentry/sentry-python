@@ -12,7 +12,6 @@ MYPY = TYPE_CHECKING
 
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
-BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
 
 
 class AnnotatedValue:
@@ -209,6 +208,7 @@ if TYPE_CHECKING:
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
             "_dropped_spans": int,
+            "_has_gen_ai_span": bool,
         },
         total=False,
     )
