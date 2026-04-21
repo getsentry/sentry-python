@@ -382,13 +382,10 @@ class StreamedSpan:
                 )
 
         if self._timestamp is None:
-            if self._start_timestamp_monotonic_ns is not None:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-                self._timestamp = self._start_timestamp + timedelta(
-                    microseconds=elapsed / 1000
-                )
-            else:
-                self._timestamp = datetime.now(timezone.utc)
+            elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+            self._timestamp = self._start_timestamp + timedelta(
+                microseconds=elapsed / 1000
+            )
 
         client = sentry_sdk.get_client()
         if not client.is_active():
