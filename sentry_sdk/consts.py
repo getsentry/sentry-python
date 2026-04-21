@@ -406,11 +406,29 @@ class SPANDATA:
 
     CODE_FILEPATH = "code.filepath"
     """
+    .. deprecated::
+        This attribute is deprecated. Use CODE_FILE_PATH instead.
+
+    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
+    Example: "/app/myapplication/http/handler/server.py"
+    """
+
+    CODE_FILE_PATH = "code.file.path"
+    """
     The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
     Example: "/app/myapplication/http/handler/server.py"
     """
 
     CODE_FUNCTION = "code.function"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use CODE_FUNCTION_NAME instead.
+
+    The method or function name, or equivalent (usually rightmost part of the code unit's name).
+    Example: "server_request"
+    """
+
+    CODE_FUNCTION_NAME = "code.function.name"
     """
     The method or function name, or equivalent (usually rightmost part of the code unit's name).
     Example: "server_request"
@@ -418,12 +436,24 @@ class SPANDATA:
 
     CODE_LINENO = "code.lineno"
     """
+    .. deprecated::
+        This attribute is deprecated. Use CODE_LINE_NUMBER instead.
+
     The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
+    Example: 42
+    """
+
+    CODE_LINE_NUMBER = "code.line.number"
+    """
+    The line number in `code.file.path` best representing the operation. It SHOULD point within the code unit named in `code.function.name`.
     Example: 42
     """
 
     CODE_NAMESPACE = "code.namespace"
     """
+    .. deprecated::
+        This attribute is deprecated. Use CODE_FUNCTION_NAME instead; the namespace should be included within the function name.
+
     The "namespace" within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
     Example: "http.handler"
     """
@@ -437,8 +467,17 @@ class SPANDATA:
 
     DB_NAME = "db.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use DB_NAMESPACE instead.
+
     The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
     Example: myDatabase
+    """
+
+    DB_NAMESPACE = "db.namespace"
+    """
+    The name of the database being accessed.
+    Example: "customers"
     """
 
     DB_DRIVER_NAME = "db.driver.name"
@@ -449,16 +488,34 @@ class SPANDATA:
 
     DB_OPERATION = "db.operation"
     """
+    .. deprecated::
+        This attribute is deprecated. Use DB_OPERATION_NAME instead.
+
     The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
     See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
     Example: findAndModify, HMSET, SELECT
     """
 
+    DB_OPERATION_NAME = "db.operation.name"
+    """
+    The name of the operation being executed.
+    Example: "SELECT"
+    """
+
     DB_SYSTEM = "db.system"
     """
+    .. deprecated::
+        This attribute is deprecated. Use DB_SYSTEM_NAME instead.
+
     An identifier for the database management system (DBMS) product being used.
     See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
     Example: postgresql
+    """
+
+    DB_SYSTEM_NAME = "db.system.name"
+    """
+    An identifier for the database management system (DBMS) product being used. See OpenTelemetry's list of well-known DBMS identifiers.
+    Example: "postgresql"
     """
 
     DB_USER = "db.user"
@@ -530,8 +587,17 @@ class SPANDATA:
 
     GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_OUTPUT_MESSAGES instead.
+
     The model's response text messages.
     Example: ["The weather in Paris is rainy and overcast, with temperatures around 57°F", "The weather in London is sunny and warm, with temperatures around 65°F"]
+    """
+
+    GEN_AI_OUTPUT_MESSAGES = "gen_ai.output.messages"
+    """
+    The model's response messages. It has to be a stringified version of an array of message objects, which can include text responses and tool calls.
+    Example: [{"role": "assistant", "parts": [{"type": "text", "content": "The weather in Paris is currently rainy with a temperature of 57°F."}], "finish_reason": "stop"}]
     """
 
     GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN = "gen_ai.response.time_to_first_token"
@@ -542,14 +608,26 @@ class SPANDATA:
 
     GEN_AI_RESPONSE_TOOL_CALLS = "gen_ai.response.tool_calls"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_OUTPUT_MESSAGES instead.
+
     The tool calls in the model's response.
     Example: [{"name": "get_weather", "arguments": {"location": "Paris"}}]
     """
 
     GEN_AI_REQUEST_AVAILABLE_TOOLS = "gen_ai.request.available_tools"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_DEFINITIONS instead.
+
     The available tools for the model.
     Example: [{"name": "get_weather", "description": "Get the weather for a given location"}, {"name": "get_news", "description": "Get the news for a given topic"}]
+    """
+
+    GEN_AI_TOOL_DEFINITIONS = "gen_ai.tool.definitions"
+    """
+    The list of source system tool definitions available to the GenAI agent or model.
+    Example: [{"type": "function", "name": "get_current_weather", "description": "Get the current weather in a given location", "parameters": {"type": "object", "properties": {"location": {"type": "string", "description": "The city and state, e.g. San Francisco, CA"}, "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}}, "required": ["location", "unit"]}}]
     """
 
     GEN_AI_REQUEST_FREQUENCY_PENALTY = "gen_ai.request.frequency_penalty"
@@ -572,8 +650,17 @@ class SPANDATA:
 
     GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_INPUT_MESSAGES instead.
+
     The messages passed to the model. The "content" can be a string or an array of objects.
     Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
+    """
+
+    GEN_AI_INPUT_MESSAGES = "gen_ai.input.messages"
+    """
+    The messages passed to the model. It has to be a stringified version of an array of objects. Role values must be "user", "assistant", "tool", or "system".
+    Example: [{"role": "user", "parts": [{"type": "text", "content": "Weather in Paris?"}]}, {"role": "assistant", "parts": [{"type": "tool_call", "id": "call_VSPygqKTWdrhaFErNvMV18Yl", "name": "get_weather", "arguments": {"location": "Paris"}}]}, {"role": "tool", "parts": [{"type": "tool_call_response", "id": "call_VSPygqKTWdrhaFErNvMV18Yl", "result": "rainy, 57°F"}]}]
     """
 
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
@@ -614,7 +701,16 @@ class SPANDATA:
 
     GEN_AI_SYSTEM = "gen_ai.system"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_PROVIDER_NAME instead.
+
     The name of the AI system being used.
+    Example: "openai"
+    """
+
+    GEN_AI_PROVIDER_NAME = "gen_ai.provider.name"
+    """
+    The Generative AI provider as identified by the client or server instrumentation.
     Example: "openai"
     """
 
@@ -626,7 +722,16 @@ class SPANDATA:
 
     GEN_AI_TOOL_INPUT = "gen_ai.tool.input"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_CALL_ARGUMENTS instead.
+
     The input of the tool being used.
+    Example: {"location": "Paris"}
+    """
+
+    GEN_AI_TOOL_CALL_ARGUMENTS = "gen_ai.tool.call.arguments"
+    """
+    The arguments of the tool call. It has to be a stringified version of the arguments to the tool.
     Example: {"location": "Paris"}
     """
 
@@ -638,7 +743,16 @@ class SPANDATA:
 
     GEN_AI_TOOL_OUTPUT = "gen_ai.tool.output"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_CALL_RESULT instead.
+
     The output of the tool being used.
+    Example: "rainy, 57°F"
+    """
+
+    GEN_AI_TOOL_CALL_RESULT = "gen_ai.tool.call.result"
+    """
+    The result of the tool call. It has to be a stringified version of the result of the tool.
     Example: "rainy, 57°F"
     """
 
@@ -691,6 +805,15 @@ class SPANDATA:
     """
 
     HTTP_METHOD = "http.method"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use HTTP_REQUEST_METHOD instead.
+
+    The HTTP method used.
+    Example: GET
+    """
+
+    HTTP_REQUEST_METHOD = "http.request.method"
     """
     The HTTP method used.
     Example: GET
