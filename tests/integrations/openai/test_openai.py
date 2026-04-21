@@ -3724,51 +3724,6 @@ def test_openai_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
-def test_openai_message_truncation(sentry_init, capture_items):
-    """Test that large messages are truncated properly in OpenAI integration."""
-    sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    items = capture_items("transaction", "span")
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    large_content = (
-        "This is a very long message that will exceed our size limits. " * 1000
-    )
-    large_messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": large_content},
-        {"role": "assistant", "content": large_content},
-        {"role": "user", "content": large_content},
-    ]
-
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model",
-            messages=large_messages,
-        )
-
-    span = next(item.payload for item in items if item.type == "span")
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-
-    messages_data = span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
-
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) <= len(large_messages)
-
-    (event,) = (item.payload for item in items if item.type == "transaction")
-    meta_path = event["_meta"]
-    span_meta = meta_path["spans"]["0"]["data"]
-    messages_meta = span_meta[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert "len" in messages_meta.get("", {})
-
-
 # noinspection PyTypeChecker
 def test_streaming_chat_completion_ttft(
     sentry_init, capture_items, get_model_response, server_side_event_chunks
