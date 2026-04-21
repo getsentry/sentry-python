@@ -384,7 +384,7 @@ def _set_common_input_data(
                         normalized_messages.append(
                             {
                                 "role": GEN_AI_ALLOWED_MESSAGE_ROLES.TOOL,
-                                "content": {  # type: ignore[dict-item]
+                                "content": {
                                     "tool_use_id": item.get("tool_use_id"),
                                     "output": item.get("content"),
                                 },
