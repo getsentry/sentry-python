@@ -329,15 +329,17 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            custom_sampling_context = {
-                "celery_job": {
-                    "task": task.name,
-                    # for some reason, args[1] is a list if non-empty but a
-                    # tuple if empty
-                    "args": list(args[1]),
-                    "kwargs": args[2],
+            custom_sampling_context = {}
+            with capture_internal_exceptions():
+                custom_sampling_context = {
+                    "celery_job": {
+                        "task": task.name,
+                        # for some reason, args[1] is a list if non-empty but a
+                        # tuple if empty
+                        "args": list(args[1]),
+                        "kwargs": args[2],
+                    }
                 }
-            }
 
             span: "Union[Span, StreamedSpan]"
             span_ctx: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
