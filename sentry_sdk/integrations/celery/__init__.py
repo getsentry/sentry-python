@@ -333,7 +333,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
             with capture_internal_exceptions():
                 custom_sampling_context = {
                     "celery_job": {
-                        "task": task.name,
+                        "task": getattr(task, "name", None),
                         # for some reason, args[1] is a list if non-empty but a
                         # tuple if empty
                         "args": list(args[1]),
