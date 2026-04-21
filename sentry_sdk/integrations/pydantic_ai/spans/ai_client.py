@@ -18,7 +18,6 @@ from ..utils import (
     get_is_streaming,
 )
 from .utils import (
-    _serialize_image_url_item,
     _set_usage_data,
 )
 
@@ -156,8 +155,6 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                             for item in part.content:
                                 if isinstance(item, str):
                                     content.append({"type": "text", "text": item})
-                                elif ImageUrl and isinstance(item, ImageUrl):
-                                    content.append(_serialize_image_url_item(item))
                                 else:
                                     content.append(safe_serialize(item))
                         else:

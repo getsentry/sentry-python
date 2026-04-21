@@ -3,6 +3,7 @@
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
