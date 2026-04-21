@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk.ai.utils import (
     set_data_normalized,
     normalize_message_roles,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -181,17 +180,12 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        normalized_input_messages, span, scope
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        normalized_input_messages,
+                        unpack=False,
                     )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
 
             result = f(self, *args, **kwargs)
 
@@ -234,17 +228,12 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        normalized_input_messages, span, scope
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        normalized_input_messages,
+                        unpack=False,
                     )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
 
             result = await f(self, *args, **kwargs)
 
