@@ -272,8 +272,9 @@ def test_pregel_invoke(sentry_init, capture_items, send_default_pii, include_pro
             import json
 
             request_messages = json.loads(request_messages)
-        assert len(request_messages) == 1
-        assert request_messages[0]["content"] == "Of course! How can I assist you?"
+        assert len(request_messages) == 2
+        assert request_messages[0]["content"] == "Hello, can you help me?"
+        assert request_messages[1]["content"] == "Of course! How can I assist you?"
 
         response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert response_text == expected_assistant_response
