@@ -6,7 +6,6 @@ from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
-    truncate_and_annotate_messages,
     truncate_and_annotate_embedding_inputs,
 )
 from sentry_sdk.consts import SPANDATA
@@ -104,15 +103,9 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             # For chat, look for the 'messages' parameter
             messages = kwargs.get("messages", [])
             if messages:
-                scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(messages, span, scope)
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+                )
 
     # Record other parameters
     params = {
