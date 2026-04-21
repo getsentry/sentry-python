@@ -95,12 +95,13 @@ def _install_httpx_client() -> None:
                         else:
                             request.headers[key] = value
 
-                rv = real_send(self, request, **kwargs)
+                try:
+                    rv = real_send(self, request, **kwargs)
 
-                streamed_span.status = "error" if rv.status_code >= 400 else "ok"
-                attributes["http.response.status_code"] = rv.status_code
-
-                streamed_span.set_attributes(attributes)
+                    streamed_span.status = "error" if rv.status_code >= 400 else "ok"
+                    attributes["http.response.status_code"] = rv.status_code
+                finally:
+                    streamed_span.set_attributes(attributes)
 
                 # Needs to happen within the context manager as we want to attach the
                 # final data before the span finishes and is sent for ingesting.
