@@ -1,5 +1,52 @@
 # Changelog
 
+## 2.58.0a1
+
+### New Features ✨
+
+- (ci) Cancel in-progress PR workflows on new commit push by @joshuarli in [#5994](https://github.com/getsentry/sentry-python/pull/5994)
+- Send GenAI spans as V2 envelope items by @alexander-alderman-webb in [#6079](https://github.com/getsentry/sentry-python/pull/6079)
+
+### Bug Fixes 🐛
+
+- (google_genai) Redact binary data in inline_data and fix multi-part message extraction by @ericapisani in [#5977](https://github.com/getsentry/sentry-python/pull/5977)
+- (profiler) Stop nulling buffer on teardown by @ericapisani in [#6075](https://github.com/getsentry/sentry-python/pull/6075)
+
+### Internal Changes 🔧
+
+#### Anthropic
+
+- Revert input truncation by @alexander-alderman-webb in [#6113](https://github.com/getsentry/sentry-python/pull/6113)
+- Revert input transformation by @alexander-alderman-webb in [#6108](https://github.com/getsentry/sentry-python/pull/6108)
+
+#### Google Genai
+
+- Revert input truncation by @alexander-alderman-webb in [#6111](https://github.com/getsentry/sentry-python/pull/6111)
+- Revert input transformation by @alexander-alderman-webb in [#6105](https://github.com/getsentry/sentry-python/pull/6105)
+
+#### Langchain
+
+- Revert input truncation by @alexander-alderman-webb in [#6115](https://github.com/getsentry/sentry-python/pull/6115)
+- Revert input transformation by @alexander-alderman-webb in [#6109](https://github.com/getsentry/sentry-python/pull/6109)
+
+#### Litellm
+
+- Revert input truncation by @alexander-alderman-webb in [#6112](https://github.com/getsentry/sentry-python/pull/6112)
+- Revert input transformation by @alexander-alderman-webb in [#6107](https://github.com/getsentry/sentry-python/pull/6107)
+
+#### Pydantic Ai
+
+- Revert input truncation by @alexander-alderman-webb in [#6106](https://github.com/getsentry/sentry-python/pull/6106)
+- Remove dead `Model.request` patch by @alexander-alderman-webb in [#5956](https://github.com/getsentry/sentry-python/pull/5956)
+
+#### Other
+
+- (ai) Revert binary blob truncation by @alexander-alderman-webb in [#6110](https://github.com/getsentry/sentry-python/pull/6110)
+- (langgraph) Revert input truncation by @alexander-alderman-webb in [#6114](https://github.com/getsentry/sentry-python/pull/6114)
+- (openai) Revert input truncation by @alexander-alderman-webb in [#6117](https://github.com/getsentry/sentry-python/pull/6117)
+- (openai-agents) Revert input truncation by @alexander-alderman-webb in [#6116](https://github.com/getsentry/sentry-python/pull/6116)
+- Set explicit base-branch for codecov action by @ericapisani in [#5992](https://github.com/getsentry/sentry-python/pull/5992)
+
 ## 2.58.0
 
 ### New Features ✨
