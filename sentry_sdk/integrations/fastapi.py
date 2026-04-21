@@ -5,7 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.utils import transaction_from_function
 
@@ -83,7 +83,9 @@ def patch_get_request_handler() -> None:
                 current_scope = sentry_sdk.get_current_scope()
                 current_span = current_scope.span
 
-                if isinstance(current_span, StreamedSpan):
+                if isinstance(current_span, StreamedSpan) and not isinstance(
+                    current_span, NoOpStreamedSpan
+                ):
                     segment = current_span._segment
                     segment._update_active_thread()
                 elif current_scope.transaction is not None:
