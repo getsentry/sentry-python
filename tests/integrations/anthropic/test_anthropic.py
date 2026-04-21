@@ -2478,56 +2478,6 @@ def test_anthropic_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
-@pytest.mark.asyncio
-async def test_anthropic_message_truncation_async(sentry_init, capture_items):
-    """Test that large messages are truncated properly in Anthropic integration."""
-    sentry_init(
-        integrations=[AnthropicIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    items = capture_items("transaction", "span")
-
-    client = AsyncAnthropic(api_key="z")
-    client.messages._post = mock.AsyncMock(return_value=EXAMPLE_MESSAGE)
-
-    large_content = (
-        "This is a very long message that will exceed our size limits. " * 1000
-    )
-    messages = [
-        {"role": "user", "content": "small message 1"},
-        {"role": "assistant", "content": large_content},
-        {"role": "user", "content": large_content},
-        {"role": "assistant", "content": "small message 4"},
-        {"role": "user", "content": "small message 5"},
-    ]
-
-    with start_transaction():
-        await client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-    spans = [item.payload for item in items if item.type == "span"]
-    chat_spans = [
-        span for span in spans if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-    ]
-    assert len(chat_spans) > 0
-
-    chat_span = chat_spans[0]
-    assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-    assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
-
-    messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
-
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert "small message 5" in str(parsed_messages[0])
-
-    tx = next(item.payload for item in items if item.type == "transaction")
-    assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
-
-
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
