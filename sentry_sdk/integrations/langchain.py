@@ -14,6 +14,8 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
+    truncate_and_annotate_messages,
+    transform_content_part,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -125,6 +127,39 @@ DATA_FIELDS = {
     "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
     "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
 }
+
+
+def _transform_langchain_content_block(
+    content_block: "Dict[str, Any]",
+) -> "Dict[str, Any]":
+    """
+    Transform a LangChain content block using the shared transform_content_part function.
+
+    Returns the original content block if transformation is not applicable
+    (e.g., for text blocks or unrecognized formats).
+    """
+    result = transform_content_part(content_block)
+    return result if result is not None else content_block
+
+
+def _transform_langchain_message_content(content: "Any") -> "Any":
+    """
+    Transform LangChain message content, handling both string content and
+    list of content blocks.
+    """
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, (list, tuple)):
+        transformed = []
+        for block in content:
+            if isinstance(block, dict):
+                transformed.append(_transform_langchain_content_block(block))
+            else:
+                transformed.append(block)
+        return transformed
+
+    return content
 
 
 # Contextvar to track agent names in a stack for re-entrant agent support
@@ -278,7 +313,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message: "BaseMessage") -> "Any":
-        parsed = {"role": message.type, "content": message.content}
+        # Transform content to handle multimodal data (images, audio, video, files)
+        transformed_content = _transform_langchain_message_content(message.content)
+        parsed = {"role": message.type, "content": transformed_content}
         parsed.update(message.additional_kwargs)
         return parsed
 
@@ -376,12 +413,17 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     }
                     for prompt in prompts
                 ]
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    normalized_messages,
-                    unpack=False,
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    normalized_messages, span, scope
                 )
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
 
     def on_chat_model_start(
         self: "SentryLangchainCallback",
@@ -451,12 +493,17 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                             self._normalize_langchain_message(message)
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    normalized_messages,
-                    unpack=False,
+                scope = sentry_sdk.get_current_scope()
+                messages_data = truncate_and_annotate_messages(
+                    normalized_messages, span, scope
                 )
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
 
     def on_chat_model_end(
         self: "SentryLangchainCallback",
@@ -968,12 +1015,17 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     and integration.include_prompts
                 ):
                     normalized_messages = normalize_message_roles([input])
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        normalized_messages,
-                        unpack=False,
+                    scope = sentry_sdk.get_current_scope()
+                    messages_data = truncate_and_annotate_messages(
+                        normalized_messages, span, scope
                     )
+                    if messages_data is not None:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                            messages_data,
+                            unpack=False,
+                        )
 
                 output = result.get("output")
                 if (
@@ -1025,12 +1077,17 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             and integration.include_prompts
         ):
             normalized_messages = normalize_message_roles([input])
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                normalized_messages,
-                unpack=False,
+            scope = sentry_sdk.get_current_scope()
+            messages_data = truncate_and_annotate_messages(
+                normalized_messages, span, scope
             )
+            if messages_data is not None:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    messages_data,
+                    unpack=False,
+                )
 
         # Run the agent
         result = f(self, *args, **kwargs)
