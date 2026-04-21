@@ -10,7 +10,6 @@ from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
     set_data_normalized,
     normalize_message_roles,
-    truncate_and_annotate_messages,
     get_start_span_function,
 )
 from sentry_sdk.consts import OP, SPANDATA
@@ -394,14 +393,12 @@ def _set_common_input_data(
                 normalized_messages.append(message)
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
-        scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(
-            role_normalized_messages, span, scope
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            role_normalized_messages,
+            unpack=False,
         )
-        if messages_data is not None:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
 
     if max_tokens is not None and _is_given(max_tokens):
         span.set_data(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
