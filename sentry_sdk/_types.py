@@ -12,7 +12,6 @@ MYPY = TYPE_CHECKING
 
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
-BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
 
 
 class AnnotatedValue:
