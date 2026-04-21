@@ -520,7 +520,7 @@ def test_text_generation(
         "sentry.origin": "auto.ai.huggingface_hub",
         "sentry.release": mock.ANY,
         "sentry.sdk.name": "sentry.python",
-        "sentry.sdk.version": "2.58.0",
+        "sentry.sdk.version": mock.ANY,
         "sentry.segment.id": mock.ANY,
         "sentry.segment.name": "test",
         "thread.id": mock.ANY,
