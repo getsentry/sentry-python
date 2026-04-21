@@ -2,9 +2,7 @@ import json
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
-    normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import safe_serialize
@@ -20,7 +18,6 @@ from ..utils import (
     get_is_streaming,
 )
 from .utils import (
-    _serialize_binary_content_item,
     _serialize_image_url_item,
     _set_usage_data,
 )
@@ -40,7 +37,6 @@ try:
         UserPromptPart,
         TextPart,
         ThinkingPart,
-        BinaryContent,
         ImageUrl,
     )
 except ImportError:
@@ -51,7 +47,6 @@ except ImportError:
     UserPromptPart = None
     TextPart = None
     ThinkingPart = None
-    BinaryContent = None
     ImageUrl = None
 
 
@@ -163,8 +158,6 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                                     content.append({"type": "text", "text": item})
                                 elif ImageUrl and isinstance(item, ImageUrl):
                                     content.append(_serialize_image_url_item(item))
-                                elif BinaryContent and isinstance(item, BinaryContent):
-                                    content.append(_serialize_binary_content_item(item))
                                 else:
                                     content.append(safe_serialize(item))
                         else:
@@ -181,13 +174,8 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                         formatted_messages.append(message)
 
         if formatted_messages:
-            normalized_messages = normalize_message_roles(formatted_messages)
-            scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
-            )
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, formatted_messages, unpack=False
             )
     except Exception:
         # If we fail to format messages, just skip it

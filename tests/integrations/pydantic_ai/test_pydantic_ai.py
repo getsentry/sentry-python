@@ -7,13 +7,11 @@ from typing import Annotated
 from pydantic import Field
 
 import sentry_sdk
-from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 from pydantic_ai import Agent
-from pydantic_ai.messages import BinaryContent, ImageUrl, UserPromptPart
 from pydantic_ai.usage import RequestUsage
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
 from pydantic_ai.models.function import FunctionModel
@@ -1006,7 +1004,6 @@ async def test_mcp_tool_execution_spans(sentry_init, capture_items):
     """
     pytest.importorskip("mcp")
 
-    from unittest.mock import MagicMock
     from pydantic_ai.mcp import MCPServerStdio
     from pydantic_ai import Agent
     from pydantic_ai.toolsets.combined import CombinedToolset
@@ -1381,7 +1378,6 @@ async def test_model_name_extraction_with_callable(sentry_init, capture_items):
     """
     Test model name extraction when model has a callable name() method.
     """
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
@@ -1407,7 +1403,6 @@ async def test_model_name_extraction_fallback_to_str(sentry_init, capture_items)
     """
     Test model name extraction falls back to str() when no name attribute exists.
     """
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
@@ -1435,7 +1430,6 @@ async def test_model_settings_object_style(sentry_init, capture_items):
     Test that object-style model settings (non-dict) are handled correctly.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
 
     sentry_init(
@@ -1728,7 +1722,6 @@ async def test_model_response_without_parts(sentry_init, capture_items):
     Test handling of model response without parts attribute.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
@@ -1788,7 +1781,6 @@ async def test_available_tools_error_handling(sentry_init, capture_items):
     Test that _set_available_tools handles errors gracefully.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
@@ -1843,7 +1835,6 @@ async def test_set_usage_data_with_partial_fields(sentry_init, capture_items):
     Test that _set_usage_data handles usage with only some fields.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_usage_data
 
     sentry_init(
@@ -1913,7 +1904,6 @@ async def test_message_parts_with_list_content(sentry_init, capture_items):
     Test that message parts with list content are handled correctly.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1948,7 +1938,6 @@ async def test_output_data_with_text_and_tool_calls(sentry_init, capture_items):
     Test that _set_output_data handles both text and tool calls in response.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
@@ -1987,7 +1976,6 @@ async def test_output_data_error_handling(sentry_init, capture_items):
     Test that _set_output_data handles errors in formatting gracefully.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
@@ -2019,7 +2007,6 @@ async def test_message_with_system_prompt_part(sentry_init, capture_items):
     Test that SystemPromptPart is handled with correct role.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from pydantic_ai import messages
 
     sentry_init(
@@ -2055,7 +2042,6 @@ async def test_message_with_instructions(sentry_init, capture_items):
     Test that messages with instructions field are handled correctly.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2116,7 +2102,6 @@ async def test_set_output_data_without_prompts(sentry_init, capture_items):
     Test that _set_output_data respects _should_send_prompts().
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
@@ -2144,7 +2129,6 @@ async def test_get_model_name_with_exception_in_callable(sentry_init, capture_it
     """
     Test that _get_model_name handles exceptions in name() callable.
     """
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
@@ -2207,7 +2191,6 @@ async def test_set_model_data_with_system(sentry_init, capture_items):
     Test that _set_model_data captures system from model.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
 
     sentry_init(
@@ -2238,7 +2221,6 @@ async def test_set_model_data_from_agent_scope(sentry_init, capture_items):
     Test that _set_model_data retrieves model from agent in scope when not passed.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
 
     sentry_init(
@@ -2347,7 +2329,6 @@ async def test_set_agent_data_from_scope(sentry_init, capture_items):
     Test that _set_agent_data retrieves agent from scope when not passed.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
 
     sentry_init(
@@ -2379,7 +2360,6 @@ async def test_set_agent_data_without_name(sentry_init, capture_items):
     Test that _set_agent_data handles agent without name attribute.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
 
     sentry_init(
@@ -2409,7 +2389,6 @@ async def test_set_available_tools_without_toolset(sentry_init, capture_items):
     Test that _set_available_tools handles agent without toolset.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
@@ -2439,7 +2418,6 @@ async def test_set_available_tools_with_schema(sentry_init, capture_items):
     Test that _set_available_tools extracts tool schema correctly.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
@@ -2655,7 +2633,6 @@ async def test_invoke_agent_span_with_callable_instruction(sentry_init, capture_
     Test that invoke_agent_span skips callable instructions correctly.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import invoke_agent_span
 
     sentry_init(
@@ -2688,7 +2665,6 @@ async def test_invoke_agent_span_with_string_instructions(sentry_init, capture_i
     Test that invoke_agent_span handles string instructions (not list).
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import invoke_agent_span
 
     sentry_init(
@@ -2744,7 +2720,6 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_items):
     Test that ai_client_span gets agent from scope when not passed.
     """
     import sentry_sdk
-    from unittest.mock import MagicMock
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
 
     sentry_init(
@@ -2767,128 +2742,6 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_items):
 
     # Should not crash
     assert transaction is not None
-
-
-def _get_messages_from_span(span_data):
-    """Helper to extract and parse messages from span data."""
-    messages_data = span_data["gen_ai.request.messages"]
-    return (
-        json.loads(messages_data) if isinstance(messages_data, str) else messages_data
-    )
-
-
-def _find_binary_content(messages_data, expected_modality, expected_mime_type):
-    """Helper to find and verify binary content in messages."""
-    for msg in messages_data:
-        if "content" not in msg:
-            continue
-        for content_item in msg["content"]:
-            if content_item.get("type") == "blob":
-                assert content_item["modality"] == expected_modality
-                assert content_item["mime_type"] == expected_mime_type
-                assert content_item["content"] == BLOB_DATA_SUBSTITUTE
-                return True
-    return False
-
-
-@pytest.mark.asyncio
-async def test_binary_content_encoding_image(sentry_init, capture_items):
-    """Test that BinaryContent with image data is properly encoded in messages."""
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    items = capture_items("transaction", "span")
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        binary_content = BinaryContent(
-            data=b"fake_image_data_12345", media_type="image/png"
-        )
-        user_part = UserPromptPart(content=["Look at this image:", binary_content])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
-
-        _set_input_messages(span, [mock_msg])
-        span.finish()
-
-    (event,) = (item.payload for item in items if item.type == "transaction")
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
-    assert _find_binary_content(messages_data, "image", "image/png")
-
-
-@pytest.mark.asyncio
-async def test_binary_content_encoding_mixed_content(sentry_init, capture_items):
-    """Test that BinaryContent mixed with text content is properly handled."""
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    items = capture_items("transaction", "span")
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        span = sentry_sdk.start_span(op="test_span")
-        binary_content = BinaryContent(
-            data=b"fake_image_bytes", media_type="image/jpeg"
-        )
-        user_part = UserPromptPart(
-            content=["Here is an image:", binary_content, "What do you see?"]
-        )
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
-
-        _set_input_messages(span, [mock_msg])
-        span.finish()
-
-    (event,) = (item.payload for item in items if item.type == "transaction")
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
-
-    # Verify both text and binary content are present
-    found_text = any(
-        content_item.get("type") == "text"
-        for msg in messages_data
-        if "content" in msg
-        for content_item in msg["content"]
-    )
-    assert found_text, "Text content should be found"
-    assert _find_binary_content(messages_data, "image", "image/jpeg")
-
-
-@pytest.mark.asyncio
-async def test_binary_content_in_agent_run(sentry_init, capture_items):
-    """Test that BinaryContent in actual agent run is properly captured in spans."""
-    agent = Agent("test", name="test_binary_agent")
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    items = capture_items("transaction", "span")
-    binary_content = BinaryContent(
-        data=b"fake_image_data_for_testing", media_type="image/png"
-    )
-    await agent.run(["Analyze this image:", binary_content])
-
-    spans = [item.payload for item in items if item.type == "span"]
-    chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
-    ]
-    assert len(chat_spans) >= 1
-
-    chat_span = chat_spans[0]
-    if "gen_ai.request.messages" in chat_span["attributes"]:
-        messages_str = str(chat_span["attributes"]["gen_ai.request.messages"])
-        assert any(keyword in messages_str for keyword in ["blob", "image", "base64"])
 
 
 @pytest.mark.asyncio
@@ -2916,153 +2769,6 @@ async def test_set_usage_data_with_cache_tokens(sentry_init, capture_items):
     (span_data,) = event["spans"]
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
     assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
-
-
-@pytest.mark.parametrize(
-    "url,image_url_kwargs,expected_content",
-    [
-        pytest.param(
-            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            {},
-            BLOB_DATA_SUBSTITUTE,
-            id="base64_data_url",
-        ),
-        pytest.param(
-            "https://example.com/image.png",
-            {},
-            "https://example.com/image.png",
-            id="http_url_no_redaction",
-        ),
-        pytest.param(
-            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            {"media_type": "image/png"},
-            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            id="http_url_with_base64_query_param",
-        ),
-        pytest.param(
-            "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=",
-            {},
-            BLOB_DATA_SUBSTITUTE,
-            id="complex_mime_type",
-        ),
-        pytest.param(
-            "data:image/png;name=file.png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            {},
-            BLOB_DATA_SUBSTITUTE,
-            id="optional_parameters",
-        ),
-        pytest.param(
-            "data:text/plain;charset=utf-8;name=hello.txt;base64,SGVsbG8sIFdvcmxkIQ==",
-            {},
-            BLOB_DATA_SUBSTITUTE,
-            id="multiple_optional_parameters",
-        ),
-    ],
-)
-def test_image_url_base64_content_in_span(
-    sentry_init, capture_items, url, image_url_kwargs, expected_content
-):
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    items = capture_items("transaction", "span")
-
-    with sentry_sdk.start_transaction(op="test", name="test"):
-        image_url = ImageUrl(url=url, **image_url_kwargs)
-        user_part = UserPromptPart(content=["Look at this image:", image_url])
-        mock_msg = MagicMock()
-        mock_msg.parts = [user_part]
-        mock_msg.instructions = None
-
-        span = ai_client_span([mock_msg], None, None, None)
-        span.finish()
-
-    spans = [item.payload for item in items if item.type == "span"]
-    chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
-    ]
-    assert len(chat_spans) >= 1
-    messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
-
-    found_image = False
-    for msg in messages_data:
-        if "content" not in msg:
-            continue
-        for content_item in msg["content"]:
-            if content_item.get("type") == "image":
-                found_image = True
-                assert content_item["content"] == expected_content
-
-    assert found_image, "Image content item should be found in messages data"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url, image_url_kwargs, expected_content",
-    [
-        pytest.param(
-            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            {},
-            BLOB_DATA_SUBSTITUTE,
-            id="base64_data_url_redacted",
-        ),
-        pytest.param(
-            "https://example.com/image.png",
-            {},
-            "https://example.com/image.png",
-            id="http_url_no_redaction",
-        ),
-        pytest.param(
-            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            {},
-            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            id="http_url_with_base64_query_param",
-        ),
-        pytest.param(
-            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            {"media_type": "image/png"},
-            "https://example.com/api?data=iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs",
-            id="http_url_with_base64_query_param_and_media_type",
-        ),
-    ],
-)
-async def test_invoke_agent_image_url(
-    sentry_init, capture_items, url, image_url_kwargs, expected_content
-):
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    agent = Agent("test", name="test_image_url_agent")
-
-    items = capture_items("transaction", "span")
-    image_url = ImageUrl(url=url, **image_url_kwargs)
-    await agent.run([image_url, "Describe this image"])
-
-    found_image = False
-
-    spans = [item.payload for item in items if item.type == "span"]
-    chat_spans = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
-    ]
-    for chat_span in chat_spans:
-        messages_data = _get_messages_from_span(chat_span["attributes"])
-        for msg in messages_data:
-            if "content" not in msg:
-                continue
-            for content_item in msg["content"]:
-                if content_item.get("type") == "image":
-                    assert content_item["content"] == expected_content
-                    found_image = True
-
-    assert found_image, "Image content item should be found in messages data"
 
 
 @pytest.mark.asyncio
