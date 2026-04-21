@@ -6,7 +6,6 @@ from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
-    truncate_and_annotate_embedding_inputs,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -82,22 +81,14 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             # For embeddings, look for the 'input' parameter
             embedding_input = kwargs.get("input")
             if embedding_input:
-                scope = sentry_sdk.get_current_scope()
-                # Normalize to list format
                 input_list = (
                     embedding_input
                     if isinstance(embedding_input, list)
                     else [embedding_input]
                 )
-                messages_data = truncate_and_annotate_embedding_inputs(
-                    input_list, span, scope
-                )
-                if messages_data is not None:
+                if input_list is not None:
                     set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
-                        messages_data,
-                        unpack=False,
+                        span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, input_list, unpack=False
                     )
         else:
             # For chat, look for the 'messages' parameter
