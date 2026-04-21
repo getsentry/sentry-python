@@ -143,10 +143,8 @@ def _set_client_data(
     span: "Union[Span, StreamedSpan]", is_cluster: bool, name: str, *args: "Any"
 ) -> None:
     if isinstance(span, StreamedSpan):
-        span.set_attribute("redis.is_cluster", is_cluster)
         if name:
-            span.set_attribute("redis.command", name)
-            span.set_attribute(SPANDATA.DB_OPERATION, name)
+            span.set_attribute("db.operation.name", name)
     else:
         span.set_tag("redis.is_cluster", is_cluster)
         if name:
