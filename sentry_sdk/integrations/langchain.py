@@ -14,7 +14,6 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -377,17 +376,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     }
                     for prompt in prompts
                 ]
-                scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
 
     def on_chat_model_start(
         self: "SentryLangchainCallback",
@@ -457,17 +451,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                             self._normalize_langchain_message(message)
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
-                scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    normalized_messages,
+                    unpack=False,
                 )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
 
     def on_chat_model_end(
         self: "SentryLangchainCallback",
@@ -979,17 +968,12 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     and integration.include_prompts
                 ):
                     normalized_messages = normalize_message_roles([input])
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        normalized_messages, span, scope
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        normalized_messages,
+                        unpack=False,
                     )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
 
                 output = result.get("output")
                 if (
@@ -1041,17 +1025,12 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             and integration.include_prompts
         ):
             normalized_messages = normalize_message_roles([input])
-            scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                normalized_messages,
+                unpack=False,
             )
-            if messages_data is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages_data,
-                    unpack=False,
-                )
 
         # Run the agent
         result = f(self, *args, **kwargs)
