@@ -329,11 +329,13 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
+            task_name = getattr(task, "name", "<unknown Celery task>")
+
             custom_sampling_context = {}
             with capture_internal_exceptions():
                 custom_sampling_context = {
                     "celery_job": {
-                        "task": getattr(task, "name", None),
+                        "task": task_name,
                         # for some reason, args[1] is a list if non-empty but a
                         # tuple if empty
                         "args": list(args[1]),
@@ -352,7 +354,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                     sentry_sdk.traces.continue_trace(headers)
                     scope.set_custom_sampling_context(custom_sampling_context)
                     span = sentry_sdk.traces.start_span(
-                        name=task.name,
+                        name=task_name,
                         parent_span=None,  # make this a segment
                         attributes={
                             "sentry.origin": CeleryIntegration.origin,
@@ -367,7 +369,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                     span = continue_trace(
                         headers,
                         op=OP.QUEUE_TASK_CELERY,
-                        name=task.name,
+                        name=task_name,
                         source=TransactionSource.TASK,
                         origin=CeleryIntegration.origin,
                     )
