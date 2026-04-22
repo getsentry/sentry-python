@@ -243,7 +243,10 @@ def assert_single_transaction_without_profile_chunks(envelopes):
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
+@mock.patch(
+    "sentry_sdk.profiler.continuous_profiler.ProfileBuffer.should_flush",
+    lambda a, b: True,
+)  # Force flushing profile of first transaction.
 def test_continuous_profiler_auto_start_and_manual_stop(
     sentry_init,
     capture_envelopes,
@@ -265,7 +268,10 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
     with sentry_sdk.start_transaction(name="profiling"):
         with sentry_sdk.start_span(op="op"):
-            time.sleep(0.05)
+            pass
+
+    # Wait so profiles are captured before assertions.
+    sentry_sdk.profiler.continuous_profiler._scheduler.teardown()
 
     assert_single_transaction_with_profile_chunks(envelopes, thread)
 
