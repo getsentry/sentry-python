@@ -220,11 +220,43 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
-@pytest.mark.asyncio
-async def test_original_request_not_scrubbed(sentry_init, capture_events):
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     sentry_init(
+        auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    app = fastapi_app_factory()
+
+    items = capture_items("span")
+
+    client = TestClient(app)
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    data = json.loads(response.content)
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.asyncio
+async def test_original_request_not_scrubbed(
+    sentry_init, capture_events, span_streaming
+):
+    sentry_init(
+        auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
 
     app = FastAPI()
@@ -344,6 +376,7 @@ def test_response_status_code_not_found_in_transaction_context(
     assert transaction["contexts"]["response"]["status_code"] == 404
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
@@ -368,6 +401,8 @@ def test_transaction_name(
     expected_transaction_name,
     expected_transaction_source,
     capture_envelopes,
+    capture_items,
+    span_streaming,
 ):
     """
     Tests that the transaction name is something meaningful.
@@ -379,22 +414,39 @@ def test_transaction_name(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
 
-    envelopes = capture_envelopes()
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        envelopes = capture_envelopes()
 
     app = fastapi_app_factory()
 
     client = TestClient(app)
     client.get(request_url)
 
-    (_, transaction_envelope) = envelopes
-    transaction_event = transaction_envelope.get_transaction_event()
+    if span_streaming:
+        sentry_sdk.flush()
+        segments = [item.payload for item in items if item.payload.get("is_segment")]
+        assert len(segments) == 1
+        segment = segments[0]
+        assert segment["name"] == expected_transaction_name
+        assert (
+            segment["attributes"]["sentry.span.source"] == expected_transaction_source
+        )
+    else:
+        (_, transaction_envelope) = envelopes
+        transaction_event = transaction_envelope.get_transaction_event()
 
-    assert transaction_event["transaction"] == expected_transaction_name
-    assert (
-        transaction_event["transaction_info"]["source"] == expected_transaction_source
-    )
+        assert transaction_event["transaction"] == expected_transaction_name
+        assert (
+            transaction_event["transaction_info"]["source"]
+            == expected_transaction_source
+        )
 
 
 def test_route_endpoint_equal_dependant_call(sentry_init):
