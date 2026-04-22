@@ -78,6 +78,7 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
+            "transport_async": Optional[bool],
             "enable_logs": Optional[bool],
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
             "enable_metrics": Optional[bool],
@@ -485,6 +486,12 @@ class SPANDATA:
     Example: "Hello!"
     """
 
+    GEN_AI_FUNCTION_ID = "gen_ai.function_id"
+    """
+    Framework-specific tracing label for the execution of a function or other unit of execution in a generative AI system.
+    Example: "my-awesome-function"
+    """
+
     GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
     """
     The name of the operation being performed.
@@ -633,12 +640,6 @@ class SPANDATA:
     """
     The output of the tool being used.
     Example: "rainy, 57°F"
-    """
-
-    GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
-    """
-    The type of tool being used.
-    Example: "function"
     """
 
     GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
@@ -921,9 +922,8 @@ class OP:
     GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
-    GEN_AI_GENERATE_TEXT = "gen_ai.generate_text"
+    GEN_AI_TEXT_COMPLETION = "gen_ai.text_completion"
     GEN_AI_HANDOFF = "gen_ai.handoff"
-    GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
     GEN_AI_RESPONSES = "gen_ai.responses"
     GRAPHQL_EXECUTE = "graphql.execute"
@@ -1492,4 +1492,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.56.0"
+VERSION = "2.58.0"

@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.56.0",
+    version="2.58.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -36,7 +36,7 @@ setup(
     # PEP 561
     package_data={"sentry_sdk": ["py.typed"]},
     zip_safe=False,
-    license="MIT",
+    license_expression="MIT",
     python_requires=">=3.6",
     install_requires=[
         "urllib3>=1.26.11",
@@ -59,13 +59,14 @@ setup(
         "flask": ["flask>=0.11", "blinker>=1.1", "markupsafe"],
         "grpcio": ["grpcio>=1.21.1", "protobuf>=3.8.0"],
         "http2": ["httpcore[http2]==1.*"],
+        "asyncio": ["httpcore[asyncio]==1.*"],
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
         "huggingface_hub": ["huggingface_hub>=0.22"],
         "langchain": ["langchain>=0.0.210"],
         "langgraph": ["langgraph>=0.6.6"],
         "launchdarkly": ["launchdarkly-server-sdk>=9.8.0"],
-        "litellm": ["litellm>=1.77.5"],
+        "litellm": ["litellm>=1.77.5,!=1.82.7,!=1.82.8"],
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
         "mcp": ["mcp>=1.15.0"],
@@ -98,7 +99,6 @@ setup(
         "Development Status :: 5 - Production/Stable",
         "Environment :: Web Environment",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",

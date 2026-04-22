@@ -1,15 +1,14 @@
-from unittest import mock
-import pytest
 import re
-import responses
+from typing import TYPE_CHECKING
+from unittest import mock
 
+import pytest
+import responses
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
-from sentry_sdk.utils import package_version
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
-
-from typing import TYPE_CHECKING
+from sentry_sdk.utils import package_version
 
 try:
     from huggingface_hub.utils._errors import HfHubHTTPError
@@ -507,12 +506,12 @@ def test_text_generation(
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.generate_text"
-    assert span["description"] == "generate_text test-model"
+    assert span["op"] == "gen_ai.text_completion"
+    assert span["description"] == "text_completion test-model"
     assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
-        "gen_ai.operation.name": "generate_text",
+        "gen_ai.operation.name": "text_completion",
         "gen_ai.request.model": "test-model",
         "gen_ai.response.finish_reasons": "length",
         "gen_ai.response.streaming": False,
@@ -576,12 +575,12 @@ def test_text_generation_streaming(
 
     assert span is not None
 
-    assert span["op"] == "gen_ai.generate_text"
-    assert span["description"] == "generate_text test-model"
+    assert span["op"] == "gen_ai.text_completion"
+    assert span["description"] == "text_completion test-model"
     assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
-        "gen_ai.operation.name": "generate_text",
+        "gen_ai.operation.name": "text_completion",
         "gen_ai.request.model": "test-model",
         "gen_ai.response.finish_reasons": "length",
         "gen_ai.response.streaming": True,
@@ -833,8 +832,6 @@ def test_span_status_error(
     assert span is not None
     assert span["status"] == "internal_error"
     assert span["tags"]["status"] == "internal_error"
-
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)

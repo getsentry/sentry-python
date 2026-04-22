@@ -16,7 +16,7 @@ except ImportError:
 
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
-from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
+from openai.types.chat import ChatCompletionMessage, ChatCompletionChunk
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
@@ -41,10 +41,11 @@ except ImportError:
     SKIP_RESPONSES_TESTS = True
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
-    _calculate_token_usage,
+    _calculate_completions_token_usage,
+    _calculate_responses_token_usage,
 )
 from sentry_sdk.utils import safe_serialize
 
@@ -60,26 +61,6 @@ except ImportError:
 
 
 OPENAI_VERSION = package_version("openai")
-EXAMPLE_CHAT_COMPLETION = ChatCompletion(
-    id="chat-id",
-    choices=[
-        Choice(
-            index=0,
-            finish_reason="stop",
-            message=ChatCompletionMessage(
-                role="assistant", content="the model response"
-            ),
-        )
-    ],
-    created=10000000,
-    model="response-model-id",
-    object="chat.completion",
-    usage=CompletionUsage(
-        completion_tokens=10,
-        prompt_tokens=20,
-        total_tokens=30,
-    ),
-)
 
 
 if SKIP_RESPONSES_TESTS:
@@ -131,7 +112,11 @@ else:
     ],
 )
 def test_nonstreaming_chat_completion_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
@@ -141,7 +126,19 @@ def test_nonstreaming_chat_completion_no_prompts(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     with start_transaction(name="openai tx"):
         response = (
@@ -151,6 +148,11 @@ def test_nonstreaming_chat_completion_no_prompts(
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": "hello"},
                 ],
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
             )
             .choices[0]
             .message.content
@@ -161,6 +163,15 @@ def test_nonstreaming_chat_completion_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -214,7 +225,13 @@ def test_nonstreaming_chat_completion_no_prompts(
         ),
     ],
 )
-def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, request):
+def test_nonstreaming_chat_completion(
+    sentry_init,
+    capture_events,
+    messages,
+    request,
+    nonstreaming_chat_completions_model_response,
+):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -223,13 +240,30 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     with start_transaction(name="openai tx"):
         response = (
             client.chat.completions.create(
                 model="some-model",
                 messages=messages,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
             )
             .choices[0]
             .message.content
@@ -240,6 +274,15 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -279,7 +322,11 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, req
     ],
 )
 async def test_nonstreaming_chat_completion_async_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
@@ -289,7 +336,19 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = mock.AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     with start_transaction(name="openai tx"):
         response = await client.chat.completions.create(
@@ -298,6 +357,11 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "hello"},
             ],
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response = response.choices[0].message.content
 
@@ -306,6 +370,15 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -361,7 +434,11 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     ],
 )
 async def test_nonstreaming_chat_completion_async(
-    sentry_init, capture_events, messages, request
+    sentry_init,
+    capture_events,
+    messages,
+    request,
+    nonstreaming_chat_completions_model_response,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -371,12 +448,29 @@ async def test_nonstreaming_chat_completion_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     with start_transaction(name="openai tx"):
         response = await client.chat.completions.create(
             model="some-model",
             messages=messages,
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
         response = response.choices[0].message.content
 
@@ -385,6 +479,15 @@ async def test_nonstreaming_chat_completion_async(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -433,7 +536,12 @@ def tiktoken_encoding_if_installed():
     ],
 )
 def test_streaming_chat_completion_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[
@@ -448,61 +556,90 @@ def test_streaming_chat_completion_no_prompts(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
-                )
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="hel"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=1,
+                            delta=ChoiceDelta(content="lo "),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=2,
+                            delta=ChoiceDelta(content="world"),
+                            finish_reason="stop",
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
             ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
-        ),
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
-                )
-            ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
-        ),
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=2, delta=ChoiceDelta(content="world"), finish_reason="stop"
-                )
-            ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
-        ),
-    ]
+            include_event_type=False,
+        )
+    )
 
-    client.chat.completions._post = mock.Mock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
-        response_stream = client.chat.completions.create(
-            model="some-model",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "hello"},
-            ],
-            stream=True,
-        )
-        response_string = "".join(
-            map(lambda x: x.choices[0].delta.content, response_stream)
-        )
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+                stream=True,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            response_string = "".join(
+                map(lambda x: x.choices[0].delta.content, response_stream)
+            )
+
     assert response_string == "hello world"
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -518,6 +655,304 @@ def test_streaming_chat_completion_no_prompts(
         assert span["data"]["gen_ai.usage.total_tokens"] == 9
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
+def test_streaming_chat_completion_with_usage_in_stream(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    """When stream_options=include_usage is set, token usage comes from the final chunk's usage field."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="hel"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="lo"),
+                            finish_reason="stop",
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                    usage=CompletionUsage(
+                        prompt_tokens=20,
+                        completion_tokens=10,
+                        total_tokens=30,
+                    ),
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            for _ in response_stream:
+                pass
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.output_tokens"] == 10
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
+def test_streaming_chat_completion_empty_content_preserves_token_usage(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    server_side_event_chunks,
+):
+    """Token usage from the stream is recorded even when no content is produced (e.g. content filter)."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                    usage=CompletionUsage(
+                        prompt_tokens=20,
+                        completion_tokens=0,
+                        total_tokens=20,
+                    ),
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            for _ in response_stream:
+                pass
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert "gen_ai.usage.output_tokens" not in span["data"]
+    assert span["data"]["gen_ai.usage.total_tokens"] == 20
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
+@pytest.mark.asyncio
+async def test_streaming_chat_completion_empty_content_preserves_token_usage_async(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    """Token usage from the stream is recorded even when no content is produced - async variant."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                        usage=CompletionUsage(
+                            prompt_tokens=20,
+                            completion_tokens=0,
+                            total_tokens=20,
+                        ),
+                    ),
+                ],
+                include_event_type=False,
+            )
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            async for _ in response_stream:
+                pass
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert "gen_ai.usage.output_tokens" not in span["data"]
+    assert span["data"]["gen_ai.usage.total_tokens"] == 20
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
+)
+@pytest.mark.asyncio
+async def test_streaming_chat_completion_async_with_usage_in_stream(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+):
+    """When stream_options=include_usage is set, token usage comes from the final chunk's usage field (async)."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="hel"),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="lo"),
+                                finish_reason="stop",
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                        usage=CompletionUsage(
+                            prompt_tokens=20,
+                            completion_tokens=10,
+                            total_tokens=30,
+                        ),
+                    ),
+                ],
+                include_event_type=False,
+            )
+        )
+    )
+
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            async for _ in response_stream:
+                pass
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.output_tokens"] == 10
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 # noinspection PyTypeChecker
@@ -564,7 +999,14 @@ def test_streaming_chat_completion_no_prompts(
         ),
     ],
 )
-def test_streaming_chat_completion(sentry_init, capture_events, messages, request):
+def test_streaming_chat_completion(
+    sentry_init,
+    capture_events,
+    messages,
+    request,
+    get_model_response,
+    server_side_event_chunks,
+):
     sentry_init(
         integrations=[
             OpenAIIntegration(
@@ -578,58 +1020,86 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
-                )
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="hel"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=1,
+                            delta=ChoiceDelta(content="lo "),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=2,
+                            delta=ChoiceDelta(content="world"),
+                            finish_reason="stop",
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
             ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
-        ),
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
-                )
-            ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
-        ),
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=2, delta=ChoiceDelta(content="world"), finish_reason="stop"
-                )
-            ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
-        ),
-    ]
+            include_event_type=False,
+        )
+    )
 
-    client.chat.completions._post = mock.Mock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
-        response_stream = client.chat.completions.create(
-            model="some-model",
-            messages=messages,
-            stream=True,
-        )
-        response_string = "".join(
-            map(lambda x: x.choices[0].delta.content, response_stream)
-        )
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=messages,
+                stream=True,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            response_string = "".join(
+                map(lambda x: x.choices[0].delta.content, response_stream)
+            )
     assert response_string == "hello world"
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     param_id = request.node.callspec.id
     if "blocks" in param_id:
@@ -682,7 +1152,13 @@ def test_streaming_chat_completion(sentry_init, capture_events, messages, reques
     ],
 )
 async def test_streaming_chat_completion_async_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[
@@ -697,67 +1173,93 @@ async def test_streaming_chat_completion_async_no_prompts(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(
-        [
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
-                    )
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="hel"),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=1,
+                                delta=ChoiceDelta(content="lo "),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=2,
+                                delta=ChoiceDelta(content="world"),
+                                finish_reason="stop",
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
                 ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
-            ),
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
-                    )
-                ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
-            ),
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=2,
-                        delta=ChoiceDelta(content="world"),
-                        finish_reason="stop",
-                    )
-                ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
-            ),
-        ]
+                include_event_type=False,
+            )
+        )
     )
 
-    client.chat.completions._post = AsyncMock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
-        response_stream = await client.chat.completions.create(
-            model="some-model",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "hello"},
-            ],
-            stream=True,
-        )
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+                stream=True,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
 
-        response_string = ""
-        async for x in response_stream:
-            response_string += x.choices[0].delta.content
+            response_string = ""
+            async for x in response_stream:
+                response_string += x.choices[0].delta.content
 
     assert response_string == "hello world"
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -822,7 +1324,13 @@ async def test_streaming_chat_completion_async_no_prompts(
     ],
 )
 async def test_streaming_chat_completion_async(
-    sentry_init, capture_events, messages, request, async_iterator
+    sentry_init,
+    capture_events,
+    messages,
+    request,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[
@@ -837,64 +1345,91 @@ async def test_streaming_chat_completion_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(
-        [
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
-                    )
+
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="hel"),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=1,
+                                delta=ChoiceDelta(content="lo "),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=2,
+                                delta=ChoiceDelta(content="world"),
+                                finish_reason="stop",
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
                 ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
-            ),
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
-                    )
-                ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
-            ),
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=2,
-                        delta=ChoiceDelta(content="world"),
-                        finish_reason="stop",
-                    )
-                ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
-            ),
-        ]
+                include_event_type=False,
+            )
+        )
     )
 
-    client.chat.completions._post = AsyncMock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
-        response_stream = await client.chat.completions.create(
-            model="some-model",
-            messages=messages,
-            stream=True,
-        )
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=messages,
+                stream=True,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
 
-        response_string = ""
-        async for x in response_stream:
-            response_string += x.choices[0].delta.content
+            response_string = ""
+            async for x in response_stream:
+                response_string += x.choices[0].delta.content
 
     assert response_string == "hello world"
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.chat"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -1036,6 +1571,8 @@ def test_embeddings_create_no_pii(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
@@ -1116,6 +1653,8 @@ def test_embeddings_create(sentry_init, capture_events, input, request):
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     param_id = request.node.callspec.id
     if param_id == "string":
@@ -1187,6 +1726,8 @@ async def test_embeddings_create_async_no_pii(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
 
@@ -1270,6 +1811,8 @@ async def test_embeddings_create_async(sentry_init, capture_events, input, reque
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
 
     param_id = request.node.callspec.id
     if param_id == "string":
@@ -1353,7 +1896,9 @@ async def test_embeddings_create_raises_error_async(
     assert event["level"] == "error"
 
 
-def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
+def test_span_origin_nonstreaming_chat(
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -1361,7 +1906,19 @@ def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     with start_transaction(name="openai tx"):
         client.chat.completions.create(
@@ -1375,7 +1932,9 @@ def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_events):
+async def test_span_origin_nonstreaming_chat_async(
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -1383,7 +1942,19 @@ async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_events):
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     with start_transaction(name="openai tx"):
         await client.chat.completions.create(
@@ -1582,7 +2153,8 @@ async def test_span_origin_embeddings_async(sentry_init, capture_events):
     assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
-def test_calculate_token_usage_a():
+def test_completions_token_usage_from_response():
+    """Token counts are extracted from response.usage using Completions API field names."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1599,8 +2171,13 @@ def test_calculate_token_usage_a():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
@@ -1612,7 +2189,46 @@ def test_calculate_token_usage_a():
         )
 
 
-def test_calculate_token_usage_b():
+def test_completions_token_usage_with_detailed_fields():
+    """Cached and reasoning token counts are extracted from prompt_tokens_details and completion_tokens_details."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.prompt_tokens = 20
+    response.usage.prompt_tokens_details = mock.MagicMock()
+    response.usage.prompt_tokens_details.cached_tokens = 5
+    response.usage.completion_tokens = 10
+    response.usage.completion_tokens_details = mock.MagicMock()
+    response.usage.completion_tokens_details.reasoning_tokens = 8
+    response.usage.total_tokens = 30
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_completions_token_usage(
+            messages=[],
+            response=response,
+            span=span,
+            streaming_message_responses=[],
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
+        )
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=5,
+            output_tokens=10,
+            output_tokens_reasoning=8,
+            total_tokens=30,
+        )
+
+
+def test_completions_token_usage_manual_input_counting():
+    """When prompt_tokens is missing, input tokens are counted manually from messages."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1632,8 +2248,13 @@ def test_calculate_token_usage_b():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
@@ -1645,7 +2266,8 @@ def test_calculate_token_usage_b():
         )
 
 
-def test_calculate_token_usage_c():
+def test_completions_token_usage_manual_output_counting_streaming():
+    """When completion_tokens is missing, output tokens are counted from streaming responses."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1665,8 +2287,13 @@ def test_calculate_token_usage_c():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
@@ -1678,7 +2305,8 @@ def test_calculate_token_usage_c():
         )
 
 
-def test_calculate_token_usage_d():
+def test_completions_token_usage_manual_output_counting_choices():
+    """When completion_tokens is missing, output tokens are counted from response.choices."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1689,30 +2317,48 @@ def test_calculate_token_usage_d():
     response.usage.prompt_tokens = 20
     response.usage.total_tokens = 20
     response.choices = [
-        mock.MagicMock(message="one"),
-        mock.MagicMock(message="two"),
-        mock.MagicMock(message="three"),
+        Choice(
+            index=0,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="one"),
+        ),
+        Choice(
+            index=1,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="two"),
+        ),
+        Choice(
+            index=2,
+            finish_reason="stop",
+            message=ChatCompletionMessage(role="assistant", content="three"),
+        ),
     ]
     messages = []
-    streaming_message_responses = []
+    streaming_message_responses = None
 
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
             input_tokens=20,
             input_tokens_cached=None,
-            output_tokens=None,
+            output_tokens=11,
             output_tokens_reasoning=None,
             total_tokens=20,
         )
 
 
-def test_calculate_token_usage_e():
+def test_completions_token_usage_no_usage_data():
+    """When response has no usage data and no streaming responses, all tokens are None."""
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -1725,8 +2371,13 @@ def test_calculate_token_usage_e():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_token_usage(
-            messages, response, span, streaming_message_responses, count_tokens
+        _calculate_completions_token_usage(
+            messages=messages,
+            response=response,
+            span=span,
+            streaming_message_responses=streaming_message_responses,
+            streaming_message_total_token_usage=None,
+            count_tokens=count_tokens,
         )
         mock_record_token_usage.assert_called_once_with(
             span,
@@ -1735,6 +2386,132 @@ def test_calculate_token_usage_e():
             output_tokens=None,
             output_tokens_reasoning=None,
             total_tokens=None,
+        )
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_token_usage_from_response():
+    """Token counts including cached and reasoning tokens are extracted from Responses API."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.input_tokens = 20
+    response.usage.input_tokens_details = mock.MagicMock()
+    response.usage.input_tokens_details.cached_tokens = 5
+    response.usage.output_tokens = 10
+    response.usage.output_tokens_details = mock.MagicMock()
+    response.usage.output_tokens_details.reasoning_tokens = 8
+    response.usage.total_tokens = 30
+    input = []
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_responses_token_usage(input, response, span, None, count_tokens)
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=5,
+            output_tokens=10,
+            output_tokens_reasoning=8,
+            total_tokens=30,
+        )
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_token_usage_no_usage_data():
+    """When Responses API response has no usage data, all tokens are None."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = None
+    input = []
+    streaming_message_responses = None
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_responses_token_usage(
+            input, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=None,
+            input_tokens_cached=None,
+            output_tokens=None,
+            output_tokens_reasoning=None,
+            total_tokens=None,
+        )
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_token_usage_manual_output_counting_response_output():
+    """When output_tokens is missing, output tokens are counted from response.output."""
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.input_tokens = 20
+    response.usage.total_tokens = 20
+    response.output = [
+        ResponseOutputMessage(
+            id="msg-1",
+            content=[
+                ResponseOutputText(
+                    annotations=[],
+                    text="one",
+                    type="output_text",
+                ),
+            ],
+            role="assistant",
+            status="completed",
+            type="message",
+        ),
+        ResponseOutputMessage(
+            id="msg-2",
+            content=[
+                ResponseOutputText(
+                    annotations=[],
+                    text="two",
+                    type="output_text",
+                ),
+                ResponseOutputText(
+                    annotations=[],
+                    text="three",
+                    type="output_text",
+                ),
+            ],
+            role="assistant",
+            status="completed",
+            type="message",
+        ),
+    ]
+    input = []
+    streaming_message_responses = None
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_responses_token_usage(
+            input, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=None,
+            output_tokens=11,
+            output_tokens_reasoning=None,
+            total_tokens=20,
         )
 
 
@@ -1754,6 +2531,9 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
             model="gpt-4o",
             instructions="You are a coding assistant that talks like a pirate.",
             input="How do I check if a Python object is an instance of a class?",
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -1764,8 +2544,12 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
+        "gen_ai.response.streaming": False,
         "gen_ai.system": "openai",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
@@ -1864,6 +2648,9 @@ def test_ai_client_span_responses_api(
             model="gpt-4o",
             instructions=instructions,
             input=input,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -1875,8 +2662,12 @@ def test_ai_client_span_responses_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.system": "openai",
         "gen_ai.response.model": "response-model-id",
+        "gen_ai.response.streaming": False,
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
@@ -2166,6 +2957,9 @@ async def test_ai_client_span_responses_async_api(
             model="gpt-4o",
             instructions=instructions,
             input=input,
+            max_output_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
         )
 
     (transaction,) = events
@@ -2177,9 +2971,13 @@ async def test_ai_client_span_responses_async_api(
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
+        "gen_ai.response.streaming": False,
         "gen_ai.system": "openai",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
@@ -2415,7 +3213,14 @@ async def test_ai_client_span_responses_async_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_ai_client_span_streaming_responses_async_api(
-    sentry_init, capture_events, instructions, input, request, async_iterator
+    sentry_init,
+    capture_events,
+    instructions,
+    input,
+    request,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -2425,29 +3230,39 @@ async def test_ai_client_span_streaming_responses_async_api(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
-    client.responses._post = mock.AsyncMock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
+    )
 
-    with start_transaction(name="openai tx"):
-        result = await client.responses.create(
-            model="gpt-4o",
-            instructions=instructions,
-            input=input,
-            stream=True,
-        )
-        async for _ in result:
-            pass
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            result = await client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            async for _ in result:
+                pass
 
     (transaction,) = events
-    spans = transaction["spans"]
+    spans = [span for span in transaction["spans"] if span["op"] == OP.GEN_AI_RESPONSES]
 
     assert len(spans) == 1
-    assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
 
     expected_data = {
         "gen_ai.operation.name": "responses",
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.temperature": 0.7,
+        "gen_ai.request.top_p": 0.9,
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
@@ -2737,7 +3552,12 @@ else:
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_streaming_responses_api(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[
@@ -2751,27 +3571,41 @@ def test_streaming_responses_api(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = EXAMPLE_RESPONSES_STREAM
-    client.responses._post = mock.Mock(return_value=returned_stream)
-
-    with start_transaction(name="openai tx"):
-        response_stream = client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            EXAMPLE_RESPONSES_STREAM,
         )
+    )
 
-        response_string = ""
-        for item in response_stream:
-            if hasattr(item, "delta"):
-                response_string += item.delta
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+            )
+
+            response_string = ""
+            for item in response_stream:
+                if hasattr(item, "delta"):
+                    response_string += item.delta
 
     assert response_string == "hello world"
 
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -2794,7 +3628,13 @@ def test_streaming_responses_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_async(
-    sentry_init, capture_events, send_default_pii, include_prompts, async_iterator
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     sentry_init(
         integrations=[
@@ -2808,27 +3648,39 @@ async def test_streaming_responses_api_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
-    client.responses._post = AsyncMock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
+    )
 
-    with start_transaction(name="openai tx"):
-        response_stream = await client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-        )
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+            )
 
-        response_string = ""
-        async for item in response_stream:
-            if hasattr(item, "delta"):
-                response_string += item.delta
+            response_string = ""
+            async for item in response_stream:
+                if hasattr(item, "delta"):
+                    response_string += item.delta
 
     assert response_string == "hello world"
 
     (transaction,) = events
     (span,) = transaction["spans"]
     assert span["op"] == "gen_ai.responses"
+    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -2852,7 +3704,9 @@ async def test_streaming_responses_api_async(
     "tools",
     [[], None, NOT_GIVEN, omit],
 )
-def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
+def test_empty_tools_in_chat_completion(
+    sentry_init, capture_events, tools, nonstreaming_chat_completions_model_response
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
@@ -2860,7 +3714,19 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     with start_transaction(name="openai tx"):
         client.chat.completions.create(
@@ -2891,7 +3757,11 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     ],
 )
 def test_openai_message_role_mapping(
-    sentry_init, capture_events, test_message, expected_role
+    sentry_init,
+    capture_events,
+    test_message,
+    expected_role,
+    nonstreaming_chat_completions_model_response,
 ):
     """Test that OpenAI integration properly maps message roles like 'ai' to 'assistant'"""
 
@@ -2903,7 +3773,19 @@ def test_openai_message_role_mapping(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     test_messages = [test_message]
 
@@ -2924,7 +3806,9 @@ def test_openai_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
-def test_openai_message_truncation(sentry_init, capture_events):
+def test_openai_message_truncation(
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+):
     """Test that large messages are truncated properly in OpenAI integration."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
@@ -2934,7 +3818,19 @@ def test_openai_message_truncation(sentry_init, capture_events):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -2970,7 +3866,9 @@ def test_openai_message_truncation(sentry_init, capture_events):
 
 
 # noinspection PyTypeChecker
-def test_streaming_chat_completion_ttft(sentry_init, capture_events):
+def test_streaming_chat_completion_ttft(
+    sentry_init, capture_events, get_model_response, server_side_event_chunks
+):
     """
     Test that streaming chat completions capture time-to-first-token (TTFT).
     """
@@ -2981,43 +3879,54 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = [
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=0, delta=ChoiceDelta(content="Hello"), finish_reason=None
-                )
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="Hello"),
+                            finish_reason=None,
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content=" world"),
+                            finish_reason="stop",
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
             ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
+            include_event_type=False,
         ),
-        ChatCompletionChunk(
-            id="1",
-            choices=[
-                DeltaChoice(
-                    index=0, delta=ChoiceDelta(content=" world"), finish_reason="stop"
-                )
-            ],
-            created=100000,
-            model="model-id",
-            object="chat.completion.chunk",
-        ),
-    ]
+    )
 
-    client.chat.completions._post = mock.Mock(return_value=returned_stream)
-
-    with start_transaction(name="openai tx"):
-        response_stream = client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "Say hello"}],
-            stream=True,
-        )
-        # Consume the stream
-        for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Say hello"}],
+                stream=True,
+            )
+            # Consume the stream
+            for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
@@ -3033,7 +3942,11 @@ def test_streaming_chat_completion_ttft(sentry_init, capture_events):
 # noinspection PyTypeChecker
 @pytest.mark.asyncio
 async def test_streaming_chat_completion_ttft_async(
-    sentry_init, capture_events, async_iterator
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """
     Test that async streaming chat completions capture time-to-first-token (TTFT).
@@ -3045,47 +3958,56 @@ async def test_streaming_chat_completion_ttft_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(
-        [
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=0, delta=ChoiceDelta(content="Hello"), finish_reason=None
-                    )
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="Hello"),
+                                finish_reason=None,
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content=" world"),
+                                finish_reason="stop",
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
                 ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
+                include_event_type=False,
             ),
-            ChatCompletionChunk(
-                id="1",
-                choices=[
-                    DeltaChoice(
-                        index=0,
-                        delta=ChoiceDelta(content=" world"),
-                        finish_reason="stop",
-                    )
-                ],
-                created=100000,
-                model="model-id",
-                object="chat.completion.chunk",
-            ),
-        ]
+        )
     )
 
-    client.chat.completions._post = AsyncMock(return_value=returned_stream)
-
-    with start_transaction(name="openai tx"):
-        response_stream = await client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "Say hello"}],
-            stream=True,
-        )
-        # Consume the stream
-        async for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.chat._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Say hello"}],
+                stream=True,
+            )
+            # Consume the stream
+            async for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
@@ -3100,7 +4022,9 @@ async def test_streaming_chat_completion_ttft_async(
 
 # noinspection PyTypeChecker
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_streaming_responses_api_ttft(sentry_init, capture_events):
+def test_streaming_responses_api_ttft(
+    sentry_init, capture_events, get_model_response, server_side_event_chunks
+):
     """
     Test that streaming responses API captures time-to-first-token (TTFT).
     """
@@ -3111,19 +4035,24 @@ def test_streaming_responses_api_ttft(sentry_init, capture_events):
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = EXAMPLE_RESPONSES_STREAM
-    client.responses._post = mock.Mock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        server_side_event_chunks(EXAMPLE_RESPONSES_STREAM)
+    )
 
-    with start_transaction(name="openai tx"):
-        response_stream = client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-        )
-        # Consume the stream
-        for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            # Consume the stream
+            for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
@@ -3140,7 +4069,11 @@ def test_streaming_responses_api_ttft(sentry_init, capture_events):
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_ttft_async(
-    sentry_init, capture_events, async_iterator
+    sentry_init,
+    capture_events,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
 ):
     """
     Test that async streaming responses API captures time-to-first-token (TTFT).
@@ -3152,19 +4085,24 @@ async def test_streaming_responses_api_ttft_async(
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    returned_stream = AsyncStream(cast_to=None, response=None, client=client)
-    returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
-    client.responses._post = AsyncMock(return_value=returned_stream)
+    returned_stream = get_model_response(
+        async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
+    )
 
-    with start_transaction(name="openai tx"):
-        response_stream = await client.responses.create(
-            model="some-model",
-            input="hello",
-            stream=True,
-        )
-        # Consume the stream
-        async for _ in response_stream:
-            pass
+    with mock.patch.object(
+        client.responses._client._client,
+        "send",
+        return_value=returned_stream,
+    ):
+        with start_transaction(name="openai tx"):
+            response_stream = await client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            # Consume the stream
+            async for _ in response_stream:
+                pass
 
     (tx,) = events
     span = tx["spans"][0]
