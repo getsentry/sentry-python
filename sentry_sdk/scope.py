@@ -714,7 +714,7 @@ class Scope:
     def set_custom_sampling_context(
         self, custom_sampling_context: "dict[str, Any]"
     ) -> None:
-        self.get_active_propagation_context()._set_custom_sampling_context(
+        self.get_current_scope().get_active_propagation_context()._set_custom_sampling_context(
             custom_sampling_context
         )
 
@@ -892,6 +892,19 @@ class Scope:
                 self._transaction = transaction.name
                 if transaction.source:
                     self._transaction_info["source"] = transaction.source
+
+        # Also set _transaction and _transaction_info in streaming mode as this
+        # is used for populating events and linking them to segments
+        if (
+            isinstance(span, StreamedSpan)
+            and not isinstance(span, NoOpStreamedSpan)
+            and span._is_segment()
+        ):
+            self._transaction = span.name
+            if span._attributes.get("sentry.span.source"):
+                self._transaction_info["source"] = str(
+                    span._attributes["sentry.span.source"]
+                )
 
     @property
     def profile(self) -> "Optional[Profile]":
