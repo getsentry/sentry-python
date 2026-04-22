@@ -67,6 +67,7 @@ from openai.types.responses.response_usage import (
 )
 
 LANGCHAIN_VERSION = package_version("langchain")
+LANGCHAIN_OPENAI_VERSION = package_version("langchain-openai")
 
 
 @tool
@@ -170,6 +171,95 @@ def test_langchain_text_completion(
     assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
 
 
+def test_langchain_chat_with_run_name(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    request_headers = {}
+    # Changed in https://github.com/langchain-ai/langchain/pull/32655
+    if LANGCHAIN_OPENAI_VERSION >= (0, 3, 32):
+        request_headers["X-Stainless-Raw-Response"] = "True"
+
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="response-model-id",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers=request_headers,
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+
+    with patch.object(
+        llm.client._client._client,
+        "send",
+        return_value=model_response,
+    ) as _:
+        with start_transaction():
+            llm.invoke(
+                "How many letters in the word eudca",
+                config={"run_name": "my-snazzy-pipeline"},
+            )
+
+    tx = events[0]
+
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    assert len(chat_spans) == 1
+    assert chat_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
+
+
+def test_langchain_tool_call_with_run_name(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    with start_transaction():
+        get_word_length.invoke(
+            {"word": "eudca"},
+            config={"run_name": "my-snazzy-pipeline"},
+        )
+
+    tx = events[0]
+    tool_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
+    assert len(tool_spans) == 1
+    assert tool_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
+
+
 @pytest.mark.skipif(
     LANGCHAIN_VERSION < (1,),
     reason="LangChain 1.0+ required (ONE AGENT refactor)",
@@ -259,6 +349,8 @@ def test_langchain_create_agent(
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
 
     assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
+    assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
+
     assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
     assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
     assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
@@ -414,6 +506,10 @@ def test_tool_execution_span(
     assert chat_spans[0]["origin"] == "auto.ai.langchain"
     assert chat_spans[1]["origin"] == "auto.ai.langchain"
     assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+    assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
+    assert chat_spans[1]["data"]["gen_ai.agent.name"] == "word_length_agent"
+    assert tool_exec_span["data"]["gen_ai.agent.name"] == "word_length_agent"
 
     assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
     assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50

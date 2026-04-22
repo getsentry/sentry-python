@@ -49,6 +49,7 @@ CRUMBS_CONNECT = {
             "db.name": PG_NAME,
             "db.system": "postgresql",
             "db.user": PG_USER,
+            "db.driver.name": "asyncpg",
             "server.address": PG_HOST,
             "server.port": PG_PORT,
         }

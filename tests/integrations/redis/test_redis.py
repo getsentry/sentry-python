@@ -262,6 +262,7 @@ def test_db_connection_attributes_client(sentry_init, capture_events):
     assert span["op"] == "db.redis"
     assert span["description"] == "GET 'foobar'"
     assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
+    assert span["data"][SPANDATA.DB_DRIVER_NAME] == "redis-py"
     assert span["data"][SPANDATA.DB_NAME] == "1"
     assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
     assert span["data"][SPANDATA.SERVER_PORT] == 63791
@@ -288,6 +289,7 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_events):
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
     assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
+    assert span["data"][SPANDATA.DB_DRIVER_NAME] == "redis-py"
     assert span["data"][SPANDATA.DB_NAME] == "1"
     assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
     assert span["data"][SPANDATA.SERVER_PORT] == 63791

@@ -52,6 +52,7 @@ def _set_db_data_on_span(
 
     if isinstance(span, StreamedSpan):
         span.set_attribute("db.system.name", "redis")
+        span.set_attribute(SPANDATA.DB_DRIVER_NAME, "redis")
 
         if db is not None:
             span.set_attribute("db.namespace", str(db))
@@ -64,6 +65,7 @@ def _set_db_data_on_span(
 
     else:
         span.set_data(SPANDATA.DB_SYSTEM, "redis")
+        span.set_data(SPANDATA.DB_DRIVER_NAME, "redis-py")
 
         if db is not None:
             span.set_data(SPANDATA.DB_NAME, str(db))

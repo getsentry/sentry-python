@@ -124,12 +124,7 @@ def _set_pipeline_data(
         command = get_command_args_fn(arg)
         commands.append(_get_safe_command(command[0], command[1:]))
 
-    if isinstance(span, StreamedSpan):
-        span.set_attribute(
-            "db.redis.pipeline_length",
-            len(commands_seq),
-        )
-    else:
+    if not isinstance(span, StreamedSpan):
         span.set_data(
             "redis.commands",
             {
@@ -157,6 +152,6 @@ def _set_client_data(
             name_low in _MULTI_KEY_COMMANDS and len(args) == 1
         ):
             if isinstance(span, StreamedSpan):
-                span.set_attribute("redis.key", args[0])
+                span.set_attribute("db.redis.key", args[0])
             else:
                 span.set_tag("redis.key", args[0])
