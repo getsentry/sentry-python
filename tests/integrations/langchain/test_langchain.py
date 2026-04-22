@@ -233,6 +233,33 @@ def test_langchain_chat_with_run_name(
     assert chat_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
 
 
+def test_langchain_tool_call_with_run_name(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    with start_transaction():
+        get_word_length.invoke(
+            {"word": "eudca"},
+            config={"run_name": "my-snazzy-pipeline"},
+        )
+
+    tx = events[0]
+    tool_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
+    assert len(tool_spans) == 1
+    assert tool_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
+
+
 @pytest.mark.skipif(
     LANGCHAIN_VERSION < (1,),
     reason="LangChain 1.0+ required (ONE AGENT refactor)",
