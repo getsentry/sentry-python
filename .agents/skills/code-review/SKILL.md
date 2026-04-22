@@ -91,7 +91,7 @@ useEffect(() => {
 
 ```python
 # Bad: SQL injection risk
-cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
+cursor.execute("SELECT * FROM users WHERE id = <user_id>")
 
 # Good: Parameterized query
 cursor.execute("SELECT * FROM users WHERE id = %s", [user_id])

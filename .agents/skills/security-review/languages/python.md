@@ -70,11 +70,11 @@ mark_safe(user_input)                  # FLAG: If user_input is user-controlled
 format_html() with unescaped input     # CHECK: Depends on usage
 
 # SQL Injection
-User.objects.raw(f"SELECT * FROM users WHERE name = '{user_input}'")  # FLAG
-User.objects.extra(where=[f"name = '{user_input}'"])  # FLAG (deprecated)
-cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")  # FLAG
-RawSQL(f"SELECT * FROM x WHERE y = '{input}'")  # FLAG
-connection.execute(query % user_input)  # FLAG
+User.objects.raw("SELECT * FROM users WHERE name = '<user_input>'")  # FLAG
+User.objects.extra(where=["name = '<user_input>'"])  # FLAG (deprecated)
+cursor.execute("SELECT * FROM users WHERE id = <user_id>")  # FLAG
+RawSQL("SELECT * FROM x WHERE y = '<input>'")  # FLAG
+connection.execute("query with <user_input>")  # FLAG
 
 # Command Injection
 os.system(f"cmd {user_input}")  # FLAG
@@ -139,8 +139,8 @@ render_template_string(user_input)  # FLAG: SSTI vulnerability
 {{ variable|safe }}  # FLAG in templates
 
 # SQL Injection
-db.engine.execute(f"SELECT * FROM users WHERE name = '{user_input}'")  # FLAG
-text(f"SELECT * FROM users WHERE id = {user_id}")  # FLAG
+db.engine.execute("SELECT * FROM users WHERE name = '<user_input>'")  # FLAG
+text("SELECT * FROM users WHERE id = <user_id>")  # FLAG
 
 # SSTI (Server-Side Template Injection)
 render_template_string(user_controlled_template)  # FLAG: Critical
@@ -180,8 +180,8 @@ db.query(User).filter(User.id == user_id).first()
 
 ```python
 # SQL Injection (same as Flask/SQLAlchemy)
-db.execute(f"SELECT * FROM users WHERE id = {user_id}")  # FLAG
-text(f"SELECT * FROM users WHERE name = '{name}'")  # FLAG
+db.execute("SELECT * FROM users WHERE id = <user_id>")  # FLAG
+text("SELECT * FROM users WHERE name = '<name>'")  # FLAG
 
 # Response without validation
 @app.get("/data")
@@ -303,12 +303,12 @@ session.execute(text("SELECT * FROM users WHERE id = :id"), {"id": user_id})
 
 ```python
 # String interpolation in queries
-session.execute(f"SELECT * FROM users WHERE name = '{name}'")
-session.execute("SELECT * FROM users WHERE name = '%s'" % name)
-session.execute("SELECT * FROM users WHERE name = '" + name + "'")
+session.execute("SELECT * FROM users WHERE name = '<name>'")
+session.execute("SELECT * FROM users WHERE name = '<name>'")
+session.execute("SELECT * FROM users WHERE name = '" + "<name>" + "'")
 
 # text() with interpolation
-session.execute(text(f"SELECT * FROM users WHERE id = {user_id}"))
+session.execute(text("SELECT * FROM users WHERE id = <user_id>"))
 ```
 
 ---

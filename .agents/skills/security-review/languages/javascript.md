@@ -123,8 +123,8 @@ res.render('template', { name: userInput });  // EJS, Pug, Handlebars
 
 ```javascript
 // SQL Injection
-db.query(`SELECT * FROM users WHERE id = ${userId}`);  // FLAG
-connection.query('SELECT * FROM users WHERE name = "' + name + '"');  // FLAG
+db.query(`SELECT * FROM users WHERE id = <userId>`);  // FLAG
+connection.query('SELECT * FROM users WHERE name = "' + "<name>" + '"');  // FLAG
 
 // NoSQL Injection
 db.collection('users').find({ $where: userInput });  // FLAG: Code execution

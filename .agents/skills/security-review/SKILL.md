@@ -202,9 +202,9 @@ child_process.exec(user)   # Node.js
 innerHTML = userInput              # DOM XSS
 dangerouslySetInnerHTML={user}     # React XSS
 v-html="userInput"                 # Vue XSS
-f"SELECT * FROM x WHERE {user}"    # SQL injection
-`SELECT * FROM x WHERE ${user}`    # SQL injection
-os.system(f"cmd {user_input}")     # Command injection
+"SELECT * FROM x WHERE <user>"     # SQL injection
+`SELECT * FROM x WHERE <user>`     # SQL injection
+os.system("cmd <user_input>")      # Command injection
 ```
 
 ### Always Flag (Secrets)
