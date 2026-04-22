@@ -1983,7 +1983,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
 
     llm_span = llm_spans[0]
     assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
-    assert llm_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "my_pipeline"
+    assert llm_span["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my_pipeline"
 
     assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
     messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
