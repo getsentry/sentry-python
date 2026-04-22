@@ -171,10 +171,15 @@ def test_rediscluster_pipeline(
             pipeline.execute()
         sentry_sdk.flush()
 
-        assert len(items) == 2
-        pipeline_span, parent_span = items[0].payload, items[1].payload
-
+        # on initializing a RedisCluster, a COMMAND call may be emitted
+        payloads = [item.payload for item in items]
+        parent_span = payloads[-1]
+        redis_spans = payloads[:-1]
         assert parent_span["name"] == "custom parent"
+        assert len(redis_spans) in (1, 2)
+        assert len(redis_spans) == 1 or redis_spans[0]["name"] == "COMMAND"
+
+        pipeline_span = redis_spans[-1]
         assert pipeline_span["name"] == "redis.pipeline.execute"
         attrs = pipeline_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
