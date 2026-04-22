@@ -165,6 +165,7 @@ def _wrap_send_data() -> None:
 
 def _set_db_data(span: "Span", connection: "Connection") -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
+    span.set_data(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
     span.set_data(SPANDATA.SERVER_ADDRESS, connection.host)
     span.set_data(SPANDATA.SERVER_PORT, connection.port)
     span.set_data(SPANDATA.DB_NAME, connection.database)

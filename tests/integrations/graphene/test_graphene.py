@@ -207,7 +207,7 @@ def test_no_event_if_no_errors_sync(sentry_init, capture_events):
 def test_graphql_span_holds_query_information(sentry_init, capture_events):
     sentry_init(
         integrations=[GrapheneIntegration(), FlaskIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         default_integrations=False,
     )
     events = capture_events()
