@@ -44,6 +44,7 @@ def _get_db_span_description(
 
 def _set_db_data_on_span(span: "Span", connection_params: "dict[str, Any]") -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "redis")
+    span.set_data(SPANDATA.DB_DRIVER_NAME, "redis-py")
 
     db = connection_params.get("db")
     if db is not None:

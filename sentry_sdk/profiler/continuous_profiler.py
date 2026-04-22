@@ -506,8 +506,6 @@ class ThreadContinuousScheduler(ContinuousScheduler):
             self.thread.join()
             self.thread = None
 
-        self.buffer = None
-
 
 class GeventContinuousScheduler(ContinuousScheduler):
     """
@@ -579,8 +577,6 @@ class GeventContinuousScheduler(ContinuousScheduler):
         if self.thread is not None:
             self.thread.join()
             self.thread = None
-
-        self.buffer = None
 
 
 PROFILE_BUFFER_SECONDS = 60

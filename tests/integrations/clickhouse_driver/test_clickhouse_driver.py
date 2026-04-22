@@ -42,6 +42,7 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -54,6 +55,7 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -66,6 +68,7 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -78,6 +81,7 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -90,6 +94,7 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -257,6 +262,7 @@ def test_clickhouse_client_spans(
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -272,6 +278,7 @@ def test_clickhouse_client_spans(
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -287,6 +294,7 @@ def test_clickhouse_client_spans(
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -302,6 +310,7 @@ def test_clickhouse_client_spans(
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -317,6 +326,7 @@ def test_clickhouse_client_spans(
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -529,6 +539,7 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -541,6 +552,7 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -553,6 +565,7 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -565,6 +578,7 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -577,6 +591,7 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
             "category": "query",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -737,6 +752,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -752,6 +768,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -767,6 +784,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -782,6 +800,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",
@@ -797,6 +816,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
+                "db.driver.name": "clickhouse-driver",
                 "db.name": "",
                 "db.user": "default",
                 "server.address": "localhost",

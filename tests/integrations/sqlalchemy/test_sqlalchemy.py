@@ -127,6 +127,7 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
 
     for span in event["spans"]:
         assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
+        assert span["data"][SPANDATA.DB_DRIVER_NAME] == "pysqlite"
         assert span["data"][SPANDATA.DB_NAME] == ":memory:"
         assert SPANDATA.SERVER_ADDRESS not in span["data"]
         assert SPANDATA.SERVER_PORT not in span["data"]
@@ -201,6 +202,7 @@ def test_transactions_no_engine_url(sentry_init, capture_events):
 
     for span in event["spans"]:
         assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
+        assert span["data"][SPANDATA.DB_DRIVER_NAME] == "pysqlite"
         assert SPANDATA.DB_NAME not in span["data"]
         assert SPANDATA.SERVER_ADDRESS not in span["data"]
         assert SPANDATA.SERVER_PORT not in span["data"]
@@ -301,7 +303,7 @@ def test_engine_name_not_string(sentry_init):
 def test_query_source_disabled(sentry_init, capture_events):
     sentry_options = {
         "integrations": [SqlalchemyIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
     }
@@ -352,7 +354,7 @@ def test_query_source_disabled(sentry_init, capture_events):
 def test_query_source_enabled(sentry_init, capture_events, enable_db_query_source):
     sentry_options = {
         "integrations": [SqlalchemyIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
@@ -403,7 +405,7 @@ def test_query_source_enabled(sentry_init, capture_events, enable_db_query_sourc
 def test_query_source(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
@@ -468,7 +470,7 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
     """
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
@@ -531,7 +533,7 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
 def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
@@ -597,7 +599,7 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
 def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
