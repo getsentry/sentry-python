@@ -148,16 +148,14 @@ def patch_redis_client(
             set_db_data_fn(db_span, self)
             _set_client_data(db_span, is_cluster, name, *args)
 
-        try:
-            value = old_execute_command(self, name, *args, **kwargs)
-        finally:
-            db_span.__exit__(None, None, None)
+        value = old_execute_command(self, name, *args, **kwargs)
+        db_span.__exit__(None, None, None)
 
-            if cache_span:
-                with capture_internal_exceptions():
-                    _set_cache_data(cache_span, self, cache_properties, value)
+        if cache_span:
+            with capture_internal_exceptions():
+                _set_cache_data(cache_span, self, cache_properties, value)
 
-                cache_span.__exit__(None, None, None)
+            cache_span.__exit__(None, None, None)
 
         return value
 

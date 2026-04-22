@@ -8,13 +8,13 @@ from sentry_sdk.integrations.redis.consts import (
 )
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Sequence, Union
-    from sentry_sdk.tracing import Span
 
 
 def _get_safe_command(name: str, args: "Sequence[Any]") -> str:
