@@ -271,8 +271,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
             pass
 
     # Wait so profiles are captured before assertions.
-    sentry_sdk.profiler.continuous_profiler._scheduler.running = False
-    sentry_sdk.profiler.continuous_profiler._scheduler.thread.join()
+    sentry_sdk.profiler.continuous_profiler._scheduler.teardown()
 
     assert_single_transaction_with_profile_chunks(envelopes, thread)
 
