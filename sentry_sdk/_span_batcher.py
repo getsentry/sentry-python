@@ -109,7 +109,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         res: "dict[str, Any]" = {
             "trace_id": item.trace_id,
             "span_id": item.span_id,
-            "name": item._name,
+            "name": item._name if item._name is not None else "<unlabeled span>",
             "status": item._status,
             "is_segment": item._is_segment(),
             "start_timestamp": item._start_timestamp.timestamp(),

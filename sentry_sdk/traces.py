@@ -258,7 +258,9 @@ class StreamedSpan:
     ):
         self._name: str = name
         self._active: bool = active
-        self._attributes: "Attributes" = {}
+        self._attributes: "Attributes" = {
+            "sentry.origin": "manual",
+        }
 
         if attributes:
             for attribute, value in attributes.items():
@@ -278,12 +280,9 @@ class StreamedSpan:
         self._start_timestamp = datetime.now(timezone.utc)
         self._timestamp: "Optional[datetime]" = None
 
-        try:
-            # profiling depends on this value and requires that
-            # it is measured in nanoseconds
-            self._start_timestamp_monotonic_ns = nanosecond_time()
-        except AttributeError:
-            pass
+        # profiling depends on this value and requires that
+        # it is measured in nanoseconds
+        self._start_timestamp_monotonic_ns = nanosecond_time()
 
         self._span_id: "Optional[str]" = None
 
@@ -385,13 +384,10 @@ class StreamedSpan:
                 )
 
         if self._timestamp is None:
-            try:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-                self._timestamp = self._start_timestamp + timedelta(
-                    microseconds=elapsed / 1000
-                )
-            except AttributeError:
-                self._timestamp = datetime.now(timezone.utc)
+            elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+            self._timestamp = self._start_timestamp + timedelta(
+                microseconds=elapsed / 1000
+            )
 
         client = sentry_sdk.get_client()
         if not client.is_active():

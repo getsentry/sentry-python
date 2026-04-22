@@ -1549,6 +1549,7 @@ def test_transport_format(sentry_init, capture_envelopes):
                     "server.address": {"value": "test-server", "type": "string"},
                     "sentry.environment": {"value": "production", "type": "string"},
                     "sentry.release": {"value": "1.0.0", "type": "string"},
+                    "sentry.origin": {"value": "manual", "type": "string"},
                 },
             }
         ]
