@@ -98,6 +98,7 @@ def test_rediscluster_basic(
         attrs = span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
         assert attrs["db.system.name"] == "redis-py"
+        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         # ClusterNode converts localhost to 127.0.0.1
         assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
         assert attrs[SPANDATA.SERVER_PORT] == 6379
@@ -184,6 +185,7 @@ def test_rediscluster_pipeline(
         attrs = pipeline_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
         assert attrs["db.system.name"] == "redis-py"
+        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         # ClusterNode converts localhost to 127.0.0.1
         assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
         assert attrs[SPANDATA.SERVER_PORT] == 6379

@@ -102,6 +102,7 @@ async def test_async_basic(
         attrs = redis_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
         assert attrs["db.system.name"] == "redis-py"
+        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
         assert attrs[SPANDATA.SERVER_PORT] == 6379
         assert attrs["db.operation.name"] == "SET"
@@ -175,6 +176,7 @@ async def test_async_redis_pipeline(
         attrs = pipeline_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
         assert attrs["db.system.name"] == "redis-py"
+        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
         assert attrs[SPANDATA.SERVER_PORT] == 6379
     else:
