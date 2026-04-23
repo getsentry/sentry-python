@@ -88,7 +88,7 @@ def test_redis_pipeline(
         assert pipeline_span["name"] == "redis.pipeline.execute"
         assert pipeline_span["attributes"]["sentry.op"] == "db.redis"
         assert pipeline_span["attributes"]["sentry.origin"] == "auto.db.redis"
-        assert pipeline_span["attributes"]["db.system.name"] == "redis"
+        assert pipeline_span["attributes"]["db.system.name"] == "redis-py"
     else:
         events = capture_events()
         with start_transaction():
@@ -402,7 +402,7 @@ def test_db_connection_attributes_client(
         assert redis_span["name"] == "GET 'foobar'"
         attrs = redis_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
-        assert attrs["db.system.name"] == "redis"
+        assert attrs["db.system.name"] == "redis-py"
         assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         assert attrs["db.namespace"] == "1"
         assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
@@ -453,7 +453,7 @@ def test_db_connection_attributes_pipeline(
         assert pipeline_span["name"] == "redis.pipeline.execute"
         attrs = pipeline_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
-        assert attrs["db.system.name"] == "redis"
+        assert attrs["db.system.name"] == "redis-py"
         assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis"
         assert attrs["db.namespace"] == "1"
         assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
