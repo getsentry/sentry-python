@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import json
 import warnings
 from collections.abc import Set
 from copy import deepcopy
@@ -231,6 +232,16 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         middleware_class.__call__ = _create_span_call
 
     return middleware_class
+
+
+def _serialize_body_data(data: "Any") -> str:
+    # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
+    def _default(value: "Any") -> "Any":
+        if isinstance(value, AnnotatedValue):
+            return {"value": value.value, "metadata": value.metadata}
+        return str(value)
+
+    return json.dumps(data, default=_default)
 
 
 @ensure_integration_enabled(StarletteIntegration)
@@ -499,6 +510,23 @@ def patch_request_response() -> None:
                 sentry_scope.add_event_processor(
                     _make_request_event_processor(request, integration)
                 )
+
+                client = sentry_sdk.get_client()
+                is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+                if is_span_streaming_enabled:
+                    current_span = sentry_sdk.get_current_span()
+
+                    if (
+                        info
+                        and "data" in info
+                        and isinstance(current_span, StreamedSpan)
+                        and not isinstance(current_span, NoOpStreamedSpan)
+                    ):
+                        data = info["data"]
+                        current_span.set_attribute(
+                            "http.request.body.data",
+                            _serialize_body_data(data),
+                        )
 
                 return await old_func(*args, **kwargs)
 

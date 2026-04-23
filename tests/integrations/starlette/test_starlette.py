@@ -1056,6 +1056,124 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
 
 
+def _post_body_app(handler_awaitable):
+    async def _handler(request):
+        await handler_awaitable(request)
+        return starlette.responses.JSONResponse({"ok": True})
+
+    return starlette.applications.Starlette(
+        routes=[starlette.routing.Route("/body", _handler, methods=["POST"])],
+    )
+
+
+def test_request_body_data_scrubs_pii_span_streaming(sentry_init, capture_items):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def _read_json(request):
+        await request.json()
+
+    items = capture_items("span")
+
+    client = TestClient(_post_body_app(_read_json))
+    response = client.post(
+        "/body",
+        json={
+            "password": "ohno",
+            "authorization": "Bearer token",
+            "message": "hello",
+        },
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    attr = segments[0]["attributes"]["http.request.body.data"]
+
+    # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
+    # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
+    assert "ohno" in attr
+    assert "Bearer token" in attr
+    assert "hello" in attr
+
+
+def test_request_body_data_annotated_value_top_level_span_streaming(
+    sentry_init, capture_items
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def _read_body(request):
+        await request.body()
+
+    items = capture_items("span")
+
+    client = TestClient(_post_body_app(_read_body))
+    response = client.post(
+        "/body",
+        content=b"not json and not form",
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    attr = segments[0]["attributes"]["http.request.body.data"]
+
+    assert isinstance(attr, str)
+    assert "!raw" in attr
+
+
+def test_request_body_data_annotated_value_nested_span_streaming(
+    sentry_init, capture_items
+):
+    pytest.importorskip("multipart")
+
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def _read_form(request):
+        await request.form()
+
+    items = capture_items("span")
+
+    client = TestClient(_post_body_app(_read_form))
+    response = client.post(
+        "/body",
+        data={"name": "erica"},
+        files={"avatar": ("photo.jpg", b"fake-bytes", "image/jpeg")},
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    attr = segments[0]["attributes"]["http.request.body.data"]
+
+    assert isinstance(attr, str)
+    parsed = json.loads(attr)
+    assert parsed["name"] == "erica"
+    assert parsed["avatar"]["metadata"]["rem"] == [["!raw", "x"]]
+    assert "fake-bytes" not in attr
+
+
 def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(integrations=[StarletteIntegration()])
 
