@@ -1103,6 +1103,10 @@ def test_request_body_data_scrubs_pii_span_streaming(sentry_init, capture_items)
     assert "hello" in attr
 
 
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 21),
+    reason="Requires Starlette >= 0.21, because earlier versions use a requests-based TestClient which does not support the 'content' kwarg",
+)
 def test_request_body_data_annotated_value_top_level_span_streaming(
     sentry_init, capture_items
 ):
