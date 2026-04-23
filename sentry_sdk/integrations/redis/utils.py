@@ -112,7 +112,7 @@ def _set_pipeline_data(
     is_transaction: bool,
     commands_seq: "Sequence[Any]",
 ) -> None:
-    # TODO: Remove when removing transaction based tracing
+    # TODO: Remove this whole function when removing transaction based tracing
     if isinstance(span, StreamedSpan):
         return
 
@@ -141,7 +141,7 @@ def _set_client_data(
 ) -> None:
     if isinstance(span, StreamedSpan):
         if name:
-            span.set_attribute("db.operation.name", name)
+            span.set_attribute(SPANDATA.DB_OPERATION_NAME, name)
     else:
         span.set_tag("redis.is_cluster", is_cluster)
         if name:

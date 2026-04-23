@@ -97,12 +97,12 @@ def test_rediscluster_basic(
         assert span["name"] == description
         attrs = span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
-        assert attrs["db.system.name"] == "redis"
+        assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
         assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         # ClusterNode converts localhost to 127.0.0.1
         assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
         assert attrs[SPANDATA.SERVER_PORT] == 6379
-        assert attrs["db.operation.name"] == "SET"
+        assert attrs[SPANDATA.DB_OPERATION_NAME] == "SET"
         assert attrs["db.redis.key"] == "bar"
     else:
         events = capture_events()
@@ -184,7 +184,7 @@ def test_rediscluster_pipeline(
         assert pipeline_span["name"] == "redis.pipeline.execute"
         attrs = pipeline_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
-        assert attrs["db.system.name"] == "redis"
+        assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
         assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         # ClusterNode converts localhost to 127.0.0.1
         assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"

@@ -5,6 +5,7 @@ import pytest
 import fakeredis
 from fakeredis import FakeStrictRedis
 
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import parse_version
@@ -78,26 +79,26 @@ def test_cache_basic(sentry_init, capture_events, capture_items, span_streaming)
 
         # hget: db only (HGET is not a cache command)
         assert payloads[0]["attributes"]["sentry.op"] == "db.redis"
-        assert payloads[0]["attributes"]["db.operation.name"] == "HGET"
+        assert payloads[0]["attributes"][SPANDATA.DB_OPERATION_NAME] == "HGET"
 
         # get: db then cache.get
         assert payloads[1]["attributes"]["sentry.op"] == "db.redis"
-        assert payloads[1]["attributes"]["db.operation.name"] == "GET"
+        assert payloads[1]["attributes"][SPANDATA.DB_OPERATION_NAME] == "GET"
         assert payloads[2]["attributes"]["sentry.op"] == "cache.get"
 
         # set: db then cache.put
         assert payloads[3]["attributes"]["sentry.op"] == "db.redis"
-        assert payloads[3]["attributes"]["db.operation.name"] == "SET"
+        assert payloads[3]["attributes"][SPANDATA.DB_OPERATION_NAME] == "SET"
         assert payloads[4]["attributes"]["sentry.op"] == "cache.put"
 
         # setex: db then cache.put
         assert payloads[5]["attributes"]["sentry.op"] == "db.redis"
-        assert payloads[5]["attributes"]["db.operation.name"] == "SETEX"
+        assert payloads[5]["attributes"][SPANDATA.DB_OPERATION_NAME] == "SETEX"
         assert payloads[6]["attributes"]["sentry.op"] == "cache.put"
 
         # mget: db then cache.get
         assert payloads[7]["attributes"]["sentry.op"] == "db.redis"
-        assert payloads[7]["attributes"]["db.operation.name"] == "MGET"
+        assert payloads[7]["attributes"][SPANDATA.DB_OPERATION_NAME] == "MGET"
         assert payloads[8]["attributes"]["sentry.op"] == "cache.get"
 
         assert payloads[9]["name"] == "custom parent"

@@ -51,7 +51,7 @@ def _set_db_data_on_span(
     port = connection_params.get("port")
 
     if isinstance(span, StreamedSpan):
-        span.set_attribute("db.system.name", "redis")
+        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "redis")
         span.set_attribute(SPANDATA.DB_DRIVER_NAME, "redis-py")
 
         if db is not None:
