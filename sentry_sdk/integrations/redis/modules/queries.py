@@ -55,7 +55,7 @@ def _set_db_data_on_span(
         span.set_attribute(SPANDATA.DB_DRIVER_NAME, "redis-py")
 
         if db is not None:
-            span.set_attribute("db.namespace", str(db))
+            span.set_attribute(SPANDATA.DB_NAMESPACE, str(db))
 
         if host is not None:
             span.set_attribute(SPANDATA.SERVER_ADDRESS, host)
