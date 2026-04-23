@@ -80,7 +80,7 @@ async def test_async_redis_pipeline(
         assert pipeline_span["name"] == "redis.pipeline.execute"
         attrs = pipeline_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
-        assert attrs["db.system.name"] == "redis-py"
+        assert attrs["db.system.name"] == "redis"
         assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         assert attrs["db.namespace"] == "0"
         assert attrs[SPANDATA.SERVER_ADDRESS] == (
