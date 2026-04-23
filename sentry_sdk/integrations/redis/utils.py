@@ -112,9 +112,12 @@ def _set_pipeline_data(
     is_transaction: bool,
     commands_seq: "Sequence[Any]",
 ) -> None:
-    if isinstance(span, Span):
-        span.set_tag("redis.is_cluster", is_cluster)
-        span.set_tag("redis.transaction", is_transaction)
+    # TODO: Remove when removing transaction based tracing
+    if isinstance(span, StreamedSpan):
+        return
+
+    span.set_tag("redis.is_cluster", is_cluster)
+    span.set_tag("redis.transaction", is_transaction)
 
     commands = []
     for i, arg in enumerate(commands_seq):
@@ -124,14 +127,13 @@ def _set_pipeline_data(
         command = get_command_args_fn(arg)
         commands.append(_get_safe_command(command[0], command[1:]))
 
-    if not isinstance(span, StreamedSpan):
-        span.set_data(
-            "redis.commands",
-            {
-                "count": len(commands_seq),
-                "first_ten": commands,
-            },
-        )
+    span.set_data(
+        "redis.commands",
+        {
+            "count": len(commands_seq),
+            "first_ten": commands,
+        },
+    )
 
 
 def _set_client_data(
