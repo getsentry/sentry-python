@@ -88,6 +88,7 @@ def test_redis_pipeline(
         assert pipeline_span["name"] == "redis.pipeline.execute"
         assert pipeline_span["attributes"]["sentry.op"] == "db.redis"
         assert pipeline_span["attributes"]["sentry.origin"] == "auto.db.redis"
+        assert pipeline_span["attributes"]["db.system.name"] == "redis"
     else:
         events = capture_events()
         with start_transaction():
