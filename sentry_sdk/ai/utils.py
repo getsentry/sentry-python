@@ -7,7 +7,7 @@ from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.consts import DATA_URL_BASE64_REGEX
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
     from sentry_sdk.tracing import Span
 
@@ -497,6 +497,15 @@ def set_data_normalized(
         span.set_data(key, normalized)
     else:
         span.set_data(key, json.dumps(normalized))
+
+
+def _set_span_data_attribute(
+    span: "Union[Span, StreamedSpan]", key: str, value: "Any"
+) -> None:
+    if isinstance(span, StreamedSpan):
+        span.set_attribute(key, value)
+    else:
+        span.set_data(key, value)
 
 
 def normalize_message_role(role: str) -> str:
