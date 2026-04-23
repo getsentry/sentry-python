@@ -7,13 +7,14 @@ from sentry_sdk.integrations.redis.consts import (
     _SINGLE_KEY_COMMANDS,
 )
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Sequence
-    from sentry_sdk.tracing import Span
+    from typing import Any, Optional, Sequence, Union
 
 
 def _get_safe_command(name: str, args: "Sequence[Any]") -> str:
@@ -105,12 +106,16 @@ def _parse_rediscluster_command(command: "Any") -> "Sequence[Any]":
 
 
 def _set_pipeline_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     is_cluster: bool,
     get_command_args_fn: "Any",
     is_transaction: bool,
     commands_seq: "Sequence[Any]",
 ) -> None:
+    # TODO: Remove this whole function when removing transaction based tracing
+    if isinstance(span, StreamedSpan):
+        return
+
     span.set_tag("redis.is_cluster", is_cluster)
     span.set_tag("redis.transaction", is_transaction)
 
@@ -131,15 +136,24 @@ def _set_pipeline_data(
     )
 
 
-def _set_client_data(span: "Span", is_cluster: bool, name: str, *args: "Any") -> None:
-    span.set_tag("redis.is_cluster", is_cluster)
-    if name:
-        span.set_tag("redis.command", name)
-        span.set_tag(SPANDATA.DB_OPERATION, name)
+def _set_client_data(
+    span: "Union[Span, StreamedSpan]", is_cluster: bool, name: str, *args: "Any"
+) -> None:
+    if isinstance(span, StreamedSpan):
+        if name:
+            span.set_attribute(SPANDATA.DB_OPERATION_NAME, name)
+    else:
+        span.set_tag("redis.is_cluster", is_cluster)
+        if name:
+            span.set_tag("redis.command", name)
+            span.set_tag(SPANDATA.DB_OPERATION, name)
 
     if name and args:
         name_low = name.lower()
         if (name_low in _SINGLE_KEY_COMMANDS) or (
             name_low in _MULTI_KEY_COMMANDS and len(args) == 1
         ):
-            span.set_tag("redis.key", args[0])
+            if isinstance(span, StreamedSpan):
+                span.set_attribute("db.redis.key", args[0])
+            else:
+                span.set_tag("redis.key", args[0])
