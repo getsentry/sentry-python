@@ -402,7 +402,7 @@ def test_db_connection_attributes_client(
         attrs = redis_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
         assert attrs["db.system.name"] == "redis"
-        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis"
+        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         assert attrs["db.namespace"] == "1"
         assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
         assert attrs[SPANDATA.SERVER_PORT] == 63791
