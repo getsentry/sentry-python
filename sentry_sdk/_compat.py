@@ -13,6 +13,7 @@ PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
 PY38 = sys.version_info[0] == 3 and sys.version_info[1] >= 8
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
+PY313 = sys.version_info[0] == 3 and sys.version_info[1] >= 13
 
 
 def with_metaclass(meta: "Any", *bases: "Any") -> "Any":

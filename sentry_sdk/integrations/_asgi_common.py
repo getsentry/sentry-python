@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import urllib
 
+from sentry_sdk._compat import PY313
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
@@ -16,13 +17,9 @@ if TYPE_CHECKING:
 
     from sentry_sdk.utils import AnnotatedValue
 
-# Python 3.12 deprecates asyncio.iscoroutinefunction() as an alias for
-# inspect.iscoroutinefunction(). Until 3.12 is the minimum supported Python
-# version, provide a shim.
-if hasattr(inspect, "iscoroutinefunction"):
-    _iscoroutinefunction = inspect.iscoroutinefunction
-else:
-    _iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
+_iscoroutinefunction = (
+    inspect.iscoroutinefunction if PY313 else asyncio.iscoroutinefunction
+)
 
 
 def _get_headers(asgi_scope: "Any") -> "Dict[str, str]":
