@@ -1066,10 +1066,13 @@ def _post_body_app(handler_awaitable):
     )
 
 
-def test_request_body_data_scrubs_pii_span_streaming(sentry_init, capture_items):
+@pytest.mark.parametrize("middleware_spans", [False, True])
+def test_request_body_data_scrubs_pii_span_streaming(
+    sentry_init, capture_items, middleware_spans
+):
     sentry_init(
         auto_enabling_integrations=False,
-        integrations=[StarletteIntegration()],
+        integrations=[StarletteIntegration(middleware_spans=middleware_spans)],
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
@@ -1107,12 +1110,13 @@ def test_request_body_data_scrubs_pii_span_streaming(sentry_init, capture_items)
     STARLETTE_VERSION < (0, 21),
     reason="Requires Starlette >= 0.21, because earlier versions use a requests-based TestClient which does not support the 'content' kwarg",
 )
+@pytest.mark.parametrize("middleware_spans", [False, True])
 def test_request_body_data_annotated_value_top_level_span_streaming(
-    sentry_init, capture_items
+    sentry_init, capture_items, middleware_spans
 ):
     sentry_init(
         auto_enabling_integrations=False,
-        integrations=[StarletteIntegration()],
+        integrations=[StarletteIntegration(middleware_spans=middleware_spans)],
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
@@ -1140,14 +1144,15 @@ def test_request_body_data_annotated_value_top_level_span_streaming(
     assert "!raw" in attr
 
 
+@pytest.mark.parametrize("middleware_spans", [False, True])
 def test_request_body_data_annotated_value_nested_span_streaming(
-    sentry_init, capture_items
+    sentry_init, capture_items, middleware_spans
 ):
     pytest.importorskip("multipart")
 
     sentry_init(
         auto_enabling_integrations=False,
-        integrations=[StarletteIntegration()],
+        integrations=[StarletteIntegration(middleware_spans=middleware_spans)],
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )

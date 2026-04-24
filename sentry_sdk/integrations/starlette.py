@@ -469,9 +469,8 @@ def patch_request_response() -> None:
         if is_coroutine:
 
             async def _sentry_async_func(*args: "Any", **kwargs: "Any") -> "Any":
-                integration = sentry_sdk.get_client().get_integration(
-                    StarletteIntegration
-                )
+                client = sentry_sdk.get_client()
+                integration = client.get_integration(StarletteIntegration)
                 if integration is None:
                     return await old_func(*args, **kwargs)
 
@@ -511,7 +510,6 @@ def patch_request_response() -> None:
                     _make_request_event_processor(request, integration)
                 )
 
-                client = sentry_sdk.get_client()
                 is_span_streaming_enabled = has_span_streaming_enabled(client.options)
                 if is_span_streaming_enabled:
                     current_span = sentry_sdk.get_current_span()
@@ -523,7 +521,7 @@ def patch_request_response() -> None:
                         and not isinstance(current_span, NoOpStreamedSpan)
                     ):
                         data = info["data"]
-                        current_span.set_attribute(
+                        current_span._segment.set_attribute(
                             "http.request.body.data",
                             _serialize_body_data(data),
                         )
