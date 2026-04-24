@@ -707,6 +707,14 @@ async def test_prompt_handler_with_error(
         assert error_event["level"] == "error"
         assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
 
+        # Check transaction and span
+        assert tx["type"] == "transaction"
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+
+        assert span["status"] == "internal_error"
+        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["data"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -934,6 +942,14 @@ async def test_resource_handler_with_error(
 
         assert error_event["level"] == "error"
         assert error_event["exception"]["values"][0]["type"] == "FileNotFoundError"
+
+        # Check transaction and span
+        assert tx["type"] == "transaction"
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+
+        assert span["status"] == "internal_error"
+        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["data"]
 
 
 @pytest.mark.asyncio
