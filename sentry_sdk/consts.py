@@ -549,6 +549,12 @@ class SPANDATA:
     Example: "Hello!"
     """
 
+    GEN_AI_FUNCTION_ID = "gen_ai.function_id"
+    """
+    Framework-specific tracing label for the execution of a function or other unit of execution in a generative AI system.
+    Example: "my-awesome-function"
+    """
+
     GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
     """
     The name of the operation being performed.
