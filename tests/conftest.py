@@ -483,7 +483,6 @@ def render_span_tree():
 
         by_parent = {}
         for span in spans:
-            print(span)
             if "parent_span_id" not in span:
                 root_span = span
                 continue
