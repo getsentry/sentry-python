@@ -1,4 +1,3 @@
-import asyncio
 import functools
 import warnings
 from collections.abc import Set
@@ -12,6 +11,7 @@ from sentry_sdk.integrations import (
     Integration,
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
 )
+from sentry_sdk.integrations._asgi_common import _iscoroutinefunction
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     HttpCodeRangeContainer,
@@ -424,8 +424,8 @@ def _is_async_callable(obj: "Any") -> bool:
     while isinstance(obj, functools.partial):
         obj = obj.func
 
-    return asyncio.iscoroutinefunction(obj) or (
-        callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+    return _iscoroutinefunction(obj) or (
+        callable(obj) and _iscoroutinefunction(obj.__call__)
     )
 
 

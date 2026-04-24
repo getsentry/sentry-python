@@ -2,17 +2,12 @@ import functools
 
 import sentry_sdk
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations._asgi_common import _iscoroutinefunction
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-
-
-try:
-    from asyncio import iscoroutinefunction
-except ImportError:
-    iscoroutinefunction = None  # type: ignore
 
 
 try:
@@ -48,10 +43,8 @@ def patch_views() -> None:
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is not None:
-            is_async_view = (
-                iscoroutinefunction is not None
-                and wrap_async_view is not None
-                and iscoroutinefunction(callback)
+            is_async_view = wrap_async_view is not None and _iscoroutinefunction(
+                callback
             )
             if is_async_view:
                 sentry_wrapped_callback = wrap_async_view(callback)

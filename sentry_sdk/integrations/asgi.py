@@ -5,7 +5,6 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 """
 
 import sys
-import asyncio
 import inspect
 from copy import deepcopy
 from functools import partial
@@ -18,6 +17,7 @@ from sentry_sdk.integrations._asgi_common import (
     _get_request_attributes,
     _get_request_data,
     _get_url,
+    _iscoroutinefunction,
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -87,10 +87,10 @@ def _looks_like_asgi3(app: "Any") -> bool:
     if inspect.isclass(app):
         return hasattr(app, "__await__")
     elif inspect.isfunction(app):
-        return asyncio.iscoroutinefunction(app)
+        return _iscoroutinefunction(app)
     else:
         call = getattr(app, "__call__", None)  # noqa
-        return asyncio.iscoroutinefunction(call)
+        return _iscoroutinefunction(call)
 
 
 class SentryAsgiMiddleware:

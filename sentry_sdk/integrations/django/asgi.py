@@ -16,6 +16,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations._asgi_common import _iscoroutinefunction
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -41,10 +42,8 @@ if TYPE_CHECKING:
 # Until 3.12 is the minimum supported Python version, provide a shim.
 # This was copied from https://github.com/django/asgiref/blob/main/asgiref/sync.py
 if hasattr(inspect, "markcoroutinefunction"):
-    iscoroutinefunction = inspect.iscoroutinefunction
     markcoroutinefunction = inspect.markcoroutinefunction
 else:
-    iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
 
     def markcoroutinefunction(func: "_F") -> "_F":
         func._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore
@@ -215,7 +214,7 @@ def _asgi_middleware_mixin_factory(
             a thread is not consumed during a whole request.
             Taken from django.utils.deprecation::MiddlewareMixin._async_check
             """
-            if iscoroutinefunction(self.get_response):
+            if _iscoroutinefunction(self.get_response):
                 markcoroutinefunction(self)
 
         def async_route_check(self) -> bool:
@@ -223,7 +222,7 @@ def _asgi_middleware_mixin_factory(
             Function that checks if we are in async mode,
             and if we are forwards the handling of requests to __acall__
             """
-            return iscoroutinefunction(self.get_response)
+            return _iscoroutinefunction(self.get_response)
 
         async def __acall__(self, *args: "Any", **kwargs: "Any") -> "Any":
             f = self._acall_method

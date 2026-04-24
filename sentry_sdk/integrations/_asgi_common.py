@@ -1,5 +1,8 @@
+import asyncio
+import inspect
 import urllib
 
+from sentry_sdk._compat import PY313
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
@@ -13,6 +16,10 @@ if TYPE_CHECKING:
     from typing_extensions import Literal
 
     from sentry_sdk.utils import AnnotatedValue
+
+_iscoroutinefunction = (
+    inspect.iscoroutinefunction if PY313 else asyncio.iscoroutinefunction
+)
 
 
 def _get_headers(asgi_scope: "Any") -> "Dict[str, str]":
