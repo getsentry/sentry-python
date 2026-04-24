@@ -14,7 +14,7 @@ from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import record_sql_queries_supporting_streaming
 from sentry_sdk.utils import json_dumps
 
 
@@ -922,7 +922,9 @@ def test_no_query_source_if_duration_too_short(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    with record_sql_queries(*args, **kwargs) as span:
+                    with record_sql_queries_supporting_streaming(
+                        *args, **kwargs
+                    ) as span:
                         self.span = span
 
                     if span_streaming:
@@ -939,7 +941,7 @@ def test_no_query_source_if_duration_too_short(
                     pass
 
             with mock.patch(
-                "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
+                "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
                 fake_record_sql_queries,
             ):
                 assert session.query(Person).first() == bob
@@ -983,7 +985,9 @@ def test_no_query_source_if_duration_too_short(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    with record_sql_queries(*args, **kwargs) as span:
+                    with record_sql_queries_supporting_streaming(
+                        *args, **kwargs
+                    ) as span:
                         self.span = span
 
                     if span_streaming:
@@ -1000,7 +1004,7 @@ def test_no_query_source_if_duration_too_short(
                     pass
 
             with mock.patch(
-                "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
+                "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
                 fake_record_sql_queries,
             ):
                 assert session.query(Person).first() == bob
@@ -1061,7 +1065,9 @@ def test_query_source_if_duration_over_threshold(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    with record_sql_queries(*args, **kwargs) as span:
+                    with record_sql_queries_supporting_streaming(
+                        *args, **kwargs
+                    ) as span:
                         self.span = span
 
                     self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
@@ -1074,7 +1080,7 @@ def test_query_source_if_duration_over_threshold(
                     pass
 
             with mock.patch(
-                "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
+                "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
                 fake_record_sql_queries,
             ):
                 assert session.query(Person).first() == bob
@@ -1131,7 +1137,9 @@ def test_query_source_if_duration_over_threshold(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    with record_sql_queries(*args, **kwargs) as span:
+                    with record_sql_queries_supporting_streaming(
+                        *args, **kwargs
+                    ) as span:
                         self.span = span
 
                     self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
@@ -1144,7 +1152,7 @@ def test_query_source_if_duration_over_threshold(
                     pass
 
             with mock.patch(
-                "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
+                "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
                 fake_record_sql_queries,
             ):
                 assert session.query(Person).first() == bob

@@ -1,6 +1,9 @@
 from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
-from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
+from sentry_sdk.tracing_utils import (
+    add_query_source,
+    record_sql_queries_supporting_streaming,
+)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -49,7 +52,7 @@ def _before_cursor_execute(
     executemany: bool,
     *args: "Any",
 ) -> None:
-    ctx_mgr = record_sql_queries(
+    ctx_mgr = record_sql_queries_supporting_streaming(
         cursor,
         statement,
         parameters,
