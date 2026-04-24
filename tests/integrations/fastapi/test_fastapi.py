@@ -6,6 +6,7 @@ import warnings
 from unittest import mock
 
 import fastapi
+import starlette
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -20,6 +21,7 @@ from sentry_sdk.utils import parse_version
 
 
 FASTAPI_VERSION = parse_version(fastapi.__version__)
+STARLETTE_VERSION = parse_version(starlette.__version__)
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
 from tests.integrations.starlette import test_starlette
@@ -299,6 +301,10 @@ def test_request_body_data_does_not_scrub_pii_span_streaming(
     assert "hello" in attr
 
 
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 21),
+    reason="Requires Starlette >= 0.21, because earlier versions use a requests-based TestClient which does not support the 'content' kwarg",
+)
 @pytest.mark.parametrize("middleware_spans", [False, True])
 def test_request_body_data_annotated_value_top_level_span_streaming(
     sentry_init, capture_items, middleware_spans
