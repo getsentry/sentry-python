@@ -20,7 +20,7 @@ try:
     from sentry_sdk.integrations.starlette import (
         StarletteIntegration,
         StarletteRequestExtractor,
-        _set_body_data_on_streaming_segment,
+        _set_request_body_data_on_streaming_segment,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
@@ -141,7 +141,7 @@ def patch_get_request_handler() -> None:
             )
 
             if has_span_streaming_enabled(client.options):
-                _set_body_data_on_streaming_segment(info)
+                _set_request_body_data_on_streaming_segment(info)
 
             return await old_app(*args, **kwargs)
 
