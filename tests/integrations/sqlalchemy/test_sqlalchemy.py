@@ -63,7 +63,7 @@ def test_orm_queries(
     assert session.query(Person).first() == bob
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event")
         capture_message("hi")
         (event,) = (item.payload for item in items if item.type == "event")
     else:
@@ -1201,7 +1201,7 @@ def test_span_origin(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}
     )
     if span_streaming:
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
         with sentry_sdk.traces.start_span(name="custom parent"):
             with engine.connect() as con:
                 con.execute(text("SELECT 0"))
