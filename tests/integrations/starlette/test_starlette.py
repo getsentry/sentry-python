@@ -1066,7 +1066,7 @@ def _post_body_app(handler_awaitable):
 
 
 @pytest.mark.parametrize("middleware_spans", [False, True])
-def test_request_body_data_scrubs_pii_span_streaming(
+def test_request_body_data_does_not_scrub_pii_span_streaming(
     sentry_init, capture_items, middleware_spans
 ):
     sentry_init(
