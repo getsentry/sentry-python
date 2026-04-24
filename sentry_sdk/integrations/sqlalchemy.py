@@ -80,14 +80,15 @@ def _after_cursor_execute(
         context, "_sentry_sql_span_manager", None
     )
 
-    if ctx_mgr is not None:
-        context._sentry_sql_span_manager = None
-        ctx_mgr.__exit__(None, None, None)
-
+    # Record query source immediately before span is finished: accurate end timestamp and before the span is flushed.
     span: "Optional[Span]" = getattr(context, "_sentry_sql_span", None)
     if span is not None:
         with capture_internal_exceptions():
             add_query_source(span)
+
+    if ctx_mgr is not None:
+        context._sentry_sql_span_manager = None
+        ctx_mgr.__exit__(None, None, None)
 
 
 def _handle_error(context: "Any", *args: "Any") -> None:
