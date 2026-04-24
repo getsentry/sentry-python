@@ -7,6 +7,7 @@ from sentry_sdk.utils import (
     parse_version,
 )
 from sentry_sdk.traces import StreamedSpan, SpanStatus
+from sentry_sdk.tracing import Span
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
@@ -22,8 +23,6 @@ if TYPE_CHECKING:
     from typing import ContextManager
     from typing import Optional
     from typing import Union
-
-    from sentry_sdk.tracing import Span
 
 
 class SqlalchemyIntegration(Integration):
@@ -81,14 +80,20 @@ def _after_cursor_execute(
     )
 
     # Record query source immediately before span is finished: accurate end timestamp and before the span is flushed.
-    span: "Optional[Span]" = getattr(context, "_sentry_sql_span", None)
-    if span is not None:
+    span: "Optional[Union[Span, StreamedSpan]]" = getattr(
+        context, "_sentry_sql_span", None
+    )
+    if isinstance(span, StreamedSpan):
         with capture_internal_exceptions():
             add_query_source(span)
 
     if ctx_mgr is not None:
         context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
+
+    if isinstance(span, Span):
+        with capture_internal_exceptions():
+            add_query_source(span)
 
 
 def _handle_error(context: "Any", *args: "Any") -> None:
