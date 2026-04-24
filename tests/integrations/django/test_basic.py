@@ -457,7 +457,7 @@ def test_response_trace(sentry_init, client, capture_events, render_span_tree):
 
     assert (
         '- op="view.response.render": description="serialize response"'
-        in render_span_tree(events[0])
+        in render_span_tree(events[0]["spans"], events[0]["contexts"]["trace"])
     )
 
 
