@@ -1,4 +1,4 @@
-import asyncio
+import sys
 from copy import deepcopy
 from functools import wraps
 
@@ -30,6 +30,13 @@ except ImportError:
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
+
+
+# Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
+if sys.version_info >= (3, 13):  # pragma: no cover
+    from inspect import iscoroutinefunction
+else:
+    from asyncio import iscoroutinefunction
 
 
 class FastApiIntegration(StarletteIntegration):
@@ -74,7 +81,7 @@ def patch_get_request_handler() -> None:
         if (
             dependant
             and dependant.call is not None
-            and not asyncio.iscoroutinefunction(dependant.call)
+            and not iscoroutinefunction(dependant.call)
         ):
             old_call = dependant.call
 
