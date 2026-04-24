@@ -511,15 +511,6 @@ def _set_span_data_attribute(
         span.set_data(key, value)
 
 
-def _set_span_data_attribute(
-    span: "Union[Span, StreamedSpan]", key: str, value: "Any"
-) -> None:
-    if isinstance(span, StreamedSpan):
-        span.set_attribute(key, value)
-    else:
-        span.set_data(key, value)
-
-
 def normalize_message_role(role: str) -> str:
     """
     Normalize a message role to one of the 4 allowed gen_ai role values.
