@@ -1,7 +1,7 @@
 from __future__ import annotations
 import contextlib
 import re
-from typing import Any, TypeVar, Callable, Awaitable, Iterator, Union
+from typing import Any, TypeVar, Callable, Awaitable, Iterator
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -13,7 +13,6 @@ from sentry_sdk.utils import (
     parse_version,
     capture_internal_exceptions,
 )
-from sentry_sdk.traces import StreamedSpan
 
 try:
     import asyncpg  # type: ignore[import-not-found]
@@ -102,7 +101,7 @@ def _record(
     params_list: "tuple[Any, ...] | None",
     *,
     executemany: bool = False,
-) -> "Iterator[Union[Span, StreamedSpan]]":
+) -> "Iterator[Span]":
     integration = sentry_sdk.get_client().get_integration(AsyncPGIntegration)
     if integration is not None and not integration._record_params:
         params_list = None
@@ -198,27 +197,22 @@ def _wrap_connect_addr(
     return _inner
 
 
-def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
-    if isinstance(span, StreamedSpan):
-        set_on_span = span.set_attribute
-    else:
-        set_on_span = span.set_data
-
-    set_on_span(SPANDATA.DB_SYSTEM, "postgresql")
-    set_on_span(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+def _set_db_data(span: "Span", conn: "Any") -> None:
+    span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+    span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
 
     addr = conn._addr
     if addr:
         try:
-            set_on_span(SPANDATA.SERVER_ADDRESS, addr[0])
-            set_on_span(SPANDATA.SERVER_PORT, addr[1])
+            span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
+            span.set_data(SPANDATA.SERVER_PORT, addr[1])
         except IndexError:
             pass
 
     database = conn._params.database
     if database:
-        set_on_span(SPANDATA.DB_NAME, database)
+        span.set_data(SPANDATA.DB_NAME, database)
 
     user = conn._params.user
     if user:
-        set_on_span(SPANDATA.DB_USER, user)
+        span.set_data(SPANDATA.DB_USER, user)
