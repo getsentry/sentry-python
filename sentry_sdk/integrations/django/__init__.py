@@ -641,7 +641,7 @@ def install_sql_hook() -> None:
             executemany=False,
             span_origin=DjangoIntegration.origin_db,
         ) as span:
-            _set_db_data(span, self)  # type: ignore
+            _set_db_data(span, self)
             result = real_execute(self, sql, params)
 
         with capture_internal_exceptions():
@@ -661,7 +661,7 @@ def install_sql_hook() -> None:
             executemany=True,
             span_origin=DjangoIntegration.origin_db,
         ) as span:
-            _set_db_data(span, self)  # type: ignore
+            _set_db_data(span, self)
 
             result = real_executemany(self, sql, param_list)
 

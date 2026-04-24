@@ -118,7 +118,7 @@ def _record(
         record_cursor_repr=cursor is not None,
         span_origin=AsyncPGIntegration.origin,
     ) as span:
-        yield span  # type: ignore
+        yield span
 
 
 def _wrap_connection_method(
