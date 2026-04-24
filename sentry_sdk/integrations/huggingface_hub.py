@@ -5,10 +5,12 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import _set_span_data_attribute, set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -16,7 +18,9 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable
+    from typing import Any, Callable, Iterable, Union
+
+    from sentry_sdk.tracing import Span
 
 try:
     import huggingface_hub.inference._client
@@ -83,17 +87,27 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         model = client.model or kwargs.get("model") or ""
         operation_name = op.split(".")[-1]
 
-        span = sentry_sdk.start_span(
-            op=op,
-            name=f"{operation_name} {model}",
-            origin=HuggingfaceHubIntegration.origin,
-        )
+        span: "Union[Span, StreamedSpan]"
+        if has_span_streaming_enabled(sentry_sdk.get_client().options):
+            span = sentry_sdk.traces.start_span(
+                name=f"{operation_name} {model}",
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": HuggingfaceHubIntegration.origin,
+                },
+            )
+        else:
+            span = sentry_sdk.start_span(
+                op=op,
+                name=f"{operation_name} {model}",
+                origin=HuggingfaceHubIntegration.origin,
+            )
         span.__enter__()
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
+        _set_span_data_attribute(span, SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
 
         if model:
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+            _set_span_data_attribute(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
         # Input attributes
         if should_send_default_pii() and integration.include_prompts:
@@ -116,7 +130,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             value = kwargs.get(attribute, None)
             if value is not None:
                 if isinstance(value, (int, float, bool, str)):
-                    span.set_data(span_attribute, value)
+                    _set_span_data_attribute(span, span_attribute, value)
                 else:
                     set_data_normalized(span, span_attribute, value, unpack=False)
 
@@ -177,7 +191,9 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                         response_text_buffer.append(choice.message.content)
 
             if response_model is not None:
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+                _set_span_data_attribute(
+                    span, SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
+                )
 
             if finish_reason is not None:
                 set_data_normalized(
@@ -328,8 +344,8 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             yield chunk
 
                         if response_model is not None:
-                            span.set_data(
-                                SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
+                            _set_span_data_attribute(
+                                span, SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
                             )
 
                         if finish_reason is not None:
