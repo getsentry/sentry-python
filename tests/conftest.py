@@ -482,7 +482,6 @@ def render_span_tree():
             streamed_spans = True
 
         by_parent = {}
-        print("spans are", spans)
         for span in spans:
             print(span)
             if "parent_span_id" not in span:
