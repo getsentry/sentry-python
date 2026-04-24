@@ -6,6 +6,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     parse_version,
 )
+from sentry_sdk.traces import StreamedSpan, SpanStatus
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import ContextManager
     from typing import Optional
+    from typing import Union
 
     from sentry_sdk.tracing import Span
 
@@ -96,7 +98,10 @@ def _handle_error(context: "Any", *args: "Any") -> None:
     span: "Optional[Span]" = getattr(execution_context, "_sentry_sql_span", None)
 
     if span is not None:
-        span.set_status(SPANSTATUS.INTERNAL_ERROR)
+        if isinstance(span, StreamedSpan):
+            span.status = SpanStatus.ERROR
+        else:
+            span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     # _after_cursor_execute does not get called for crashing SQL stmts. Judging
     # from SQLAlchemy codebase it does seem like any error coming into this
@@ -132,29 +137,53 @@ def _get_db_system(name: str) -> "Optional[str]":
     return None
 
 
-def _set_db_data(span: "Span", conn: "Any") -> None:
+def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
     db_system = _get_db_system(conn.engine.name)
-    if db_system is not None:
-        span.set_data(SPANDATA.DB_SYSTEM, db_system)
+    if isinstance(span, StreamedSpan):
+        if db_system is not None:
+            span.set_attribute(SPANDATA.DB_SYSTEM, db_system)
 
-    try:
-        driver = conn.dialect.driver
-        if driver:
-            span.set_data(SPANDATA.DB_DRIVER_NAME, driver)
-    except Exception:
-        pass
+        try:
+            driver = conn.dialect.driver
+            if driver:
+                span.set_attribute(SPANDATA.DB_DRIVER_NAME, driver)
+        except Exception:
+            pass
+    else:
+        if db_system is not None:
+            span.set_data(SPANDATA.DB_SYSTEM, db_system)
+
+        try:
+            driver = conn.dialect.driver
+            if driver:
+                span.set_data(SPANDATA.DB_DRIVER_NAME, driver)
+        except Exception:
+            pass
 
     if conn.engine.url is None:
         return
 
-    db_name = conn.engine.url.database
-    if db_name is not None:
-        span.set_data(SPANDATA.DB_NAME, db_name)
+    if isinstance(span, StreamedSpan):
+        db_name = conn.engine.url.database
+        if db_name is not None:
+            span.set_attribute(SPANDATA.DB_NAME, db_name)
 
-    server_address = conn.engine.url.host
-    if server_address is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+        server_address = conn.engine.url.host
+        if server_address is not None:
+            span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
 
-    server_port = conn.engine.url.port
-    if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, server_port)
+        server_port = conn.engine.url.port
+        if server_port is not None:
+            span.set_attribute(SPANDATA.SERVER_PORT, server_port)
+    else:
+        db_name = conn.engine.url.database
+        if db_name is not None:
+            span.set_data(SPANDATA.DB_NAME, db_name)
+
+        server_address = conn.engine.url.host
+        if server_address is not None:
+            span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+
+        server_port = conn.engine.url.port
+        if server_port is not None:
+            span.set_data(SPANDATA.SERVER_PORT, server_port)
