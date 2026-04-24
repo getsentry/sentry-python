@@ -101,13 +101,13 @@ def patch_asgi_app() -> None:
 
 
 def patch_scaffold_route() -> None:
-    old_route = Scaffold.route
-
     # Vendored: https://github.com/pallets/quart/blob/5817e983d0b586889337a596d674c0c246d68878/src/quart/app.py#L137-L140
     if sys.version_info >= (3, 12):
         iscoroutinefunction = inspect.iscoroutinefunction
     else:
         iscoroutinefunction = asyncio.iscoroutinefunction
+
+    old_route = Scaffold.route
 
     def _sentry_route(*args: "Any", **kwargs: "Any") -> "Any":
         old_decorator = old_route(*args, **kwargs)
