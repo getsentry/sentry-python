@@ -138,52 +138,33 @@ def _get_db_system(name: str) -> "Optional[str]":
 
 
 def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
-    db_system = _get_db_system(conn.engine.name)
     if isinstance(span, StreamedSpan):
-        if db_system is not None:
-            span.set_attribute(SPANDATA.DB_SYSTEM, db_system)
-
-        try:
-            driver = conn.dialect.driver
-            if driver:
-                span.set_attribute(SPANDATA.DB_DRIVER_NAME, driver)
-        except Exception:
-            pass
+        set_on_span = span.set_attribute
     else:
-        if db_system is not None:
-            span.set_data(SPANDATA.DB_SYSTEM, db_system)
+        set_on_span = span.set_data
 
-        try:
-            driver = conn.dialect.driver
-            if driver:
-                span.set_data(SPANDATA.DB_DRIVER_NAME, driver)
-        except Exception:
-            pass
+    db_system = _get_db_system(conn.engine.name)
+    if db_system is not None:
+        set_on_span(SPANDATA.DB_SYSTEM, db_system)
+
+    try:
+        driver = conn.dialect.driver
+        if driver:
+            set_on_span(SPANDATA.DB_DRIVER_NAME, driver)
+    except Exception:
+        pass
 
     if conn.engine.url is None:
         return
 
-    if isinstance(span, StreamedSpan):
-        db_name = conn.engine.url.database
-        if db_name is not None:
-            span.set_attribute(SPANDATA.DB_NAME, db_name)
+    db_name = conn.engine.url.database
+    if db_name is not None:
+        set_on_span(SPANDATA.DB_NAME, db_name)
 
-        server_address = conn.engine.url.host
-        if server_address is not None:
-            span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
+    server_address = conn.engine.url.host
+    if server_address is not None:
+        set_on_span(SPANDATA.SERVER_ADDRESS, server_address)
 
-        server_port = conn.engine.url.port
-        if server_port is not None:
-            span.set_attribute(SPANDATA.SERVER_PORT, server_port)
-    else:
-        db_name = conn.engine.url.database
-        if db_name is not None:
-            span.set_data(SPANDATA.DB_NAME, db_name)
-
-        server_address = conn.engine.url.host
-        if server_address is not None:
-            span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
-
-        server_port = conn.engine.url.port
-        if server_port is not None:
-            span.set_data(SPANDATA.SERVER_PORT, server_port)
+    server_port = conn.engine.url.port
+    if server_port is not None:
+        set_on_span(SPANDATA.SERVER_PORT, server_port)
