@@ -701,8 +701,7 @@ def test_middleware_spans(sentry_init, capture_events, capture_items, span_strea
 
         for idx, span in enumerate(middleware_spans):
             assert (
-                span["attributes"]["starlette.middleware_name"]
-                == expected_middleware_spans[idx]
+                span["attributes"]["middleware.name"] == expected_middleware_spans[idx]
             )
     else:
         (_, transaction_event) = events
@@ -852,7 +851,7 @@ def test_middleware_callback_spans(
             assert span["attributes"]["sentry.op"] == exp["op"]
             assert span["name"] == exp["description"]
             assert (
-                span["attributes"]["starlette.middleware_name"]
+                span["attributes"]["middleware.name"]
                 == exp["tags"]["starlette.middleware_name"]
             )
     else:

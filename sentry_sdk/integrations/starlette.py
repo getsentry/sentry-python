@@ -177,7 +177,7 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
                     attributes={
                         "sentry.op": op,
                         "sentry.origin": StarletteIntegration.origin,
-                        "starlette.middleware_name": middleware_name,
+                        "middleware.name": middleware_name,
                     },
                 )
             return sentry_sdk.start_span(
