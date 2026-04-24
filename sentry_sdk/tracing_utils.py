@@ -326,22 +326,36 @@ def add_source(
                 span.set_attribute("code.function.name", frame.f_code.co_name)
 
 
-def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
+def add_query_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+) -> None:
     """
     Adds OTel compatible source code information to a database query span
     """
     client = sentry_sdk.get_client()
-    if not client.is_active():
-        return
 
-    if span.timestamp is None or span.start_timestamp is None:
+    if isinstance(span, LegacySpan):
+        if not client.is_active():
+            return
+
+        # In the StreamedSpan case, we need to add the extra span information before
+        # the span finishes, so it's expected that this will be None. In the LegacySpan case,
+        # it should already be finished.
+        if span.timestamp is None:
+            return
+
+    if span.start_timestamp is None:
         return
 
     should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
-    duration = span.timestamp - span.start_timestamp
+    end_timestamp = (
+        datetime.now(timezone.utc) if span.timestamp is None else span.timestamp
+    )
+
+    duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 
