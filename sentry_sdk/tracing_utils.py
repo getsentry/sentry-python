@@ -135,7 +135,8 @@ def record_sql_queries(
     span_origin: str = "manual",
 ) -> "Generator[sentry_sdk.tracing.Span, None, None]":
     # TODO: Bring back capturing of params by default
-    if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
+    client = sentry_sdk.get_client()
+    if client.options["_experiments"].get("record_sql_params", False):
         if not params_list or params_list == [None]:
             params_list = None
 
@@ -160,14 +161,26 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    with sentry_sdk.start_span(
-        op=OP.DB,
-        name=query,
-        origin=span_origin,
-    ) as span:
-        for k, v in data.items():
-            span.set_data(k, v)
-        yield span
+    if has_span_streaming_enabled(client.options):
+        with sentry_sdk.traces.start_span(
+            name=query,
+            attributes={
+                "sentry.origin": span_origin,
+                "sentry.op": OP.DB,
+            },
+        ) as span:
+            for k, v in data.items():
+                span.set_attribute(k, v)
+            yield span
+    else:
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            name=query,
+            origin=span_origin,
+        ) as span:
+            for k, v in data.items():
+                span.set_data(k, v)
+            yield span
 
 
 def maybe_create_breadcrumbs_from_span(
