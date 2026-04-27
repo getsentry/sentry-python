@@ -654,6 +654,7 @@ def test_middleware_spans(sentry_init, capture_events, capture_items, span_strea
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=True)],
+        auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
         _experiments={
             "trace_lifecycle": "stream" if span_streaming else "static",
         },
@@ -686,19 +687,19 @@ def test_middleware_spans(sentry_init, capture_events, capture_items, span_strea
     if span_streaming:
         sentry_sdk.flush()
 
-        middleware_spans = sorted(
-            [
-                item.payload
-                for item in items
-                if item.payload.get("attributes", {})
-                .get("sentry.op", "")
-                .startswith("middleware.starlette")
-            ],
-            key=lambda s: s["start_timestamp"],
-        )
+        segment = items.pop().payload
+        middleware_spans = [item.payload for item in items]
+
+        # In span-first, the `middleware.starlette.send` ops appear first,
+        # so the list needs to be reversed for the assertions below
+        middleware_spans.reverse()
 
         assert len(middleware_spans) == len(expected_middleware_spans)
 
+        assert segment["is_segment"] is True
+        assert segment["attributes"]["sentry.op"] == "http.server"
+
+        idx = 0
         for idx, span in enumerate(middleware_spans):
             assert (
                 span["attributes"]["middleware.name"] == expected_middleware_spans[idx]
@@ -725,6 +726,7 @@ def test_middleware_spans_disabled(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=False)],
+        auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
         _experiments={
             "trace_lifecycle": "stream" if span_streaming else "static",
         },
@@ -747,14 +749,13 @@ def test_middleware_spans_disabled(
     if span_streaming:
         sentry_sdk.flush()
 
-        middleware_spans = [
-            item.payload
-            for item in items
-            if item.payload.get("attributes", {})
-            .get("sentry.op", "")
-            .startswith("middleware.starlette")
-        ]
+        segment = items.pop().payload
+        middleware_spans = [item.payload for item in items]
+
         assert len(middleware_spans) == 0
+
+        assert segment["is_segment"] is True
+        assert segment["attributes"]["sentry.op"] == "http.server"
     else:
         (_, transaction_event) = events
         assert len(transaction_event["spans"]) == 0
@@ -767,6 +768,7 @@ def test_middleware_callback_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=True)],
+        auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
         _experiments={
             "trace_lifecycle": "stream" if span_streaming else "static",
         },
@@ -835,18 +837,18 @@ def test_middleware_callback_spans(
     if span_streaming:
         sentry_sdk.flush()
 
-        middleware_spans = sorted(
-            [
-                item.payload
-                for item in items
-                if item.payload.get("attributes", {})
-                .get("sentry.op", "")
-                .startswith("middleware.starlette")
-            ],
-            key=lambda s: s["start_timestamp"],
-        )
+        segment = items.pop().payload
+        middleware_spans = [item.payload for item in items]
+
+        # In span-first, the `middleware.starlette.send` ops appear first,
+        # so the list needs to be reversed for the assertions below
+        middleware_spans.reverse()
 
         assert len(middleware_spans) == len(expected)
+
+        assert segment["is_segment"] is True
+        assert segment["attributes"]["sentry.op"] == "http.server"
+
         for span, exp in zip(middleware_spans, expected):
             assert span["attributes"]["sentry.op"] == exp["op"]
             assert span["name"] == exp["description"]
@@ -1066,7 +1068,7 @@ def _post_body_app(handler_awaitable):
 
 
 @pytest.mark.parametrize("middleware_spans", [False, True])
-def test_request_body_data_scrubs_pii_span_streaming(
+def test_request_body_data_does_not_scrub_pii_span_streaming(
     sentry_init, capture_items, middleware_spans
 ):
     sentry_init(
