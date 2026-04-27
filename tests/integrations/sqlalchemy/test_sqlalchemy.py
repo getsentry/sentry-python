@@ -821,6 +821,10 @@ def test_query_source_with_module_in_search_path(
                 assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
                 assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
                 assert (
+                    attributes.get(SPANDATA.CODE_NAMESPACE)
+                    == "sqlalchemy_helpers.helpers"
+                )
+                assert (
                     attributes.get(SPANDATA.CODE_FILE_PATH)
                     == "sqlalchemy_helpers/helpers.py"
                 )
@@ -1107,6 +1111,10 @@ def test_query_source_if_duration_over_threshold(
 
                 assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
                 assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+                assert (
+                    attributes.get(SPANDATA.CODE_NAMESPACE)
+                    == "tests.integrations.sqlalchemy.test_sqlalchemy"
+                )
                 assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
                     "tests/integrations/sqlalchemy/test_sqlalchemy.py"
                 )
