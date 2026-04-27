@@ -1489,6 +1489,8 @@ def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
+    elif hasattr(func, "__name__"):
+        func_qualname = func.__name__
 
     if func_qualname is not None:
         if hasattr(func, "__module__") and isinstance(func.__module__, str):
