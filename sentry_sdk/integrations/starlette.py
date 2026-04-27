@@ -254,10 +254,11 @@ def _set_request_body_data_on_streaming_segment(
         and isinstance(current_span, StreamedSpan)
         and not isinstance(current_span, NoOpStreamedSpan)
     ):
-        current_span._segment.set_attribute(
-            "http.request.body.data",
-            _serialize_request_body_data(info["data"]),
-        )
+        with capture_internal_exceptions():
+            current_span._segment.set_attribute(
+                "http.request.body.data",
+                _serialize_request_body_data(info["data"]),
+            )
 
 
 @ensure_integration_enabled(StarletteIntegration)
