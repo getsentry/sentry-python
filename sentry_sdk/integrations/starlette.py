@@ -521,10 +521,12 @@ def patch_request_response() -> None:
                         and not isinstance(current_span, NoOpStreamedSpan)
                     ):
                         data = info["data"]
-                        current_span._segment.set_attribute(
-                            "http.request.body.data",
-                            _serialize_body_data(data),
-                        )
+
+                        with capture_internal_exceptions():
+                            current_span._segment.set_attribute(
+                                "http.request.body.data",
+                                _serialize_body_data(data),
+                            )
 
                 return await old_func(*args, **kwargs)
 
