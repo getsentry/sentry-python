@@ -1,4 +1,6 @@
+import random
 import threading
+from _queue import Queue
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -14,10 +16,10 @@ if TYPE_CHECKING:
 
 class SpanBatcher(Batcher["StreamedSpan"]):
     # MAX_BEFORE_FLUSH should be lower than MAX_BEFORE_DROP, so that there is
-    # a bit of a buffer for spans that appear between setting the flush event
+    # a bit of a buffer for spans that appear between the trigger to flush
     # and actually flushing the buffer.
     #
-    # The max limits are all per trace.
+    # The max limits are all per trace (per bucket).
     MAX_ENVELOPE_SIZE = 1000  # spans
     MAX_BEFORE_FLUSH = 1000
     MAX_BEFORE_DROP = 2000
@@ -45,10 +47,23 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._lock = threading.Lock()
         self._active: "threading.local" = threading.local()
 
-        self._flush_event: "threading.Event" = threading.Event()
+        self._flush_queue: Queue = Queue()
 
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
+
+    def _flush_loop(self) -> None:
+        # Mark the flush-loop thread as active for its entire lifetime so
+        # that any re-entrant add() triggered by GC warnings during wait(),
+        # flush(), or Event operations is silently dropped instead of
+        # deadlocking on internal locks.
+        self._active.flag = True
+        while self._running:
+            # XXX: the timeout should also be per bucket
+            trace_id = self._flush_queue.get(
+                timeout=self.FLUSH_WAIT_TIME + random.random()
+            )
+            self._flush(trace_id=trace_id)
 
     def add(self, span: "StreamedSpan") -> None:
         # Bail out if the current thread is already executing batcher code.
@@ -79,14 +94,22 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 self._running_size[span.trace_id] += self._estimate_size(span)
 
                 if size + 1 >= self.MAX_BEFORE_FLUSH:
-                    self._flush_event.set()
+                    self._flush_queue.put(span.trace_id)
                     return
 
                 if self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH:
-                    self._flush_event.set()
+                    self._flush_queue.put(span.trace_id)
                     return
         finally:
             self._active.flag = False
+
+    def kill(self) -> None:
+        if self._flusher is None:
+            return
+
+        self._running = False
+        self._flush_queue.put(None)
+        self._flusher = None
 
     @staticmethod
     def _estimate_size(item: "StreamedSpan") -> int:
@@ -128,50 +151,60 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
         return res
 
-    def _flush(self) -> None:
+    def _flush(self, trace_id: "Optional[str]") -> None:
         with self._lock:
             if len(self._span_buffer) == 0:
                 return
 
+            if trace_id is None:
+                # flush whole buffer, e.g. if the SDK is shutting down
+                buckets = self._span_buffer.keys()
+            else:
+                buckets = [trace_id]
+
             envelopes = []
-            for spans in self._span_buffer.values():
-                if spans:
-                    dsc = spans[0]._dynamic_sampling_context()
 
-                    # Max per envelope is 1000, so if we happen to have more than
-                    # 1000 spans in one bucket, we'll need to separate them.
-                    for start in range(0, len(spans), self.MAX_ENVELOPE_SIZE):
-                        end = min(start + self.MAX_ENVELOPE_SIZE, len(spans))
+            for trace_id in buckets:
+                spans = self._span_buffer.get(trace_id)
+                if not spans:
+                    continue
 
-                        envelope = Envelope(
+                dsc = spans[0]._dynamic_sampling_context()
+
+                # Max per envelope is 1000, so if we happen to have more than
+                # 1000 spans in one bucket, we'll need to separate them.
+                for start in range(0, len(spans), self.MAX_ENVELOPE_SIZE):
+                    end = min(start + self.MAX_ENVELOPE_SIZE, len(spans))
+
+                    envelope = Envelope(
+                        headers={
+                            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+                            "trace": dsc,
+                        }
+                    )
+
+                    envelope.add_item(
+                        Item(
+                            type=self.TYPE,
+                            content_type=self.CONTENT_TYPE,
                             headers={
-                                "sent_at": format_timestamp(datetime.now(timezone.utc)),
-                                "trace": dsc,
-                            }
+                                "item_count": end - start,
+                            },
+                            payload=PayloadRef(
+                                json={
+                                    "items": [
+                                        self._to_transport_format(spans[j])
+                                        for j in range(start, end)
+                                    ]
+                                }
+                            ),
                         )
+                    )
 
-                        envelope.add_item(
-                            Item(
-                                type=self.TYPE,
-                                content_type=self.CONTENT_TYPE,
-                                headers={
-                                    "item_count": end - start,
-                                },
-                                payload=PayloadRef(
-                                    json={
-                                        "items": [
-                                            self._to_transport_format(spans[j])
-                                            for j in range(start, end)
-                                        ]
-                                    }
-                                ),
-                            )
-                        )
+                    envelopes.append(envelope)
 
-                        envelopes.append(envelope)
-
-            self._span_buffer.clear()
-            self._running_size.clear()
+                del self._span_buffer[trace_id]
+                del self._running_size[trace_id]
 
         for envelope in envelopes:
             self._capture_func(envelope)
