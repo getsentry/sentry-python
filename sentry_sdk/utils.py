@@ -1472,16 +1472,6 @@ def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
     """Return the qualified name of func. Works with regular function, lambda, partial and partialmethod."""
     func_qualname: "Optional[str]" = None
 
-    # Python 2
-    try:
-        return "%s.%s.%s" % (
-            func.im_class.__module__,  # type: ignore
-            func.im_class.__name__,  # type: ignore
-            func.__name__,
-        )
-    except Exception:
-        pass
-
     prefix, suffix = "", ""
 
     if isinstance(func, partial) and hasattr(func.func, "__name__"):
@@ -1499,10 +1489,9 @@ def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
-    elif hasattr(func, "__name__"):  # Python 2.7 has no __qualname__
+    elif hasattr(func, "__name__"):
         func_qualname = func.__name__
 
-    # Python 3: methods, functions, classes
     if func_qualname is not None:
         if hasattr(func, "__module__") and isinstance(func.__module__, str):
             func_qualname = func.__module__ + "." + func_qualname
