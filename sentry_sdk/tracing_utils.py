@@ -285,6 +285,8 @@ def add_source(
             namespace = None
         if namespace is not None and isinstance(span, LegacySpan):
             span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+        elif namespace is not None:
+            span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -310,7 +312,7 @@ def add_source(
             if isinstance(span, LegacySpan):
                 span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
             else:
-                span.set_attribute("code.function.name", frame.f_code.co_name)
+                span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
