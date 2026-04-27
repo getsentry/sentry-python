@@ -23,6 +23,9 @@ class Monitor:
 
     name = "sentry.monitor"
 
+    _thread: "Optional[Thread]"
+    _thread_for_pid: "Optional[int]"
+
     def __init__(
         self, transport: "sentry_sdk.transport.Transport", interval: float = 10
     ) -> None:
@@ -31,11 +34,24 @@ class Monitor:
 
         self._healthy = True
         self._downsample_factor: int = 0
-
-        self._thread: "Optional[Thread]" = None
-        self._thread_lock = Lock()
-        self._thread_for_pid: "Optional[int]" = None
         self._running = True
+        self._reset_thread_state()
+
+        # See https://github.com/getsentry/sentry-python/issues/6148.
+        # If os.fork() runs while another thread holds self._thread_lock,
+        # the child inherits the lock locked but the holding thread does
+        # not exist in the child, so the lock can never be released and
+        # _ensure_running deadlocks forever. Reinitialise the lock and
+        # cached thread/pid in the child so it starts clean regardless
+        # of inherited state. register_at_fork is POSIX-only; Windows
+        # uses spawn.
+        if hasattr(os, "register_at_fork"):
+            os.register_at_fork(after_in_child=self._reset_thread_state)
+
+    def _reset_thread_state(self) -> None:
+        self._thread = None
+        self._thread_lock = Lock()
+        self._thread_for_pid = None
 
     def _ensure_running(self) -> None:
         """
