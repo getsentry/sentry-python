@@ -1,6 +1,6 @@
-import asyncio
 import functools
 import warnings
+import sys
 from collections.abc import Set
 from copy import deepcopy
 from json import JSONDecodeError
@@ -72,6 +72,13 @@ try:
         import multipart  # type: ignore
 except ImportError:
     multipart = None
+
+
+# Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
+if sys.version_info >= (3, 13):  # pragma: no cover
+    from inspect import iscoroutinefunction
+else:
+    from asyncio import iscoroutinefunction
 
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
@@ -424,8 +431,8 @@ def _is_async_callable(obj: "Any") -> bool:
     while isinstance(obj, functools.partial):
         obj = obj.func
 
-    return asyncio.iscoroutinefunction(obj) or (
-        callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+    return iscoroutinefunction(obj) or (
+        callable(obj) and iscoroutinefunction(obj.__call__)
     )
 
 

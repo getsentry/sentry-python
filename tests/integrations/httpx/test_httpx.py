@@ -830,8 +830,9 @@ def test_request_source_disabled_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert "code.line.number" not in http_span["attributes"]
+    assert SPANDATA.CODE_NAMESPACE not in http_span["attributes"]
     assert "code.file.path" not in http_span["attributes"]
-    assert "code.function.name" not in http_span["attributes"]
+    assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
 
 
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
@@ -873,8 +874,9 @@ def test_request_source_enabled_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert "code.line.number" in http_span["attributes"]
+    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
     assert "code.file.path" in http_span["attributes"]
-    assert "code.function.name" in http_span["attributes"]
+    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -908,11 +910,16 @@ def test_request_source_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert "code.line.number" in http_span["attributes"]
+    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
     assert "code.file.path" in http_span["attributes"]
-    assert "code.function.name" in http_span["attributes"]
+    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
 
     assert type(http_span["attributes"]["code.line.number"]) == int
     assert http_span["attributes"]["code.line.number"] > 0
+    assert (
+        http_span["attributes"][SPANDATA.CODE_NAMESPACE]
+        == "tests.integrations.httpx.test_httpx"
+    )
     assert http_span["attributes"]["code.file.path"].endswith(
         "tests/integrations/httpx/test_httpx.py"
     )
@@ -921,7 +928,7 @@ def test_request_source_span_streaming(
     assert is_relative_path
 
     assert (
-        http_span["attributes"]["code.function.name"]
+        http_span["attributes"][SPANDATA.CODE_FUNCTION]
         == "test_request_source_span_streaming"
     )
 
@@ -966,11 +973,13 @@ def test_request_source_with_module_in_search_path_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert "code.line.number" in http_span["attributes"]
+    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
     assert "code.file.path" in http_span["attributes"]
-    assert "code.function.name" in http_span["attributes"]
+    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
 
     assert type(http_span["attributes"]["code.line.number"]) == int
     assert http_span["attributes"]["code.line.number"] > 0
+    assert http_span["attributes"][SPANDATA.CODE_NAMESPACE] == "httpx_helpers.helpers"
     assert http_span["attributes"]["code.file.path"] == "httpx_helpers/helpers.py"
 
     is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
@@ -978,12 +987,12 @@ def test_request_source_with_module_in_search_path_span_streaming(
 
     if asyncio.iscoroutinefunction(httpx_client.get):
         assert (
-            http_span["attributes"]["code.function.name"]
+            http_span["attributes"][SPANDATA.CODE_FUNCTION]
             == "async_get_request_with_client"
         )
     else:
         assert (
-            http_span["attributes"]["code.function.name"] == "get_request_with_client"
+            http_span["attributes"][SPANDATA.CODE_FUNCTION] == "get_request_with_client"
         )
 
 
@@ -1019,8 +1028,9 @@ def test_no_request_source_if_duration_too_short_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert "code.line.number" not in http_span["attributes"]
+    assert SPANDATA.CODE_NAMESPACE not in http_span["attributes"]
     assert "code.file.path" not in http_span["attributes"]
-    assert "code.function.name" not in http_span["attributes"]
+    assert SPANDATA.CODE_FUNCTION not in http_span["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -1055,11 +1065,16 @@ def test_request_source_if_duration_over_threshold_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert "code.line.number" in http_span["attributes"]
+    assert SPANDATA.CODE_NAMESPACE in http_span["attributes"]
     assert "code.file.path" in http_span["attributes"]
-    assert "code.function.name" in http_span["attributes"]
+    assert SPANDATA.CODE_FUNCTION in http_span["attributes"]
 
     assert type(http_span["attributes"]["code.line.number"]) == int
     assert http_span["attributes"]["code.line.number"] > 0
+    assert (
+        http_span["attributes"][SPANDATA.CODE_NAMESPACE]
+        == "tests.integrations.httpx.test_httpx"
+    )
     assert http_span["attributes"]["code.file.path"].endswith(
         "tests/integrations/httpx/test_httpx.py"
     )
@@ -1068,7 +1083,7 @@ def test_request_source_if_duration_over_threshold_span_streaming(
     assert is_relative_path
 
     assert (
-        http_span["attributes"]["code.function.name"]
+        http_span["attributes"][SPANDATA.CODE_FUNCTION]
         == "test_request_source_if_duration_over_threshold_span_streaming"
     )
 
