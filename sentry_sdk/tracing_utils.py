@@ -283,10 +283,11 @@ def add_source(
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
-        if namespace is not None and isinstance(span, LegacySpan):
-            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
-        elif namespace is not None:
-            span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
+        if namespace is not None:
+            if isinstance(span, LegacySpan):
+                span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+            else:
+                span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
