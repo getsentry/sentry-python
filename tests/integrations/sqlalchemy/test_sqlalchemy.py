@@ -485,8 +485,9 @@ def test_query_source_disabled(
                 attributes = span["attributes"]
 
                 assert SPANDATA.CODE_LINE_NUMBER not in attributes
+                assert SPANDATA.CODE_NAMESPACE not in attributes
                 assert SPANDATA.CODE_FILE_PATH not in attributes
-                assert SPANDATA.CODE_FUNCTION_NAME not in attributes
+                assert SPANDATA.CODE_FUNCTION not in attributes
                 break
         else:
             raise AssertionError("No db span found")
@@ -586,8 +587,9 @@ def test_query_source_enabled(
                 attributes = span["attributes"]
 
                 assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
                 assert SPANDATA.CODE_FILE_PATH in attributes
-                assert SPANDATA.CODE_FUNCTION_NAME in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
                 break
         else:
             raise AssertionError("No db span found")
@@ -679,11 +681,16 @@ def test_query_source(
                 attributes = span["attributes"]
 
                 assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
                 assert SPANDATA.CODE_FILE_PATH in attributes
-                assert SPANDATA.CODE_FUNCTION_NAME in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
 
                 assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
                 assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+                assert (
+                    attributes.get(SPANDATA.CODE_NAMESPACE)
+                    == "tests.integrations.sqlalchemy.test_sqlalchemy"
+                )
                 assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
                     "tests/integrations/sqlalchemy/test_sqlalchemy.py"
                 )
@@ -691,9 +698,7 @@ def test_query_source(
                 is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
                 assert is_relative_path
 
-                assert (
-                    attributes.get(SPANDATA.CODE_FUNCTION_NAME) == "test_query_source"
-                )
+                assert attributes.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
                 break
         else:
             raise AssertionError("No db span found")
@@ -809,8 +814,9 @@ def test_query_source_with_module_in_search_path(
                 attributes = span["attributes"]
 
                 assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
                 assert SPANDATA.CODE_FILE_PATH in attributes
-                assert SPANDATA.CODE_FUNCTION_NAME in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
 
                 assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
                 assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
@@ -823,7 +829,7 @@ def test_query_source_with_module_in_search_path(
                 assert is_relative_path
 
                 assert (
-                    attributes.get(SPANDATA.CODE_FUNCTION_NAME)
+                    attributes.get(SPANDATA.CODE_FUNCTION)
                     == "query_first_model_from_session"
                 )
                 break
@@ -955,8 +961,9 @@ def test_no_query_source_if_duration_too_short(
                 attributes = span["attributes"]
 
                 assert SPANDATA.CODE_LINE_NUMBER not in attributes
+                assert SPANDATA.CODE_NAMESPACE not in attributes
                 assert SPANDATA.CODE_FILE_PATH not in attributes
-                assert SPANDATA.CODE_FUNCTION_NAME not in attributes
+                assert SPANDATA.CODE_FUNCTION not in attributes
                 break
         else:
             raise AssertionError("No db span found")
@@ -1094,8 +1101,9 @@ def test_query_source_if_duration_over_threshold(
                 attributes = span["attributes"]
 
                 assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
                 assert SPANDATA.CODE_FILE_PATH in attributes
-                assert SPANDATA.CODE_FUNCTION_NAME in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
 
                 assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
                 assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
@@ -1107,7 +1115,7 @@ def test_query_source_if_duration_over_threshold(
                 assert is_relative_path
 
                 assert (
-                    attributes.get(SPANDATA.CODE_FUNCTION_NAME)
+                    attributes.get(SPANDATA.CODE_FUNCTION)
                     == "test_query_source_if_duration_over_threshold"
                 )
                 break
