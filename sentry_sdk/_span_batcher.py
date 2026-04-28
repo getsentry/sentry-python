@@ -53,10 +53,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._flusher_pid: "Optional[int]" = None
 
     def _flush_loop(self) -> None:
-        # Mark the flush-loop thread as active for its entire lifetime so
-        # that any re-entrant add() triggered by GC warnings during wait(),
-        # flush(), or Event operations is silently dropped instead of
-        # deadlocking on internal locks.
         self._active.flag = True
         while self._running:
             # XXX: the timeout should also be per bucket
