@@ -192,15 +192,17 @@ def test_outgoing_trace_headers_head_sdk(
     if span_streaming:
         items = capture_items("span")
 
+        sentry_sdk.traces.continue_trace({})
+
         with mock.patch(
             "sentry_sdk.tracing_utils.Random.randrange", return_value=250000
         ):
-            sentry_sdk.traces.continue_trace({})
-
-        with sentry_sdk.traces.start_span(name="Head SDK tx"):
-            connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
-            connection.request("GET", "/top-chasers")
-            connection.getresponse()
+            with sentry_sdk.traces.start_span(name="Head SDK tx"):
+                connection = HTTPSConnectionRecordingRequestHeaders(
+                    "localhost", port=PORT
+                )
+                connection.request("GET", "/top-chasers")
+                connection.getresponse()
 
         sentry_sdk.flush()
         request_span = next(item.payload for item in items if item.type == "span")
@@ -215,8 +217,9 @@ def test_outgoing_trace_headers_head_sdk(
             "sentry-sample_rand=0.250000,"
             "sentry-environment=production,"
             "sentry-release=foo,"
+            "sentry-transaction=Head%%20SDK%%20tx,"
             "sentry-sample_rate=0.5,"
-            "sentry-sampled=%s"
+            "sentry-sampled=true"
         ) % request_span["trace_id"]
     else:
         events = capture_events()
