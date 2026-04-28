@@ -382,11 +382,10 @@ def add_query_source(
     Adds OTel compatible source code information to a database query span
     """
     client = sentry_sdk.get_client()
+    if not client.is_active():
+        return
 
     if isinstance(span, LegacySpan):
-        if not client.is_active():
-            return
-
         # In the StreamedSpan case, we need to add the extra span information before
         # the span finishes, so it's expected that this will be None. In the LegacySpan case,
         # it should already be finished.
