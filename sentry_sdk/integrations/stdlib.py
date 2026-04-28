@@ -104,6 +104,7 @@ def _install_httplib() -> None:
             parsed_url = parse_url(real_url, sanitize=False)
 
         span_streaming = has_span_streaming_enabled(client.options)
+        span: "Union[Span, StreamedSpan]"
         if span_streaming:
             span = sentry_sdk.traces.start_span(
                 name="%s %s"
