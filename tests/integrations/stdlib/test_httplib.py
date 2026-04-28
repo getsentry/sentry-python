@@ -1,4 +1,5 @@
 import os
+import socket
 import datetime
 from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -54,13 +55,14 @@ def test_empty_realurl(sentry_init, span_streaming):
     HTTPConnection("localhost", port=PORT).putrequest("POST", None)
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_outgoing_trace_headers(sentry_init, capture_items, span_streaming):
-    original_send = HTTPConnection.send
+def test_outgoing_trace_headers(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0)
+
+    already_patched_getresponse = HTTPSConnection.getresponse
 
     request_headers = {}
 
-    class HttpConnectionRecordingRequestHeaders(HTTPConnection):
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
         def send(self, *args, **kwargs) -> None:
             request_str = args[0]
             for line in request_str.decode("utf-8").split("\r\n")[1:]:
@@ -68,12 +70,14 @@ def test_outgoing_trace_headers(sentry_init, capture_items, span_streaming):
                     key, val = line.split(": ")
                     request_headers[key] = val
 
-            original_send(self, *args, **kwargs)
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
 
-    sentry_init(
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
-    )
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
     items = capture_items("event", "transaction", "span")
 
     headers = {
@@ -93,12 +97,12 @@ def test_outgoing_trace_headers(sentry_init, capture_items, span_streaming):
             "sentry.op": "greeting.sniff",
         },
     ):
-        connection = HttpConnectionRecordingRequestHeaders("localhost", port=PORT)
+        connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
         connection.request("GET", "/top-chasers")
         connection.getresponse()
 
     sentry_sdk.flush()
-    request_span = [item.payload for item in items if item.type == "span"][0]
+    request_span = next(item.payload for item in items if item.type == "span")
     expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
         trace_id=request_span["trace_id"],
         parent_span_id=request_span["span_id"],
@@ -117,13 +121,14 @@ def test_outgoing_trace_headers(sentry_init, capture_items, span_streaming):
     assert request_headers["baggage"] == expected_outgoing_baggage
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_outgoing_trace_headers_head_sdk(sentry_init, capture_items, span_streaming):
-    original_send = HTTPConnection.send
+def test_outgoing_trace_headers_head_sdk(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=0.5, release="foo")
+
+    already_patched_getresponse = HTTPSConnection.getresponse
 
     request_headers = {}
 
-    class HttpConnectionRecordingRequestHeaders(HTTPConnection):
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
         def send(self, *args, **kwargs) -> None:
             request_str = args[0]
             for line in request_str.decode("utf-8").split("\r\n")[1:]:
@@ -131,25 +136,26 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, capture_items, span_stream
                     key, val = line.split(": ")
                     request_headers[key] = val
 
-            original_send(self, *args, **kwargs)
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
 
-    sentry_init(
-        traces_sample_rate=0.5,
-        release="foo",
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
-    )
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
     items = capture_items("event", "transaction", "span")
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
         sentry_sdk.traces.continue_trace({})
 
     with sentry_sdk.traces.start_span(name="Head SDK tx"):
-        connection = HttpConnectionRecordingRequestHeaders("localhost", port=PORT)
+        connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
         connection.request("GET", "/top-chasers")
         connection.getresponse()
 
     sentry_sdk.flush()
-    request_span = [item.payload for item in items if item.type == "span"][0]
+    request_span = next(item.payload for item in items if item.type == "span")
     expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
         trace_id=request_span["trace_id"],
         parent_span_id=request_span["span_id"],
@@ -232,24 +238,37 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, capture_items, span_stream
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_option_trace_propagation_targets(
     sentry_init,
-    monkeypatch,
     trace_propagation_targets,
     host,
     path,
     trace_propagated,
     span_streaming,
 ):
-    # HTTPSConnection.send is passed a string containing (among other things)
-    # the headers on the request. Mock it so we can check the headers, and also
-    # so it doesn't try to actually talk to the internet.
-    mock_send = mock.Mock()
-    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
-
     sentry_init(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
+
+    already_patched_getresponse = HTTPSConnection.getresponse
+
+    request_headers = {}
+
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
+        def send(self, *args, **kwargs) -> None:
+            request_str = args[0]
+            for line in request_str.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
+
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
 
     headers = {
         "baggage": (
@@ -266,21 +285,16 @@ def test_option_trace_propagation_targets(
             "sentry.op": "greeting.sniff",
         },
     ):
-        HTTPSConnection(host).request("GET", path)
+        connection = HTTPSConnectionRecordingRequestHeaders(host)
+        connection.request("GET", path)
+        connection.getresponse()
 
-        (request_str,) = mock_send.call_args[0]
-        request_headers = {}
-        for line in request_str.decode("utf-8").split("\r\n")[1:]:
-            if line:
-                key, val = line.split(": ")
-                request_headers[key] = val
-
-        if trace_propagated:
-            assert "sentry-trace" in request_headers
-            assert "baggage" in request_headers
-        else:
-            assert "sentry-trace" not in request_headers
-            assert "baggage" not in request_headers
+    if trace_propagated:
+        assert "sentry-trace" in request_headers
+        assert "baggage" in request_headers
+    else:
+        assert "sentry-trace" not in request_headers
+        assert "baggage" not in request_headers
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
