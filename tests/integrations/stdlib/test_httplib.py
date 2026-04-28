@@ -1,4 +1,5 @@
 import os
+import socket
 import datetime
 from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -203,11 +204,13 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
 
 def test_outgoing_trace_headers(sentry_init, capture_events):
-    original_send = HTTPConnection.send
+    sentry_init(traces_sample_rate=1.0)
+
+    already_patched_getresponse = HTTPSConnection.getresponse
 
     request_headers = {}
 
-    class HttpConnectionRecordingRequestHeaders(HTTPConnection):
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
         def send(self, *args, **kwargs) -> None:
             request_str = args[0]
             for line in request_str.decode("utf-8").split("\r\n")[1:]:
@@ -215,9 +218,14 @@ def test_outgoing_trace_headers(sentry_init, capture_events):
                     key, val = line.split(": ")
                     request_headers[key] = val
 
-            original_send(self, *args, **kwargs)
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
 
-    sentry_init(traces_sample_rate=1.0)
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
     events = capture_events()
 
     headers = {
@@ -237,7 +245,7 @@ def test_outgoing_trace_headers(sentry_init, capture_events):
         op="greeting.sniff",
         trace_id="12312012123120121231201212312012",
     ) as transaction:
-        connection = HttpConnectionRecordingRequestHeaders("localhost", port=PORT)
+        connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
         connection.request("GET", "/top-chasers")
         connection.getresponse()
 
@@ -262,11 +270,13 @@ def test_outgoing_trace_headers(sentry_init, capture_events):
 
 
 def test_outgoing_trace_headers_head_sdk(sentry_init, capture_events):
-    original_send = HTTPConnection.send
+    sentry_init(traces_sample_rate=0.5, release="foo")
+
+    already_patched_getresponse = HTTPSConnection.getresponse
 
     request_headers = {}
 
-    class HttpConnectionRecordingRequestHeaders(HTTPConnection):
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
         def send(self, *args, **kwargs) -> None:
             request_str = args[0]
             for line in request_str.decode("utf-8").split("\r\n")[1:]:
@@ -274,16 +284,21 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, capture_events):
                     key, val = line.split(": ")
                     request_headers[key] = val
 
-            original_send(self, *args, **kwargs)
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
 
-    sentry_init(traces_sample_rate=0.5, release="foo")
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
     events = capture_events()
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
         transaction = continue_trace({})
 
     with start_transaction(transaction=transaction, name="Head SDK tx") as transaction:
-        connection = HttpConnectionRecordingRequestHeaders("localhost", port=PORT)
+        connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
         connection.request("GET", "/top-chasers")
         connection.getresponse()
 
@@ -369,18 +384,32 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, capture_events):
     ],
 )
 def test_option_trace_propagation_targets(
-    sentry_init, monkeypatch, trace_propagation_targets, host, path, trace_propagated
+    sentry_init, trace_propagation_targets, host, path, trace_propagated
 ):
-    # HTTPSConnection.send is passed a string containing (among other things)
-    # the headers on the request. Mock it so we can check the headers, and also
-    # so it doesn't try to actually talk to the internet.
-    mock_send = mock.Mock()
-    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
-
     sentry_init(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
     )
+
+    already_patched_getresponse = HTTPSConnection.getresponse
+
+    request_headers = {}
+
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
+        def send(self, *args, **kwargs) -> None:
+            request_str = args[0]
+            for line in request_str.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
+
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
 
     headers = {
         "baggage": (
@@ -397,21 +426,16 @@ def test_option_trace_propagation_targets(
         op="greeting.sniff",
         trace_id="12312012123120121231201212312012",
     ) as transaction:
-        HTTPSConnection(host).request("GET", path)
+        connection = HTTPSConnectionRecordingRequestHeaders(host)
+        connection.request("GET", path)
+        connection.getresponse()
 
-        (request_str,) = mock_send.call_args[0]
-        request_headers = {}
-        for line in request_str.decode("utf-8").split("\r\n")[1:]:
-            if line:
-                key, val = line.split(": ")
-                request_headers[key] = val
-
-        if trace_propagated:
-            assert "sentry-trace" in request_headers
-            assert "baggage" in request_headers
-        else:
-            assert "sentry-trace" not in request_headers
-            assert "baggage" not in request_headers
+    if trace_propagated:
+        assert "sentry-trace" in request_headers
+        assert "baggage" in request_headers
+    else:
+        assert "sentry-trace" not in request_headers
+        assert "baggage" not in request_headers
 
 
 def test_request_source_disabled(sentry_init, capture_events):
