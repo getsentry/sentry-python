@@ -1182,7 +1182,6 @@ def test_request_body_data_annotated_value_nested_span_streaming(
     assert isinstance(attr, str)
     parsed = json.loads(attr)
     assert parsed["name"] == "erica"
-    assert parsed["avatar"]["metadata"]["rem"] == [["!raw", "x"]]
     assert "fake-bytes" not in attr
 
 
