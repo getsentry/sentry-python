@@ -980,7 +980,10 @@ def test_proxy_http_tunnel(
 
         port_modifier = f":{tunnel_port}" if tunnel_port else ""
         assert span["name"] == f"GET http://api.example.com{port_modifier}/foo"
-        assert span["attributes"]["url"] == f"http://api.example.com{port_modifier}/foo"
+        assert (
+            span["attributes"][SPANDATA.URL_FULL]
+            == f"http://api.example.com{port_modifier}/foo"
+        )
         assert span["attributes"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["attributes"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
         assert span["attributes"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT

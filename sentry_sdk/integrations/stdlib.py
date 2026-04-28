@@ -104,7 +104,6 @@ def _install_httplib() -> None:
             parsed_url = parse_url(real_url, sanitize=False)
 
         span_streaming = has_span_streaming_enabled(client.options)
-        span: "Union[Span, StreamedSpan]"
         if span_streaming:
             span = sentry_sdk.traces.start_span(
                 name="%s %s"
@@ -114,6 +113,13 @@ def _install_httplib() -> None:
                     "sentry.op": OP.HTTP_CLIENT,
                 },
             )
+
+            span.set_attribute(SPANDATA.HTTP_METHOD, method)
+            if parsed_url is not None:
+                span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
+                span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
+
             set_on_span = span.set_attribute
 
         else:
@@ -123,13 +129,14 @@ def _install_httplib() -> None:
                 % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
                 origin="auto.http.stdlib.httplib",
             )
-            set_on_span = span.set_data
 
-        set_on_span(SPANDATA.HTTP_METHOD, method)
-        if parsed_url is not None:
-            set_on_span("url", parsed_url.url)
-            set_on_span(SPANDATA.HTTP_QUERY, parsed_url.query)
-            set_on_span(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            span.set_data(SPANDATA.HTTP_METHOD, method)
+            if parsed_url is not None:
+                span.set_data("url", parsed_url.url)
+                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+            set_on_span = span.set_data
 
         # for proxies, these point to the proxy host/port
         if tunnel_host:
