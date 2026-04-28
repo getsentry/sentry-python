@@ -53,7 +53,7 @@ def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
                         "attributes": otel_attributes_to_dict(log_json["attributes"]),
                         "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
                         "trace_id": log_json["trace_id"],
-                        "span_id": log_json["span_id"],
+                        "span_id": log_json.get("span_id"),
                     }
                     res.append(log)
     return res
@@ -322,6 +322,24 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
 
     assert "span_id" in logs[0]
     assert logs[0]["span_id"] == trx.span_id
+
+
+@minimum_python_37
+def test_logs_no_span_id_without_active_span(sentry_init, capture_envelopes):
+    """
+    Per the metrics spec, span_id is only attached when a span is active
+    when the telemetry is emitted. The propagation context's synthesized
+    span_id must not be used as a fallback.
+    """
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    sentry_sdk.logger.warning("This is a log without an active span")
+
+    get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+    assert logs[0]["trace_id"] is not None
+    assert logs[0]["span_id"] is None
 
 
 @minimum_python_37

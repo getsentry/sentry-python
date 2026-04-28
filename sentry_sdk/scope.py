@@ -1848,9 +1848,13 @@ class Scope:
                 telemetry["trace_id"] = (
                     trace_id or "00000000-0000-0000-0000-000000000000"
                 )
-            span_id = trace_context.get("span_id")
-            if telemetry.get("span_id") is None and span_id:
-                telemetry["span_id"] = span_id
+
+            # span_id should only be populated if there's an active span. We can't
+            # use the trace_context here because it synthesizes a span_id if there
+            # isn't one
+            span = sentry_sdk.get_current_span()
+            if span:
+                telemetry["span_id"] = span.span_id
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
