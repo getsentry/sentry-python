@@ -111,7 +111,6 @@ def expected_error(integrations):
                 "extra1": "extra1_value",
                 "extra2": "extra2_value",
                 "should_be_removed_by_event_scrubber": "[Filtered]",
-                "sys.argv": "[Filtered]",
             },
             "breadcrumbs": {
                 "values": [
@@ -142,7 +141,6 @@ def expected_error(integrations):
                     "should_be_removed_by_event_scrubber": {
                         "": {"rem": [["!config", "s"]]}
                     },
-                    "sys.argv": {"": {"rem": [["!config", "s"]]}},
                 },
             },
         }
@@ -213,7 +211,6 @@ def expected_transaction(integrations):
                 "extra1": "extra1_value",
                 "extra2": "extra2_value",
                 "should_be_removed_by_event_scrubber": "[Filtered]",
-                "sys.argv": "[Filtered]",
             },
             "release": "0.1.2rc3",
             "environment": "checking-compatibility-with-sdk1",
@@ -231,7 +228,6 @@ def expected_transaction(integrations):
                     "should_be_removed_by_event_scrubber": {
                         "": {"rem": [["!config", "s"]]}
                     },
-                    "sys.argv": {"": {"rem": [["!config", "s"]]}},
                 },
             },
         }
@@ -316,8 +312,7 @@ def _init_sentry_sdk(sentry_init):
         before_send_transaction=_test_before_send_transaction,
         before_breadcrumb=_test_before_breadcrumb,
         event_scrubber=EventScrubber(
-            denylist=DEFAULT_DENYLIST
-            + ["should_be_removed_by_event_scrubber", "sys.argv"]
+            denylist=DEFAULT_DENYLIST + ["should_be_removed_by_event_scrubber"]
         ),
         send_default_pii=False,
         traces_sample_rate=1.0,
