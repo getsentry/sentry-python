@@ -463,14 +463,15 @@ def test_no_request_source_if_duration_too_short(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    already_patched_putrequest = HTTPConnection.putrequest
+    already_patched_getresponse = HTTPConnection.getresponse
 
     class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def putrequest(self, *args, **kwargs) -> None:
-            already_patched_putrequest(self, *args, **kwargs)
+        def getresponse(self, *args, **kwargs):
+            response = already_patched_getresponse(self, *args, **kwargs)
             span = self._sentrysdk_span  # type: ignore
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            return response
 
     items = capture_items("event", "transaction", "span")
 
@@ -502,14 +503,15 @@ def test_request_source_if_duration_over_threshold(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    already_patched_putrequest = HTTPConnection.putrequest
+    already_patched_getresponse = HTTPConnection.getresponse
 
     class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def putrequest(self, *args, **kwargs) -> None:
-            already_patched_putrequest(self, *args, **kwargs)
+        def getresponse(self, *args, **kwargs):
+            response = already_patched_getresponse(self, *args, **kwargs)
             span = self._sentrysdk_span  # type: ignore
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span._timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+            return response
 
     items = capture_items("event", "transaction", "span")
 
