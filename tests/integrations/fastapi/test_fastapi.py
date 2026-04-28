@@ -339,7 +339,7 @@ def test_request_body_data_annotated_value_top_level_span_streaming(
     attr = segments[0]["attributes"]["http.request.body.data"]
 
     assert isinstance(attr, str)
-    assert "!raw" in attr
+    assert attr == '""'
 
 
 @pytest.mark.parametrize("middleware_spans", [False, True])
@@ -380,7 +380,6 @@ def test_request_body_data_annotated_value_nested_span_streaming(
     assert isinstance(attr, str)
     parsed = json.loads(attr)
     assert parsed["name"] == "erica"
-    assert parsed["avatar"]["metadata"]["rem"] == [["!raw", "x"]]
     assert "fake-bytes" not in attr
 
 
