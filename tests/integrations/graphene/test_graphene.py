@@ -1,3 +1,4 @@
+import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from flask import Flask, request, jsonify
@@ -204,11 +205,18 @@ def test_no_event_if_no_errors_sync(sentry_init, capture_events):
     assert len(events) == 0
 
 
-def test_graphql_span_holds_query_information(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "send_default_pii",
+    [True, False],
+)
+def test_graphql_span_holds_query_information(
+    sentry_init, capture_events, send_default_pii
+):
     sentry_init(
         integrations=[GrapheneIntegration(), FlaskIntegration()],
         traces_sample_rate=1.0,
         default_integrations=False,
+        send_default_pii=send_default_pii,
     )
     events = capture_events()
 
@@ -237,9 +245,13 @@ def test_graphql_span_holds_query_information(sentry_init, capture_events):
     (span,) = event["spans"]
     assert span["op"] == OP.GRAPHQL_QUERY
     assert span["description"] == query["operationName"]
-    assert span["data"]["graphql.document"] == query["query"]
     assert span["data"]["graphql.operation.name"] == query["operationName"]
     assert span["data"]["graphql.operation.type"] == "query"
+
+    if send_default_pii is True:
+        assert span["data"]["graphql.document"] == query["query"]
+    else:
+        assert "graphql.document" not in span["data"]
 
 
 def test_breadcrumbs_hold_query_information_on_error(sentry_init, capture_events):
