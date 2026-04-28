@@ -1,5 +1,6 @@
 import os
 import time
+import weakref
 from threading import Thread, Lock
 
 import sentry_sdk
@@ -43,10 +44,19 @@ class Monitor:
         # not exist in the child, so the lock can never be released and
         # _ensure_running deadlocks forever. Reinitialise the lock and
         # cached thread/pid in the child so it starts clean regardless
-        # of inherited state. register_at_fork is POSIX-only; Windows
-        # uses spawn.
+        # of inherited state. We bind via a WeakMethod so the
+        # permanently-registered fork handler does not pin this Monitor
+        # (and its Transport): register_at_fork has no unregister API.
+        # POSIX-only; Windows uses spawn.
         if hasattr(os, "register_at_fork"):
-            os.register_at_fork(after_in_child=self._reset_thread_state)
+            weak_reset = weakref.WeakMethod(self._reset_thread_state)
+
+            def _reset_in_child() -> None:
+                method = weak_reset()
+                if method is not None:
+                    method()
+
+            os.register_at_fork(after_in_child=_reset_in_child)
 
     def _reset_thread_state(self) -> None:
         self._thread = None
