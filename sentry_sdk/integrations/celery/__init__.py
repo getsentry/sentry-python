@@ -14,10 +14,12 @@ from sentry_sdk.integrations.celery.beat import (
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span, TransactionSource
 from sentry_sdk.tracing_utils import Baggage, has_span_streaming_enabled
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     event_from_exception,
     reraise,
@@ -143,8 +145,12 @@ def _make_event_processor(
             extra = event.setdefault("extra", {})
             extra["celery-job"] = {
                 "task_name": task.name,
-                "args": args,
-                "kwargs": kwargs,
+                "args": (
+                    args if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                ),
+                "kwargs": (
+                    kwargs if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                ),
             }
 
         if "exc_info" in hint:
