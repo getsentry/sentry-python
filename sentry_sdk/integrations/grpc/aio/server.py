@@ -25,7 +25,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         self: "ServerInterceptor",
         find_name: "Callable[[ServicerContext], str] | None" = None,
     ) -> None:
-        self._find_method_name = find_name or self._find_name
+        self._custom_find_name = find_name
 
         super().__init__()
 
@@ -34,17 +34,21 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         continuation: "Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]]",
         handler_call_details: "HandlerCallDetails",
     ) -> "Optional[Awaitable[RpcMethodHandler]]":
-        self._handler_call_details = handler_call_details
         handler = await continuation(handler_call_details)
         if handler is None:
             return None
+
+        method_name = handler_call_details.method
+        custom_find_name = self._custom_find_name
 
         if not handler.request_streaming and not handler.response_streaming:
             handler_factory = grpc.unary_unary_rpc_method_handler
 
             async def wrapped(request: "Any", context: "ServicerContext") -> "Any":
                 with sentry_sdk.isolation_scope():
-                    name = self._find_method_name(context)
+                    name = (
+                        custom_find_name(context) if custom_find_name else method_name
+                    )
                     if not name:
                         return await handler(request, context)
 
@@ -96,6 +100,3 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
             request_deserializer=handler.request_deserializer,
             response_serializer=handler.response_serializer,
         )
-
-    def _find_name(self, context: "ServicerContext") -> str:
-        return self._handler_call_details.method
