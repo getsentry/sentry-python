@@ -13,6 +13,7 @@ from sentry_sdk.integrations.celery import (
     _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
 
 
@@ -118,11 +119,18 @@ def celery_invocation(request):
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_simple_with_performance(
-    capture_events, capture_items, init_celery, celery_invocation, span_streaming
+    capture_events,
+    capture_items,
+    init_celery,
+    celery_invocation,
+    span_streaming,
+    send_default_pii,
 ):
     celery = init_celery(
         traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -158,9 +166,16 @@ def test_simple_with_performance(
 
     assert error_event["transaction"] == "dummy_task"
     assert "celery_task_id" in error_event["tags"]
-    assert error_event["extra"]["celery-job"] == dict(
-        task_name="dummy_task", **expected_context
-    )
+    if send_default_pii:
+        assert error_event["extra"]["celery-job"] == dict(
+            task_name="dummy_task", **expected_context
+        )
+    else:
+        assert error_event["extra"]["celery-job"] == {
+            "task_name": "dummy_task",
+            "args": SENSITIVE_DATA_SUBSTITUTE,
+            "kwargs": SENSITIVE_DATA_SUBSTITUTE,
+        }
 
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -168,8 +183,11 @@ def test_simple_with_performance(
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
-def test_simple_without_performance(capture_events, init_celery, celery_invocation):
-    celery = init_celery(traces_sample_rate=None)
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_simple_without_performance(
+    capture_events, init_celery, celery_invocation, send_default_pii
+):
+    celery = init_celery(traces_sample_rate=None, send_default_pii=send_default_pii)
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -194,9 +212,16 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
     )
     assert error_event["transaction"] == "dummy_task"
     assert "celery_task_id" in error_event["tags"]
-    assert error_event["extra"]["celery-job"] == dict(
-        task_name="dummy_task", **expected_context
-    )
+    if send_default_pii:
+        assert error_event["extra"]["celery-job"] == dict(
+            task_name="dummy_task", **expected_context
+        )
+    else:
+        assert error_event["extra"]["celery-job"] == {
+            "task_name": "dummy_task",
+            "args": SENSITIVE_DATA_SUBSTITUTE,
+            "kwargs": SENSITIVE_DATA_SUBSTITUTE,
+        }
 
     (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
