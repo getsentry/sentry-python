@@ -112,10 +112,10 @@ def _install_httplib() -> None:
                 attributes={
                     "sentry.origin": "auto.http.stdlib.httplib",
                     "sentry.op": OP.HTTP_CLIENT,
+                    SPANDATA.HTTP_REQUEST_METHOD: method,
                 },
             )
 
-            span.set_attribute(SPANDATA.HTTP_METHOD, method)
             if parsed_url is not None:
                 span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
                 span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
