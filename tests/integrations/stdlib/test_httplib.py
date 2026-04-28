@@ -587,14 +587,15 @@ def test_no_request_source_if_duration_too_short(sentry_init, capture_events):
         http_request_source_threshold_ms=100,
     )
 
-    already_patched_putrequest = HTTPConnection.putrequest
+    already_patched_getresponse = HTTPConnection.getresponse
 
     class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def putrequest(self, *args, **kwargs) -> None:
-            already_patched_putrequest(self, *args, **kwargs)
+        def getresponse(self, *args, **kwargs):
+            response = already_patched_getresponse(self, *args, **kwargs)
             span = self._sentrysdk_span  # type: ignore
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            return response
 
     events = capture_events()
 
@@ -623,14 +624,15 @@ def test_request_source_if_duration_over_threshold(sentry_init, capture_events):
         http_request_source_threshold_ms=100,
     )
 
-    already_patched_putrequest = HTTPConnection.putrequest
+    already_patched_getresponse = HTTPConnection.getresponse
 
     class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def putrequest(self, *args, **kwargs) -> None:
-            already_patched_putrequest(self, *args, **kwargs)
+        def getresponse(self, *args, **kwargs):
+            response = already_patched_getresponse(self, *args, **kwargs)
             span = self._sentrysdk_span  # type: ignore
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+            return response
 
     events = capture_events()
 
