@@ -6,6 +6,7 @@ import warnings
 from unittest import mock
 
 import fastapi
+import starlette
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -20,6 +21,7 @@ from sentry_sdk.utils import parse_version
 
 
 FASTAPI_VERSION = parse_version(fastapi.__version__)
+STARLETTE_VERSION = parse_version(starlette.__version__)
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
 from tests.integrations.starlette import test_starlette
@@ -243,6 +245,142 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
     assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
+
+
+def _post_body_fastapi_app(handler_awaitable):
+    app = FastAPI()
+
+    @app.post("/body")
+    async def _route(request: Request):
+        await handler_awaitable(request)
+        return {"ok": True}
+
+    return app
+
+
+@pytest.mark.parametrize("middleware_spans", [False, True])
+def test_request_body_data_does_not_scrub_pii_span_streaming(
+    sentry_init, capture_items, middleware_spans
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[
+            StarletteIntegration(middleware_spans=middleware_spans),
+            FastApiIntegration(middleware_spans=middleware_spans),
+        ],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def _read_json(request):
+        await request.json()
+
+    items = capture_items("span")
+
+    client = TestClient(_post_body_fastapi_app(_read_json))
+    response = client.post(
+        "/body",
+        json={
+            "password": "ohno",
+            "authorization": "Bearer token",
+            "message": "hello",
+        },
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    attr = segments[0]["attributes"]["http.request.body.data"]
+
+    # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
+    # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
+    assert "ohno" in attr
+    assert "Bearer token" in attr
+    assert "hello" in attr
+
+
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 21),
+    reason="Requires Starlette >= 0.21, because earlier versions use a requests-based TestClient which does not support the 'content' kwarg",
+)
+@pytest.mark.parametrize("middleware_spans", [False, True])
+def test_request_body_data_annotated_value_top_level_span_streaming(
+    sentry_init, capture_items, middleware_spans
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[
+            StarletteIntegration(middleware_spans=middleware_spans),
+            FastApiIntegration(middleware_spans=middleware_spans),
+        ],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def _read_body(request):
+        await request.body()
+
+    items = capture_items("span")
+
+    client = TestClient(_post_body_fastapi_app(_read_body))
+    response = client.post(
+        "/body",
+        content=b"not json and not form",
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    attr = segments[0]["attributes"]["http.request.body.data"]
+
+    assert isinstance(attr, str)
+    assert attr == '""'
+
+
+@pytest.mark.parametrize("middleware_spans", [False, True])
+def test_request_body_data_annotated_value_nested_span_streaming(
+    sentry_init, capture_items, middleware_spans
+):
+    pytest.importorskip("multipart")
+
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[
+            StarletteIntegration(middleware_spans=middleware_spans),
+            FastApiIntegration(middleware_spans=middleware_spans),
+        ],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def _read_form(request):
+        await request.form()
+
+    items = capture_items("span")
+
+    client = TestClient(_post_body_fastapi_app(_read_form))
+    response = client.post(
+        "/body",
+        data={"name": "erica"},
+        files={"avatar": ("photo.jpg", b"fake-bytes", "image/jpeg")},
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    attr = segments[0]["attributes"]["http.request.body.data"]
+
+    assert isinstance(attr, str)
+    parsed = json.loads(attr)
+    assert parsed["name"] == "erica"
+    assert "fake-bytes" not in attr
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

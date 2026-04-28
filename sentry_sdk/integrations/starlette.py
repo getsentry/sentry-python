@@ -241,7 +241,7 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
     return middleware_class
 
 
-def _serialize_body_data(data: "Any") -> str:
+def _serialize_request_body_data(data: "Any") -> str:
     # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
     def _default(value: "Any") -> "Any":
         if isinstance(value, AnnotatedValue):
@@ -249,6 +249,23 @@ def _serialize_body_data(data: "Any") -> str:
         return str(value)
 
     return json.dumps(data, default=_default)
+
+
+def _set_request_body_data_on_streaming_segment(
+    info: "Optional[Dict[str, Any]]",
+) -> None:
+    current_span = sentry_sdk.get_current_span()
+    if (
+        info
+        and "data" in info
+        and isinstance(current_span, StreamedSpan)
+        and not isinstance(current_span, NoOpStreamedSpan)
+    ):
+        with capture_internal_exceptions():
+            current_span._segment.set_attribute(
+                "http.request.body.data",
+                _serialize_request_body_data(info["data"]),
+            )
 
 
 @ensure_integration_enabled(StarletteIntegration)
@@ -517,23 +534,8 @@ def patch_request_response() -> None:
                     _make_request_event_processor(request, integration)
                 )
 
-                is_span_streaming_enabled = has_span_streaming_enabled(client.options)
-                if is_span_streaming_enabled:
-                    current_span = sentry_sdk.get_current_span()
-
-                    if (
-                        info
-                        and "data" in info
-                        and isinstance(current_span, StreamedSpan)
-                        and not isinstance(current_span, NoOpStreamedSpan)
-                    ):
-                        data = info["data"]
-
-                        with capture_internal_exceptions():
-                            current_span._segment.set_attribute(
-                                "http.request.body.data",
-                                _serialize_body_data(data),
-                            )
+                if has_span_streaming_enabled(client.options):
+                    _set_request_body_data_on_streaming_segment(info)
 
                 return await old_func(*args, **kwargs)
 
