@@ -1142,7 +1142,9 @@ def test_request_body_data_annotated_value_top_level_span_streaming(
     attr = segments[0]["attributes"]["http.request.body.data"]
 
     assert isinstance(attr, str)
-    assert "!raw" in attr
+    assert (
+        attr == '""'
+    )  # AnnotatedValue.removed_because_raw_data is called because the content was not able to be parsed, and replaces the value with an empty string
 
 
 @pytest.mark.parametrize("middleware_spans", [False, True])

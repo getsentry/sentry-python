@@ -238,7 +238,7 @@ def _serialize_body_data(data: "Any") -> str:
     # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
     def _default(value: "Any") -> "Any":
         if isinstance(value, AnnotatedValue):
-            return {"value": value.value, "metadata": value.metadata}
+            return value.value
         return str(value)
 
     return json.dumps(data, default=_default)
