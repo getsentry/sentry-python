@@ -159,8 +159,6 @@ def _install_httplib() -> None:
     def getresponse(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
         span = getattr(self, "_sentrysdk_span", None)
 
-        print("span is here")
-
         if span is None:
             return real_getresponse(self, *args, **kwargs)
 
