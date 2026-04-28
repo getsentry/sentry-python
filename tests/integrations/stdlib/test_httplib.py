@@ -337,13 +337,13 @@ def test_request_source_enabled(
     sentry_options = {
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
+        "_experiments": {"trace_lifecycle": "stream" if span_streaming else "static"},
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
 
     sentry_init(
         **sentry_options,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     items = capture_items("event", "transaction", "span")
@@ -463,22 +463,23 @@ def test_no_request_source_if_duration_too_short(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    already_patched_getresponse = HTTPConnection.getresponse
+    add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
 
-    class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def getresponse(self, *args, **kwargs):
-            response = already_patched_getresponse(self, *args, **kwargs)
-            span = self._sentrysdk_span  # type: ignore
-            span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
-            return response
+    def add_http_request_source_with_pinned_timestamps(span):
+        span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+        span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+        return add_http_request_source(span)
 
     items = capture_items("event", "transaction", "span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+    with mock.patch(
+        "sentry_sdk.integrations.stdlib.add_http_request_source",
+        add_http_request_source_with_pinned_timestamps,
+    ):
+        with sentry_sdk.traces.start_span(name="foo"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
 
     sentry_sdk.flush()
     span = next(item.payload for item in items if item.type == "span")
@@ -503,22 +504,23 @@ def test_request_source_if_duration_over_threshold(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    already_patched_getresponse = HTTPConnection.getresponse
+    add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
 
-    class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def getresponse(self, *args, **kwargs):
-            response = already_patched_getresponse(self, *args, **kwargs)
-            span = self._sentrysdk_span  # type: ignore
-            span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
-            return response
+    def add_http_request_source_with_pinned_timestamps(span):
+        span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+        span._timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+        return add_http_request_source(span)
 
     items = capture_items("event", "transaction", "span")
 
-    with sentry_sdk.traces.start_span(name="custom parent"):
-        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+    with mock.patch(
+        "sentry_sdk.integrations.stdlib.add_http_request_source",
+        add_http_request_source_with_pinned_timestamps,
+    ):
+        with sentry_sdk.traces.start_span(name="foo"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
 
     sentry_sdk.flush()
     span = next(item.payload for item in items if item.type == "span")
@@ -546,7 +548,7 @@ def test_request_source_if_duration_over_threshold(
 
     assert (
         attributes.get(SPANDATA.CODE_FUNCTION)
-        == "test_request_source_if_duration_over_threshold"
+        == "add_http_request_source_with_pinned_timestamps"
     )
 
 
@@ -566,14 +568,14 @@ def test_span_origin(sentry_init, capture_items, span_streaming):
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[0]["attributes"]["sentry.origin"] == "manual"
+    assert spans[1]["attributes"]["sentry.origin"] == "manual"
 
     assert spans[0]["attributes"]["sentry.op"] == "http.client"
-    assert spans[0]["origin"] == "auto.http.stdlib.httplib"
+    assert spans[0]["attributes"]["sentry.origin"] == "auto.http.stdlib.httplib"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_http_timeout(monkeypatch, sentry_init, capture_envelopes, span_streaming):
+def test_http_timeout(monkeypatch, sentry_init, capture_items, span_streaming):
     mock_readinto = mock.Mock(side_effect=TimeoutError)
     monkeypatch.setattr(SocketIO, "readinto", mock_readinto)
 
@@ -582,7 +584,7 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes, span_streamin
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    envelopes = capture_envelopes()
+    items = capture_items("event", "transaction", "span")
 
     with pytest.raises(TimeoutError):
         with sentry_sdk.traces.start_span(
@@ -595,11 +597,9 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes, span_streamin
             conn.request("GET", "/bla")
             conn.getresponse()
 
-    (transaction_envelope,) = envelopes
-    transaction = transaction_envelope.get_transaction_event()
-    assert len(transaction["spans"]) == 1
-
-    span = transaction["spans"][0]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    span = spans[0]
     assert span["attributes"]["sentry.op"] == "http.client"
     assert span["name"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
 
@@ -624,7 +624,7 @@ def test_proxy_http_tunnel(sentry_init, capture_items, tunnel_port, span_streami
     (span,) = (
         span
         for span in spans
-        if span["attributes"].get("sentry.op") == "auto.http.stdlib.httplib"
+        if span["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
     )
 
     port_modifier = f":{tunnel_port}" if tunnel_port else ""
