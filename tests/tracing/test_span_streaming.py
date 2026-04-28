@@ -1504,6 +1504,46 @@ def test_profile_stops_when_segment_ends(
     assert get_profiler_id() is None, "profiler should have stopped"
 
 
+def test_default_attributes(sentry_init, capture_envelopes):
+    sentry_init(
+        server_name="test-server",
+        release="1.0.0",
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="test"):
+        ...
+
+    sentry_sdk.get_client().flush()
+
+    assert len(envelopes) == 1
+    assert len(envelopes[0].items) == 1
+    item = envelopes[0].items[0]
+
+    assert item.type == "span"
+    assert item.headers == {
+        "type": "span",
+        "item_count": 1,
+        "content_type": "application/vnd.sentry.items.span.v2+json",
+    }
+    assert item.payload.json["items"][0]["attributes"] == {
+        "thread.id": {"value": mock.ANY, "type": "string"},
+        "thread.name": {"value": "MainThread", "type": "string"},
+        "process.command_args": {"value": mock.ANY, "type": "array"},
+        "sentry.segment.id": {"value": mock.ANY, "type": "string"},
+        "sentry.segment.name": {"value": "test", "type": "string"},
+        "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
+        "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
+        "server.address": {"value": "test-server", "type": "string"},
+        "sentry.environment": {"value": "production", "type": "string"},
+        "sentry.release": {"value": "1.0.0", "type": "string"},
+        "sentry.origin": {"value": "manual", "type": "string"},
+    }
+
+
 def test_transport_format(sentry_init, capture_envelopes):
     sentry_init(
         server_name="test-server",
@@ -1539,18 +1579,17 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "is_segment": True,
                 "start_timestamp": mock.ANY,
                 "end_timestamp": mock.ANY,
-                "attributes": {
-                    "thread.id": {"value": mock.ANY, "type": "string"},
-                    "thread.name": {"value": "MainThread", "type": "string"},
-                    "sentry.segment.id": {"value": mock.ANY, "type": "string"},
-                    "sentry.segment.name": {"value": "test", "type": "string"},
-                    "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
-                    "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
-                    "server.address": {"value": "test-server", "type": "string"},
-                    "sentry.environment": {"value": "production", "type": "string"},
-                    "sentry.release": {"value": "1.0.0", "type": "string"},
-                    "sentry.origin": {"value": "manual", "type": "string"},
-                },
+                "attributes": mock.ANY,
             }
         ]
     }
+    for attribute, value in item.payload.json["items"][0]["attributes"].items():
+        assert isinstance(attribute, str)
+
+        assert isinstance(value, dict)
+        assert (
+            len(value) == 2
+        )  # technically, "unit" is also supported, but we don't currently set it anywhere
+        assert "value" in value
+        assert "type" in value
+        assert value["type"] in ("string", "boolean", "integer", "double", "array")
