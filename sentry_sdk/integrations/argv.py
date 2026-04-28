@@ -2,7 +2,7 @@ import sys
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 
 from typing import TYPE_CHECKING
 
@@ -23,7 +23,7 @@ class ArgvIntegration(Integration):
                 extra = event.setdefault("extra", {})
                 # If some event processor decided to set extra to e.g. an
                 # `int`, don't crash. Not here.
-                if isinstance(extra, dict):
+                if isinstance(extra, dict) and should_send_default_pii:
                     extra["sys.argv"] = sys.argv
 
             return event
