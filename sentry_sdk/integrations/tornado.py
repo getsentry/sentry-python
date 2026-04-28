@@ -107,6 +107,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
 
     if integration is None:
         yield
+        return
 
     weak_handler = weakref.ref(self)
 
