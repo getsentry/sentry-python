@@ -166,8 +166,6 @@ def _install_httplib() -> None:
             rv = real_getresponse(self, *args, **kwargs)
 
             if isinstance(span, StreamedSpan):
-                span.set_attribute("reason", rv.reason)
-
                 status_code = int(rv.status)
                 span.status = "error" if status_code >= 400 else "ok"
                 span.set_attribute("http.response.status_code", status_code)
