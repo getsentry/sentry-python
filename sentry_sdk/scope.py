@@ -1854,7 +1854,7 @@ class Scope:
             # isn't one
             span = self._span
             if (
-                telemetry["span_id"] is None
+                telemetry.get("span_id") is None
                 and span is not None
                 and not isinstance(self._span, NoOpStreamedSpan)
             ):
