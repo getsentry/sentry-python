@@ -215,8 +215,6 @@ def record_sql_queries_supporting_streaming(
                 "sentry.op": OP.DB,
             },
         ) as span:
-            for k, v in data.items():
-                span.set_attribute(k, v)
             yield span
     else:
         with sentry_sdk.start_span(
