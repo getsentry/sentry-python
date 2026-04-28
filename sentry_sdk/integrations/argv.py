@@ -23,7 +23,7 @@ class ArgvIntegration(Integration):
                 extra = event.setdefault("extra", {})
                 # If some event processor decided to set extra to e.g. an
                 # `int`, don't crash. Not here.
-                if isinstance(extra, dict) and should_send_default_pii:
+                if isinstance(extra, dict) and should_send_default_pii():
                     extra["sys.argv"] = sys.argv
 
             return event
