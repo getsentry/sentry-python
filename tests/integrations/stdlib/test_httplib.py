@@ -953,11 +953,12 @@ def test_proxy_http_tunnel(
     tunnel_port,
     span_streaming,
 ):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
     if span_streaming:
-        sentry_init(
-            traces_sample_rate=1.0,
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
-        )
         items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
@@ -981,7 +982,6 @@ def test_proxy_http_tunnel(
         assert span["attributes"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
         assert span["attributes"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
     else:
-        sentry_init(traces_sample_rate=1.0)
         events = capture_events()
 
         with start_transaction(name="test_transaction"):
