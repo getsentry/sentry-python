@@ -254,10 +254,12 @@ def _install_subprocess() -> None:
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         span: "Union[Span, StreamedSpan]"
         if span_streaming:
-            span = sentry_sdk.start_span(
-                op=OP.SUBPROCESS,
-                name=description,
-                origin="auto.subprocess.stdlib.subprocess",
+            span = sentry_sdk.traces.start_span(
+                name=OP.SUBPROCESS if description is None else description,
+                attributes={
+                    "sentry.op": OP.SUBPROCESS,
+                    "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                },
             )
         else:
             span = sentry_sdk.start_span(
@@ -280,12 +282,16 @@ def _install_subprocess() -> None:
                     )
                 env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
-            if cwd:
+            if cwd and isinstance(span, Span):
                 span.set_data("subprocess.cwd", cwd)
 
             rv = old_popen_init(self, *a, **kw)
 
-            span.set_tag("subprocess.pid", self.pid)
+            if isinstance(span, Span):
+                span.set_tag("subprocess.pid", self.pid)
+            else:
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+
             return rv
 
     subprocess.Popen.__init__ = sentry_patched_popen_init  # type: ignore
@@ -296,12 +302,24 @@ def _install_subprocess() -> None:
     def sentry_patched_popen_wait(
         self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
     ) -> "Any":
-        with sentry_sdk.start_span(
-            op=OP.SUBPROCESS_WAIT,
-            origin="auto.subprocess.stdlib.subprocess",
-        ) as span:
-            span.set_tag("subprocess.pid", self.pid)
-            return old_popen_wait(self, *a, **kw)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=OP.SUBPROCESS_COMMUNICATE,
+                attributes={
+                    "sentry.op": OP.SUBPROCESS_WAIT,
+                    "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                },
+            ) as span:
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+                return old_popen_wait(self, *a, **kw)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.SUBPROCESS_WAIT,
+                origin="auto.subprocess.stdlib.subprocess",
+            ) as span:
+                span.set_tag("subprocess.pid", self.pid)
+                return old_popen_wait(self, *a, **kw)
 
     subprocess.Popen.wait = sentry_patched_popen_wait  # type: ignore
 
@@ -311,12 +329,24 @@ def _install_subprocess() -> None:
     def sentry_patched_popen_communicate(
         self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
     ) -> "Any":
-        with sentry_sdk.start_span(
-            op=OP.SUBPROCESS_COMMUNICATE,
-            origin="auto.subprocess.stdlib.subprocess",
-        ) as span:
-            span.set_tag("subprocess.pid", self.pid)
-            return old_popen_communicate(self, *a, **kw)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=OP.SUBPROCESS_COMMUNICATE,
+                attributes={
+                    "sentry.op": OP.SUBPROCESS_COMMUNICATE,
+                    "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                },
+            ) as span:
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+                return old_popen_communicate(self, *a, **kw)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.SUBPROCESS_COMMUNICATE,
+                origin="auto.subprocess.stdlib.subprocess",
+            ) as span:
+                span.set_tag("subprocess.pid", self.pid)
+                return old_popen_communicate(self, *a, **kw)
 
     subprocess.Popen.communicate = sentry_patched_popen_communicate  # type: ignore
 
