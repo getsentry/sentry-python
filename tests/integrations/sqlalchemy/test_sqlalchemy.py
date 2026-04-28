@@ -156,9 +156,9 @@ def test_transactions(
             if span["attributes"]["sentry.origin"] == "auto.db.sqlalchemy"
         ]
         for span in sqlalchemy_spans:
-            assert span["attributes"][SPANDATA.DB_SYSTEM] == "sqlite"
+            assert span["attributes"][SPANDATA.DB_SYSTEM_NAME] == "sqlite"
             assert span["attributes"][SPANDATA.DB_DRIVER_NAME] == "pysqlite"
-            assert span["attributes"][SPANDATA.DB_NAME] == ":memory:"
+            assert span["attributes"][SPANDATA.DB_NAMESPACE] == ":memory:"
             assert SPANDATA.SERVER_PORT not in span["attributes"]
 
         assert (
@@ -287,7 +287,7 @@ def test_transactions_no_engine_url(
             if span["attributes"]["sentry.origin"] == "auto.db.sqlalchemy"
         ]
         for span in sqlalchemy_spans:
-            assert span["attributes"][SPANDATA.DB_SYSTEM] == "sqlite"
+            assert span["attributes"][SPANDATA.DB_SYSTEM_NAME] == "sqlite"
             assert span["attributes"][SPANDATA.DB_DRIVER_NAME] == "pysqlite"
             assert SPANDATA.DB_NAME not in span["attributes"]
             assert SPANDATA.SERVER_PORT not in span["attributes"]
