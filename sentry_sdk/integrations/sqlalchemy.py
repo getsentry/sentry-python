@@ -154,7 +154,7 @@ def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
 
     db_system = _get_db_system(conn.engine.name)
     if db_system is not None:
-        set_on_span(SPANDATA.DB_SYSTEM, db_system)
+        set_on_span(SPANDATA.DB_SYSTEM_NAME, db_system)
 
     try:
         driver = conn.dialect.driver
@@ -168,7 +168,7 @@ def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
 
     db_name = conn.engine.url.database
     if db_name is not None:
-        set_on_span(SPANDATA.DB_NAME, db_name)
+        set_on_span(SPANDATA.DB_NAMESPACE, db_name)
 
     server_address = conn.engine.url.host
     if server_address is not None:
