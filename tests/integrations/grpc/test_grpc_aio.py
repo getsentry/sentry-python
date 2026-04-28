@@ -269,6 +269,83 @@ async def test_stream_unary(grpc_server_and_channel):
 
 
 @pytest.mark.asyncio
+async def test_concurrent_requests_do_not_leak_method_name(sentry_init, capture_events):
+    """
+    Regression test for SDK-1184: the async ServerInterceptor must not stash
+    request-specific state on the shared interceptor instance, otherwise
+    concurrent requests can overwrite each other's method names.
+    """
+    from sentry_sdk.integrations.grpc.aio.server import ServerInterceptor
+
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events()
+
+    interceptor = ServerInterceptor()
+
+    request_a_can_finish = asyncio.Event()
+    request_a_started = asyncio.Event()
+
+    async def handler_a(request, context):
+        request_a_started.set()
+        await request_a_can_finish.wait()
+        return "a-response"
+
+    async def handler_b(request, context):
+        return "b-response"
+
+    def make_handler(behavior):
+        h = type(
+            "H",
+            (),
+            {
+                "request_streaming": False,
+                "response_streaming": False,
+                "unary_unary": behavior,
+                "request_deserializer": None,
+                "response_serializer": None,
+            },
+        )()
+        return h
+
+    class FakeHandlerCallDetails:
+        def __init__(self, method):
+            self.method = method
+
+    class FakeContext:
+        def invocation_metadata(self):
+            return ()
+
+    async def continuation_a(_):
+        return make_handler(handler_a)
+
+    async def continuation_b(_):
+        return make_handler(handler_b)
+
+    wrapped_a_handler = await interceptor.intercept_service(
+        continuation_a, FakeHandlerCallDetails("/svc/MethodA")
+    )
+    # Kick off request A; it parks inside the handler awaiting the event.
+    task_a = asyncio.create_task(
+        wrapped_a_handler.unary_unary(None, FakeContext())  # type: ignore[attr-defined]
+    )
+    await request_a_started.wait()
+
+    # While A is parked, intercept B. Pre-fix this overwrote shared state on
+    # the interceptor and A would later read B's method name.
+    wrapped_b_handler = await interceptor.intercept_service(
+        continuation_b, FakeHandlerCallDetails("/svc/MethodB")
+    )
+    await wrapped_b_handler.unary_unary(None, FakeContext())  # type: ignore[attr-defined]
+
+    request_a_can_finish.set()
+    await task_a
+
+    transactions = [e for e in events if e.get("type") == "transaction"]
+    names = sorted(t["transaction"] for t in transactions)
+    assert names == ["/svc/MethodA", "/svc/MethodB"]
+
+
+@pytest.mark.asyncio
 async def test_span_origin(grpc_server_and_channel, capture_events_forksafe):
     _, channel = grpc_server_and_channel
     events = capture_events_forksafe()
