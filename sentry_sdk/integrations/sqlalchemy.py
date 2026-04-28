@@ -148,27 +148,46 @@ def _get_db_system(name: str) -> "Optional[str]":
 
 def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
     if isinstance(span, StreamedSpan):
+        db_system = _get_db_system(conn.engine.name)
+        if db_system is not None:
+            span.set_attribute(SPANDATA.DB_SYSTEM_NAME, db_system)
+
+        try:
+            driver = conn.dialect.driver
+            if driver:
+                span.set_attribute(SPANDATA.DB_DRIVER_NAME, driver)
+        except Exception:
+            pass
+
+        if conn.engine.url is None:
+            return
+
+        db_name = conn.engine.url.database
+        if db_name is not None:
+            span.set_attribute(SPANDATA.DB_NAMESPACE, db_name)
+    else:
+        db_system = _get_db_system(conn.engine.name)
+        if db_system is not None:
+            span.set_data(SPANDATA.DB_SYSTEM, db_system)
+
+        try:
+            driver = conn.dialect.driver
+            if driver:
+                span.set_data(SPANDATA.DB_DRIVER_NAME, driver)
+        except Exception:
+            pass
+
+        if conn.engine.url is None:
+            return
+
+        db_name = conn.engine.url.database
+        if db_name is not None:
+            span.set_data(SPANDATA.DB_NAME, db_name)
+
+    if isinstance(span, StreamedSpan):
         set_on_span = span.set_attribute
     else:
         set_on_span = span.set_data
-
-    db_system = _get_db_system(conn.engine.name)
-    if db_system is not None:
-        set_on_span(SPANDATA.DB_SYSTEM_NAME, db_system)
-
-    try:
-        driver = conn.dialect.driver
-        if driver:
-            set_on_span(SPANDATA.DB_DRIVER_NAME, driver)
-    except Exception:
-        pass
-
-    if conn.engine.url is None:
-        return
-
-    db_name = conn.engine.url.database
-    if db_name is not None:
-        set_on_span(SPANDATA.DB_NAMESPACE, db_name)
 
     server_address = conn.engine.url.host
     if server_address is not None:
