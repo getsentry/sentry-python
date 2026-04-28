@@ -3,6 +3,7 @@ import random
 import threading
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, TypeVar, Generic
+import weakref
 
 from sentry_sdk.utils import format_timestamp
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
@@ -37,6 +38,24 @@ class Batcher(Generic[T]):
 
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
+
+        self_ref = weakref.ref(self)
+
+        def _reset_thread_state() -> None:
+            batcher = self_ref()
+
+            if batcher is not None:
+                batcher._flusher = None
+                batcher._lock = threading.Lock()
+                batcher._flusher_pid = None
+
+        # Same as https://github.com/getsentry/sentry-python/issues/6148.
+        # If os.fork() runs while another thread holds self._lock,
+        # the child inherits the lock locked but the holding thread does
+        # not exist in the child, so the lock can never be released and
+        # _ensure_thread deadlocks forever.
+        if hasattr(os, "register_at_fork"):
+            os.register_at_fork(after_in_child=_reset_thread_state)
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.

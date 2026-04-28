@@ -1,4 +1,3 @@
-import threading
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -8,7 +7,7 @@ from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import format_timestamp, serialize_attribute
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional
+    from typing import Any, Callable
     from sentry_sdk.traces import StreamedSpan
 
 
@@ -32,6 +31,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
     ) -> None:
+        super().__init__(capture_func, record_lost_func)
         # Spans from different traces cannot be emitted in the same envelope
         # since the envelope contains a shared trace header. That's why we bucket
         # by trace_id, so that we can then send the buckets each in its own
@@ -39,16 +39,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # trace_id -> span buffer
         self._span_buffer: dict[str, list["StreamedSpan"]] = defaultdict(list)
         self._running_size: dict[str, int] = defaultdict(lambda: 0)
-        self._capture_func = capture_func
-        self._record_lost_func = record_lost_func
-        self._running = True
-        self._lock = threading.Lock()
-        self._active: "threading.local" = threading.local()
-
-        self._flush_event: "threading.Event" = threading.Event()
-
-        self._flusher: "Optional[threading.Thread]" = None
-        self._flusher_pid: "Optional[int]" = None
 
     def add(self, span: "StreamedSpan") -> None:
         # Bail out if the current thread is already executing batcher code.

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 import time
 from typing import List, Any, Mapping, Union
@@ -819,3 +820,40 @@ def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
     assert reentrant_add_called
     # If the re-entrancy guard didn't work, this test would hang and it'd
     # eventually be timed out by pytest-timeout
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or not hasattr(os, "fork")
+    or not hasattr(os, "register_at_fork"),
+    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
+)
+def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
+    """Regression test for the LogBatcher fork-deadlock fix.
+
+    If os.fork() runs while another thread holds LogBatcher._lock, the
+    child inherits the lock locked. The holding thread does not exist in
+    the child, so the lock can never be released and _ensure_thread
+    deadlocks forever. The after-fork hook must replace the lock with a
+    fresh one in the child and reset _flusher / _flusher_pid.
+    """
+    sentry_init(enable_logs=True)
+    batcher = sentry_sdk.get_client().log_batcher
+    assert batcher is not None
+
+    original_lock = batcher._lock
+    original_lock.acquire()
+    pid = os.fork()
+    if pid == 0:
+        # Child: was the lock object replaced and is the new one not
+        # held? Without the fix, _lock is `original_lock` inherited
+        # locked, so `replaced` is False. blocking=False guarantees the
+        # child can't hang on a regression.
+        replaced = batcher._lock is not original_lock
+        unheld = batcher._lock.acquire(blocking=False)
+        flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
+        os._exit(0 if replaced and unheld and flusher_reset else 1)
+
+    original_lock.release()
+    _, status = os.waitpid(pid, 0)
+    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
