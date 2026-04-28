@@ -170,6 +170,8 @@ def record_sql_queries(
         yield span
 
 
+# Mirrors record_sql_queries() temporarily so the Django and asyncpg integrations don't crash with span streaming enabled.
+# Once both are ported, remove record_sql_queries() and rename record_sql_queries_supporting_streaming() to record_sql_queries().
 @contextlib.contextmanager
 def record_sql_queries_supporting_streaming(
     cursor: "Any",
