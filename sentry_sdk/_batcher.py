@@ -52,6 +52,7 @@ class Batcher(Generic[T]):
 
     def _reset_thread_state(self) -> None:
         self._buffer = []
+        self._running = True
         self._lock = threading.Lock()
         self._active = threading.local()
         self._flush_event = threading.Event()

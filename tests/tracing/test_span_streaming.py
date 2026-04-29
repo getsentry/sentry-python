@@ -1588,6 +1588,7 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     batcher._running_size["test-trace-id"] = 42
     batcher._active.flag = True
     batcher._flush_event.set()
+    batcher._running = False
 
     pid = os.fork()
     if pid == 0:
@@ -1600,6 +1601,7 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
 
         active_reset = not getattr(batcher._active, "flag", False)
         event_reset = not batcher._flush_event.is_set()
+        running_reset = batcher._running is True
 
         os._exit(
             0
@@ -1610,6 +1612,7 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
             and running_size_reset
             and active_reset
             and event_reset
+            and running_reset
             else 1
         )
 

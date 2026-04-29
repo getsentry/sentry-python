@@ -844,21 +844,24 @@ def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
 
     original_lock = batcher._lock
     original_lock.acquire()
+
     batcher._buffer.append(object())
     batcher._active.flag = True
     batcher._flush_event.set()
+    batcher._running = False
+
     pid = os.fork()
     if pid == 0:
-        # Child: was the lock object replaced and is the new one not
-        # held? Without the fix, _lock is `original_lock` inherited
-        # locked, so `replaced` is False. blocking=False guarantees the
-        # child can't hang on a regression.
         replaced = batcher._lock is not original_lock
         unheld = batcher._lock.acquire(blocking=False)
+
         flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
         buffer_reset = len(batcher._buffer) == 0
         active_reset = not getattr(batcher._active, "flag", False)
+
         event_reset = not batcher._flush_event.is_set()
+        running_reset = batcher._running is True
+
         os._exit(
             0
             if replaced
@@ -867,6 +870,7 @@ def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
             and buffer_reset
             and active_reset
             and event_reset
+            and running_reset
             else 1
         )
 

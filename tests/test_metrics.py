@@ -543,6 +543,7 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
     batcher._buffer.append(object())
     batcher._active.flag = True
     batcher._flush_event.set()
+    batcher._running = False
 
     pid = os.fork()
     if pid == 0:
@@ -553,6 +554,7 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
         buffer_reset = len(batcher._buffer) == 0
         active_reset = not getattr(batcher._active, "flag", False)
         event_reset = not batcher._flush_event.is_set()
+        running_reset = batcher._running is True
 
         os._exit(
             0
@@ -562,6 +564,7 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
             and buffer_reset
             and active_reset
             and event_reset
+            and running_reset
             else 1
         )
 

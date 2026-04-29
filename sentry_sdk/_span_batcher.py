@@ -66,6 +66,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _reset_thread_state(self) -> None:
         self._span_buffer = defaultdict(list)
         self._running_size = defaultdict(lambda: 0)
+        self._running = True
 
         self._lock = threading.Lock()
         self._active = threading.local()
