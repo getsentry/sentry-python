@@ -149,7 +149,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
         return res
 
-    def _flush(self, trace_id: "Optional[str]") -> None:
+    def _flush(self, trace_id: "Optional[str]" = None) -> None:
         with self._lock:
             if len(self._span_buffer) == 0:
                 return
