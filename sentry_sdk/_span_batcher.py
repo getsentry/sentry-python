@@ -156,7 +156,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
             if trace_id is None:
                 # flush whole buffer, e.g. if the SDK is shutting down
-                buckets = self._span_buffer.keys()
+                buckets = list(self._span_buffer.keys())
             else:
                 buckets = [trace_id]
 
