@@ -292,8 +292,9 @@ async def test_async_middleware_spans(
 
     (transaction,) = events
 
+    assert transaction["type"] == "transaction"
     assert (
-        render_span_tree(transaction)
+        render_span_tree(transaction["spans"], transaction["contexts"]["trace"])
         == """\
 - op="http.server": description=null
   - op="event.django": description="django.db.reset_queries"
