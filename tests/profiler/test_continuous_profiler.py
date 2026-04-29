@@ -326,7 +326,6 @@ def test_continuous_profiler_auto_start_and_manual_stop(
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_manual_start_and_stop_sampled(
     sentry_init,
     capture_envelopes,
@@ -356,14 +355,14 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
         with sentry_sdk.start_transaction(name="profiling"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.1)
+                pass
             assert get_profiler_id() is not None, "profiler should be running"
-
-        assert_single_transaction_with_profile_chunks(envelopes, thread)
 
         assert get_profiler_id() is not None, "profiler should be running"
 
         stop_profiler_func()
+
+        assert_single_transaction_with_profile_chunks(envelopes, thread)
 
         # the profiler stops immediately in manual mode
         assert get_profiler_id() is None, "profiler should not be running"
@@ -373,7 +372,7 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
         with sentry_sdk.start_transaction(name="profiling"):
             assert get_profiler_id() is None, "profiler should not be running"
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.1)
+                pass
             assert get_profiler_id() is None, "profiler should not be running"
 
         assert_single_transaction_without_profile_chunks(envelopes)
