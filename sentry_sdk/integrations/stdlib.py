@@ -295,10 +295,10 @@ def _install_subprocess() -> None:
 
             rv = old_popen_init(self, *a, **kw)
 
-            if isinstance(span, Span):
-                span.set_tag("subprocess.pid", self.pid)
-            else:
+            if isinstance(span, StreamedSpan):
                 span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+            else:
+                span.set_tag("subprocess.pid", self.pid)
 
             return rv
 
