@@ -182,12 +182,14 @@ def _install_httplib() -> None:
                 span.set_data("reason", rv.reason)
         finally:
             if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_http_request_source(span)
                 span.end()
             else:
                 span.finish()
 
-            with capture_internal_exceptions():
-                add_http_request_source(span)
+                with capture_internal_exceptions():
+                    add_http_request_source(span)
 
         return rv
 
