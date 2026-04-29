@@ -51,8 +51,11 @@ class Batcher(Generic[T]):
             os.register_at_fork(after_in_child=_reset_in_child)
 
     def _reset_thread_state(self) -> None:
-        self._flusher = None
+        self._buffer = []
         self._lock = threading.Lock()
+        self._active = threading.local()
+        self._flush_event = threading.Event()
+        self._flusher = None
         self._flusher_pid = None
 
     def _ensure_thread(self) -> bool:

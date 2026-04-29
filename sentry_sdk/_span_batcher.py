@@ -63,6 +63,18 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
             os.register_at_fork(after_in_child=_reset_in_child)
 
+    def _reset_thread_state(self) -> None:
+        self._span_buffer = defaultdict(list)
+        self._running_size = defaultdict(lambda: 0)
+
+        self._lock = threading.Lock()
+        self._active = threading.local()
+
+        self._flush_event = threading.Event()
+
+        self._flusher = None
+        self._flusher_pid = None
+
     def add(self, span: "StreamedSpan") -> None:
         # Bail out if the current thread is already executing batcher code.
         # This prevents deadlocks when code running inside the batcher (e.g.

@@ -531,7 +531,7 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
     exist in the child, so the lock can never be released and
     _ensure_thread deadlocks forever. The after-fork hook must replace
     the lock with a fresh one in the child and reset
-    _flusher / _flusher_pid.
+    _flusher / _flusher_pid / _buffer / _active / _flush_event.
     """
     sentry_init()
     batcher = sentry_sdk.get_client().metrics_batcher
@@ -539,16 +539,31 @@ def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
 
     original_lock = batcher._lock
     original_lock.acquire()
+
+    batcher._buffer.append(object())
+    batcher._active.flag = True
+    batcher._flush_event.set()
+
     pid = os.fork()
     if pid == 0:
-        # Child: was the lock object replaced and is the new one not
-        # held? Without the fix, _lock is `original_lock` inherited
-        # locked, so `replaced` is False. blocking=False guarantees the
-        # child can't hang on a regression.
         replaced = batcher._lock is not original_lock
         unheld = batcher._lock.acquire(blocking=False)
+
         flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
-        os._exit(0 if replaced and unheld and flusher_reset else 1)
+        buffer_reset = len(batcher._buffer) == 0
+        active_reset = not getattr(batcher._active, "flag", False)
+        event_reset = not batcher._flush_event.is_set()
+
+        os._exit(
+            0
+            if replaced
+            and unheld
+            and flusher_reset
+            and buffer_reset
+            and active_reset
+            and event_reset
+            else 1
+        )
 
     original_lock.release()
     _, status = os.waitpid(pid, 0)

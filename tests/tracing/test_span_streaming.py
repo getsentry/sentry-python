@@ -1570,7 +1570,9 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     child inherits the lock locked. The holding thread does not exist in
     the child, so the lock can never be released and _ensure_thread
     deadlocks forever. The after-fork hook must replace the lock with a
-    fresh one in the child and reset _flusher / _flusher_pid.
+    fresh one in the child and reset
+    _flusher / _flusher_pid / _span_buffer / _running_size / _active /
+    _flush_event.
     """
     sentry_init(
         traces_sample_rate=1.0,
@@ -1581,16 +1583,35 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
 
     original_lock = batcher._lock
     original_lock.acquire()
+
+    batcher._span_buffer["test-trace-id"].append(object())
+    batcher._running_size["test-trace-id"] = 42
+    batcher._active.flag = True
+    batcher._flush_event.set()
+
     pid = os.fork()
     if pid == 0:
-        # Child: was the lock object replaced and is the new one not
-        # held? Without the fix, _lock is `original_lock` inherited
-        # locked, so `replaced` is False. blocking=False guarantees the
-        # child can't hang on a regression.
         replaced = batcher._lock is not original_lock
         unheld = batcher._lock.acquire(blocking=False)
+
         flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
-        os._exit(0 if replaced and unheld and flusher_reset else 1)
+        span_buffer_reset = len(batcher._span_buffer) == 0
+        running_size_reset = len(batcher._running_size) == 0
+
+        active_reset = not getattr(batcher._active, "flag", False)
+        event_reset = not batcher._flush_event.is_set()
+
+        os._exit(
+            0
+            if replaced
+            and unheld
+            and flusher_reset
+            and span_buffer_reset
+            and running_size_reset
+            and active_reset
+            and event_reset
+            else 1
+        )
 
     original_lock.release()
     _, status = os.waitpid(pid, 0)
