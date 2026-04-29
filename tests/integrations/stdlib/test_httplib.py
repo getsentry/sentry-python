@@ -11,6 +11,7 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import capture_message, start_transaction, continue_trace
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
@@ -587,21 +588,23 @@ def test_no_request_source_if_duration_too_short(sentry_init, capture_events):
         http_request_source_threshold_ms=100,
     )
 
-    already_patched_putrequest = HTTPConnection.putrequest
+    add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
 
-    class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def putrequest(self, *args, **kwargs) -> None:
-            already_patched_putrequest(self, *args, **kwargs)
-            span = self._sentrysdk_span  # type: ignore
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+    def add_http_request_source_with_pinned_timestamps(span):
+        span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+        span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+        return add_http_request_source(span)
 
     events = capture_events()
 
-    with start_transaction(name="foo"):
-        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+    with mock.patch(
+        "sentry_sdk.integrations.stdlib.add_http_request_source",
+        add_http_request_source_with_pinned_timestamps,
+    ):
+        with start_transaction(name="foo"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
 
     (event,) = events
 
@@ -623,21 +626,23 @@ def test_request_source_if_duration_over_threshold(sentry_init, capture_events):
         http_request_source_threshold_ms=100,
     )
 
-    already_patched_putrequest = HTTPConnection.putrequest
+    add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
 
-    class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def putrequest(self, *args, **kwargs) -> None:
-            already_patched_putrequest(self, *args, **kwargs)
-            span = self._sentrysdk_span  # type: ignore
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+    def add_http_request_source_with_pinned_timestamps(span):
+        span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+        span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+        return add_http_request_source(span)
 
     events = capture_events()
 
-    with start_transaction(name="foo"):
-        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+    with mock.patch(
+        "sentry_sdk.integrations.stdlib.add_http_request_source",
+        add_http_request_source_with_pinned_timestamps,
+    ):
+        with start_transaction(name="foo"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
 
     (event,) = events
 
@@ -663,7 +668,7 @@ def test_request_source_if_duration_over_threshold(sentry_init, capture_events):
 
     assert (
         data.get(SPANDATA.CODE_FUNCTION)
-        == "test_request_source_if_duration_over_threshold"
+        == "add_http_request_source_with_pinned_timestamps"
     )
 
 
