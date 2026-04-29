@@ -38,24 +38,23 @@ class Batcher(Generic[T]):
 
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
+        self._reset_thread_state()
 
-        self_ref = weakref.ref(self)
-
-        def _reset_thread_state() -> None:
-            batcher = self_ref()
-
-            if batcher is not None:
-                batcher._flusher = None
-                batcher._lock = threading.Lock()
-                batcher._flusher_pid = None
-
-        # Same as https://github.com/getsentry/sentry-python/issues/6148.
-        # If os.fork() runs while another thread holds self._lock,
-        # the child inherits the lock locked but the holding thread does
-        # not exist in the child, so the lock can never be released and
-        # _ensure_thread deadlocks forever.
+        # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
         if hasattr(os, "register_at_fork"):
-            os.register_at_fork(after_in_child=_reset_thread_state)
+            weak_reset = weakref.WeakMethod(self._reset_thread_state)
+
+            def _reset_in_child() -> None:
+                method = weak_reset()
+                if method is not None:
+                    method()
+
+            os.register_at_fork(after_in_child=_reset_in_child)
+
+    def _reset_thread_state(self) -> None:
+        self._flusher = None
+        self._lock = threading.Lock()
+        self._flusher_pid = None
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.

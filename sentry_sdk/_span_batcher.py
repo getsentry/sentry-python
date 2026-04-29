@@ -1,6 +1,9 @@
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+import os
+import threading
+from typing import TYPE_CHECKING, Optional
+import weakref
 
 from sentry_sdk._batcher import Batcher
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
@@ -31,7 +34,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         capture_func: "Callable[[Envelope], None]",
         record_lost_func: "Callable[..., None]",
     ) -> None:
-        super().__init__(capture_func, record_lost_func)
         # Spans from different traces cannot be emitted in the same envelope
         # since the envelope contains a shared trace header. That's why we bucket
         # by trace_id, so that we can then send the buckets each in its own
@@ -39,6 +41,34 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # trace_id -> span buffer
         self._span_buffer: dict[str, list["StreamedSpan"]] = defaultdict(list)
         self._running_size: dict[str, int] = defaultdict(lambda: 0)
+        self._capture_func = capture_func
+        self._record_lost_func = record_lost_func
+        self._running = True
+        self._lock = threading.Lock()
+        self._active: "threading.local" = threading.local()
+
+        self._flush_event: "threading.Event" = threading.Event()
+
+        self._flusher: "Optional[threading.Thread]" = None
+        self._flusher_pid: "Optional[int]" = None
+
+        self._reset_thread_state()
+
+        # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
+        if hasattr(os, "register_at_fork"):
+            weak_reset = weakref.WeakMethod(self._reset_thread_state)
+
+            def _reset_in_child() -> None:
+                method = weak_reset()
+                if method is not None:
+                    method()
+
+            os.register_at_fork(after_in_child=_reset_in_child)
+
+    def _reset_thread_state(self) -> None:
+        self._flusher = None
+        self._lock = threading.Lock()
+        self._flusher_pid = None
 
     def add(self, span: "StreamedSpan") -> None:
         # Bail out if the current thread is already executing batcher code.
