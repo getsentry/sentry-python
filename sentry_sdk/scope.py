@@ -1852,13 +1852,12 @@ class Scope:
             # span_id should only be populated if there's an active span. We can't
             # use the trace_context here because it synthesizes a span_id if there
             # isn't one
-            span = self._span
             if (
                 telemetry.get("span_id") is None
-                and span is not None
+                and self._span is not None
                 and not isinstance(self._span, NoOpStreamedSpan)
             ):
-                telemetry["span_id"] = span.span_id
+                telemetry["span_id"] = self._span.span_id
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
