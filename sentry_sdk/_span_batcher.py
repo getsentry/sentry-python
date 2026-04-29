@@ -58,7 +58,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _flush_loop(self) -> None:
         self._active.flag = True
         while self._running:
-            jitter = random.random()
+            jitter = random.random() * self.FLUSH_WAIT_TIME * 0.1
             try:
                 trace_id = self._flush_queue.get(timeout=self.FLUSH_WAIT_TIME + jitter)
                 self._flush(trace_id=trace_id)
@@ -171,8 +171,8 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
             envelopes = []
 
-            for trace_id in buckets:
-                spans = self._span_buffer.get(trace_id)
+            for bucket_id in buckets:
+                spans = self._span_buffer.get(bucket_id)
                 if not spans:
                     continue
 
@@ -210,8 +210,10 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
                     envelopes.append(envelope)
 
-                del self._span_buffer[trace_id]
-                del self._running_size[trace_id]
+                del self._span_buffer[bucket_id]
+                del self._running_size[bucket_id]
+
+                # XXX remove trace_id from queue
 
         for envelope in envelopes:
             self._capture_func(envelope)
