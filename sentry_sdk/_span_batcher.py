@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 import os
 import threading
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 import weakref
 
 from sentry_sdk._batcher import Batcher
@@ -10,7 +10,7 @@ from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import format_timestamp, serialize_attribute
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Optional
     from sentry_sdk.traces import StreamedSpan
 
 
