@@ -268,7 +268,7 @@ def _install_subprocess() -> None:
         span: "Union[Span, StreamedSpan]"
         if span_streaming:
             span = sentry_sdk.traces.start_span(
-                name=OP.SUBPROCESS if description is None else description,
+                name=description,
                 attributes={
                     "sentry.op": OP.SUBPROCESS,
                     "sentry.origin": "auto.subprocess.stdlib.subprocess",
