@@ -7,6 +7,7 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import transaction_from_function
 
 from typing import TYPE_CHECKING
@@ -19,6 +20,7 @@ try:
     from sentry_sdk.integrations.starlette import (
         StarletteIntegration,
         StarletteRequestExtractor,
+        _set_request_body_data_on_streaming_segment,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
@@ -109,7 +111,8 @@ def patch_get_request_handler() -> None:
         old_app = old_get_request_handler(*args, **kwargs)
 
         async def _sentry_app(*args: "Any", **kwargs: "Any") -> "Any":
-            integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
+            client = sentry_sdk.get_client()
+            integration = client.get_integration(FastApiIntegration)
             if integration is None:
                 return await old_app(*args, **kwargs)
 
@@ -143,6 +146,9 @@ def patch_get_request_handler() -> None:
             sentry_scope.add_event_processor(
                 _make_request_event_processor(request, integration)
             )
+
+            if has_span_streaming_enabled(client.options):
+                _set_request_body_data_on_streaming_segment(info)
 
             return await old_app(*args, **kwargs)
 
