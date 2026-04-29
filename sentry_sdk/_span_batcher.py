@@ -1,11 +1,11 @@
 import random
 import threading
-from _queue import Empty, Queue
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
+from sentry_sdk._queue import EmptyError, Queue
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import format_timestamp, serialize_attribute
 
@@ -60,7 +60,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                     timeout=self.FLUSH_WAIT_TIME + random.random()
                 )
                 self._flush(trace_id=trace_id)
-            except Empty:
+            except EmptyError:
                 self._flush()
 
     def add(self, span: "StreamedSpan") -> None:
