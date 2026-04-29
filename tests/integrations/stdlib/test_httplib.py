@@ -1031,7 +1031,6 @@ def test_span_origin(
         assert spans[0]["attributes"]["sentry.op"] == "http.client"
         assert spans[0]["attributes"]["sentry.origin"] == "auto.http.stdlib.httplib"
     else:
-        sentry_init(traces_sample_rate=1.0, debug=True)
         events = capture_events()
 
         with start_transaction(name="foo"):
