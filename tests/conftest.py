@@ -476,22 +476,33 @@ def maybe_monkeypatched_threading(request):
 
 @pytest.fixture
 def render_span_tree():
-    def inner(event):
-        assert event["type"] == "transaction"
+    def inner(spans, root_span=None):
+        streamed_spans = False
+        if root_span is None:
+            streamed_spans = True
 
         by_parent = {}
-        for span in event["spans"]:
+        for span in spans:
+            if "parent_span_id" not in span:
+                root_span = span
+                continue
+
             by_parent.setdefault(span["parent_span_id"], []).append(span)
 
         def render_span(span):
-            yield "- op={}: description={}".format(
-                json.dumps(span.get("op")), json.dumps(span.get("description"))
-            )
+            if streamed_spans:
+                yield "- sentry.op={}: name={}".format(
+                    json.dumps(span["attributes"].get("sentry.op")),
+                    json.dumps(span["name"]),
+                )
+            else:
+                yield "- op={}: description={}".format(
+                    json.dumps(span.get("op")), json.dumps(span.get("description"))
+                )
+
             for subspan in by_parent.get(span["span_id"]) or ():
                 for line in render_span(subspan):
                     yield "  {}".format(line)
-
-        root_span = event["contexts"]["trace"]
 
         return "\n".join(render_span(root_span))
 

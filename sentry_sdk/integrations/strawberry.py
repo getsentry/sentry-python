@@ -188,7 +188,8 @@ class SentryAsyncExtension(SchemaExtension):
 
         self.graphql_span.set_data("graphql.operation.type", operation_type)
         self.graphql_span.set_data("graphql.operation.name", self._operation_name)
-        self.graphql_span.set_data("graphql.document", self.execution_context.query)
+        if should_send_default_pii():
+            self.graphql_span.set_data("graphql.document", self.execution_context.query)
         self.graphql_span.set_data("graphql.resource_name", self._resource_name)
 
         yield
