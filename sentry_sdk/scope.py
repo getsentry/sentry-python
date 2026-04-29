@@ -1858,6 +1858,12 @@ class Scope:
                 and not isinstance(self._span, NoOpStreamedSpan)
             ):
                 telemetry["span_id"] = self._span.span_id
+            else:
+                external_propagation_context = get_external_propagation_context()
+                if external_propagation_context:
+                    _, span_id = external_propagation_context
+                    if span_id is not None:
+                        telemetry["span_id"] = span_id
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
