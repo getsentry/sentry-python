@@ -963,6 +963,79 @@ async def test_fastmcp_prompt_sync(
                 assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
 
 
+@pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
+@pytest.mark.asyncio
+async def test_fastmcp_prompt_async(
+    sentry_init,
+    capture_events,
+    FastMCP,
+    json_rpc,
+    select_transactions_with_mcp_spans,
+):
+    """Test that FastMCP async prompt handlers create proper spans"""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    mcp = FastMCP("Test Server")
+
+    session_manager = StreamableHTTPSessionManager(
+        app=mcp._mcp_server,
+        json_response=True,
+    )
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
+
+    # Try to register an async prompt handler
+    if hasattr(mcp, "prompt"):
+
+        @mcp.prompt()
+        async def async_prompt(topic: str):
+            """Get async prompt for a topic"""
+            message1 = {
+                "role": "user",
+                "content": {"type": "text", "text": f"What is {topic}?"},
+            }
+
+            message2 = {
+                "role": "assistant",
+                "content": {
+                    "type": "text",
+                    "text": "Let me explain that",
+                },
+            }
+
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+                message1 = Message(message1)
+                message2 = Message(message2)
+
+            return [message1, message2]
+
+        _, result = json_rpc(
+            app,
+            method="prompts/get",
+            params={
+                "name": "async_prompt",
+                "arguments": {"topic": "MCP"},
+            },
+            request_id="req-async-prompt",
+        )
+
+        assert len(result.json()["result"]["messages"]) == 2
+
+        transactions = select_transactions_with_mcp_spans(
+            events, method_name="prompts/get"
+        )
+        assert len(transactions) == 1
+
+
 # =============================================================================
 # Resource Handler Tests (if supported)
 # =============================================================================
