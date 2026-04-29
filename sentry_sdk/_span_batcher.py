@@ -52,8 +52,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
 
-        self._reset_thread_state()
-
         # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
         if hasattr(os, "register_at_fork"):
             weak_reset = weakref.WeakMethod(self._reset_thread_state)
@@ -64,11 +62,6 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                     method()
 
             os.register_at_fork(after_in_child=_reset_in_child)
-
-    def _reset_thread_state(self) -> None:
-        self._flusher = None
-        self._lock = threading.Lock()
-        self._flusher_pid = None
 
     def add(self, span: "StreamedSpan") -> None:
         # Bail out if the current thread is already executing batcher code.

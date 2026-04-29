@@ -38,7 +38,6 @@ class Batcher(Generic[T]):
 
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
-        self._reset_thread_state()
 
         # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
         if hasattr(os, "register_at_fork"):
