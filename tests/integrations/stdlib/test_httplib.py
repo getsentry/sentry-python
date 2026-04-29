@@ -1078,6 +1078,7 @@ def test_http_timeout(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
