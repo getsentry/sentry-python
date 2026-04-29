@@ -1,5 +1,6 @@
 import random
 import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -24,6 +25,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     MAX_BEFORE_FLUSH = 1000
     MAX_BEFORE_DROP = 2000
     MAX_BYTES_BEFORE_FLUSH = 5 * 1024 * 1024  # 5 MB
+
     FLUSH_WAIT_TIME = 5.0
 
     TYPE = "span"
@@ -47,6 +49,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._lock = threading.Lock()
         self._active: "threading.local" = threading.local()
 
+        self._last_full_flush: float = time.monotonic()
         self._flush_queue: Queue = Queue()
 
         self._flusher: "Optional[threading.Thread]" = None
@@ -55,13 +58,19 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _flush_loop(self) -> None:
         self._active.flag = True
         while self._running:
+            jitter = random.random()
             try:
-                trace_id = self._flush_queue.get(
-                    timeout=self.FLUSH_WAIT_TIME + random.random()
-                )
+                trace_id = self._flush_queue.get(timeout=self.FLUSH_WAIT_TIME + jitter)
                 self._flush(trace_id=trace_id)
             except EmptyError:
+                pass
+
+            if (
+                time.monotonic() - self._last_full_flush
+                >= self.FLUSH_WAIT_TIME + jitter
+            ):
                 self._flush()
+                self._last_full_flush = time.monotonic()
 
     def add(self, span: "StreamedSpan") -> None:
         # Bail out if the current thread is already executing batcher code.
