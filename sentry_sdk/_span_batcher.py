@@ -1,6 +1,6 @@
 import random
 import threading
-from _queue import Queue
+from _queue import Empty, Queue
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -55,11 +55,13 @@ class SpanBatcher(Batcher["StreamedSpan"]):
     def _flush_loop(self) -> None:
         self._active.flag = True
         while self._running:
-            # XXX: the timeout should also be per bucket
-            trace_id = self._flush_queue.get(
-                timeout=self.FLUSH_WAIT_TIME + random.random()
-            )
-            self._flush(trace_id=trace_id)
+            try:
+                trace_id = self._flush_queue.get(
+                    timeout=self.FLUSH_WAIT_TIME + random.random()
+                )
+                self._flush(trace_id=trace_id)
+            except Empty:
+                self._flush()
 
     def add(self, span: "StreamedSpan") -> None:
         # Bail out if the current thread is already executing batcher code.
