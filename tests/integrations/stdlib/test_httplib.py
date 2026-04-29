@@ -224,7 +224,6 @@ def test_outgoing_trace_headers(
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
-
     request_headers = {}
 
     class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
@@ -242,6 +241,8 @@ def test_outgoing_trace_headers(
 
         def getresponse(self, *args, **kwargs):
             return already_patched_getresponse(self, *args, **kwargs)
+
+    events = capture_events()
 
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
@@ -322,7 +323,6 @@ def test_outgoing_trace_headers_head_sdk(
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
-
     request_headers = {}
 
     class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
