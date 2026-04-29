@@ -5,15 +5,18 @@ from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
 from threading import Thread
+from urllib.error import HTTPError
+from urllib.request import urlopen
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk import start_transaction, continue_trace
+from sentry_sdk import capture_message, start_transaction, continue_trace
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
+from sentry_sdk.integrations.stdlib import StdlibIntegration
 
-from tests.conftest import create_mock_http_server, get_free_port
+from tests.conftest import ApproxDict, create_mock_http_server, get_free_port
 
 PORT = create_mock_http_server()
 
@@ -42,6 +45,106 @@ def create_mock_proxy_server():
 PROXY_PORT = create_mock_proxy_server()
 
 
+def test_crumb_capture(sentry_init, capture_events):
+    sentry_init(integrations=[StdlibIntegration()])
+    events = capture_events()
+
+    url = "http://localhost:{}/some/random/url".format(PORT)
+    urlopen(url)
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
+    sentry_init(integrations=[StdlibIntegration()])
+    events = capture_events()
+
+    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
+    try:
+        urlopen(url)
+    except HTTPError:
+        pass
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if level is None:
+        assert "level" not in crumb
+    else:
+        assert crumb["level"] == level
+
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: status_code,
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
+
+
+def test_crumb_capture_hint(sentry_init, capture_events):
+    def before_breadcrumb(crumb, hint):
+        crumb["data"]["extra"] = "foo"
+        return crumb
+
+    sentry_init(integrations=[StdlibIntegration()], before_breadcrumb=before_breadcrumb)
+    events = capture_events()
+
+    url = "http://localhost:{}/some/random/url".format(PORT)
+    urlopen(url)
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            "extra": "foo",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_empty_realurl(
     sentry_init,
@@ -57,6 +160,55 @@ def test_empty_realurl(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     HTTPConnection("localhost", port=PORT).putrequest("POST", None)
+
+
+def test_httplib_misuse(sentry_init, capture_events, request):
+    """HTTPConnection.getresponse must be called after every call to
+    HTTPConnection.request. However, if somebody does not abide by
+    this contract, we still should handle this gracefully and not
+    send mixed breadcrumbs.
+
+    Test whether our breadcrumbs are coherent when somebody uses HTTPConnection
+    wrongly.
+    """
+
+    sentry_init()
+    events = capture_events()
+
+    conn = HTTPConnection("localhost", PORT)
+
+    # make sure we release the resource, even if the test fails
+    request.addfinalizer(conn.close)
+
+    conn.request("GET", "/200")
+
+    with pytest.raises(Exception):  # noqa: B017
+        # This raises an exception, because we didn't call `getresponse` for
+        # the previous request yet.
+        #
+        # This call should not affect our breadcrumb.
+        conn.request("POST", "/200")
+
+    response = conn.getresponse()
+    assert response._method == "GET"
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": "http://localhost:{}/200".format(PORT),
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
