@@ -313,7 +313,7 @@ def _install_subprocess() -> None:
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
-                name=OP.SUBPROCESS_COMMUNICATE,
+                name=OP.SUBPROCESS_WAIT,
                 attributes={
                     "sentry.op": OP.SUBPROCESS_WAIT,
                     "sentry.origin": "auto.subprocess.stdlib.subprocess",
