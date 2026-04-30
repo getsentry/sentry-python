@@ -879,15 +879,10 @@ class Scope:
     @property
     def span(self) -> "Optional[Span]":
         """Get/set current tracing span or transaction."""
-        return self._span
-
-    @property
-    def streamed_span(self) -> "Optional[StreamedSpan]":
-        """Get/set current tracing span."""
-        return self._span
+        return self._span if isinstance(self._span, Span) else None
 
     @span.setter
-    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
+    def span(self, span: "Optional[Span]") -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -897,6 +892,15 @@ class Scope:
                 self._transaction = transaction.name
                 if transaction.source:
                     self._transaction_info["source"] = transaction.source
+
+    @property
+    def streamed_span(self) -> "Optional[StreamedSpan]":
+        """Get/set current tracing span."""
+        return self._span if isinstance(self._span, StreamedSpan) else None
+
+    @streamed_span.setter
+    def streamed_span(self, span: "Optional[StreamedSpan]") -> None:
+        self._span = span
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
