@@ -580,12 +580,18 @@ class Scope:
         """
         client = self.get_client()
 
+        if not has_tracing_enabled(client.options):
+            return self.get_active_propagation_context().to_traceparent()
+
+        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
         if (
-            has_tracing_enabled(client.options)
-            and self.span is not None
-            and not isinstance(self.span, NoOpStreamedSpan)
+            span_streaming
+            and self.streamed_span is not None
+            and not isinstance(self.streamed_span, NoOpStreamedSpan)
         ):
+            return self.streamed_span._to_traceparent()
+        elif not span_streaming and self.span is not None:
             return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
@@ -598,12 +604,18 @@ class Scope:
         """
         client = self.get_client()
 
+        if not has_tracing_enabled(client.options):
+            return self.get_active_propagation_context().get_baggage()
+
+        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
         if (
-            has_tracing_enabled(client.options)
-            and self.span is not None
-            and not isinstance(self.span, NoOpStreamedSpan)
+            span_streaming
+            and self.streamed_span is not None
+            and not isinstance(self.streamed_span, NoOpStreamedSpan)
         ):
+            return self.streamed_span._to_baggage()
+        elif not span_streaming and self.span is not None:
             return self.span._to_baggage()
 
         # else return baggage from the propagation context
@@ -680,7 +692,9 @@ class Scope:
             return
 
         span = kwargs.pop("span", None)
-        span = span or self.span
+        if not span:
+            span_streaming = has_span_streaming_enabled(client.options)
+            span = self.streamed_span if span_streaming else self.span
 
         if (
             has_tracing_enabled(client.options)
@@ -877,12 +891,12 @@ class Scope:
             session.update(user=value)
 
     @property
-    def span(self) -> "Optional[Union[Span, StreamedSpan]]":
+    def span(self) -> "Optional[Span]":
         """Get/set current tracing span or transaction."""
-        return self._span
+        return self._span if isinstance(self._span, Span) else None
 
     @span.setter
-    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
+    def span(self, span: "Optional[Span]") -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -892,6 +906,15 @@ class Scope:
                 self._transaction = transaction.name
                 if transaction.source:
                     self._transaction_info["source"] = transaction.source
+
+    @property
+    def streamed_span(self) -> "Optional[StreamedSpan]":
+        """Get/set current tracing span."""
+        return self._span if isinstance(self._span, StreamedSpan) else None
+
+    @streamed_span.setter
+    def streamed_span(self, span: "Optional[StreamedSpan]") -> None:
+        self._span = span
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
@@ -1267,7 +1290,7 @@ class Scope:
         if parent_span is _DEFAULT_PARENT_SPAN or isinstance(
             parent_span, NoOpStreamedSpan
         ):
-            parent_span = self.span  # type: ignore
+            parent_span = self.streamed_span
 
         # If no eligible parent_span was provided and there is no currently
         # active span, this is a segment
@@ -1848,9 +1871,21 @@ class Scope:
                 telemetry["trace_id"] = (
                     trace_id or "00000000-0000-0000-0000-000000000000"
                 )
-            span_id = trace_context.get("span_id")
-            if telemetry.get("span_id") is None and span_id:
-                telemetry["span_id"] = span_id
+
+            # span_id should only be populated if there's an active span. We can't
+            # use the trace_context here because it synthesizes a span_id if there
+            # isn't one
+            if telemetry.get("span_id") is None:
+                if self._span is not None and not isinstance(
+                    self._span, NoOpStreamedSpan
+                ):
+                    telemetry["span_id"] = self._span.span_id
+                else:
+                    external_propagation_context = get_external_propagation_context()
+                    if external_propagation_context:
+                        _, span_id = external_propagation_context
+                        if span_id is not None:
+                            telemetry["span_id"] = span_id
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
