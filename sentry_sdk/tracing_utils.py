@@ -35,7 +35,6 @@ from sentry_sdk.utils import (
     _module_in_list,
 )
 from sentry_sdk.tracing import Span as LegacySpan
-from sentry_sdk.traces import _get_current_streamed_span
 
 from typing import TYPE_CHECKING
 
@@ -1209,7 +1208,7 @@ def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None
     Set the status of the current or given span to INTERNAL_ERROR.
     Also sets the status of the transaction (root span) to INTERNAL_ERROR.
     """
-    from sentry_sdk.traces import StreamedSpan, SpanStatus
+    from sentry_sdk.traces import StreamedSpan, SpanStatus, _get_current_streamed_span
 
     client = sentry_sdk.get_client()
 
