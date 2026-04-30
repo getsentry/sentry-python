@@ -543,12 +543,7 @@ def update_current_span(
             attributes={"user_id": 123, "batch_size": 50}
         )
     """
-    current_span = get_current_span()
-
-    if current_span is None:
-        return
-
-    if isinstance(current_span, StreamedSpan):
+    if isinstance(get_current_streamed_span(), StreamedSpan):
         warnings.warn(
             "The `update_current_span` API isn't available in streaming mode. "
             "Retrieve the current span with get_current_span() and use its API "
@@ -556,6 +551,11 @@ def update_current_span(
             DeprecationWarning,
             stacklevel=2,
         )
+        return
+
+    current_span = get_current_span()
+
+    if current_span is None:
         return
 
     if op is not None:
