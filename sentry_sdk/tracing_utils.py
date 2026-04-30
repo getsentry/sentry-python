@@ -35,6 +35,7 @@ from sentry_sdk.utils import (
     _module_in_list,
 )
 from sentry_sdk.tracing import Span as LegacySpan
+from sentry_sdk.traces import _get_current_streamed_span
 
 from typing import TYPE_CHECKING
 
@@ -1203,17 +1204,6 @@ def get_current_span(
     return current_span
 
 
-def get_current_streamed_span(
-    scope: "Optional[sentry_sdk.Scope]" = None,
-) -> "Optional[StreamedSpan]":
-    """
-    Returns the currently active span if there is one running, otherwise `None`
-    """
-    scope = scope or sentry_sdk.get_current_scope()
-    current_span = scope.streamed_span
-    return current_span
-
-
 def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
     """
     Set the status of the current or given span to INTERNAL_ERROR.
@@ -1221,7 +1211,14 @@ def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None
     """
     from sentry_sdk.traces import StreamedSpan, SpanStatus
 
-    span = span or get_current_span()
+    client = sentry_sdk.get_client()
+
+    if not span:
+        span = (
+            _get_current_streamed_span()
+            if has_span_streaming_enabled(client.options)
+            else sentry_sdk.get_current_span()
+        )
 
     if span is not None:
         if isinstance(span, Span):

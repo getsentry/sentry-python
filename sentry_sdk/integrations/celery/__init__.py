@@ -15,7 +15,7 @@ from sentry_sdk.integrations.celery.beat import (
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span, TransactionSource
 from sentry_sdk.tracing_utils import Baggage, has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -292,10 +292,7 @@ def _wrap_task_run(f: "F") -> "F":
 
         span_mgr: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
         if span_streaming:
-            if (
-                not task_started_from_beat
-                and sentry_sdk.get_current_streamed_span() is not None
-            ):
+            if not task_started_from_beat and _get_current_streamed_span() is not None:
                 span_mgr = sentry_sdk.traces.start_span(
                     name=task_name,
                     attributes={
@@ -576,7 +573,7 @@ def _patch_producer_publish() -> None:
 
         span: "Union[StreamedSpan, Span, None]" = None
         if span_streaming:
-            if sentry_sdk.get_current_streamed_span() is not None:
+            if _get_current_streamed_span() is not None:
                 span = sentry_sdk.traces.start_span(
                     name=task_name,
                     attributes={

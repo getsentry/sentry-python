@@ -755,3 +755,14 @@ def trace(
         return decorator(func)
     else:
         return decorator
+
+
+def _get_current_streamed_span(
+    scope: "Optional[sentry_sdk.Scope]" = None,
+) -> "Optional[StreamedSpan]":
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    scope = scope or sentry_sdk.get_current_scope()
+    current_span = scope.streamed_span
+    return current_span

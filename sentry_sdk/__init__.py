@@ -32,7 +32,6 @@ __all__ = [  # noqa
     "get_isolation_scope",
     "get_current_scope",
     "get_current_span",
-    "get_current_streamed_span",
     "get_traceparent",
     "is_initialized",
     "isolation_scope",

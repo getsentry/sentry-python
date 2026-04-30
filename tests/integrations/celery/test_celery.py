@@ -7,7 +7,8 @@ from celery import Celery, VERSION
 from celery.bin import worker
 
 import sentry_sdk
-from sentry_sdk import start_transaction, get_current_span, get_current_streamed_span
+from sentry_sdk import start_transaction, get_current_span
+from sentry_sdk.traces import _get_current_streamed_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
@@ -664,7 +665,7 @@ def test_sentry_propagate_traces_override(span_streaming, init_celery):
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
         trace_id = (
-            get_current_streamed_span().trace_id
+            _get_current_streamed_span().trace_id
             if span_streaming
             else get_current_span().trace_id
         )

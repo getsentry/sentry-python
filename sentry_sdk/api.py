@@ -6,7 +6,7 @@ from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
 
@@ -67,7 +67,6 @@ __all__ = [
     "get_isolation_scope",
     "get_current_scope",
     "get_current_span",
-    "get_current_streamed_span",
     "get_traceparent",
     "is_initialized",
     "isolation_scope",
@@ -430,15 +429,6 @@ def get_current_span(
     return tracing_utils.get_current_span(scope)
 
 
-def get_current_streamed_span(
-    scope: "Optional[Scope]" = None,
-) -> "Optional[StreamedSpan]":
-    """
-    Returns the currently active streamed span if there is one running, otherwise `None`
-    """
-    return tracing_utils.get_current_streamed_span(scope)
-
-
 def get_traceparent() -> "Optional[str]":
     """
     Returns the traceparent either from the active span or from the scope.
@@ -543,7 +533,7 @@ def update_current_span(
             attributes={"user_id": 123, "batch_size": 50}
         )
     """
-    if isinstance(get_current_streamed_span(), StreamedSpan):
+    if isinstance(_get_current_streamed_span(), StreamedSpan):
         warnings.warn(
             "The `update_current_span` API isn't available in streaming mode. "
             "Retrieve the current span with get_current_span() and use its API "

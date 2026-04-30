@@ -21,7 +21,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
+from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
@@ -254,7 +254,7 @@ def _serialize_request_body_data(data: "Any") -> str:
 def _set_request_body_data_on_streaming_segment(
     info: "Optional[Dict[str, Any]]",
 ) -> None:
-    current_span = sentry_sdk.get_current_streamed_span()
+    current_span = _get_current_streamed_span()
     if (
         info
         and "data" in info
