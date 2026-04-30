@@ -241,14 +241,16 @@ def test_weight_based_flushing_by_attribute_size(
         pass
 
     bare_span_size = SpanBatcher._estimate_size(bare_span)
-    monkeypatch.setattr(SpanBatcher, "MAX_BYTES_BEFORE_FLUSH", bare_span_size * 2)
+    big_attr = "x" * bare_span_size
+
+    monkeypatch.setattr(SpanBatcher, "MAX_BYTES_BEFORE_FLUSH", bare_span_size * 3)
 
     time.sleep(0.1)
 
     # The first span alone is well under the byte limit, so no flush yet.
     assert len(envelopes) == 0
 
-    with sentry_sdk.traces.start_span(name="big span", attributes={"big": "x" * 300}):
+    with sentry_sdk.traces.start_span(name="big span", attributes={"big": big_attr}):
         pass
 
     time.sleep(0.1)
