@@ -98,13 +98,16 @@ class CeleryIntegration(Integration):
 
 
 def _set_status(status: str) -> None:
+    client = sentry_sdk.get_client()
+    span_streaming = has_span_streaming_enabled(client.options)
+
     with capture_internal_exceptions():
         scope = sentry_sdk.get_current_scope()
-        if scope.span is not None:
-            if isinstance(scope.span, Span):
-                scope.span.set_status(status)
-            else:
-                scope.span.status = "ok" if status == "ok" else "error"
+
+        if span_streaming and scope.streamed_span is not None:
+            scope.streamed_span.status = "ok" if status == "ok" else "error"
+        elif not span_streaming and scope.span is not None:
+            scope.span.set_status(status)
 
 
 def _capture_exception(task: "Any", exc_info: "ExcInfo") -> None:
