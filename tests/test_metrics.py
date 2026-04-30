@@ -184,7 +184,10 @@ def test_metrics_tracing_without_performance(sentry_init, capture_envelopes):
     propagation_context = isolation_scope._propagation_context
     assert propagation_context is not None
     assert metrics[0]["trace_id"] == propagation_context.trace_id
-    assert metrics[0]["span_id"] == propagation_context.span_id
+    # Per the metrics spec, span_id is only attached when a span is
+    # active when the metric is emitted. The propagation context's
+    # synthesized span_id must not be used as a fallback.
+    assert metrics[0]["span_id"] is None
 
 
 def test_metrics_before_send(sentry_init, capture_envelopes):
@@ -294,7 +297,6 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "value": 1,
                 "timestamp": mock.ANY,
                 "trace_id": mock.ANY,
-                "span_id": mock.ANY,
                 "attributes": {
                     "sentry.environment": {
                         "type": "string",
