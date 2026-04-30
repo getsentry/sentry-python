@@ -545,19 +545,22 @@ def patch_request_response() -> None:
 
             @functools.wraps(old_func)
             def _sentry_sync_func(*args: "Any", **kwargs: "Any") -> "Any":
-                integration = sentry_sdk.get_client().get_integration(
-                    StarletteIntegration
-                )
+                client = sentry_sdk.get_client()
+
+                integration = client.get_integration(StarletteIntegration)
                 if integration is None:
                     return old_func(*args, **kwargs)
 
                 current_scope = sentry_sdk.get_current_scope()
-                current_span = current_scope.span
 
-                if isinstance(current_span, StreamedSpan) and not isinstance(
-                    current_span, NoOpStreamedSpan
-                ):
-                    current_span._segment._update_active_thread()
+                span_streaming = has_span_streaming_enabled(client.options)
+                if span_streaming:
+                    current_span = current_scope.streamed_span
+
+                    if isinstance(current_span, StreamedSpan) and not isinstance(
+                        current_span, NoOpStreamedSpan
+                    ):
+                        current_span._segment._update_active_thread()
                 elif current_scope.transaction is not None:
                     current_scope.transaction.update_active_thread()
 

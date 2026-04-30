@@ -292,7 +292,10 @@ def _wrap_task_run(f: "F") -> "F":
 
         span_mgr: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
         if span_streaming:
-            if not task_started_from_beat and sentry_sdk.get_current_span() is not None:
+            if (
+                not task_started_from_beat
+                and sentry_sdk.get_current_streamed_span() is not None
+            ):
                 span_mgr = sentry_sdk.traces.start_span(
                     name=task_name,
                     attributes={
@@ -573,7 +576,7 @@ def _patch_producer_publish() -> None:
 
         span: "Union[StreamedSpan, Span, None]" = None
         if span_streaming:
-            if sentry_sdk.get_current_span() is not None:
+            if sentry_sdk.get_current_streamed_span() is not None:
                 span = sentry_sdk.traces.start_span(
                     name=task_name,
                     attributes={
