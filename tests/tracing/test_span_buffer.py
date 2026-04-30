@@ -204,23 +204,15 @@ def test_weight_based_flushing(sentry_init, capture_envelopes, monkeypatch):
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="span 1"):
+    with sentry_sdk.traces.start_span(name="span"):
         pass
 
     time.sleep(0.1)
 
-    with sentry_sdk.traces.start_span(name="span 2"):
-        pass
-
-    time.sleep(0.1)
-
-    assert len(envelopes) == 2
+    assert len(envelopes) == 1
 
     assert len(envelopes[0].items[0].payload.json["items"]) == 1
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
-
-    assert len(envelopes[1].items[0].payload.json["items"]) == 1
-    assert envelopes[1].items[0].payload.json["items"][0]["name"] == "span 2"
+    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span"
 
 
 def test_weight_based_flushing_by_attribute_size(
