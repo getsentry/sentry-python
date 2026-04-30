@@ -227,10 +227,6 @@ def test_weight_based_flushing_by_attribute_size(
     sentry_init, capture_envelopes, monkeypatch
 ):
     """A bucket is flushed once the estimated bytes (driven by attribute size) exceed MAX_BYTES_BEFORE_FLUSH."""
-    # _estimate_size adds 210 base + (50 + len(str(value))) per attribute.
-    # With this limit, a span without attributes (~210) won't trigger a flush,
-    # but a span carrying a large attribute value will push the bucket over.
-    monkeypatch.setattr(SpanBatcher, "MAX_BYTES_BEFORE_FLUSH", 500)
     monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
     monkeypatch.setattr(SpanBatcher, "MAX_BEFORE_FLUSH", 100000)
 
@@ -241,8 +237,11 @@ def test_weight_based_flushing_by_attribute_size(
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="small span"):
+    with sentry_sdk.traces.start_span(name="small span") as bare_span:
         pass
+
+    bare_span_size = SpanBatcher._estimate_size(bare_span)
+    monkeypatch.setattr(SpanBatcher, "MAX_BYTES_BEFORE_FLUSH", bare_span_size * 2)
 
     time.sleep(0.1)
 
