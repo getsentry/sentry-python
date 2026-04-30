@@ -114,6 +114,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         if self._flusher is None:
             return
 
+        self._flush()
         self._running = False
         self._flush_queue.put(None)
         self._flusher = None
