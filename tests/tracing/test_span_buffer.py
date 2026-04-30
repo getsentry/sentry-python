@@ -226,7 +226,7 @@ def test_weight_based_flushing(sentry_init, capture_envelopes, monkeypatch):
 def test_weight_based_flushing_by_attribute_size(
     sentry_init, capture_envelopes, monkeypatch
 ):
-    """A bucket is flushed once the estimated bytes (driven by attribute size) exceed MAX_BYTES_BEFORE_FLUSH."""
+    """Attribute size is taken into account when using MAX_BYTES_BEFORE_FLUSH."""
     monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
     monkeypatch.setattr(SpanBatcher, "MAX_BEFORE_FLUSH", 100000)
 
