@@ -254,7 +254,7 @@ def _serialize_request_body_data(data: "Any") -> str:
 def _set_request_body_data_on_streaming_segment(
     info: "Optional[Dict[str, Any]]",
 ) -> None:
-    current_span = sentry_sdk.get_current_span()
+    current_span = sentry_sdk.get_current_streamed_span()
     if (
         info
         and "data" in info
