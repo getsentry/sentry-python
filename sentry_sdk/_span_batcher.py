@@ -76,9 +76,9 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._lock = threading.Lock()
         self._active = threading.local()
 
-        self._last_full_flush: float = time.monotonic()
+        self._last_full_flush = time.monotonic()
         self._flush_event = threading.Event()
-        self._pending_flush: set[str] = set()
+        self._pending_flush = set()
 
         self._flusher = None
         self._flusher_pid = None
