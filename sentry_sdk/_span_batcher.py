@@ -213,7 +213,5 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 del self._span_buffer[bucket_id]
                 del self._running_size[bucket_id]
 
-                # XXX remove trace_id from queue
-
         for envelope in envelopes:
             self._capture_func(envelope)
