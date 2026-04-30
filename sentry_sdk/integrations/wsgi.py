@@ -400,7 +400,7 @@ def _get_request_attributes(
     if method:
         attributes["http.request.method"] = method.upper()
 
-    headers = _filter_headers(dict(_get_headers(environ)))
+    headers = _filter_headers(dict(_get_headers(environ)), use_annotated_value=False)
     for header, value in headers.items():
         attributes[f"http.request.header.{header.lower()}"] = value
 
