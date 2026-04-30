@@ -761,7 +761,10 @@ def _get_current_streamed_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
 ) -> "Optional[StreamedSpan]":
     """
-    Returns the currently active span if there is one running, otherwise `None`
+    Returns the currently active span on the scope if the span is a `StreamedSpan`, otherwise `None`.
+
+    This function will only return a non-`None` value when the streaming trace lifecycle is enabled.
+    To enable the lifecycle, pass `_experiments={"trace_lifecycle": "stream"}` to `sentry.init()`.
     """
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.streamed_span
