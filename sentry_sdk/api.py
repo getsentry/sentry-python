@@ -422,11 +422,20 @@ def set_measurement(name: str, value: float, unit: "MeasurementUnit" = "") -> No
 
 def get_current_span(
     scope: "Optional[Scope]" = None,
-) -> "Optional[Union[Span, StreamedSpan]]":
+) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
     return tracing_utils.get_current_span(scope)
+
+
+def get_current_streamed_span(
+    scope: "Optional[Scope]" = None,
+) -> "Optional[StreamedSpan]":
+    """
+    Returns the currently active streamed span if there is one running, otherwise `None`
+    """
+    return tracing_utils.get_current_streamed_span(scope)
 
 
 def get_traceparent() -> "Optional[str]":

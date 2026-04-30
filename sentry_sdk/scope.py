@@ -877,8 +877,13 @@ class Scope:
             session.update(user=value)
 
     @property
-    def span(self) -> "Optional[Union[Span, StreamedSpan]]":
+    def span(self) -> "Optional[Span]":
         """Get/set current tracing span or transaction."""
+        return self._span
+
+    @property
+    def streamed_span(self) -> "Optional[StreamedSpan]":
+        """Get/set current tracing span."""
         return self._span
 
     @span.setter
