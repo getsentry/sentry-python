@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk._queue import EmptyError, Queue
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import format_timestamp, serialize_attribute
 
@@ -49,8 +48,9 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._lock = threading.Lock()
         self._active: "threading.local" = threading.local()
 
-        self._last_full_flush: float = time.monotonic()
-        self._flush_queue: Queue = Queue()
+        self._last_full_flush: float = time.monotonic()  # drives time-based flushes
+        self._flush_event: threading.Event = threading.Event()
+        self._pending_flush: set[str] = set()  # buckets to be flushed
 
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
@@ -59,11 +59,10 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         self._active.flag = True
         while self._running:
             jitter = random.random() * self.FLUSH_WAIT_TIME * 0.1
-            try:
-                trace_id = self._flush_queue.get(timeout=self.FLUSH_WAIT_TIME + jitter)
-                self._flush(trace_id=trace_id)
-            except EmptyError:
-                pass
+            self._flush_event.wait(timeout=self.FLUSH_WAIT_TIME + jitter)
+            self._flush_event.clear()
+
+            self._flush(only_pending=True)
 
             if (
                 time.monotonic() - self._last_full_flush
@@ -100,24 +99,19 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 self._span_buffer[span.trace_id].append(span)
                 self._running_size[span.trace_id] += self._estimate_size(span)
 
-                if size + 1 >= self.MAX_BEFORE_FLUSH:
-                    self._flush_queue.put(span.trace_id)
-                    return
+                if (
+                    size + 1 >= self.MAX_BEFORE_FLUSH
+                    or self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH
+                ):
+                    self._pending_flush.add(span.trace_id)
+                    notify = True
+                else:
+                    notify = False
 
-                if self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH:
-                    self._flush_queue.put(span.trace_id)
-                    return
+            if notify:
+                self._flush_event.set()
         finally:
             self._active.flag = False
-
-    def kill(self) -> None:
-        if self._flusher is None:
-            return
-
-        self.flush()
-        self._running = False
-        self._flush_queue.put(None)
-        self._flusher = None
 
     @staticmethod
     def _estimate_size(item: "StreamedSpan") -> int:
@@ -159,16 +153,18 @@ class SpanBatcher(Batcher["StreamedSpan"]):
 
         return res
 
-    def _flush(self, trace_id: "Optional[str]" = None) -> None:
+    def _flush(self, only_pending: bool = False) -> None:
         with self._lock:
-            if len(self._span_buffer) == 0:
-                return
-
-            if trace_id is None:
+            if only_pending:
+                buckets = list(self._pending_flush)
+            else:
                 # flush whole buffer, e.g. if the SDK is shutting down
                 buckets = list(self._span_buffer.keys())
-            else:
-                buckets = [trace_id]
+
+            self._pending_flush.clear()
+
+            if not buckets:
+                return
 
             envelopes = []
 
