@@ -583,10 +583,10 @@ class Scope:
         # If we have an active span, return traceparent from there
         if (
             has_tracing_enabled(client.options)
-            and self.span is not None
+            and self.streamed_span is not None
             and not isinstance(self.span, NoOpStreamedSpan)
         ):
-            return self.span._to_traceparent()
+            return self.streamed_span._to_traceparent()
 
         # else return traceparent from the propagation context
         return self.get_active_propagation_context().to_traceparent()
@@ -601,10 +601,10 @@ class Scope:
         # If we have an active span, return baggage from there
         if (
             has_tracing_enabled(client.options)
-            and self.span is not None
+            and self.streamed_span is not None
             and not isinstance(self.span, NoOpStreamedSpan)
         ):
-            return self.span._to_baggage()
+            return self.streamed_span._to_baggage()
 
         # else return baggage from the propagation context
         return self.get_active_propagation_context().get_baggage()
