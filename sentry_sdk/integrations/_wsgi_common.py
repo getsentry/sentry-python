@@ -6,6 +6,7 @@ import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue, logger
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 try:
     from django.http.request import RawPostDataException
@@ -213,16 +214,18 @@ def _is_json_content_type(ct: "Optional[str]") -> bool:
 
 def _filter_headers(
     headers: "Mapping[str, str]",
-    use_annotated_value: bool = True,
 ) -> "Mapping[str, Union[AnnotatedValue, str]]":
     if should_send_default_pii():
         return headers
 
-    substitute: "Union[AnnotatedValue, str]"
-    if use_annotated_value:
-        substitute = AnnotatedValue.removed_because_over_size_limit()
-    else:
-        substitute = SENSITIVE_DATA_SUBSTITUTE
+    client_options = sentry_sdk.get_client().options
+    is_span_streaming_enabled = has_span_streaming_enabled(client_options)
+
+    substitute: "Union[AnnotatedValue, str]" = (
+        SENSITIVE_DATA_SUBSTITUTE
+        if is_span_streaming_enabled
+        else AnnotatedValue.removed_because_over_size_limit()
+    )
 
     return {
         k: (v if k.upper().replace("-", "_") not in SENSITIVE_HEADERS else substitute)

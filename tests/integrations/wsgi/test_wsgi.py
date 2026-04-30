@@ -841,3 +841,50 @@ def test_file_response_wrapping(
 )
 def test_get_request_url_x_forwarded_proto(environ, use_x_forwarded_for, expected_url):
     assert get_request_url(environ, use_x_forwarded_for) == expected_url
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_filter_sensitive_headers_without_pii(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    def app(environ, start_response):
+        start_response("200 OK", [])
+        return [b"ok"]
+
+    sentry_init(
+        send_default_pii=False,
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+    middleware = SentryWsgiMiddleware(app)
+    client = Client(middleware)
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        events = capture_events()
+
+    client.get(
+        "/",
+        headers={"Authorization": "Bearer secret", "X-Custom": "ok"},
+    )
+
+    sentry_sdk.flush()
+
+    if span_streaming:
+        assert len(items) == 1
+        attributes = items[0].payload["attributes"]
+        assert attributes["http.request.header.authorization"] == "[Filtered]"
+        assert attributes["http.request.header.x-custom"] == "ok"
+    else:
+        envelope = events[0]
+        headers = envelope["request"]["headers"]
+        assert (
+            headers["Authorization"] != "Bearer secret"
+        )  # In the legacy approach, the expectation is that the event scrubber would remove this
+        assert headers["X-Custom"] == "ok"
