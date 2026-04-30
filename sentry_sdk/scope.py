@@ -680,7 +680,9 @@ class Scope:
             return
 
         span = kwargs.pop("span", None)
-        span = span or self.span
+        if not span:
+            span_streaming = has_span_streaming_enabled(client.options)
+            span = self.streamed_span if span_streaming else self.span
 
         if (
             has_tracing_enabled(client.options)
