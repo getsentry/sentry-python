@@ -1278,7 +1278,7 @@ class Scope:
         if parent_span is _DEFAULT_PARENT_SPAN or isinstance(
             parent_span, NoOpStreamedSpan
         ):
-            parent_span = self.streamed_span  # type: ignore
+            parent_span = self.streamed_span
 
         # If no eligible parent_span was provided and there is no currently
         # active span, this is a segment
