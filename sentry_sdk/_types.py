@@ -13,6 +13,9 @@ MYPY = TYPE_CHECKING
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
+OVER_SIZE_LIMIT_SUBSTITUTE = (
+    "[Value removed due to size of field exceeding configured maximum size.]"
+)
 
 
 class AnnotatedValue:
@@ -72,6 +75,26 @@ class AnnotatedValue:
                     [
                         "!config",  # Because of configured maximum size
                         "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
+    def substituted_because_over_size_limit(
+        cls, value: "Any" = OVER_SIZE_LIMIT_SUBSTITUTE
+    ) -> "AnnotatedValue":
+        """
+        The actual value was replaced because the size of the field exceeded the configured maximum size,
+        for example specified with the max_request_body_size sdk option.
+        """
+        return AnnotatedValue(
+            value=value,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of configured maximum size
+                        "s",  # The fields original value was substituted
                     ]
                 ]
             },
