@@ -314,8 +314,7 @@ class AioHttpIntegration(Integration):
                 pass
 
             if name is not None:
-                current_scope = sentry_sdk.get_current_scope()
-                current_span = current_scope.span
+                current_span = sentry_sdk.get_current_span()
                 if isinstance(current_span, StreamedSpan) and not isinstance(
                     current_span, NoOpStreamedSpan
                 ):
@@ -325,6 +324,7 @@ class AioHttpIntegration(Integration):
                         SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
                     )
                 else:
+                    current_scope = sentry_sdk.get_current_scope()
                     current_scope.set_transaction_name(
                         name,
                         source=SOURCE_FOR_STYLE[integration.transaction_style],
