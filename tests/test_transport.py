@@ -1,14 +1,15 @@
+import asyncio
 import logging
-import pickle
 import os
+import pickle
 import socket
 import sys
-import asyncio
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
+
 from tests.conftest import CapturingServer
 
 try:
@@ -30,27 +31,26 @@ skip_under_gevent = pytest.mark.skipif(
 import sentry_sdk
 from sentry_sdk import (
     Client,
+    Hub,
     add_breadcrumb,
     capture_message,
-    isolation_scope,
     get_isolation_scope,
-    Hub,
+    isolation_scope,
 )
 from sentry_sdk._compat import PY37, PY38
-from sentry_sdk.utils import Dsn
-from sentry_sdk.envelope import Envelope, Item, parse_json, PayloadRef
+from sentry_sdk.envelope import Envelope, Item, PayloadRef, parse_json
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
-    EnvelopePrinterTransport,
-    Transport,
-    _parse_rate_limits,
     AsyncHttpTransport,
     HttpTransport,
+    Transport,
+    _EnvelopePrinterTransport,
+    _parse_rate_limits,
     make_transport,
 )
-from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
-from sentry_sdk.integrations.asyncio import AsyncioIntegration
-
+from sentry_sdk.utils import Dsn
 
 server = None
 
@@ -1047,7 +1047,7 @@ async def test_async_transport_rate_limiting_with_concurrency(
     await client.close_async(timeout=2.0)
 
 
-# --- EnvelopePrinterTransport tests ---
+# --- _EnvelopePrinterTransport tests ---
 
 
 class FakeTransport(Transport):
@@ -1088,10 +1088,10 @@ def _make_binary_envelope():
     return envelope
 
 
-class TestEnvelopePrinterTransportDelegation:
+class Test_EnvelopePrinterTransportDelegation:
     def test_capture_envelope_delegates(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         envelope = _make_json_envelope()
 
         transport.capture_envelope(envelope)
@@ -1100,7 +1100,7 @@ class TestEnvelopePrinterTransportDelegation:
 
     def test_flush_delegates(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         cb = lambda: None
 
         transport.flush(10.0, cb)
@@ -1109,7 +1109,7 @@ class TestEnvelopePrinterTransportDelegation:
 
     def test_kill_delegates(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
 
         transport.kill()
 
@@ -1117,7 +1117,7 @@ class TestEnvelopePrinterTransportDelegation:
 
     def test_record_lost_event_delegates(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         item = Item(payload='{"x": 1}', type="event")
 
         transport.record_lost_event("queue_overflow", "error", item, quantity=5)
@@ -1126,7 +1126,7 @@ class TestEnvelopePrinterTransportDelegation:
 
     def test_is_healthy_delegates(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
 
         assert transport.is_healthy() is True
 
@@ -1135,7 +1135,7 @@ class TestEnvelopePrinterTransportDelegation:
 
     def test_parsed_dsn_forwarded(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
 
         assert transport.parsed_dsn is inner.parsed_dsn
 
@@ -1151,10 +1151,10 @@ def _collect_debug_log_text(mock_debug):
     return "\n".join(parts)
 
 
-class TestEnvelopePrinterTransportLogging:
+class Test_EnvelopePrinterTransportLogging:
     def test_json_payload_is_pretty_printed(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         envelope = _make_json_envelope()
 
         with mock.patch("sentry_sdk.transport.logger") as mock_logger:
@@ -1165,7 +1165,7 @@ class TestEnvelopePrinterTransportLogging:
 
     def test_binary_payload_shows_byte_count(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         envelope = _make_binary_envelope()
 
         with mock.patch("sentry_sdk.transport.logger") as mock_logger:
@@ -1176,7 +1176,7 @@ class TestEnvelopePrinterTransportLogging:
 
     def test_envelope_headers_are_logged(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         envelope = _make_json_envelope()
 
         with mock.patch("sentry_sdk.transport.logger") as mock_logger:
@@ -1187,7 +1187,7 @@ class TestEnvelopePrinterTransportLogging:
 
     def test_item_type_and_headers_are_logged(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         envelope = _make_json_envelope()
 
         with mock.patch("sentry_sdk.transport.logger") as mock_logger:
@@ -1200,7 +1200,7 @@ class TestEnvelopePrinterTransportLogging:
 
     def test_logging_exception_does_not_propagate(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         envelope = _make_json_envelope()
 
         with mock.patch(
@@ -1212,7 +1212,7 @@ class TestEnvelopePrinterTransportLogging:
 
     def test_empty_envelope_logs_headers_only(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         envelope = Envelope(headers={"event_id": "empty1"})
 
         with mock.patch("sentry_sdk.transport.logger") as mock_logger:
@@ -1225,7 +1225,7 @@ class TestEnvelopePrinterTransportLogging:
 
     def test_multiple_items_each_logged(self):
         inner = FakeTransport()
-        transport = EnvelopePrinterTransport(inner)
+        transport = _EnvelopePrinterTransport(inner)
         envelope = Envelope(headers={"event_id": "multi"})
         envelope.add_item(Item(payload='{"a": 1}', type="event"))
         envelope.add_item(Item(payload=b"\xff", type="attachment"))
@@ -1259,7 +1259,7 @@ class TestMakeTransportEnvelopePrinter:
         with mock.patch.dict(os.environ, {"SENTRY_PRINT_ENVELOPES": "1"}):
             transport = make_transport(options)
 
-        assert isinstance(transport, EnvelopePrinterTransport)
+        assert isinstance(transport, _EnvelopePrinterTransport)
         assert isinstance(transport._inner, HttpTransport)
 
     def test_no_env_var_returns_plain_transport(self):
@@ -1284,7 +1284,7 @@ class TestMakeTransportEnvelopePrinter:
             transport = make_transport(options)
 
         assert isinstance(transport, HttpTransport)
-        assert not isinstance(transport, EnvelopePrinterTransport)
+        assert not isinstance(transport, _EnvelopePrinterTransport)
 
     @pytest.mark.parametrize("value", ["0", "false", "no", ""])
     def test_falsy_env_var_values_do_not_wrap(self, value):
@@ -1308,7 +1308,7 @@ class TestMakeTransportEnvelopePrinter:
             transport = make_transport(options)
 
         assert isinstance(transport, HttpTransport)
-        assert not isinstance(transport, EnvelopePrinterTransport)
+        assert not isinstance(transport, _EnvelopePrinterTransport)
 
     def test_env_var_wraps_pre_instantiated_transport(self):
         inner = FakeTransport()
@@ -1331,14 +1331,14 @@ class TestMakeTransportEnvelopePrinter:
         with mock.patch.dict(os.environ, {"SENTRY_PRINT_ENVELOPES": "1"}):
             transport = make_transport(options)
 
-        assert isinstance(transport, EnvelopePrinterTransport)
+        assert isinstance(transport, _EnvelopePrinterTransport)
         assert transport._inner is inner
 
 
-class TestEnvelopePrinterTransportIsinstance:
+class Test_EnvelopePrinterTransportIsinstance:
     def test_isinstance_matches_inner_transport_class(self):
         inner = FakeTransport()
-        wrapper = EnvelopePrinterTransport(inner)
+        wrapper = _EnvelopePrinterTransport(inner)
 
         assert isinstance(wrapper, FakeTransport)
         assert isinstance(wrapper, Transport)
@@ -1368,6 +1368,6 @@ class TestEnvelopePrinterTransportIsinstance:
     def test_getattr_delegates_to_inner(self):
         inner = FakeTransport()
         inner.custom_attr = "test_value"
-        wrapper = EnvelopePrinterTransport(inner)
+        wrapper = _EnvelopePrinterTransport(inner)
 
         assert wrapper.custom_attr == "test_value"
