@@ -1469,11 +1469,15 @@ async def test_transaction_style_span_streaming(
     sentry_sdk.flush()
 
     assert len(items) == 2
-    items.pop()  # drop the test client's outer segment
+    segment = items.pop().payload
     (server_span,) = [item.payload for item in items]
 
-    assert server_span["name"] == expected_name
-    assert server_span["attributes"]["sentry.span.source"] == expected_source
+    assert segment["name"] == expected_name
+    assert segment["attributes"]["sentry.span.source"] == expected_source
+
+    assert server_span["name"] == "generic AIOHTTP request"
+    assert not server_span["is_segment"]
+    assert server_span["attributes"]["sentry.span.source"] == "route"
 
 
 @pytest.mark.asyncio
