@@ -9,6 +9,7 @@ on:
 jobs:
   update-tox:
     name: Update test matrix
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -59,7 +60,6 @@ jobs:
           BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
           COMMIT_TITLE: ${{ steps.create-branch.outputs.commit_title }}
           DATE: ${{ steps.create-branch.outputs.date }}
-          BASE_BRANCH: ${{ github.ref_name }}
         with:
           script: |
             const branchName = process.env.BRANCH_NAME;
@@ -105,7 +105,7 @@ jobs:
                 repo: context.repo.repo,
                 title: commitTitle + ' (' + date + ')',
                 head: branchName,
-                base: process.env.BASE_BRANCH,
+                base: 'master',
                 body: prBody,
             });
 
