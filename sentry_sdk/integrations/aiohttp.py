@@ -224,7 +224,8 @@ class AioHttpIntegration(Integration):
                                     # approach as well, so this matches what we do today.
                                     span.status = SpanStatus.ERROR.value
                                 else:
-                                    span.set_http_status(e.status_code)
+                                    if not isinstance(span, NoOpStreamedSpan):
+                                        span.set_http_status(e.status_code)
 
                                 if (
                                     e.status_code
