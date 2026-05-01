@@ -359,11 +359,11 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
                 time.sleep(0.1)
             assert get_profiler_id() is not None, "profiler should be running"
 
-        assert_single_transaction_with_profile_chunks(envelopes, thread)
-
         assert get_profiler_id() is not None, "profiler should be running"
 
         stop_profiler_func()
+
+        assert_single_transaction_with_profile_chunks(envelopes, thread)
 
         # the profiler stops immediately in manual mode
         assert get_profiler_id() is None, "profiler should not be running"

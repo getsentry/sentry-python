@@ -1194,7 +1194,7 @@ def create_streaming_span_decorator(
 
 def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
-) -> "Optional[Union[Span, StreamedSpan]]":
+) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -1208,9 +1208,16 @@ def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None
     Set the status of the current or given span to INTERNAL_ERROR.
     Also sets the status of the transaction (root span) to INTERNAL_ERROR.
     """
-    from sentry_sdk.traces import StreamedSpan, SpanStatus
+    from sentry_sdk.traces import StreamedSpan, SpanStatus, _get_current_streamed_span
 
-    span = span or get_current_span()
+    client = sentry_sdk.get_client()
+
+    if not span:
+        span = (
+            _get_current_streamed_span()
+            if has_span_streaming_enabled(client.options)
+            else sentry_sdk.get_current_span()
+        )
 
     if span is not None:
         if isinstance(span, Span):
