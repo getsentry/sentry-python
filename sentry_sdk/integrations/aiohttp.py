@@ -205,7 +205,9 @@ class AioHttpIntegration(Integration):
                             try:
                                 response = await old_handle(self, request)
                             except HTTPException as e:
-                                if isinstance(span, StreamedSpan):
+                                if isinstance(span, StreamedSpan) and not isinstance(
+                                    span, NoOpStreamedSpan
+                                ):
                                     span.set_attribute(
                                         "http.response.status_code", e.status_code
                                     )
