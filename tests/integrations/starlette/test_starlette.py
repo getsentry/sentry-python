@@ -1193,6 +1193,7 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     async def _error(request):
         logging.critical("Oh no!")
         assert request.headers["Authorization"] == "Bearer ohno"
+        assert request.headers["Proxy-Authorization"] == "Basic ohno"
         assert await request.json() == {"password": "ohno"}
         return starlette.responses.JSONResponse({"status": "Oh no!"})
 
@@ -1206,12 +1207,16 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     client.post(
         "/error",
         json={"password": "ohno"},
-        headers={"Authorization": "Bearer ohno"},
+        headers={
+            "Authorization": "Bearer ohno",
+            "Proxy-Authorization": "Basic ohno",
+        },
     )
 
     event = events[0]
     assert event["request"]["data"] == {"password": "[Filtered]"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
+    assert event["request"]["headers"]["proxy-authorization"] == "[Filtered]"
 
 
 @pytest.mark.skipif(STARLETTE_VERSION < (0, 24), reason="Requires Starlette >= 0.24")

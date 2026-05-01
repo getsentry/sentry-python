@@ -881,6 +881,12 @@ class SPANDATA:
     Example: "tcp", "udp", "unix"
     """
 
+    PROCESS_PID = "process.pid"
+    """
+    The process ID of the running process.
+    Example: 12345
+    """
+
     PROFILER_ID = "profiler_id"
     """
     Label identifying the profiler id that the span occurred in. This should be a string.
@@ -922,6 +928,24 @@ class SPANDATA:
     """
     Label identifying a thread from where the span originated. This should be a string.
     Example: "MainThread"
+    """
+
+    URL_FULL = "url.full"
+    """
+    The URL of the resource that was fetched.
+    Example: "https://example.com/test?foo=bar#buzz"
+    """
+
+    URL_FRAGMENT = "url.fragment"
+    """
+    The fragments present in the URI. Note that this does not contain the leading # character, while the `http.fragment` attribute does.
+    Example: "details"
+    """
+
+    URL_QUERY = "url.query"
+    """
+    The query string present in the URL. Note that this does not contain the leading ? character, while the `http.query` attribute does.
+    Example: "foo=bar&bar=baz"
     """
 
     MCP_TOOL_NAME = "mcp.tool.name"

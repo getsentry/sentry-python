@@ -170,6 +170,65 @@ def record_sql_queries(
         yield span
 
 
+# Mirrors record_sql_queries() temporarily so the Django and asyncpg integrations don't crash with span streaming enabled.
+# Once both are ported, remove record_sql_queries() and rename record_sql_queries_supporting_streaming() to record_sql_queries().
+@contextlib.contextmanager
+def record_sql_queries_supporting_streaming(
+    cursor: "Any",
+    query: "Any",
+    params_list: "Any",
+    paramstyle: "Optional[str]",
+    executemany: bool,
+    record_cursor_repr: bool = False,
+    span_origin: str = "manual",
+) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
+    # TODO: Bring back capturing of params by default
+    client = sentry_sdk.get_client()
+    if client.options["_experiments"].get("record_sql_params", False):
+        if not params_list or params_list == [None]:
+            params_list = None
+
+        if paramstyle == "pyformat":
+            paramstyle = "format"
+    else:
+        params_list = None
+        paramstyle = None
+
+    query = _format_sql(cursor, query)
+
+    data = {}
+    if params_list is not None:
+        data["db.params"] = params_list
+    if paramstyle is not None:
+        data["db.paramstyle"] = paramstyle
+    if executemany:
+        data["db.executemany"] = True
+    if record_cursor_repr and cursor is not None:
+        data["db.cursor"] = cursor
+
+    with capture_internal_exceptions():
+        sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
+
+    if has_span_streaming_enabled(client.options):
+        with sentry_sdk.traces.start_span(
+            name="<unknown SQL query>" if query is None else query,
+            attributes={
+                "sentry.origin": span_origin,
+                "sentry.op": OP.DB,
+            },
+        ) as span:
+            yield span
+    else:
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            name=query,
+            origin=span_origin,
+        ) as span:
+            for k, v in data.items():
+                span.set_data(k, v)
+            yield span
+
+
 def maybe_create_breadcrumbs_from_span(
     scope: "sentry_sdk.Scope", span: "sentry_sdk.tracing.Span"
 ) -> None:
@@ -316,7 +375,9 @@ def add_source(
                 span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
-def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
+def add_query_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+) -> None:
     """
     Adds OTel compatible source code information to a database query span
     """
@@ -324,14 +385,25 @@ def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
     if not client.is_active():
         return
 
-    if span.timestamp is None or span.start_timestamp is None:
+    if isinstance(span, LegacySpan):
+        # In the StreamedSpan case, we need to add the extra span information before
+        # the span finishes, so it's expected that this will be None. In the LegacySpan case,
+        # it should already be finished.
+        if span.timestamp is None:
+            return
+
+    if span.start_timestamp is None:
         return
 
     should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
-    duration = span.timestamp - span.start_timestamp
+    end_timestamp = (
+        datetime.now(timezone.utc) if span.timestamp is None else span.timestamp
+    )
+
+    duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 
@@ -353,11 +425,10 @@ def add_http_request_source(
     Adds OTel compatible source code information to a span for an outgoing HTTP request
     """
     client = sentry_sdk.get_client()
+    if not client.is_active():
+        return
 
     if isinstance(span, LegacySpan):
-        if not client.is_active():
-            return
-
         # In the StreamedSpan case, we need to add the extra span information before
         # the span finishes, so it's expected that this will be None. In the LegacySpan case,
         # it should already be finished.
@@ -1123,7 +1194,7 @@ def create_streaming_span_decorator(
 
 def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
-) -> "Optional[Union[Span, StreamedSpan]]":
+) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -1137,9 +1208,16 @@ def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None
     Set the status of the current or given span to INTERNAL_ERROR.
     Also sets the status of the transaction (root span) to INTERNAL_ERROR.
     """
-    from sentry_sdk.traces import StreamedSpan, SpanStatus
+    from sentry_sdk.traces import StreamedSpan, SpanStatus, _get_current_streamed_span
 
-    span = span or get_current_span()
+    client = sentry_sdk.get_client()
+
+    if not span:
+        span = (
+            _get_current_streamed_span()
+            if has_span_streaming_enabled(client.options)
+            else sentry_sdk.get_current_span()
+        )
 
     if span is not None:
         if isinstance(span, Span):

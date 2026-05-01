@@ -7,7 +7,6 @@ You can enable span streaming mode via
 sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
-import sys
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -295,8 +294,6 @@ class StreamedSpan:
         self._start_profile()
         self._set_profile_id(get_profiler_id())
 
-        self._set_segment_attributes()
-
         self._start()
 
     def __repr__(self) -> str:
@@ -344,8 +341,8 @@ class StreamedSpan:
 
     def _start(self) -> None:
         if self._active:
-            old_span = self._scope.span
-            self._scope.span = self
+            old_span = self._scope.streamed_span
+            self._scope.streamed_span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -363,7 +360,7 @@ class StreamedSpan:
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.span = old_span
+                self._scope.streamed_span = old_span
 
         # Set attributes from the segment. These are set on span end on purpose
         # so that we have the best chance to capture the segment's final name
@@ -555,12 +552,6 @@ class StreamedSpan:
 
         self._continuous_profile = try_profile_lifecycle_trace_start()
 
-    def _set_segment_attributes(self) -> None:
-        if not self._is_segment():
-            return
-
-        self.set_attribute("process.command_args", sys.argv)
-
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
@@ -595,8 +586,8 @@ class NoOpStreamedSpan(StreamedSpan):
         if self._scope is None:
             return
 
-        old_span = self._scope.span
-        self._scope.span = self
+        old_span = self._scope.streamed_span
+        self._scope.streamed_span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -619,7 +610,7 @@ class NoOpStreamedSpan(StreamedSpan):
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.span = old_span
+                self._scope.streamed_span = old_span
 
         self._finished = True
 
@@ -764,3 +755,17 @@ def trace(
         return decorator(func)
     else:
         return decorator
+
+
+def _get_current_streamed_span(
+    scope: "Optional[sentry_sdk.Scope]" = None,
+) -> "Optional[StreamedSpan]":
+    """
+    Returns the currently active span on the scope if the span is a `StreamedSpan`, otherwise `None`.
+
+    This function will only return a non-`None` value when the streaming trace lifecycle is enabled.
+    To enable the lifecycle, pass `_experiments={"trace_lifecycle": "stream"}` to `sentry.init()`.
+    """
+    scope = scope or sentry_sdk.get_current_scope()
+    current_span = scope.streamed_span
+    return current_span

@@ -403,6 +403,7 @@ async def test_original_request_not_scrubbed(
     async def _error(request: Request):
         logging.critical("Oh no!")
         assert request.headers["Authorization"] == "Bearer ohno"
+        assert request.headers["Proxy-Authorization"] == "Basic ohno"
         assert await request.json() == {"password": "secret"}
 
         return {"error": "Oh no!"}
@@ -411,12 +412,18 @@ async def test_original_request_not_scrubbed(
 
     client = TestClient(app)
     client.post(
-        "/error", json={"password": "secret"}, headers={"Authorization": "Bearer ohno"}
+        "/error",
+        json={"password": "secret"},
+        headers={
+            "Authorization": "Bearer ohno",
+            "Proxy-Authorization": "Basic ohno",
+        },
     )
 
     event = events[0]
     assert event["request"]["data"] == {"password": "[Filtered]"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
+    assert event["request"]["headers"]["proxy-authorization"] == "[Filtered]"
 
 
 def test_response_status_code_ok_in_transaction_context(sentry_init, capture_envelopes):

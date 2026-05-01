@@ -1,4 +1,5 @@
 import asyncio
+import os
 import re
 import sys
 import time
@@ -1504,46 +1505,6 @@ def test_profile_stops_when_segment_ends(
     assert get_profiler_id() is None, "profiler should have stopped"
 
 
-def test_default_attributes(sentry_init, capture_envelopes):
-    sentry_init(
-        server_name="test-server",
-        release="1.0.0",
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    envelopes = capture_envelopes()
-
-    with sentry_sdk.traces.start_span(name="test"):
-        ...
-
-    sentry_sdk.get_client().flush()
-
-    assert len(envelopes) == 1
-    assert len(envelopes[0].items) == 1
-    item = envelopes[0].items[0]
-
-    assert item.type == "span"
-    assert item.headers == {
-        "type": "span",
-        "item_count": 1,
-        "content_type": "application/vnd.sentry.items.span.v2+json",
-    }
-    assert item.payload.json["items"][0]["attributes"] == {
-        "thread.id": {"value": mock.ANY, "type": "string"},
-        "thread.name": {"value": "MainThread", "type": "string"},
-        "process.command_args": {"value": mock.ANY, "type": "array"},
-        "sentry.segment.id": {"value": mock.ANY, "type": "string"},
-        "sentry.segment.name": {"value": "test", "type": "string"},
-        "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
-        "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
-        "server.address": {"value": "test-server", "type": "string"},
-        "sentry.environment": {"value": "production", "type": "string"},
-        "sentry.release": {"value": "1.0.0", "type": "string"},
-        "sentry.origin": {"value": "manual", "type": "string"},
-    }
-
-
 def test_transport_format(sentry_init, capture_envelopes):
     sentry_init(
         server_name="test-server",
@@ -1579,17 +1540,82 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "is_segment": True,
                 "start_timestamp": mock.ANY,
                 "end_timestamp": mock.ANY,
-                "attributes": mock.ANY,
+                "attributes": {
+                    "thread.id": {"value": mock.ANY, "type": "string"},
+                    "thread.name": {"value": "MainThread", "type": "string"},
+                    "sentry.segment.id": {"value": mock.ANY, "type": "string"},
+                    "sentry.segment.name": {"value": "test", "type": "string"},
+                    "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
+                    "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
+                    "server.address": {"value": "test-server", "type": "string"},
+                    "sentry.environment": {"value": "production", "type": "string"},
+                    "sentry.release": {"value": "1.0.0", "type": "string"},
+                    "sentry.origin": {"value": "manual", "type": "string"},
+                },
             }
         ]
     }
-    for attribute, value in item.payload.json["items"][0]["attributes"].items():
-        assert isinstance(attribute, str)
 
-        assert isinstance(value, dict)
-        assert (
-            len(value) == 2
-        )  # technically, "unit" is also supported, but we don't currently set it anywhere
-        assert "value" in value
-        assert "type" in value
-        assert value["type"] in ("string", "boolean", "integer", "double", "array")
+
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or not hasattr(os, "fork")
+    or not hasattr(os, "register_at_fork"),
+    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
+)
+def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
+    """Regression test for the SpanBatcher fork-deadlock fix.
+
+    If os.fork() runs while another thread holds SpanBatcher._lock, the
+    child inherits the lock locked. The holding thread does not exist in
+    the child, so the lock can never be released and _ensure_thread
+    deadlocks forever. The after-fork hook must replace the lock with a
+    fresh one in the child and reset
+    _flusher / _flusher_pid / _span_buffer / _running_size / _active /
+    _flush_event.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    batcher = sentry_sdk.get_client().span_batcher
+    assert batcher is not None
+
+    original_lock = batcher._lock
+    original_lock.acquire()
+
+    batcher._span_buffer["test-trace-id"].append(object())
+    batcher._running_size["test-trace-id"] = 42
+    batcher._active.flag = True
+    batcher._flush_event.set()
+    batcher._running = False
+
+    pid = os.fork()
+    if pid == 0:
+        replaced = batcher._lock is not original_lock
+        unheld = batcher._lock.acquire(blocking=False)
+
+        flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
+        span_buffer_reset = len(batcher._span_buffer) == 0
+        running_size_reset = len(batcher._running_size) == 0
+
+        active_reset = not getattr(batcher._active, "flag", False)
+        event_reset = not batcher._flush_event.is_set()
+        running_reset = batcher._running is True
+
+        os._exit(
+            0
+            if replaced
+            and unheld
+            and flusher_reset
+            and span_buffer_reset
+            and running_size_reset
+            and active_reset
+            and event_reset
+            and running_reset
+            else 1
+        )
+
+    original_lock.release()
+    _, status = os.waitpid(pid, 0)
+    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
