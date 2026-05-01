@@ -4,26 +4,28 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
-    _check_minimum_version,
-    Integration,
     DidNotEnable,
+    Integration,
+    _check_minimum_version,
+)
+from sentry_sdk.integrations._wsgi_common import (
+    _filter_headers,
+    request_body_within_bounds,
 )
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.sessions import track_session
-from sentry_sdk.integrations._wsgi_common import (
-    _filter_headers,
-    request_body_within_bounds,
+from sentry_sdk.traces import (
+    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
 )
 from sentry_sdk.traces import (
     NoOpStreamedSpan,
     SegmentSource,
     SpanStatus,
     StreamedSpan,
-    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -36,6 +38,10 @@ from sentry_sdk.tracing_utils import (
     should_propagate_trace,
 )
 from sentry_sdk.utils import (
+    CONTEXTVARS_ERROR_MESSAGE,
+    HAS_REAL_CONTEXTVARS,
+    SENSITIVE_DATA_SUBSTITUTE,
+    AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -44,17 +50,13 @@ from sentry_sdk.utils import (
     parse_version,
     reraise,
     transaction_from_function,
-    HAS_REAL_CONTEXTVARS,
-    CONTEXTVARS_ERROR_MESSAGE,
-    SENSITIVE_DATA_SUBSTITUTE,
-    AnnotatedValue,
 )
 
 try:
     import asyncio
 
-    from aiohttp import __version__ as AIOHTTP_VERSION
     from aiohttp import ClientSession, TraceConfig
+    from aiohttp import __version__ as AIOHTTP_VERSION
     from aiohttp.web import Application, HTTPException, UrlDispatcher
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
@@ -62,21 +64,17 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from aiohttp.web_request import Request
-    from aiohttp.web_urldispatcher import UrlMappingMatchInfo
-    from aiohttp import TraceRequestStartParams, TraceRequestEndParams
-
     from collections.abc import Set
     from types import SimpleNamespace
-    from typing import Any
-    from typing import ContextManager
-    from typing import Optional
-    from typing import Tuple
-    from typing import Union
+    from typing import Any, ContextManager, Optional, Tuple, Union
 
+    from aiohttp import TraceRequestEndParams, TraceRequestStartParams
+    from aiohttp.web_request import Request
+    from aiohttp.web_urldispatcher import UrlMappingMatchInfo
+
+    from sentry_sdk._types import Attributes, Event, EventProcessor
     from sentry_sdk.tracing import Span
     from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import Attributes, Event, EventProcessor
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
@@ -145,22 +143,24 @@ class AioHttpIntegration(Integration):
                             {"aiohttp_request": request}
                         )
 
-                        header_dict: "dict[str, Any]" = {}
+                        header_attributes: "dict[str, Any]" = {}
                         for header, header_value in _filter_headers(
                             headers, use_annotated_value=False
                         ).items():
-                            header_dict[f"http.request.header.{header.lower()}"] = (
+                            header_attributes[
+                                f"http.request.header.{header.lower()}"
+                            ] = (
                                 # header_value will always be a string because we set `use_annotated_value` to false above
                                 header_value
                             )
 
-                        url_query = (
+                        url_query_attribute = (
                             {"url.query": request.query_string}
                             if request.query_string
                             else {}
                         )
 
-                        client_address = (
+                        client_address_attributes = (
                             {
                                 "client.address": request.remote,
                                 "user.ip_address": request.remote,
@@ -180,9 +180,9 @@ class AioHttpIntegration(Integration):
                                 "url.full": "%s://%s%s"
                                 % (request.scheme, request.host, request.path),
                                 "http.request.method": request.method,
-                                **url_query,
-                                **client_address,
-                                **header_dict,
+                                **url_query_attribute,
+                                **client_address_attributes,
+                                **header_attributes,
                             },
                         )
                     else:
@@ -212,8 +212,8 @@ class AioHttpIntegration(Integration):
                                         "http.response.status_code", e.status_code
                                     )
 
-                                    # There are a number of sub-exceptions that should have an "ok" status, but will
-                                    # actually have a status of error once the `raise` happens below
+                                    # There are a number of sub-exceptions that should have an "ok" status,
+                                    # but will actually have a status of error once the `raise` happens below
                                     # and we pass through the `should_be_treated_as_error` method invoked
                                     # within a span's `__exit__` method.
                                     #
@@ -224,6 +224,8 @@ class AioHttpIntegration(Integration):
                                     # approach as well, so this matches what we do today.
                                     span.status = SpanStatus.ERROR.value
                                 else:
+                                    # Since a NoOpStreamedSpan can end up here, we have to guard against it
+                                    # so this only gets set in the legacy transaction approach.
                                     if not isinstance(span, NoOpStreamedSpan):
                                         span.set_http_status(e.status_code)
 

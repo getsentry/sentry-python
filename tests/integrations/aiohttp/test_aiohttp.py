@@ -1,31 +1,33 @@
-import os
-import datetime
 import asyncio
+import datetime
 import json
-
+import os
 from contextlib import suppress
 from unittest import mock
 
 import pytest
-
 from aiohttp import web
 from aiohttp.client import ServerDisconnectedError
-from aiohttp.web_request import Request
 from aiohttp.web_exceptions import (
+    HTTPBadRequest,
     HTTPInternalServerError,
     HTTPNetworkAuthenticationRequired,
-    HTTPBadRequest,
     HTTPNotFound,
     HTTPUnavailableForLegalReasons,
 )
+from aiohttp.web_request import Request
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.aiohttp import AioHttpIntegration, create_trace_config
+from sentry_sdk.integrations.aiohttp import (
+    BODY_NOT_READ_MESSAGE,
+    AioHttpIntegration,
+    create_trace_config,
+)
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
-from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 
 
 @pytest.mark.asyncio
@@ -1317,17 +1319,15 @@ async def test_request_body_captured_on_segment_span_streaming(
     # test the segment is the aiohttp_client's outgoing http.client span (the
     # test client is itself sentry-instrumented). In production with separate
     # processes, the server span is the segment; the assertion is the same.
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    assert segments[0]["attributes"]["http.request.body.data"] == json.dumps(body)
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
+    assert segment["attributes"]["http.request.body.data"] == json.dumps(body)
 
 
 @pytest.mark.asyncio
 async def test_request_body_not_read_span_streaming(
     sentry_init, aiohttp_client, capture_items
 ):
-    from sentry_sdk.integrations.aiohttp import BODY_NOT_READ_MESSAGE
-
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
@@ -1349,9 +1349,9 @@ async def test_request_body_not_read_span_streaming(
 
     sentry_sdk.flush()
 
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    assert segments[0]["attributes"]["http.request.body.data"] == BODY_NOT_READ_MESSAGE
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
+    assert segment["attributes"]["http.request.body.data"] == BODY_NOT_READ_MESSAGE
 
 
 @pytest.mark.asyncio
@@ -1381,12 +1381,9 @@ async def test_request_body_over_size_limit_span_streaming(
 
     sentry_sdk.flush()
 
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    assert (
-        segments[0]["attributes"]["http.request.body.data"]
-        == OVER_SIZE_LIMIT_SUBSTITUTE
-    )
+    segment = items.pop().payload
+    assert segment["is_segment"] is True
+    assert segment["attributes"]["http.request.body.data"] == OVER_SIZE_LIMIT_SUBSTITUTE
 
 
 @pytest.mark.asyncio
@@ -1619,12 +1616,13 @@ async def test_outgoing_client_span_span_streaming(
     assert inner_client_span["attributes"]["http.request.method"] == "GET"
     assert inner_client_span["attributes"]["http.response.status_code"] == 200
     assert inner_client_span["attributes"]["url.query"] == "foo=bar"
+    assert inner_client_span["status"] == "ok"
+
     url_full = inner_client_span["attributes"]["url.full"]
     # parse_url() splits the URL — url.full is the base URL only, with the
     # query string captured separately on url.query.
     assert url_full.startswith("http://127.0.0.1:")
     assert url_full.endswith("/")
-    assert inner_client_span["status"] == "ok"
 
 
 @pytest.mark.asyncio
@@ -1656,6 +1654,7 @@ async def test_outgoing_trace_headers_span_streaming(
 
     assert client_span["is_segment"] is True
     assert client_span["attributes"]["sentry.op"] == "http.client"
+    assert client_span["name"].startswith("GET http://127.0.0.1:")
     assert resp.request_info.headers[
         "sentry-trace"
     ] == "{trace_id}-{span_id}-{sampled}".format(
