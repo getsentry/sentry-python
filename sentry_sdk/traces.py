@@ -31,7 +31,16 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
+    from typing import (
+        Any,
+        Callable,
+        Iterator,
+        Optional,
+        ParamSpec,
+        TypeGuard,
+        TypeVar,
+        Union,
+    )
     from sentry_sdk._types import Attributes, AttributeValue
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
@@ -755,6 +764,11 @@ def trace(
         return decorator(func)
     else:
         return decorator
+
+
+def _is_sampled_streamed_span(span: "Any") -> "TypeGuard[StreamedSpan]":
+    """Returns True if span is a StreamedSpan that was sampled (not a NoOpStreamedSpan)."""
+    return isinstance(span, StreamedSpan) and not isinstance(span, NoOpStreamedSpan)
 
 
 def _get_current_streamed_span(

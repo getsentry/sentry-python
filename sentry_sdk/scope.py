@@ -34,7 +34,12 @@ from sentry_sdk.tracing_utils import (
     _make_sampling_decision,
     PropagationContext,
 )
-from sentry_sdk.traces import _DEFAULT_PARENT_SPAN, StreamedSpan, NoOpStreamedSpan
+from sentry_sdk.traces import (
+    _DEFAULT_PARENT_SPAN,
+    StreamedSpan,
+    NoOpStreamedSpan,
+    _is_sampled_streamed_span,
+)
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -585,11 +590,7 @@ class Scope:
 
         span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
-        if (
-            span_streaming
-            and self.streamed_span is not None
-            and not isinstance(self.streamed_span, NoOpStreamedSpan)
-        ):
+        if span_streaming and _is_sampled_streamed_span(self.streamed_span):
             return self.streamed_span._to_traceparent()
         elif not span_streaming and self.span is not None:
             return self.span._to_traceparent()
@@ -609,11 +610,7 @@ class Scope:
 
         span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
-        if (
-            span_streaming
-            and self.streamed_span is not None
-            and not isinstance(self.streamed_span, NoOpStreamedSpan)
-        ):
+        if span_streaming and _is_sampled_streamed_span(self.streamed_span):
             return self.streamed_span._to_baggage()
         elif not span_streaming and self.span is not None:
             return self.span._to_baggage()
@@ -918,11 +915,7 @@ class Scope:
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
-        if (
-            isinstance(span, StreamedSpan)
-            and not isinstance(span, NoOpStreamedSpan)
-            and span._is_segment()
-        ):
+        if _is_sampled_streamed_span(span) and span._is_segment():
             self._transaction = span.name
             if span._attributes.get("sentry.span.source"):
                 self._transaction_info["source"] = str(

@@ -21,7 +21,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan, _get_current_streamed_span
+from sentry_sdk.traces import _get_current_streamed_span, _is_sampled_streamed_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
@@ -255,12 +255,7 @@ def _set_request_body_data_on_streaming_segment(
     info: "Optional[Dict[str, Any]]",
 ) -> None:
     current_span = _get_current_streamed_span()
-    if (
-        info
-        and "data" in info
-        and isinstance(current_span, StreamedSpan)
-        and not isinstance(current_span, NoOpStreamedSpan)
-    ):
+    if info and "data" in info and _is_sampled_streamed_span(current_span):
         with capture_internal_exceptions():
             current_span._segment.set_attribute(
                 "http.request.body.data",
@@ -557,9 +552,7 @@ def patch_request_response() -> None:
                 if span_streaming:
                     current_span = current_scope.streamed_span
 
-                    if isinstance(current_span, StreamedSpan) and not isinstance(
-                        current_span, NoOpStreamedSpan
-                    ):
+                    if _is_sampled_streamed_span(current_span):
                         current_span._segment._update_active_thread()
                 elif current_scope.transaction is not None:
                     current_scope.transaction.update_active_thread()
