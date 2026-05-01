@@ -1105,7 +1105,7 @@ class EnvelopePrinterTransport(Transport):
                 logger.debug("  Item type: %s", item.type)
                 logger.debug(
                     "  Item headers: %s",
-                    json.dumps(item.headers, default=str),
+                    json.dumps(item.headers, indent=2, default=str),
                 )
                 try:
                     payload = json.loads(item.get_bytes())
