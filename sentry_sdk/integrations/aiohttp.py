@@ -317,8 +317,8 @@ class AioHttpIntegration(Integration):
                 if isinstance(current_span, StreamedSpan) and not isinstance(
                     current_span, NoOpStreamedSpan
                 ):
-                    current_span.name = name
-                    current_span.set_attribute(
+                    current_span._segment.name = name
+                    current_span._segment.set_attribute(
                         "sentry.span.source",
                         SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
                     )

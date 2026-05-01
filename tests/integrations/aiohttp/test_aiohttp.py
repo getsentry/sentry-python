@@ -1169,16 +1169,18 @@ async def test_tracing_span_streaming(sentry_init, aiohttp_client, capture_items
 
     assert segment["is_segment"] is True
     assert segment["attributes"]["sentry.op"] == "http.client"
-
-    assert server_span["is_segment"] is False
-    assert server_span["name"] == (
+    assert segment["name"] == (
         "tests.integrations.aiohttp.test_aiohttp."
         "test_tracing_span_streaming.<locals>.hello"
     )
+    assert segment["attributes"]["sentry.span.source"] == "component"
+
+    assert server_span["is_segment"] is False
+    assert server_span["name"] == "generic AIOHTTP request"
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
-    assert server_span["attributes"]["sentry.span.source"] == "component"
     assert server_span["attributes"]["http.response.status_code"] == 200
+    assert server_span["attributes"]["sentry.span.source"] == "route"
     assert server_span["status"] == "ok"
     # No query string on the request, so the attribute should be omitted.
     assert "url.query" not in server_span["attributes"]
