@@ -1,15 +1,15 @@
-from abc import ABC, abstractmethod
 import asyncio
+import gzip
 import io
 import json
 import os
-import gzip
 import socket
 import ssl
 import time
 import warnings
-from datetime import datetime, timedelta, timezone
+from abc import ABC, abstractmethod
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from urllib.request import getproxies
 
 try:
@@ -36,36 +36,37 @@ try:
 except ImportError:
     ASYNC_TRANSPORT_AVAILABLE = False
 
-import urllib3
+from typing import TYPE_CHECKING, Dict, List, cast
+
 import certifi
+import urllib3
 
 import sentry_sdk
 from sentry_sdk.consts import EndpointType
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     Dsn,
-    logger,
     capture_internal_exceptions,
+    logger,
     mark_sentry_task_internal,
 )
-from sentry_sdk.worker import BackgroundWorker, Worker, AsyncWorker
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
-
-from typing import TYPE_CHECKING, cast, List, Dict
+from sentry_sdk.worker import AsyncWorker, BackgroundWorker, Worker
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import DefaultDict
-    from typing import Iterable
-    from typing import Mapping
-    from typing import Optional
-    from typing import Self
-    from typing import Tuple
-    from typing import Type
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        DefaultDict,
+        Iterable,
+        Mapping,
+        Optional,
+        Self,
+        Tuple,
+        Type,
+        Union,
+    )
 
-    from urllib3.poolmanager import PoolManager
-    from urllib3.poolmanager import ProxyManager
+    from urllib3.poolmanager import PoolManager, ProxyManager
 
     from sentry_sdk._types import Event, EventDataCategory
 
@@ -1093,7 +1094,9 @@ class EnvelopePrinterTransport(Transport):
     def capture_envelope(self, envelope: "Envelope") -> None:
         try:
             logger.debug("--- Sentry Envelope ---")
-            logger.debug("Headers: %s", json.dumps(envelope.headers, default=str))
+            logger.debug(
+                "Headers: %s", json.dumps(envelope.headers, indent=2, default=str)
+            )
             for item in envelope.items:
                 logger.debug("  Item type: %s", item.type)
                 logger.debug(
