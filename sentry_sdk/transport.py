@@ -1083,7 +1083,7 @@ else:
             return httpcore.ConnectionPool(**opts)
 
 
-class EnvelopePrinterTransport(Transport):
+class _EnvelopePrinterTransport(Transport):
     """Wraps another transport, printing envelope contents to the SDK debug logger before sending."""
 
     def __init__(self, transport: "Transport") -> None:
@@ -1240,6 +1240,6 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
     if transport is not None and os.environ.get(
         "SENTRY_PRINT_ENVELOPES", ""
     ).lower() in ("1", "true", "yes"):
-        transport = EnvelopePrinterTransport(transport)
+        transport = _EnvelopePrinterTransport(transport)
 
     return transport
