@@ -1091,6 +1091,10 @@ class EnvelopePrinterTransport(Transport):
         self._inner = transport
         self.parsed_dsn = transport.parsed_dsn
 
+    @property  # type: ignore[misc]
+    def __class__(self) -> type:
+        return self._inner.__class__
+
     def capture_envelope(self, envelope: "Envelope") -> None:
         try:
             logger.debug("--- Sentry Envelope ---")
@@ -1124,11 +1128,11 @@ class EnvelopePrinterTransport(Transport):
         self,
         timeout: float,
         callback: "Optional[Any]" = None,
-    ) -> None:
-        self._inner.flush(timeout, callback)
+    ) -> "Any":
+        return self._inner.flush(timeout, callback)
 
-    def kill(self) -> None:
-        self._inner.kill()
+    def kill(self) -> "Any":
+        return self._inner.kill()
 
     def record_lost_event(
         self,
@@ -1142,6 +1146,9 @@ class EnvelopePrinterTransport(Transport):
 
     def is_healthy(self) -> bool:
         return self._inner.is_healthy()
+
+    def __getattr__(self, name: str) -> "Any":
+        return getattr(self._inner, name)
 
 
 class _FunctionTransport(Transport):
@@ -1210,8 +1217,10 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
             "You tried to use AsyncHttpTransport but don't have httpcore[asyncio] installed. Falling back to sync transport."
         )
 
+    transport = None  # type: Optional[Transport]
+
     if isinstance(ref_transport, Transport):
-        return ref_transport
+        transport = ref_transport
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
     elif callable(ref_transport):
@@ -1221,16 +1230,16 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
             DeprecationWarning,
             stacklevel=2,
         )
-        return _FunctionTransport(ref_transport)
+        transport = _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not
     # empty or None
-    if options["dsn"]:
+    if transport is None and options["dsn"]:
         transport = transport_cls(options)
 
-        if os.environ.get("SENTRY_PRINT_ENVELOPES", "").lower() in ("1", "true", "yes"):
-            transport = EnvelopePrinterTransport(transport)
+    if transport is not None and os.environ.get(
+        "SENTRY_PRINT_ENVELOPES", ""
+    ).lower() in ("1", "true", "yes"):
+        transport = EnvelopePrinterTransport(transport)
 
-        return transport
-
-    return None
+    return transport

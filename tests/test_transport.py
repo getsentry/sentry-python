@@ -1309,3 +1309,65 @@ class TestMakeTransportEnvelopePrinter:
 
         assert isinstance(transport, HttpTransport)
         assert not isinstance(transport, EnvelopePrinterTransport)
+
+    def test_env_var_wraps_pre_instantiated_transport(self):
+        inner = FakeTransport()
+        options = {
+            "dsn": "https://foo@sentry.io/123",
+            "transport": inner,
+            "_experiments": {},
+            "integrations": [],
+            "send_client_reports": True,
+            "transport_queue_size": 100,
+            "keep_alive": False,
+            "socket_options": None,
+            "ca_certs": None,
+            "cert_file": None,
+            "key_file": None,
+            "http_proxy": None,
+            "https_proxy": None,
+            "proxy_headers": None,
+        }
+        with mock.patch.dict(os.environ, {"SENTRY_PRINT_ENVELOPES": "1"}):
+            transport = make_transport(options)
+
+        assert isinstance(transport, EnvelopePrinterTransport)
+        assert transport._inner is inner
+
+
+class TestEnvelopePrinterTransportIsinstance:
+    def test_isinstance_matches_inner_transport_class(self):
+        inner = FakeTransport()
+        wrapper = EnvelopePrinterTransport(inner)
+
+        assert isinstance(wrapper, FakeTransport)
+        assert isinstance(wrapper, Transport)
+
+    def test_isinstance_matches_http_transport(self):
+        options = {
+            "dsn": "https://foo@sentry.io/123",
+            "transport": None,
+            "_experiments": {},
+            "integrations": [],
+            "send_client_reports": True,
+            "transport_queue_size": 100,
+            "keep_alive": False,
+            "socket_options": None,
+            "ca_certs": None,
+            "cert_file": None,
+            "key_file": None,
+            "http_proxy": None,
+            "https_proxy": None,
+            "proxy_headers": None,
+        }
+        with mock.patch.dict(os.environ, {"SENTRY_PRINT_ENVELOPES": "1"}):
+            transport = make_transport(options)
+
+        assert isinstance(transport, HttpTransport)
+
+    def test_getattr_delegates_to_inner(self):
+        inner = FakeTransport()
+        inner.custom_attr = "test_value"
+        wrapper = EnvelopePrinterTransport(inner)
+
+        assert wrapper.custom_attr == "test_value"
