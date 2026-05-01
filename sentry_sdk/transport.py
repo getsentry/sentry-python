@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import asyncio
 import io
+import json
 import os
 import gzip
 import socket
@@ -1081,6 +1082,65 @@ else:
             return httpcore.ConnectionPool(**opts)
 
 
+class EnvelopePrinterTransport(Transport):
+    """Wraps another transport, printing envelope contents to the SDK debug logger before sending."""
+
+    def __init__(self, transport: "Transport") -> None:
+        Transport.__init__(self, options=transport.options)
+        self._inner = transport
+        self.parsed_dsn = transport.parsed_dsn
+
+    def capture_envelope(self, envelope: "Envelope") -> None:
+        try:
+            logger.debug("--- Sentry Envelope ---")
+            logger.debug("Headers: %s", json.dumps(envelope.headers, default=str))
+            for item in envelope.items:
+                logger.debug("  Item type: %s", item.type)
+                logger.debug(
+                    "  Item headers: %s",
+                    json.dumps(item.headers, default=str),
+                )
+                try:
+                    payload = json.loads(item.get_bytes())
+                    logger.debug(
+                        "  Payload:\n%s",
+                        json.dumps(payload, indent=2, default=str),
+                    )
+                except (ValueError, TypeError):
+                    logger.debug(
+                        "  Payload: <binary %d bytes>",
+                        len(item.get_bytes()),
+                    )
+            logger.debug("--- End Envelope ---")
+        except Exception:
+            pass
+
+        self._inner.capture_envelope(envelope)
+
+    def flush(
+        self,
+        timeout: float,
+        callback: "Optional[Any]" = None,
+    ) -> None:
+        self._inner.flush(timeout, callback)
+
+    def kill(self) -> None:
+        self._inner.kill()
+
+    def record_lost_event(
+        self,
+        reason: str,
+        data_category: "Optional[EventDataCategory]" = None,
+        item: "Optional[Item]" = None,
+        *,
+        quantity: int = 1,
+    ) -> None:
+        self._inner.record_lost_event(reason, data_category, item, quantity=quantity)
+
+    def is_healthy(self) -> bool:
+        return self._inner.is_healthy()
+
+
 class _FunctionTransport(Transport):
     """
     DEPRECATED: Users wishing to provide a custom transport should subclass
@@ -1163,6 +1223,11 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
     # if a transport class is given only instantiate it if the dsn is not
     # empty or None
     if options["dsn"]:
-        return transport_cls(options)
+        transport = transport_cls(options)
+
+        if os.environ.get("SENTRY_PRINT_ENVELOPES", "").lower() in ("1", "true", "yes"):
+            transport = EnvelopePrinterTransport(transport)
+
+        return transport
 
     return None
