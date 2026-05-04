@@ -12,8 +12,8 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asyncio import (
     AsyncioIntegration,
-    patch_asyncio,
     enable_asyncio_integration,
+    patch_asyncio,
 )
 
 try:
@@ -63,9 +63,12 @@ def get_sentry_task_factory(mock_get_running_loop):
 
 @minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_create_task(
     sentry_init,
     capture_events,
+    capture_items,
+    span_streaming,
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -73,12 +76,17 @@ async def test_create_task(
         integrations=[
             AsyncioIntegration(),
         ],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with sentry_sdk.start_transaction(name="test_transaction_for_create_task"):
-        with sentry_sdk.start_span(op="root", name="not so important"):
+        with sentry_sdk.traces.start_span(
+            name="not so important", attributes={"sentry.op": "root"}
+        ):
             foo_task = asyncio.create_task(foo())
             bar_task = asyncio.create_task(bar())
 
@@ -91,26 +99,61 @@ async def test_create_task(
 
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test_transaction_for_create_task"):
+            with sentry_sdk.start_span(op="root", name="not so important"):
+                foo_task = asyncio.create_task(foo())
+                bar_task = asyncio.create_task(bar())
+
+                if hasattr(foo_task.get_coro(), "__name__"):
+                    assert foo_task.get_coro().__name__ == "foo"
+                if hasattr(bar_task.get_coro(), "__name__"):
+                    assert bar_task.get_coro().__name__ == "bar"
+
+                tasks = [foo_task, bar_task]
+
+                await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+
     sentry_sdk.flush()
 
-    (transaction_event,) = events
+    if span_streaming:
+        segment = items.pop().payload
 
-    assert transaction_event["spans"][0]["op"] == "root"
-    assert transaction_event["spans"][0]["description"] == "not so important"
+        assert segment["is_segment"] is True
+        assert segment["name"] == "not so important"
+        assert segment["attributes"]["sentry.op"] == "root"
 
-    assert transaction_event["spans"][1]["op"] == OP.FUNCTION
-    assert transaction_event["spans"][1]["description"] == "foo"
-    assert (
-        transaction_event["spans"][1]["parent_span_id"]
-        == transaction_event["spans"][0]["span_id"]
-    )
+        spans = [item.payload for item in items]
+        assert len(spans) == 2
 
-    assert transaction_event["spans"][2]["op"] == OP.FUNCTION
-    assert transaction_event["spans"][2]["description"] == "bar"
-    assert (
-        transaction_event["spans"][2]["parent_span_id"]
-        == transaction_event["spans"][0]["span_id"]
-    )
+        assert spans[0]["attributes"]["sentry.op"] == OP.FUNCTION
+        assert spans[0]["name"] == "foo"
+        assert spans[0]["parent_span_id"] == segment["span_id"]
+
+        assert spans[1]["attributes"]["sentry.op"] == OP.FUNCTION
+        assert spans[1]["name"] == "bar"
+        assert spans[1]["parent_span_id"] == segment["span_id"]
+    else:
+        (transaction_event,) = events
+
+        assert transaction_event["spans"][0]["op"] == "root"
+        assert transaction_event["spans"][0]["description"] == "not so important"
+
+        assert transaction_event["spans"][1]["op"] == OP.FUNCTION
+        assert transaction_event["spans"][1]["description"] == "foo"
+        assert (
+            transaction_event["spans"][1]["parent_span_id"]
+            == transaction_event["spans"][0]["span_id"]
+        )
+
+        assert transaction_event["spans"][2]["op"] == OP.FUNCTION
+        assert transaction_event["spans"][2]["description"] == "bar"
+        assert (
+            transaction_event["spans"][2]["parent_span_id"]
+            == transaction_event["spans"][0]["span_id"]
+        )
 
 
 @minimum_python_38
