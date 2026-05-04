@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.api - sentry-python 2.58.0a1 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.api - sentry-python 2.59.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
@@ -114,7 +114,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="6"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._init_implementation</span><span class="w"> </span><span class="kn">import</span> <span class="n">init</span>
 </span><span data-line="7"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.consts</span><span class="w"> </span><span class="kn">import</span> <span class="n">INSTRUMENTER</span>
 </span><span data-line="8"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.scope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Scope</span><span class="p">,</span> <span class="n">_ScopeManager</span><span class="p">,</span> <span class="n">new_scope</span><span class="p">,</span> <span class="n">isolation_scope</span>
-</span><span data-line="9"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.traces</span><span class="w"> </span><span class="kn">import</span> <span class="n">StreamedSpan</span>
+</span><span data-line="9"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.traces</span><span class="w"> </span><span class="kn">import</span> <span class="n">StreamedSpan</span><span class="p">,</span> <span class="n">_get_current_streamed_span</span>
 </span><span data-line="10"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.tracing</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoOpSpan</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">,</span> <span class="n">trace</span>
 </span><span data-line="11"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.crons</span><span class="w"> </span><span class="kn">import</span> <span class="n">monitor</span>
 </span><span data-line="12">
@@ -580,7 +580,7 @@ data-aria-dark="Switch to auto color mode">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.get_current_span">[docs]</a>
 </span><span data-line="423"><span class="k">def</span><span class="w"> </span><span class="nf">get_current_span</span><span class="p">(</span>
 </span><span data-line="424">    <span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Optional[Scope]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="425"><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Union[Span, StreamedSpan]]&quot;</span><span class="p">:</span>
+</span><span data-line="425"><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Span]&quot;</span><span class="p">:</span>
 </span><span data-line="426"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="427"><span class="sd">    Returns the currently active span if there is one running, otherwise `None`</span>
 </span><span data-line="428"><span class="sd">    &quot;&quot;&quot;</span>
@@ -703,19 +703,19 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="533"><span class="sd">            attributes={&quot;user_id&quot;: 123, &quot;batch_size&quot;: 50}</span>
 </span><span data-line="534"><span class="sd">        )</span>
 </span><span data-line="535"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="536">    <span class="n">current_span</span> <span class="o">=</span> <span class="n">get_current_span</span><span class="p">()</span>
-</span><span data-line="537">
-</span><span data-line="538">    <span class="k">if</span> <span class="n">current_span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="539">        <span class="k">return</span>
-</span><span data-line="540">
-</span><span data-line="541">    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_span</span><span class="p">,</span> <span class="n">StreamedSpan</span><span class="p">):</span>
-</span><span data-line="542">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-</span><span data-line="543">            <span class="s2">&quot;The `update_current_span` API isn&#39;t available in streaming mode. &quot;</span>
-</span><span data-line="544">            <span class="s2">&quot;Retrieve the current span with get_current_span() and use its API &quot;</span>
-</span><span data-line="545">            <span class="s2">&quot;directly.&quot;</span><span class="p">,</span>
-</span><span data-line="546">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
-</span><span data-line="547">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span data-line="548">        <span class="p">)</span>
+</span><span data-line="536">    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">_get_current_streamed_span</span><span class="p">(),</span> <span class="n">StreamedSpan</span><span class="p">):</span>
+</span><span data-line="537">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+</span><span data-line="538">            <span class="s2">&quot;The `update_current_span` API isn&#39;t available in streaming mode. &quot;</span>
+</span><span data-line="539">            <span class="s2">&quot;Retrieve the current span with get_current_span() and use its API &quot;</span>
+</span><span data-line="540">            <span class="s2">&quot;directly.&quot;</span><span class="p">,</span>
+</span><span data-line="541">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+</span><span data-line="542">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span data-line="543">        <span class="p">)</span>
+</span><span data-line="544">        <span class="k">return</span>
+</span><span data-line="545">
+</span><span data-line="546">    <span class="n">current_span</span> <span class="o">=</span> <span class="n">get_current_span</span><span class="p">()</span>
+</span><span data-line="547">
+</span><span data-line="548">    <span class="k">if</span> <span class="n">current_span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="549">        <span class="k">return</span>
 </span><span data-line="550">
 </span><span data-line="551">    <span class="k">if</span> <span class="n">op</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -771,7 +771,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=f4b7d0f4"></script>
+      <script src="../../_static/documentation_options.js?v=6517ee4d"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=cac61aee"></script></body>
