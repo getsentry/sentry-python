@@ -5,6 +5,8 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import nullcontext
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import AsyncHttpTransport
 from sentry_sdk.utils import (
@@ -20,7 +22,7 @@ try:
 except ImportError:
     raise DidNotEnable("asyncio not available")
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -147,7 +149,7 @@ def patch_asyncio() -> None:
                 integration = client.get_integration(AsyncioIntegration)
                 task_spans = integration.task_spans if integration else False
 
-                span_ctx = None
+                span_ctx: "Optional[Union[StreamedSpan, Span]]" = None
                 is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
                 with sentry_sdk.isolation_scope():
