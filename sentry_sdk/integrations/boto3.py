@@ -114,7 +114,7 @@ def _sentry_request_created(
 def _sentry_after_call(
     context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
 ) -> None:
-    span: "Optional[Span]" = context.pop("_sentrysdk_span", None)
+    span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
@@ -125,11 +125,7 @@ def _sentry_after_call(
     if not isinstance(body, StreamingBody):
         return
 
-    client = sentry_sdk.get_client()
-    span_streaming = has_span_streaming_enabled(client.options)
-
-    streaming_span: "Union[Span, StreamedSpan]"
-    if span_streaming:
+    if isinstance(span, StreamedSpan):
         streaming_span = sentry_sdk.traces.start_span(
             name=span.name,
             parent_span=span,
