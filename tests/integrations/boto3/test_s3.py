@@ -30,6 +30,7 @@ def test_basic(
     )
 
     s3 = session.resource("s3")
+    bucket = s3.Bucket("bucket")
 
     if span_streaming:
         items = capture_items("event", "transaction", "span")
@@ -37,7 +38,6 @@ def test_basic(
         with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
-            bucket = s3.Bucket("bucket")
             objects = [obj for obj in bucket.objects.all()]
             assert len(objects) == 2
             assert objects[0].key == "foo.txt"
@@ -56,7 +56,6 @@ def test_basic(
         with sentry_sdk.start_transaction() as transaction, MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
-            bucket = s3.Bucket("bucket")
             items = [obj for obj in bucket.objects.all()]
             assert len(items) == 2
             assert items[0].key == "foo.txt"
@@ -85,6 +84,7 @@ def test_streaming(
     )
 
     s3 = session.resource("s3")
+    obj = s3.Bucket("bucket").Object("foo.pdf")
 
     if span_streaming:
         items = capture_items("event", "transaction", "span")
@@ -92,7 +92,6 @@ def test_streaming(
         with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
             s3.meta.client, 200, {}, b"hello"
         ):
-            obj = s3.Bucket("bucket").Object("foo.pdf")
             body = obj.get()["Body"]
             assert body.read(1) == b"h"
             assert body.read(2) == b"el"
@@ -126,7 +125,6 @@ def test_streaming(
         with sentry_sdk.start_transaction() as transaction, MockResponse(
             s3.meta.client, 200, {}, b"hello"
         ):
-            obj = s3.Bucket("bucket").Object("foo.pdf")
             body = obj.get()["Body"]
             assert body.read(1) == b"h"
             assert body.read(2) == b"el"
@@ -170,6 +168,7 @@ def test_streaming_close(
     )
 
     s3 = session.resource("s3")
+    obj = s3.Bucket("bucket").Object("foo.pdf")
 
     if span_streaming:
         items = capture_items("event", "transaction", "span")
@@ -177,7 +176,6 @@ def test_streaming_close(
         with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
             s3.meta.client, 200, {}, b"hello"
         ):
-            obj = s3.Bucket("bucket").Object("foo.pdf")
             body = obj.get()["Body"]
             assert body.read(1) == b"h"
             body.close()  # close partially-read stream
@@ -197,7 +195,6 @@ def test_streaming_close(
         with sentry_sdk.start_transaction() as transaction, MockResponse(
             s3.meta.client, 200, {}, b"hello"
         ):
-            obj = s3.Bucket("bucket").Object("foo.pdf")
             body = obj.get()["Body"]
             assert body.read(1) == b"h"
             body.close()  # close partially-read stream
@@ -227,6 +224,7 @@ def test_omit_url_data_if_parsing_fails(
     )
 
     s3 = session.resource("s3")
+    bucket = s3.Bucket("bucket")
 
     if span_streaming:
         items = capture_items("event", "transaction", "span")
@@ -240,7 +238,6 @@ def test_omit_url_data_if_parsing_fails(
             ) as span, MockResponse(
                 s3.meta.client, 200, {}, read_fixture("s3_list.xml")
             ):
-                bucket = s3.Bucket("bucket")
                 objects = [obj for obj in bucket.objects.all()]
                 assert len(objects) == 2
                 assert objects[0].key == "foo.txt"
@@ -269,7 +266,6 @@ def test_omit_url_data_if_parsing_fails(
             with sentry_sdk.start_transaction() as transaction, MockResponse(
                 s3.meta.client, 200, {}, read_fixture("s3_list.xml")
             ):
-                bucket = s3.Bucket("bucket")
                 items = [obj for obj in bucket.objects.all()]
                 assert len(items) == 2
                 assert items[0].key == "foo.txt"
@@ -303,6 +299,7 @@ def test_span_origin(
     )
 
     s3 = session.resource("s3")
+    bucket = s3.Bucket("bucket")
 
     if span_streaming:
         items = capture_items("event", "transaction", "span")
@@ -310,7 +307,6 @@ def test_span_origin(
         with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
-            bucket = s3.Bucket("bucket")
             _ = [obj for obj in bucket.objects.all()]
 
         sentry_sdk.flush()
@@ -324,7 +320,6 @@ def test_span_origin(
         with sentry_sdk.start_transaction(), MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
-            bucket = s3.Bucket("bucket")
             _ = [obj for obj in bucket.objects.all()]
 
         (event,) = events
