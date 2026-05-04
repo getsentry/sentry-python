@@ -167,7 +167,7 @@ def _sentry_after_call(
 def _sentry_after_call_error(
     context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any"
 ) -> None:
-    span: "Optional[Span]" = context.pop("_sentrysdk_span", None)
+    span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
