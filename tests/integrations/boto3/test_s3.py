@@ -189,7 +189,6 @@ def test_streaming_close(
         span2 = spans[1]
         assert span2["attributes"]["sentry.op"] == "http.client.stream"
     else:
-        sentry_init(traces_sample_rate=1.0, integrations=[Boto3Integration()])
         events = capture_events()
 
         with sentry_sdk.start_transaction() as transaction, MockResponse(
