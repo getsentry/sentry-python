@@ -26,6 +26,9 @@ def test_basic(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
+        # disabled because session.resource() or s3.Bucket() result in a subprocess span for a
+        # shell that runs "uname -p 2> /dev/null" on Python 3.7 with boto3 version 1.12.49.
+        default_integrations=False,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
