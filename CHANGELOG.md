@@ -22,6 +22,8 @@
 
 ### Bug Fixes 🐛
 
+We've put additional data that might contain sensitive information, like GraphQL documents, behind the `send_default_pii` option.
+
 #### Httpx
 
 - Consistently early-exit when adding request source by @alexander-alderman-webb in [#6151](https://github.com/getsentry/sentry-python/pull/6151)
