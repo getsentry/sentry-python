@@ -26,7 +26,6 @@ from sentry_sdk.ai._openai_responses_api import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -133,11 +132,6 @@ class OpenAIIntegration(Integration):
 
 
 def _capture_exception(exc: "Any") -> None:
-    # Close an eventually open span
-    # We need to do this by hand because we are not using the start_span context manager
-    current_span = sentry_sdk.get_current_span()
-    set_span_errored(current_span)
-
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -697,7 +691,7 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
-            span.__exit__(None, None, None)
+            span.__exit__(*exc_info)
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
@@ -781,7 +775,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
-            span.__exit__(None, None, None)
+            span.__exit__(*exc_info)
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
@@ -1280,7 +1274,7 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
-            span.__exit__(None, None, None)
+            span.__exit__(*exc_info)
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
@@ -1354,7 +1348,7 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
-            span.__exit__(None, None, None)
+            span.__exit__(*exc_info)
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
