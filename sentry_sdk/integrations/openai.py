@@ -1200,7 +1200,7 @@ async def _new_async_embeddings_create(
 ) -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
-        return f(*args, **kwargs)
+        return await f(*args, **kwargs)
 
     model = kwargs.get("model")
 
