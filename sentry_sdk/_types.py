@@ -6,17 +6,14 @@ except ImportError:
 
 from typing import TYPE_CHECKING, TypeVar, Union
 
-
 # Re-exported for compat, since code out there in the wild might use this variable.
 MYPY = TYPE_CHECKING
 
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
-OVER_SIZE_LIMIT_SUBSTITUTE = (
-    "[Value removed due to size of field exceeding configured maximum size.]"
-)
-UNPARSABLE_RAW_DATA_SUBSTITUTE = "[Value removed due to being unparsable.]"
+OVER_SIZE_LIMIT_SUBSTITUTE = "[Value removed: Exceeds maximum size]"
+UNPARSABLE_RAW_DATA_SUBSTITUTE = "[Value removed: Unparsable]"
 
 
 class AnnotatedValue:
@@ -142,17 +139,10 @@ Annotated = Union[AnnotatedValue, T]
 
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence
-
     from datetime import datetime
-
     from types import TracebackType
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Mapping
-    from typing import NotRequired
-    from typing import Optional
-    from typing import Type
+    from typing import Any, Callable, Dict, Mapping, NotRequired, Optional, Type
+
     from typing_extensions import Literal, TypedDict
 
     class SDKInfo(TypedDict):
