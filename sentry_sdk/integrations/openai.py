@@ -132,14 +132,11 @@ class OpenAIIntegration(Integration):
             return 0
 
 
-def _capture_exception(exc: "Any", manual_span_cleanup: bool = True) -> None:
+def _capture_exception(exc: "Any") -> None:
     # Close an eventually open span
     # We need to do this by hand because we are not using the start_span context manager
     current_span = sentry_sdk.get_current_span()
     set_span_errored(current_span)
-
-    if manual_span_cleanup and current_span is not None:
-        current_span.__exit__(None, None, None)
 
     event, hint = event_from_exception(
         exc,
@@ -699,7 +696,7 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     except Exception as exc:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            _capture_exception(exc, manual_span_cleanup=False)
+            _capture_exception(exc)
             span.__exit__(None, None, None)
         reraise(*exc_info)
 
@@ -783,7 +780,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
     except Exception as exc:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            _capture_exception(exc, manual_span_cleanup=False)
+            _capture_exception(exc)
             span.__exit__(None, None, None)
         reraise(*exc_info)
 
@@ -1187,7 +1184,7 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
         except Exception as exc:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
-                _capture_exception(exc, manual_span_cleanup=False)
+                _capture_exception(exc)
             reraise(*exc_info)
 
         _set_embeddings_output_data(
@@ -1219,7 +1216,7 @@ async def _new_async_embeddings_create(
         except Exception as exc:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
-                _capture_exception(exc, manual_span_cleanup=False)
+                _capture_exception(exc)
             reraise(*exc_info)
 
         _set_embeddings_output_data(
@@ -1283,6 +1280,7 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
+            span.__exit__(None, None, None)
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
@@ -1356,6 +1354,7 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _capture_exception(exc)
+            span.__exit__(None, None, None)
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
