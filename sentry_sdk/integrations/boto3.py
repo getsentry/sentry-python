@@ -4,6 +4,8 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -18,6 +20,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
     from typing import Type
+    from typing import Union
 
 try:
     from botocore import __version__ as BOTOCORE_VERSION  # type: ignore
@@ -60,21 +63,43 @@ def _sentry_request_created(
     service_id: str, request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
     description = "aws.%s.%s" % (service_id, operation_name)
-    span = sentry_sdk.start_span(
-        op=OP.HTTP_CLIENT,
-        name=description,
-        origin=Boto3Integration.origin,
-    )
 
-    with capture_internal_exceptions():
-        parsed_url = parse_url(request.url, sanitize=False)
-        span.set_data("aws.request.url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+    client = sentry_sdk.get_client()
+    span_streaming = has_span_streaming_enabled(client.options)
+    if span_streaming:
+        span = sentry_sdk.traces.start_span(
+            name=description,
+            attributes={
+                "sentry.op": OP.HTTP_CLIENT,
+                "sentry.origin": Boto3Integration.origin,
+            },
+        )
 
-    span.set_tag("aws.service_id", service_id)
-    span.set_tag("aws.operation_name", operation_name)
-    span.set_data(SPANDATA.HTTP_METHOD, request.method)
+        with capture_internal_exceptions():
+            parsed_url = parse_url(request.url, sanitize=False)
+            span.set_attribute("aws.request.url", parsed_url.url)
+            span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+        span.set_attribute("aws.service_id", service_id)
+        span.set_attribute("aws.operation_name", operation_name)
+        span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
+    else:
+        span = sentry_sdk.start_span(
+            op=OP.HTTP_CLIENT,
+            name=description,
+            origin=Boto3Integration.origin,
+        )
+
+        with capture_internal_exceptions():
+            parsed_url = parse_url(request.url, sanitize=False)
+            span.set_data("aws.request.url", parsed_url.url)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+        span.set_tag("aws.service_id", service_id)
+        span.set_tag("aws.operation_name", operation_name)
+        span.set_data(SPANDATA.HTTP_METHOD, request.method)
 
     # We do it in order for subsequent http calls/retries be
     # attached to this span.
@@ -99,11 +124,25 @@ def _sentry_after_call(
     if not isinstance(body, StreamingBody):
         return
 
-    streaming_span = span.start_child(
-        op=OP.HTTP_CLIENT_STREAM,
-        name=span.description,
-        origin=Boto3Integration.origin,
-    )
+    client = sentry_sdk.get_client()
+    span_streaming = has_span_streaming_enabled(client.options)
+
+    streaming_span: "Union[Span, StreamedSpan]"
+    if span_streaming:
+        streaming_span = sentry_sdk.traces.start_span(
+            name=span.name,
+            parent_span=span,
+            attributes={
+                "sentry.op": OP.HTTP_CLIENT_STREAM,
+                "sentry.origin": Boto3Integration.origin,
+            },
+        )
+    else:
+        streaming_span = span.start_child(
+            op=OP.HTTP_CLIENT_STREAM,
+            name=span.description,
+            origin=Boto3Integration.origin,
+        )
 
     orig_read = body.read
     orig_close = body.close
