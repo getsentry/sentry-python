@@ -719,22 +719,6 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
             finish_span=True,
         )
 
-    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
-        messages = kwargs.get("messages")
-
-        if messages is not None and isinstance(messages, str):
-            messages = [messages]
-
-        response._iterator = _wrap_asynchronous_completions_chunk_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            messages=messages,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=True,
-        )
     else:
         _set_completions_api_output_data(
             span, response, kwargs, integration, finish_span=True
@@ -786,24 +770,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    if isinstance(response, Stream) and hasattr(response, "_iterator"):
-        messages = kwargs.get("messages")
-
-        if messages is not None and isinstance(messages, str):
-            messages = [messages]
-
-        response._iterator = _wrap_synchronous_completions_chunk_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            messages=messages,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=True,
-        )
-
-    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
+    if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
         messages = kwargs.get("messages")
 
         if messages is not None and isinstance(messages, str):
