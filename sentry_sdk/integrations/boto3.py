@@ -125,6 +125,7 @@ def _sentry_after_call(
     if not isinstance(body, StreamingBody):
         return
 
+    streaming_span: "Union[Span, StreamedSpan]"
     if isinstance(span, StreamedSpan):
         streaming_span = sentry_sdk.traces.start_span(
             name=span.name,
