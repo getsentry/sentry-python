@@ -699,7 +699,8 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     except Exception as exc:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            _capture_exception(exc)
+            _capture_exception(exc, manual_span_cleanup=False)
+            span.__exit__(None, None, None)
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
@@ -782,7 +783,8 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
     except Exception as exc:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            _capture_exception(exc)
+            _capture_exception(exc, manual_span_cleanup=False)
+            span.__exit__(None, None, None)
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
