@@ -1304,22 +1304,6 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
             finish_span=True,
         )
 
-    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
-        input = kwargs.get("input")
-
-        if input is not None and isinstance(input, str):
-            input = [input]
-
-        response._iterator = _wrap_asynchronous_responses_event_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            input=input,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=True,
-        )
     else:
         _set_responses_api_output_data(
             span, response, kwargs, integration, finish_span=True
@@ -1331,7 +1315,7 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
 async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
-        return f(*args, **kwargs)
+        return await f(*args, **kwargs)
 
     model = kwargs.get("model")
 
@@ -1361,24 +1345,7 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    if isinstance(response, Stream) and hasattr(response, "_iterator"):
-        input = kwargs.get("input")
-
-        if input is not None and isinstance(input, str):
-            input = [input]
-
-        response._iterator = _wrap_synchronous_responses_event_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            input=input,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=True,
-        )
-
-    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
+    if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
         input = kwargs.get("input")
 
         if input is not None and isinstance(input, str):
