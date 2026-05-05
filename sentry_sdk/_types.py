@@ -12,8 +12,8 @@ MYPY = TYPE_CHECKING
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
-OVER_SIZE_LIMIT_SUBSTITUTE = "[Value removed: Exceeds maximum size]"
-UNPARSABLE_RAW_DATA_SUBSTITUTE = "[Value removed: Unparsable]"
+OVER_SIZE_LIMIT_SUBSTITUTE = "[Exceeds maximum size]"
+UNPARSABLE_RAW_DATA_SUBSTITUTE = "[Unparsable]"
 
 
 class AnnotatedValue:
