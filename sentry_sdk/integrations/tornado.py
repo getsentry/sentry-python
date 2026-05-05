@@ -4,7 +4,7 @@ from inspect import iscoroutinefunction
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
@@ -13,7 +13,9 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     HAS_REAL_CONTEXTVARS,
@@ -33,9 +35,10 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Generator, Optional
+    from typing import Any, Callable, ContextManager, Dict, Generator, Optional, Union
 
     from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk.tracing import Span
 
 
 class TornadoIntegration(Integration):
@@ -97,6 +100,9 @@ class TornadoIntegration(Integration):
         RequestHandler.log_exception = sentry_log_exception
 
 
+_DEFAULT_TRANSACTION_NAME = "generic Tornado request"
+
+
 @contextlib.contextmanager
 def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]":
     integration = sentry_sdk.get_client().get_integration(TornadoIntegration)
@@ -106,6 +112,8 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         return
 
     weak_handler = weakref.ref(self)
+    client = sentry_sdk.get_client()
+    span_streaming = has_span_streaming_enabled(client.options)
 
     with sentry_sdk.isolation_scope() as scope:
         headers = self.request.headers
@@ -114,22 +122,90 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         processor = _make_event_processor(weak_handler)
         scope.add_event_processor(processor)
 
-        transaction = continue_trace(
-            headers,
-            op=OP.HTTP_SERVER,
-            # Like with all other integrations, this is our
-            # fallback transaction in case there is no route.
-            # sentry_urldispatcher_resolve is responsible for
-            # setting a transaction name later.
-            name="generic Tornado request",
-            source=TransactionSource.ROUTE,
-            origin=TornadoIntegration.origin,
-        )
+        span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
 
-        with sentry_sdk.start_transaction(
-            transaction, custom_sampling_context={"tornado_request": self.request}
-        ):
-            yield
+        if span_streaming:
+            sentry_sdk.traces.continue_trace(dict(headers))
+            scope.set_custom_sampling_context({"tornado_request": self.request})
+
+            span_ctx = sentry_sdk.traces.start_span(
+                name=_DEFAULT_TRANSACTION_NAME,
+                attributes={
+                    "sentry.op": OP.HTTP_SERVER,
+                    "sentry.origin": TornadoIntegration.origin,
+                    "sentry.span.source": SegmentSource.ROUTE,
+                },
+            )
+        else:
+            transaction = continue_trace(
+                headers,
+                op=OP.HTTP_SERVER,
+                # Like with all other integrations, this is our
+                # fallback transaction in case there is no route.
+                # sentry_urldispatcher_resolve is responsible for
+                # setting a transaction name later.
+                name=_DEFAULT_TRANSACTION_NAME,
+                source=TransactionSource.ROUTE,
+                origin=TornadoIntegration.origin,
+            )
+            span_ctx = sentry_sdk.start_transaction(
+                transaction,
+                custom_sampling_context={"tornado_request": self.request},
+            )
+
+        with span_ctx as span:
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    for attr, value in _get_request_attributes(self.request).items():
+                        span.set_attribute(attr, value)
+
+                    method = getattr(self, self.request.method.lower(), None)
+                    if method is not None:
+                        tx_name = transaction_from_function(method) or ""
+                        if tx_name:
+                            span.name = tx_name
+                            span.set_attribute(
+                                "sentry.span.source",
+                                SegmentSource.COMPONENT.value,
+                            )
+
+            try:
+                yield
+            finally:
+                if isinstance(span, StreamedSpan):
+                    with capture_internal_exceptions():
+                        status_int = self.get_status()
+                        span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
+                        span.status = "error" if status_int >= 400 else "ok"
+
+
+def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
+    attributes = {}  # type: Dict[str, Any]
+
+    if request.method:
+        attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
+
+    headers = _filter_headers(dict(request.headers), use_annotated_value=False)
+    for header, value in headers.items():
+        attributes[f"http.request.header.{header.lower()}"] = value
+
+    if request.query:
+        attributes[SPANDATA.HTTP_QUERY] = request.query
+
+    attributes[SPANDATA.URL_FULL] = "%s://%s%s" % (
+        request.protocol,
+        request.host,
+        request.path,
+    )
+
+    if request.protocol:
+        attributes["network.protocol.name"] = request.protocol
+
+    if should_send_default_pii() and request.remote_ip:
+        attributes["client.address"] = request.remote_ip
+        attributes["user.ip_address"] = request.remote_ip
+
+    return attributes
 
 
 @ensure_integration_enabled(TornadoIntegration)
