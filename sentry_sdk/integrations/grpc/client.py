@@ -84,6 +84,7 @@ class ClientInterceptor(
 
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
+        response: "UnaryStreamCall"
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name="unary stream call to %s" % method,
@@ -101,7 +102,7 @@ class ClientInterceptor(
                     )
                 )
 
-                response: "UnaryStreamCall" = continuation(client_call_details, request)
+                response = continuation(client_call_details, request)
                 # Setting code on unary-stream leads to execution getting stuck
                 # span.set_data("code", response.code().name)
 
@@ -121,7 +122,7 @@ class ClientInterceptor(
                     )
                 )
 
-                response: "UnaryStreamCall" = continuation(client_call_details, request)
+                response = continuation(client_call_details, request)
                 # Setting code on unary-stream leads to execution getting stuck
                 # span.set_data("code", response.code().name)
 
