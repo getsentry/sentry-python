@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import sys
 from functools import wraps
 
 import sentry_sdk
@@ -100,15 +101,19 @@ def patch_asgi_app() -> None:
 
 
 def patch_scaffold_route() -> None:
+    # Vendored: https://github.com/pallets/quart/blob/5817e983d0b586889337a596d674c0c246d68878/src/quart/app.py#L137-L140
+    if sys.version_info >= (3, 12):
+        iscoroutinefunction = inspect.iscoroutinefunction
+    else:
+        iscoroutinefunction = asyncio.iscoroutinefunction
+
     old_route = Scaffold.route
 
     def _sentry_route(*args: "Any", **kwargs: "Any") -> "Any":
         old_decorator = old_route(*args, **kwargs)
 
         def decorator(old_func: "Any") -> "Any":
-            if inspect.isfunction(old_func) and not asyncio.iscoroutinefunction(
-                old_func
-            ):
+            if inspect.isfunction(old_func) and not iscoroutinefunction(old_func):
 
                 @wraps(old_func)
                 @ensure_integration_enabled(QuartIntegration, old_func)
