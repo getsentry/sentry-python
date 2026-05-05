@@ -99,7 +99,7 @@ def _sentry_request_created(
             span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
             span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-        span.set_tag("aws.service_id", service_id)
+        span.set_tag("aws.service_id", service_id.hyphenize())
         span.set_tag("aws.operation_name", operation_name)
         span.set_data(SPANDATA.HTTP_METHOD, request.method)
 
