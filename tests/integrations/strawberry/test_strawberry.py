@@ -282,6 +282,10 @@ def test_breadcrumb_no_operation_name(
 
 
 @parameterize_strawberry_test
+@pytest.mark.parametrize(
+    "send_default_pii",
+    [True, False],
+)
 def test_capture_transaction_on_error(
     request,
     sentry_init,
@@ -289,9 +293,10 @@ def test_capture_transaction_on_error(
     client_factory,
     async_execution,
     framework_integrations,
+    send_default_pii,
 ):
     sentry_init(
-        send_default_pii=True,
+        send_default_pii=send_default_pii,
         integrations=[
             StrawberryIntegration(async_execution=async_execution),
         ]
@@ -323,8 +328,12 @@ def test_capture_transaction_on_error(
     assert query_span["description"] == "query ErrorQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
     assert query_span["data"]["graphql.operation.name"] == "ErrorQuery"
-    assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
+
+    if send_default_pii is True:
+        assert query_span["data"]["graphql.document"] == query
+    else:
+        assert "graphql.document" not in query_span["data"]
 
     parse_spans = [
         span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
@@ -360,6 +369,10 @@ def test_capture_transaction_on_error(
 
 
 @parameterize_strawberry_test
+@pytest.mark.parametrize(
+    "send_default_pii",
+    [True, False],
+)
 def test_capture_transaction_on_success(
     request,
     sentry_init,
@@ -367,6 +380,7 @@ def test_capture_transaction_on_success(
     client_factory,
     async_execution,
     framework_integrations,
+    send_default_pii,
 ):
     sentry_init(
         integrations=[
@@ -374,6 +388,7 @@ def test_capture_transaction_on_success(
         ]
         + framework_integrations,
         traces_sample_rate=1,
+        send_default_pii=send_default_pii,
     )
     events = capture_events()
 
@@ -400,8 +415,12 @@ def test_capture_transaction_on_success(
     assert query_span["description"] == "query GreetingQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
     assert query_span["data"]["graphql.operation.name"] == "GreetingQuery"
-    assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
+
+    if send_default_pii is True:
+        assert query_span["data"]["graphql.document"] == query
+    else:
+        assert "graphql.document" not in query_span["data"]
 
     parse_spans = [
         span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
@@ -437,6 +456,10 @@ def test_capture_transaction_on_success(
 
 
 @parameterize_strawberry_test
+@pytest.mark.parametrize(
+    "send_default_pii",
+    [True, False],
+)
 def test_transaction_no_operation_name(
     request,
     sentry_init,
@@ -444,6 +467,7 @@ def test_transaction_no_operation_name(
     client_factory,
     async_execution,
     framework_integrations,
+    send_default_pii,
 ):
     sentry_init(
         integrations=[
@@ -451,6 +475,7 @@ def test_transaction_no_operation_name(
         ]
         + framework_integrations,
         traces_sample_rate=1,
+        send_default_pii=send_default_pii,
     )
     events = capture_events()
 
@@ -480,8 +505,12 @@ def test_transaction_no_operation_name(
     assert query_span["description"] == "query"
     assert query_span["data"]["graphql.operation.type"] == "query"
     assert query_span["data"]["graphql.operation.name"] is None
-    assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
+
+    if send_default_pii is True:
+        assert query_span["data"]["graphql.document"] == query
+    else:
+        assert "graphql.document" not in query_span["data"]
 
     parse_spans = [
         span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
@@ -517,6 +546,10 @@ def test_transaction_no_operation_name(
 
 
 @parameterize_strawberry_test
+@pytest.mark.parametrize(
+    "send_default_pii",
+    [True, False],
+)
 def test_transaction_mutation(
     request,
     sentry_init,
@@ -524,6 +557,7 @@ def test_transaction_mutation(
     client_factory,
     async_execution,
     framework_integrations,
+    send_default_pii,
 ):
     sentry_init(
         integrations=[
@@ -531,6 +565,7 @@ def test_transaction_mutation(
         ]
         + framework_integrations,
         traces_sample_rate=1,
+        send_default_pii=send_default_pii,
     )
     events = capture_events()
 
@@ -557,8 +592,12 @@ def test_transaction_mutation(
     assert query_span["description"] == "mutation"
     assert query_span["data"]["graphql.operation.type"] == "mutation"
     assert query_span["data"]["graphql.operation.name"] is None
-    assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
+
+    if send_default_pii is True:
+        assert query_span["data"]["graphql.document"] == query
+    else:
+        assert "graphql.document" not in query_span["data"]
 
     parse_spans = [
         span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE

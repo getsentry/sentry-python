@@ -5,7 +5,6 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 """
 
 import sys
-import asyncio
 import inspect
 from copy import deepcopy
 from functools import partial
@@ -69,6 +68,13 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
+# Vendored: https://github.com/Kludex/uvicorn/blob/b224045f5900b7f766743bcb16ba9fc3adea2606/uvicorn/_compat.py#L10-L13
+if sys.version_info >= (3, 14):
+    from inspect import iscoroutinefunction
+else:
+    from asyncio import iscoroutinefunction
+
+
 def _capture_exception(exc: "Any", mechanism_type: str = "asgi") -> None:
     event, hint = event_from_exception(
         exc,
@@ -87,10 +93,10 @@ def _looks_like_asgi3(app: "Any") -> bool:
     if inspect.isclass(app):
         return hasattr(app, "__await__")
     elif inspect.isfunction(app):
-        return asyncio.iscoroutinefunction(app)
+        return iscoroutinefunction(app)
     else:
         call = getattr(app, "__call__", None)  # noqa
-        return asyncio.iscoroutinefunction(call)
+        return iscoroutinefunction(call)
 
 
 class SentryAsgiMiddleware:
