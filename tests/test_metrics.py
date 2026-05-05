@@ -1,6 +1,9 @@
+import os
+import sys
 from typing import List
 from unittest import mock
 
+import pytest
 
 import sentry_sdk
 from sentry_sdk import get_client
@@ -184,7 +187,10 @@ def test_metrics_tracing_without_performance(sentry_init, capture_envelopes):
     propagation_context = isolation_scope._propagation_context
     assert propagation_context is not None
     assert metrics[0]["trace_id"] == propagation_context.trace_id
-    assert metrics[0]["span_id"] == propagation_context.span_id
+    # Per the metrics spec, span_id is only attached when a span is
+    # active when the metric is emitted. The propagation context's
+    # synthesized span_id must not be used as a fallback.
+    assert metrics[0]["span_id"] is None
 
 
 def test_metrics_before_send(sentry_init, capture_envelopes):
@@ -294,7 +300,6 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "value": 1,
                 "timestamp": mock.ANY,
                 "trace_id": mock.ANY,
-                "span_id": mock.ANY,
                 "attributes": {
                     "sentry.environment": {
                         "type": "string",
@@ -512,3 +517,59 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelo
     )
 
     get_client().flush()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or not hasattr(os, "fork")
+    or not hasattr(os, "register_at_fork"),
+    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
+)
+def test_metrics_batcher_lock_reset_in_child_after_fork(sentry_init):
+    """Regression test for the MetricsBatcher fork-deadlock fix.
+
+    If os.fork() runs while another thread holds MetricsBatcher._lock,
+    the child inherits the lock locked. The holding thread does not
+    exist in the child, so the lock can never be released and
+    _ensure_thread deadlocks forever. The after-fork hook must replace
+    the lock with a fresh one in the child and reset
+    _flusher / _flusher_pid / _buffer / _active / _flush_event.
+    """
+    sentry_init()
+    batcher = sentry_sdk.get_client().metrics_batcher
+    assert batcher is not None
+
+    original_lock = batcher._lock
+    original_lock.acquire()
+
+    batcher._buffer.append(object())
+    batcher._active.flag = True
+    batcher._flush_event.set()
+    batcher._running = False
+
+    pid = os.fork()
+    if pid == 0:
+        replaced = batcher._lock is not original_lock
+        unheld = batcher._lock.acquire(blocking=False)
+
+        flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
+        buffer_reset = len(batcher._buffer) == 0
+        active_reset = not getattr(batcher._active, "flag", False)
+        event_reset = not batcher._flush_event.is_set()
+        running_reset = batcher._running is True
+
+        os._exit(
+            0
+            if replaced
+            and unheld
+            and flusher_reset
+            and buffer_reset
+            and active_reset
+            and event_reset
+            and running_reset
+            else 1
+        )
+
+    original_lock.release()
+    _, status = os.waitpid(pid, 0)
+    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0

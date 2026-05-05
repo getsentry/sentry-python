@@ -476,22 +476,33 @@ def maybe_monkeypatched_threading(request):
 
 @pytest.fixture
 def render_span_tree():
-    def inner(event):
-        assert event["type"] == "transaction"
+    def inner(spans, root_span=None):
+        streamed_spans = False
+        if root_span is None:
+            streamed_spans = True
 
         by_parent = {}
-        for span in event["spans"]:
+        for span in spans:
+            if "parent_span_id" not in span:
+                root_span = span
+                continue
+
             by_parent.setdefault(span["parent_span_id"], []).append(span)
 
         def render_span(span):
-            yield "- op={}: description={}".format(
-                json.dumps(span.get("op")), json.dumps(span.get("description"))
-            )
+            if streamed_spans:
+                yield "- sentry.op={}: name={}".format(
+                    json.dumps(span["attributes"].get("sentry.op")),
+                    json.dumps(span["name"]),
+                )
+            else:
+                yield "- op={}: description={}".format(
+                    json.dumps(span.get("op")), json.dumps(span.get("description"))
+                )
+
             for subspan in by_parent.get(span["span_id"]) or ():
                 for line in render_span(subspan):
                     yield "  {}".format(line)
-
-        root_span = event["contexts"]["trace"]
 
         return "\n".join(render_span(root_span))
 
@@ -1265,26 +1276,31 @@ def streaming_chat_completions_model_response():
 
 @pytest.fixture
 def nonstreaming_chat_completions_model_response():
-    return openai.types.chat.ChatCompletion(
-        id="chatcmpl-test",
-        choices=[
-            openai.types.chat.chat_completion.Choice(
-                index=0,
-                finish_reason="stop",
-                message=openai.types.chat.ChatCompletionMessage(
-                    role="assistant", content="Test response"
-                ),
-            )
-        ],
-        created=1234567890,
-        model="gpt-3.5-turbo",
-        object="chat.completion",
-        usage=openai.types.CompletionUsage(
-            prompt_tokens=10,
-            completion_tokens=20,
-            total_tokens=30,
-        ),
-    )
+    def inner(
+        response_id: str,
+        response_model: str,
+        message_content: str,
+        created: int,
+        usage: openai.types.CompletionUsage,
+    ):
+        return openai.types.chat.ChatCompletion(
+            id=response_id,
+            choices=[
+                openai.types.chat.chat_completion.Choice(
+                    index=0,
+                    finish_reason="stop",
+                    message=openai.types.chat.ChatCompletionMessage(
+                        role="assistant", content=message_content
+                    ),
+                )
+            ],
+            created=created,
+            model=response_model,
+            object="chat.completion",
+            usage=usage,
+        )
+
+    return inner
 
 
 @pytest.fixture
