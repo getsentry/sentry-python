@@ -2843,11 +2843,6 @@ def test_ai_client_span_responses_api(
         pytest.param(None, None, id="none"),
         pytest.param("conv_abc123", "conv_abc123", id="string"),
         pytest.param({"id": "conv_abc123"}, "conv_abc123", id="dict"),
-        pytest.param(
-            mock.Mock(spec=["id"], id="conv_abc123"),
-            "conv_abc123",
-            id="object_with_id_attr",
-        ),
     ],
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")

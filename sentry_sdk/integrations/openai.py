@@ -349,13 +349,11 @@ def _set_responses_api_input_data(
 
     conversation = kwargs.get("conversation")
     if conversation is not None and _is_given(conversation):
-        conversation_id: "Optional[str]"
+        conversation_id: "Optional[str]" = None
         if isinstance(conversation, str):
             conversation_id = conversation
         elif isinstance(conversation, dict):
             conversation_id = conversation.get("id")
-        else:
-            conversation_id = getattr(conversation, "id", None)
         if conversation_id is not None:
             span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
 
