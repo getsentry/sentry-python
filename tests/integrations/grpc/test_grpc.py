@@ -308,8 +308,7 @@ def test_grpc_client_starts_span(
         )
         assert span["attributes"] == ApproxDict(
             {
-                "type": "unary unary",
-                "method": "/grpc_test_server.gRPCTestService/TestServe",
+                "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
                 "sentry.environment": mock.ANY,
                 "sentry.op": "grpc.client",
                 "sentry.origin": "auto.grpc.grpc",
@@ -321,7 +320,7 @@ def test_grpc_client_starts_span(
                 "server.address": mock.ANY,
                 "thread.id": mock.ANY,
                 "thread.name": mock.ANY,
-                "code": "OK",
+                "rpc.response.status_code": "OK",
             }
         )
     else:
@@ -393,8 +392,7 @@ def test_grpc_client_unary_stream_starts_span(
         )
         assert span["attributes"] == ApproxDict(
             {
-                "type": "unary stream",
-                "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+                "rpc.method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
                 "sentry.environment": mock.ANY,
                 "sentry.op": "grpc.client",
                 "sentry.origin": "auto.grpc.grpc",
@@ -488,8 +486,7 @@ def test_grpc_client_other_interceptor(
         )
         assert span["attributes"] == ApproxDict(
             {
-                "type": "unary unary",
-                "method": "/grpc_test_server.gRPCTestService/TestServe",
+                "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
                 "sentry.environment": mock.ANY,
                 "sentry.op": "grpc.client",
                 "sentry.origin": "auto.grpc.grpc",
@@ -501,7 +498,7 @@ def test_grpc_client_other_interceptor(
                 "server.address": mock.ANY,
                 "thread.id": mock.ANY,
                 "thread.name": mock.ANY,
-                "code": "OK",
+                "rpc.response.status_code": "OK",
             }
         )
     else:
@@ -576,9 +573,8 @@ def test_prevent_dual_client_interceptor(
         )
         assert span["attributes"] == ApproxDict(
             {
-                "type": "unary unary",
-                "method": "/grpc_test_server.gRPCTestService/TestServe",
-                "code": "OK",
+                "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
+                "rpc.response.status_code": "OK",
             }
         )
     else:

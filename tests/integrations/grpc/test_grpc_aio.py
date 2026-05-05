@@ -333,7 +333,6 @@ async def test_grpc_client_starts_span(
         )
         assert span["attributes"] == ApproxDict(
             {
-                "type": "unary unary",
                 "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
                 "sentry.environment": mock.ANY,
                 "sentry.op": "grpc.client",
@@ -346,7 +345,7 @@ async def test_grpc_client_starts_span(
                 "server.address": mock.ANY,
                 "thread.id": mock.ANY,
                 "thread.name": mock.ANY,
-                "code": "OK",
+                "rpc.response.status_code": "OK",
             }
         )
     else:
@@ -409,7 +408,6 @@ async def test_grpc_client_unary_stream_starts_span(
         )
         assert span["attributes"] == ApproxDict(
             {
-                "type": "unary stream",
                 "rpc.method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
                 "sentry.environment": mock.ANY,
                 "sentry.op": "grpc.client",

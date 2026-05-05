@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -41,8 +41,7 @@ class ClientInterceptor(
                     "sentry.origin": SPAN_ORIGIN,
                 },
             ) as span:
-                span.set_attribute("type", "unary unary")
-                span.set_attribute("method", method)
+                span.set_attribute(SPANDATA.RPC_METHOD, method)
 
                 client_call_details = (
                     self._update_client_call_details_metadata_from_scope(
@@ -51,7 +50,9 @@ class ClientInterceptor(
                 )
 
                 response = continuation(client_call_details, request)
-                span.set_attribute("code", response.code().name)
+                span.set_attribute(
+                    SPANDATA.RPC_RESPONSE_STATUS_CODE, response.code().name
+                )
 
                 return response
         else:
@@ -93,8 +94,7 @@ class ClientInterceptor(
                     "sentry.origin": SPAN_ORIGIN,
                 },
             ) as span:
-                span.set_attribute("type", "unary stream")
-                span.set_attribute("method", method)
+                span.set_attribute(SPANDATA.RPC_METHOD, method)
 
                 client_call_details = (
                     self._update_client_call_details_metadata_from_scope(

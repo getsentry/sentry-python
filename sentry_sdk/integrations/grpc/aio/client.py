@@ -1,7 +1,7 @@
 from typing import Callable, Union, AsyncIterable, Any
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -61,7 +61,6 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
                     "sentry.origin": SPAN_ORIGIN,
                 },
             ) as span:
-                span.set_attribute("type", "unary unary")
                 span.set_attribute("rpc.method", method.decode())
 
                 client_call_details = (
@@ -72,7 +71,7 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
 
                 response = await continuation(client_call_details, request)
                 status_code = await response.code()
-                span.set_attribute("code", status_code.name)
+                span.set_attribute(SPANDATA.RPC_RESPONSE_STATUS_CODE, status_code.name)
 
                 return response
         else:
@@ -120,8 +119,7 @@ class SentryUnaryStreamClientInterceptor(
                     "sentry.origin": SPAN_ORIGIN,
                 },
             ) as span:
-                span.set_attribute("type", "unary stream")
-                span.set_attribute("rpc.method", method.decode())
+                span.set_attribute(SPANDATA.RPC_METHOD, method.decode())
 
                 client_call_details = (
                     self._update_client_call_details_metadata_from_scope(
@@ -130,8 +128,6 @@ class SentryUnaryStreamClientInterceptor(
                 )
 
                 response = await continuation(client_call_details, request)
-                # status_code = await response.code()
-                # span.set_data("code", status_code)
 
                 return response
         else:
