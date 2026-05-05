@@ -1,11 +1,13 @@
-import asyncio
+import sys
 from copy import deepcopy
 from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import transaction_from_function
 
 from typing import TYPE_CHECKING
@@ -18,6 +20,7 @@ try:
     from sentry_sdk.integrations.starlette import (
         StarletteIntegration,
         StarletteRequestExtractor,
+        _set_request_body_data_on_streaming_segment,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
@@ -29,6 +32,13 @@ except ImportError:
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
+
+
+# Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
+if sys.version_info >= (3, 13):  # pragma: no cover
+    from inspect import iscoroutinefunction
+else:
+    from asyncio import iscoroutinefunction
 
 
 class FastApiIntegration(StarletteIntegration):
@@ -73,14 +83,25 @@ def patch_get_request_handler() -> None:
         if (
             dependant
             and dependant.call is not None
-            and not asyncio.iscoroutinefunction(dependant.call)
+            and not iscoroutinefunction(dependant.call)
         ):
             old_call = dependant.call
 
             @wraps(old_call)
             def _sentry_call(*args: "Any", **kwargs: "Any") -> "Any":
                 current_scope = sentry_sdk.get_current_scope()
-                if current_scope.transaction is not None:
+
+                client = sentry_sdk.get_client()
+                if has_span_streaming_enabled(client.options):
+                    current_span = current_scope.streamed_span
+
+                    if isinstance(current_span, StreamedSpan) and not isinstance(
+                        current_span, NoOpStreamedSpan
+                    ):
+                        segment = current_span._segment
+                        segment._update_active_thread()
+
+                elif current_scope.transaction is not None:
                     current_scope.transaction.update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
@@ -94,7 +115,8 @@ def patch_get_request_handler() -> None:
         old_app = old_get_request_handler(*args, **kwargs)
 
         async def _sentry_app(*args: "Any", **kwargs: "Any") -> "Any":
-            integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
+            client = sentry_sdk.get_client()
+            integration = client.get_integration(FastApiIntegration)
             if integration is None:
                 return await old_app(*args, **kwargs)
 
@@ -128,6 +150,9 @@ def patch_get_request_handler() -> None:
             sentry_scope.add_event_processor(
                 _make_request_event_processor(request, integration)
             )
+
+            if has_span_streaming_enabled(client.options):
+                _set_request_body_data_on_streaming_segment(info)
 
             return await old_app(*args, **kwargs)
 
