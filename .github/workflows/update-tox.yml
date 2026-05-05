@@ -9,6 +9,7 @@ on:
 jobs:
   update-tox:
     name: Update test matrix
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -55,11 +56,15 @@ jobs:
 
       - name: Create pull request
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
+          COMMIT_TITLE: ${{ steps.create-branch.outputs.commit_title }}
+          DATE: ${{ steps.create-branch.outputs.date }}
         with:
           script: |
-            const branchName = '${{ steps.create-branch.outputs.branch_name }}';
-            const commitTitle = '${{ steps.create-branch.outputs.commit_title }}';
-            const date = '${{ steps.create-branch.outputs.date }}';
+            const branchName = process.env.BRANCH_NAME;
+            const commitTitle = process.env.COMMIT_TITLE;
+            const date = process.env.DATE;
             const prBody = `Update our test matrix with new releases of integrated frameworks and libraries.
 
             ## How it works
@@ -100,7 +105,7 @@ jobs:
                 repo: context.repo.repo,
                 title: commitTitle + ' (' + date + ')',
                 head: branchName,
-                base: '${{ github.ref_name }}',
+                base: 'master',
                 body: prBody,
             });
 

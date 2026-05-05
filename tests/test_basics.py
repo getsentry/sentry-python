@@ -1092,7 +1092,7 @@ def test_classmethod_instance_tracing(sentry_init, capture_events):
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert last_event_id() is None
 
@@ -1102,7 +1102,7 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert last_event_id() is None
 
@@ -1113,7 +1113,7 @@ def test_last_event_id_transaction(sentry_init):
 
 
 def test_last_event_id_scope(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     # Should not crash
     with isolation_scope() as scope:

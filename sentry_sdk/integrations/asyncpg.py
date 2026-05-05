@@ -184,6 +184,7 @@ def _wrap_connect_addr(
                     pass
             span.set_data(SPANDATA.DB_NAME, database)
             span.set_data(SPANDATA.DB_USER, user)
+            span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
@@ -198,6 +199,7 @@ def _wrap_connect_addr(
 
 def _set_db_data(span: "Span", conn: "Any") -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+    span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
 
     addr = conn._addr
     if addr:
