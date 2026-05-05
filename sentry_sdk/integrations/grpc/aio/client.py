@@ -61,7 +61,7 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
                     "sentry.origin": SPAN_ORIGIN,
                 },
             ) as span:
-                span.set_attribute("rpc.method", method.decode())
+                span.set_attribute(SPANDATA.RPC_METHOD, method.decode())
 
                 client_call_details = (
                     self._update_client_call_details_metadata_from_scope(
