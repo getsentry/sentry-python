@@ -241,7 +241,7 @@ def _install_httplib() -> None:
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
     HTTPResponse.read = read  # type: ignore[method-assign]
-    HTTPResponse.close = close  # type: ignore[method-assign]
+    HTTPResponse.close = close  # type: ignore[assignment,method-assign]
 
 
 def _init_argument(

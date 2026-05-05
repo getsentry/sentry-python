@@ -1241,7 +1241,9 @@ def test_chunked_response_span_covers_body_read(
         (event,) = events
         (span,) = event["spans"]
 
-        start = datetime.datetime.fromisoformat(span["start_timestamp"])
-        end = datetime.datetime.fromisoformat(span["timestamp"])
+        start = datetime.datetime.fromisoformat(
+            span["start_timestamp"].replace("Z", "+00:00")
+        )
+        end = datetime.datetime.fromisoformat(span["timestamp"].replace("Z", "+00:00"))
         duration = (end - start).total_seconds()
         assert duration >= min_expected_duration
