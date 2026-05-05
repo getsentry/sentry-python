@@ -254,7 +254,8 @@ def test_spans_from_multiple_threads(
 
     # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
     if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
-        assert render_span_tree(event) == dedent(
+        assert event["type"] == "transaction"
+        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
             """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
@@ -271,7 +272,8 @@ def test_spans_from_multiple_threads(
         )
 
     elif not propagate_scope:
-        assert render_span_tree(event) == dedent(
+        assert event["type"] == "transaction"
+        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
             """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
@@ -316,7 +318,8 @@ def test_spans_from_threadpool(
 
     # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
     if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
-        assert render_span_tree(event) == dedent(
+        assert event["type"] == "transaction"
+        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
             """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
@@ -333,7 +336,8 @@ def test_spans_from_threadpool(
         )
 
     elif not propagate_scope:
-        assert render_span_tree(event) == dedent(
+        assert event["type"] == "transaction"
+        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
             """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
