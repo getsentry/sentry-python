@@ -218,11 +218,11 @@ def _filter_headers(
     if should_send_default_pii():
         return headers
 
-    substitute: "Union[AnnotatedValue, str]"
-    if use_annotated_value:
-        substitute = AnnotatedValue.removed_because_over_size_limit()
-    else:
-        substitute = SENSITIVE_DATA_SUBSTITUTE
+    substitute: "Union[AnnotatedValue, str]" = (
+        SENSITIVE_DATA_SUBSTITUTE
+        if not use_annotated_value
+        else AnnotatedValue.removed_because_over_size_limit()
+    )
 
     return {
         k: (v if k.upper().replace("-", "_") not in SENSITIVE_HEADERS else substitute)
