@@ -338,6 +338,16 @@ def _set_responses_api_input_data(
     if top_p is not None and _is_given(top_p):
         span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
+    conversation = kwargs.get("conversation")
+    if conversation is not None and _is_given(conversation):
+        conversation_id: "Optional[str]" = None
+        if isinstance(conversation, str):
+            conversation_id = conversation
+        elif isinstance(conversation, dict):
+            conversation_id = conversation.get("id")
+        if conversation_id is not None:
+            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
+
     if not should_send_default_pii() or not integration.include_prompts:
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         return
@@ -711,22 +721,6 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
             finish_span=True,
         )
 
-    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
-        messages = kwargs.get("messages")
-
-        if messages is not None and isinstance(messages, str):
-            messages = [messages]
-
-        response._iterator = _wrap_asynchronous_completions_chunk_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            messages=messages,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=True,
-        )
     else:
         _set_completions_api_output_data(
             span, response, kwargs, integration, finish_span=True
@@ -779,24 +773,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    if isinstance(response, Stream) and hasattr(response, "_iterator"):
-        messages = kwargs.get("messages")
-
-        if messages is not None and isinstance(messages, str):
-            messages = [messages]
-
-        response._iterator = _wrap_synchronous_completions_chunk_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            messages=messages,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=True,
-        )
-
-    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
+    if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
         messages = kwargs.get("messages")
 
         if messages is not None and isinstance(messages, str):
@@ -1193,7 +1170,7 @@ async def _new_async_embeddings_create(
 ) -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
-        return f(*args, **kwargs)
+        return await f(*args, **kwargs)
 
     model = kwargs.get("model")
 
@@ -1294,22 +1271,6 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
             finish_span=True,
         )
 
-    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
-        input = kwargs.get("input")
-
-        if input is not None and isinstance(input, str):
-            input = [input]
-
-        response._iterator = _wrap_asynchronous_responses_event_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            input=input,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=True,
-        )
     else:
         _set_responses_api_output_data(
             span, response, kwargs, integration, finish_span=True
@@ -1321,7 +1282,7 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
 async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
-        return f(*args, **kwargs)
+        return await f(*args, **kwargs)
 
     model = kwargs.get("model")
 
@@ -1352,24 +1313,7 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
         reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    if isinstance(response, Stream) and hasattr(response, "_iterator"):
-        input = kwargs.get("input")
-
-        if input is not None and isinstance(input, str):
-            input = [input]
-
-        response._iterator = _wrap_synchronous_responses_event_iterator(
-            span=span,
-            integration=integration,
-            start_time=start_time,
-            input=input,
-            response=response,
-            old_iterator=response._iterator,
-            finish_span=True,
-        )
-
-    # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
+    if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
         input = kwargs.get("input")
 
         if input is not None and isinstance(input, str):
