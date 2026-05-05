@@ -5,8 +5,10 @@ from sentry_sdk.consts import OP
 from sentry_sdk.api import continue_trace
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -140,8 +142,16 @@ def _make_event_processor(weak_job: "Callable[[], Job]") -> "EventProcessor":
                 rq_job = {
                     "job_id": job.id,
                     "func": job.func_name,
-                    "args": job.args,
-                    "kwargs": job.kwargs,
+                    "args": (
+                        job.args
+                        if should_send_default_pii()
+                        else SENSITIVE_DATA_SUBSTITUTE
+                    ),
+                    "kwargs": (
+                        job.kwargs
+                        if should_send_default_pii()
+                        else SENSITIVE_DATA_SUBSTITUTE
+                    ),
                     "description": job.description,
                 }
 

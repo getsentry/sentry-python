@@ -486,7 +486,7 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
     logs = envelopes_to_logs(envelopes)
 
     assert "span_id" in logs[0]
-    assert isinstance(logs[0]["span_id"], str)
+    assert logs[0]["span_id"] is None
 
     attributes = logs[0]["attributes"]
 
