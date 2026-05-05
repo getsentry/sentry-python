@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
+    from botocore.model import ServiceId
+
 try:
     from botocore import __version__ as BOTOCORE_VERSION  # type: ignore
     from botocore.client import BaseClient  # type: ignore
@@ -47,7 +49,7 @@ class Boto3Integration(Integration):
         ) -> None:
             orig_init(self, *args, **kwargs)
             meta = self.meta
-            service_id = meta.service_model.service_id.hyphenize()
+            service_id = meta.service_model.service_id
             meta.events.register(
                 "request-created",
                 partial(_sentry_request_created, service_id=service_id),
@@ -60,9 +62,9 @@ class Boto3Integration(Integration):
 
 @ensure_integration_enabled(Boto3Integration)
 def _sentry_request_created(
-    service_id: str, request: "AWSRequest", operation_name: str, **kwargs: "Any"
+    service_id: "ServiceId", request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
-    description = "aws.%s.%s" % (service_id, operation_name)
+    description = "aws.%s.%s" % (service_id.hyphenize(), operation_name)
 
     client = sentry_sdk.get_client()
     span_streaming = has_span_streaming_enabled(client.options)
@@ -78,13 +80,12 @@ def _sentry_request_created(
 
         with capture_internal_exceptions():
             parsed_url = parse_url(request.url, sanitize=False)
-            span.set_attribute("aws.request.url", parsed_url.url)
-            span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
+            span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+            span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
-        span.set_attribute("aws.service_id", service_id)
-        span.set_attribute("aws.operation_name", operation_name)
-        span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
+        span.set_attribute(SPANDATA.RPC_METHOD, f"{service_id}/{operation_name}")
+        span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
     else:
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
