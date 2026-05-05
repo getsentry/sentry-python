@@ -84,9 +84,9 @@ def _sentry_request_created(
                 span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
                 span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
-            span.set_attribute(SPANDATA.RPC_METHOD, f"{service_id}/{operation_name}")
-            if request.method is not None:
-                span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
+        span.set_attribute(SPANDATA.RPC_METHOD, f"{service_id}/{operation_name}")
+        if request.method is not None:
+            span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
     else:
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
