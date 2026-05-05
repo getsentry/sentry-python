@@ -154,13 +154,13 @@ def _sentry_after_call(
             if ret:
                 return ret
 
-            if isinstance(span, StreamedSpan):
+            if isinstance(streaming_span, StreamedSpan):
                 streaming_span.end()
             else:
                 streaming_span.finish()
             return ret
         except Exception:
-            if isinstance(span, StreamedSpan):
+            if isinstance(streaming_span, StreamedSpan):
                 streaming_span.end()
             else:
                 streaming_span.finish()
@@ -169,7 +169,7 @@ def _sentry_after_call(
     body.read = sentry_streaming_body_read  # type: ignore
 
     def sentry_streaming_body_close(*args: "Any", **kwargs: "Any") -> None:
-        if isinstance(span, StreamedSpan):
+        if isinstance(streaming_span, StreamedSpan):
             streaming_span.end()
         else:
             streaming_span.finish()
