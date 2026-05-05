@@ -151,17 +151,28 @@ def _sentry_after_call(
     def sentry_streaming_body_read(*args: "Any", **kwargs: "Any") -> bytes:
         try:
             ret = orig_read(*args, **kwargs)
-            if not ret:
+            if ret:
+                return ret
+
+            if isinstance(span, StreamedSpan):
+                streaming_span.end()
+            else:
                 streaming_span.finish()
             return ret
         except Exception:
-            streaming_span.finish()
+            if isinstance(span, StreamedSpan):
+                streaming_span.end()
+            else:
+                streaming_span.finish()
             raise
 
     body.read = sentry_streaming_body_read  # type: ignore
 
     def sentry_streaming_body_close(*args: "Any", **kwargs: "Any") -> None:
-        streaming_span.finish()
+        if isinstance(span, StreamedSpan):
+            streaming_span.end()
+        else:
+            streaming_span.finish()
         orig_close(*args, **kwargs)
 
     body.close = sentry_streaming_body_close  # type: ignore

@@ -45,7 +45,7 @@ def test_basic(
             assert len(objects) == 2
             assert objects[0].key == "foo.txt"
             assert objects[1].key == "bar.txt"
-            span.finish()
+            span.end()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
@@ -100,7 +100,7 @@ def test_streaming(
             assert body.read(2) == b"el"
             assert body.read(3) == b"lo"
             assert body.read(1) == b""
-            span.finish()
+            span.end()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
@@ -194,7 +194,7 @@ def test_streaming_close(
             body = obj.get()["Body"]
             assert body.read(1) == b"h"
             body.close()  # close partially-read stream
-            span.finish()
+            span.end()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
@@ -256,7 +256,7 @@ def test_omit_url_data_if_parsing_fails(
                 assert len(objects) == 2
                 assert objects[0].key == "foo.txt"
                 assert objects[1].key == "bar.txt"
-                span.finish()
+                span.end()
 
                 sentry_sdk.flush()
                 spans = [item.payload for item in items if item.type == "span"]
