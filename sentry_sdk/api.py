@@ -6,7 +6,7 @@ from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
 
@@ -422,7 +422,7 @@ def set_measurement(name: str, value: float, unit: "MeasurementUnit" = "") -> No
 
 def get_current_span(
     scope: "Optional[Scope]" = None,
-) -> "Optional[Union[Span, StreamedSpan]]":
+) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -533,12 +533,7 @@ def update_current_span(
             attributes={"user_id": 123, "batch_size": 50}
         )
     """
-    current_span = get_current_span()
-
-    if current_span is None:
-        return
-
-    if isinstance(current_span, StreamedSpan):
+    if isinstance(_get_current_streamed_span(), StreamedSpan):
         warnings.warn(
             "The `update_current_span` API isn't available in streaming mode. "
             "Retrieve the current span with get_current_span() and use its API "
@@ -546,6 +541,11 @@ def update_current_span(
             DeprecationWarning,
             stacklevel=2,
         )
+        return
+
+    current_span = get_current_span()
+
+    if current_span is None:
         return
 
     if op is not None:
