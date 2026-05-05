@@ -278,9 +278,9 @@ def test_omit_url_data_if_parsing_fails(
                     }
                 )
 
-        assert "aws.request.url" not in spans[0]["attributes"]
-        assert "http.fragment" not in spans[0]["attributes"]
-        assert "http.query" not in spans[0]["attributes"]
+        assert "url.full" not in spans[0]["attributes"]
+        assert "url.fragment" not in spans[0]["attributes"]
+        assert "url.query" not in spans[0]["attributes"]
     else:
         events = capture_events()
 
