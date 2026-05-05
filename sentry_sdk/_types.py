@@ -6,16 +6,14 @@ except ImportError:
 
 from typing import TYPE_CHECKING, TypeVar, Union
 
-
 # Re-exported for compat, since code out there in the wild might use this variable.
 MYPY = TYPE_CHECKING
 
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
-OVER_SIZE_LIMIT_SUBSTITUTE = (
-    "[Value removed due to size of field exceeding configured maximum size.]"
-)
+OVER_SIZE_LIMIT_SUBSTITUTE = "[Exceeds maximum size]"
+UNPARSABLE_RAW_DATA_SUBSTITUTE = "[Unparsable]"
 
 
 class AnnotatedValue:
@@ -50,6 +48,8 @@ class AnnotatedValue:
     @classmethod
     def removed_because_raw_data(cls) -> "AnnotatedValue":
         """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
+        # This is the legacy approach - we want to transition over to `substituted_because_raw_data` after we completely transition
+        # to span-first
         return AnnotatedValue(
             value="",
             metadata={
@@ -63,11 +63,28 @@ class AnnotatedValue:
         )
 
     @classmethod
+    def substituted_because_raw_data(cls) -> "AnnotatedValue":
+        """The value was replaced because it could not be parsed. This is done for request body values that are not json nor a form."""
+        return AnnotatedValue(
+            value=UNPARSABLE_RAW_DATA_SUBSTITUTE,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!raw",  # Unparsable raw data
+                        "s",  # The fields original value was substituted
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
     def removed_because_over_size_limit(cls, value: "Any" = "") -> "AnnotatedValue":
         """
         The actual value was removed because the size of the field exceeded the configured maximum size,
         for example specified with the max_request_body_size sdk option.
         """
+        # This is the legacy approach - we want to transition over to `substituted_because_over_size_limit` after we completely transition
+        # to span-first
         return AnnotatedValue(
             value=value,
             metadata={
@@ -122,17 +139,10 @@ Annotated = Union[AnnotatedValue, T]
 
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence
-
     from datetime import datetime
-
     from types import TracebackType
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Mapping
-    from typing import NotRequired
-    from typing import Optional
-    from typing import Type
+    from typing import Any, Callable, Dict, Mapping, NotRequired, Optional, Type
+
     from typing_extensions import Literal, TypedDict
 
     class SDKInfo(TypedDict):
