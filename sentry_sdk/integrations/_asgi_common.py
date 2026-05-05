@@ -93,7 +93,9 @@ def _get_request_data(asgi_scope: "Any") -> "Dict[str, Any]":
     if ty in ("http", "websocket"):
         request_data["method"] = asgi_scope.get("method")
 
-        request_data["headers"] = headers = _filter_headers(_get_headers(asgi_scope))
+        request_data["headers"] = headers = _filter_headers(
+            _get_headers(asgi_scope),
+        )
         request_data["query_string"] = _get_query(asgi_scope)
 
         request_data["url"] = _get_url(

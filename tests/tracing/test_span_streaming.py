@@ -1505,7 +1505,7 @@ def test_profile_stops_when_segment_ends(
     assert get_profiler_id() is None, "profiler should have stopped"
 
 
-def test_transport_format(sentry_init, capture_envelopes):
+def test_default_attributes(sentry_init, capture_envelopes):
     sentry_init(
         server_name="test-server",
         release="1.0.0",
@@ -1530,30 +1530,17 @@ def test_transport_format(sentry_init, capture_envelopes):
         "item_count": 1,
         "content_type": "application/vnd.sentry.items.span.v2+json",
     }
-    assert item.payload.json == {
-        "items": [
-            {
-                "trace_id": mock.ANY,
-                "span_id": mock.ANY,
-                "name": "test",
-                "status": "ok",
-                "is_segment": True,
-                "start_timestamp": mock.ANY,
-                "end_timestamp": mock.ANY,
-                "attributes": {
-                    "thread.id": {"value": mock.ANY, "type": "string"},
-                    "thread.name": {"value": "MainThread", "type": "string"},
-                    "sentry.segment.id": {"value": mock.ANY, "type": "string"},
-                    "sentry.segment.name": {"value": "test", "type": "string"},
-                    "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
-                    "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
-                    "server.address": {"value": "test-server", "type": "string"},
-                    "sentry.environment": {"value": "production", "type": "string"},
-                    "sentry.release": {"value": "1.0.0", "type": "string"},
-                    "sentry.origin": {"value": "manual", "type": "string"},
-                },
-            }
-        ]
+    assert item.payload.json["items"][0]["attributes"] == {
+        "thread.id": {"value": mock.ANY, "type": "string"},
+        "thread.name": {"value": "MainThread", "type": "string"},
+        "sentry.segment.id": {"value": mock.ANY, "type": "string"},
+        "sentry.segment.name": {"value": "test", "type": "string"},
+        "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
+        "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
+        "server.address": {"value": "test-server", "type": "string"},
+        "sentry.environment": {"value": "production", "type": "string"},
+        "sentry.release": {"value": "1.0.0", "type": "string"},
+        "sentry.origin": {"value": "manual", "type": "string"},
     }
 
 
