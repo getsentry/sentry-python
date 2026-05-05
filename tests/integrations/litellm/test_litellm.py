@@ -2135,3 +2135,217 @@ def test_convert_message_parts_image_url_missing_url():
     converted = _convert_message_parts(messages)
     # Should return item unchanged
     assert converted[0]["content"][0]["type"] == "image_url"
+
+
+class MockResponsesUsage:
+    def __init__(self, input_tokens=12, output_tokens=24, total_tokens=36):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.total_tokens = total_tokens
+
+
+class MockResponsesContentItem:
+    def __init__(self, text):
+        self.type = "output_text"
+        self.text = text
+
+
+class MockResponsesOutputMessage:
+    def __init__(self, text):
+        self.type = "message"
+        self.role = "assistant"
+        self.content = [MockResponsesContentItem(text)]
+
+
+class MockResponsesResponse:
+    def __init__(
+        self,
+        model="gpt-4.1-nano",
+        output=None,
+        usage=None,
+    ):
+        self.id = "resp-test"
+        self.model = model
+        self.output = output or [MockResponsesOutputMessage("the model response")]
+        self.usage = usage or MockResponsesUsage()
+
+
+def _build_responses_kwargs(
+    *,
+    input_value="What is the capital of France?",
+    conversation=None,
+    model="openai/gpt-4.1-nano",
+    extra_body_conversation=None,
+):
+    """
+    Build the kwargs shape that litellm passes to input_callback for a
+    responses() call. `extra_body` is unpacked into
+    additional_args.complete_input_dict by litellm before callbacks fire.
+    """
+    complete_input_dict = {"model": model.split("/")[-1], "input": input_value}
+    if extra_body_conversation is not None:
+        complete_input_dict["conversation"] = extra_body_conversation
+    elif conversation is not None:
+        complete_input_dict["conversation"] = conversation
+
+    return {
+        "model": model,
+        "input": input_value,
+        "call_type": "responses",
+        "additional_args": {"complete_input_dict": complete_input_dict},
+    }
+
+
+@pytest.mark.parametrize(
+    "conversation, expected_id",
+    [
+        pytest.param(None, None, id="no_conversation"),
+        pytest.param({"id": "conv_abc123"}, "conv_abc123", id="dict"),
+        pytest.param("conv_str_id", "conv_str_id", id="string"),
+    ],
+)
+def test_responses_conversation_id(
+    sentry_init, capture_events, conversation, expected_id
+):
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    kwargs = _build_responses_kwargs(extra_body_conversation=conversation)
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs, MockResponsesResponse(), datetime.now(), datetime.now()
+        )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_RESPONSES
+    assert span["description"] == "responses gpt-4.1-nano"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "responses"
+
+    if expected_id is None:
+        assert SPANDATA.GEN_AI_CONVERSATION_ID not in span["data"]
+    else:
+        assert span["data"][SPANDATA.GEN_AI_CONVERSATION_ID] == expected_id
+
+
+def test_responses_records_input_output_and_usage(sentry_init, capture_events):
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    kwargs = _build_responses_kwargs(
+        extra_body_conversation={"id": "conv_xyz"},
+    )
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs, MockResponsesResponse(), datetime.now(), datetime.now()
+        )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_RESPONSES
+    assert span["data"][SPANDATA.GEN_AI_CONVERSATION_ID] == "conv_xyz"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 24
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 36
+
+
+def test_responses_no_pii_omits_messages(sentry_init, capture_events):
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        # send_default_pii not set -> defaults to False
+    )
+    events = capture_events()
+
+    kwargs = _build_responses_kwargs(extra_body_conversation={"id": "conv_xyz"})
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs, MockResponsesResponse(), datetime.now(), datetime.now()
+        )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    # Conversation id is not PII, but request/response content is
+    assert span["data"][SPANDATA.GEN_AI_CONVERSATION_ID] == "conv_xyz"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+
+class MockResponseCompletedEvent:
+    """Mimics litellm/openai's response.completed streaming wrapper."""
+
+    def __init__(self, response):
+        self.type = "response.completed"
+        self.response = response
+
+
+def test_responses_streaming_unwraps_completed_event(sentry_init, capture_events):
+    """For streaming responses, success_handler receives a ResponseCompletedEvent
+    wrapper. We must unwrap it to read usage/output from the inner response."""
+    sentry_init(
+        integrations=[LiteLLMIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    kwargs = _build_responses_kwargs()
+    kwargs["stream"] = True
+    kwargs["complete_streaming_response"] = MockResponsesResponse()
+
+    wrapper = MockResponseCompletedEvent(MockResponsesResponse())
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        _success_callback(kwargs, wrapper, datetime.now(), datetime.now())
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_RESPONSES
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 12
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 24
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 36
+    assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+
+def test_aresponses_call_type_treated_as_responses(sentry_init, capture_events):
+    """aresponses (async) call_type should produce a responses span."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    kwargs = _build_responses_kwargs()
+    kwargs["call_type"] = "aresponses"
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs, MockResponsesResponse(), datetime.now(), datetime.now()
+        )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_RESPONSES
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "responses"

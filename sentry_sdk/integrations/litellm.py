@@ -6,6 +6,7 @@ from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
+    normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_messages,
     transform_openai_content_part,
@@ -17,7 +18,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List
+    from typing import Any, Dict, List, Optional
     from datetime import datetime
 
 try:
@@ -84,16 +85,17 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     call_type = kwargs.get("call_type", None)
     if call_type == "embedding" or call_type == "aembedding":
         operation = "embeddings"
+        op = consts.OP.GEN_AI_EMBEDDINGS
+    elif call_type == "responses" or call_type == "aresponses":
+        operation = "responses"
+        op = consts.OP.GEN_AI_RESPONSES
     else:
         operation = "chat"
+        op = consts.OP.GEN_AI_CHAT
 
     # Start a new span/transaction
     span = get_start_span_function()(
-        op=(
-            consts.OP.GEN_AI_CHAT
-            if operation == "chat"
-            else consts.OP.GEN_AI_EMBEDDINGS
-        ),
+        op=op,
         name=f"{operation} {model}",
         origin=LiteLLMIntegration.origin,
     )
@@ -106,14 +108,15 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
-    # Record input/messages if allowed
-    if should_send_default_pii() and integration.include_prompts:
-        if operation == "embeddings":
-            # For embeddings, look for the 'input' parameter
+    # Per-operation request data. Conversation id (responses) is set
+    # unconditionally; user-content fields are gated on PII / include_prompts.
+    record_prompts = should_send_default_pii() and integration.include_prompts
+    scope = sentry_sdk.get_current_scope()
+
+    if operation == "embeddings":
+        if record_prompts:
             embedding_input = kwargs.get("input")
             if embedding_input:
-                scope = sentry_sdk.get_current_scope()
-                # Normalize to list format
                 input_list = (
                     embedding_input
                     if isinstance(embedding_input, list)
@@ -129,11 +132,50 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                         messages_data,
                         unpack=False,
                     )
-        else:
-            # For chat, look for the 'messages' parameter
+
+    elif operation == "responses":
+        # litellm unpacks `extra_body` into the request body, so the
+        # `conversation` field shows up in additional_args.complete_input_dict
+        # rather than as a top-level kwarg.
+        complete_input = (kwargs.get("additional_args") or {}).get(
+            "complete_input_dict"
+        ) or {}
+        conversation = complete_input.get("conversation")
+        if conversation is not None:
+            conversation_id: "Optional[str]" = None
+            if isinstance(conversation, str):
+                conversation_id = conversation
+            elif isinstance(conversation, dict):
+                conversation_id = conversation.get("id")
+            if conversation_id is not None:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+                )
+
+        if record_prompts:
+            # `input` is either a string or a list of message dicts (same
+            # shape as OpenAI Responses API).
+            responses_input = kwargs.get("input")
+            if responses_input:
+                if isinstance(responses_input, str):
+                    input_messages = [responses_input]
+                else:
+                    input_messages = list(responses_input)
+                normalized = normalize_message_roles(input_messages)  # type: ignore[arg-type]
+                messages_data = truncate_and_annotate_messages(normalized, span, scope)
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
+
+    else:
+        # Chat completions.
+        if record_prompts:
             messages = kwargs.get("messages", [])
             if messages:
-                scope = sentry_sdk.get_current_scope()
                 messages = _convert_message_parts(messages)
                 messages_data = truncate_and_annotate_messages(messages, span, scope)
                 if messages_data is not None:
@@ -166,11 +208,24 @@ async def _async_input_callback(kwargs: "Dict[str, Any]") -> None:
 
 def _success_callback(
     kwargs: "Dict[str, Any]",
-    completion_response: "Any",
+    response: "Any",
     start_time: "datetime",
     end_time: "datetime",
 ) -> None:
-    """Handle successful completion."""
+    """Handle a successful chat completion, embeddings, or Responses API call.
+
+    The shape of `response` differs between API paths:
+      - Chat Completions: ModelResponse with ``.choices[].message`` and
+        ``.usage`` carrying ``prompt_tokens`` / ``completion_tokens``.
+      - Responses API (non-streaming): ResponsesAPIResponse with ``.output[]``
+        items (``message`` / ``function_call``) and ``.usage`` carrying
+        ``input_tokens`` / ``output_tokens``.
+      - Responses API (streaming): a ResponseCompletedEvent wrapper
+        ``{type: "response.completed", response: ResponsesAPIResponse}``,
+        which we unwrap below.
+      - Embeddings: CreateEmbeddingResponse with ``.usage`` only (no choices
+        or output).
+    """
 
     metadata = _get_metadata_dict(kwargs)
     span = metadata.get("_sentry_span")
@@ -181,18 +236,25 @@ def _success_callback(
     if integration is None:
         return
 
-    try:
-        # Record model information
-        if hasattr(completion_response, "model"):
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_MODEL, completion_response.model
-            )
+    # Streaming Responses API: unwrap the ResponseCompletedEvent so the rest of
+    # the function sees the assembled ResponsesAPIResponse directly.
+    if getattr(response, "type", None) == "response.completed" and hasattr(
+        response, "response"
+    ):
+        response = response.response
 
-        # Record response content if allowed
+    try:
+        # `model` is set by all API shapes (chat / responses / embeddings).
+        if hasattr(response, "model"):
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
+
+        # Response content: structure depends on the API shape. Embeddings have
+        # neither ``choices`` nor ``output``, so we just skip this block.
         if should_send_default_pii() and integration.include_prompts:
-            if hasattr(completion_response, "choices"):
+            if hasattr(response, "choices"):
+                # Chat Completions API.
                 response_messages = []
-                for choice in completion_response.choices:
+                for choice in response.choices:
                     if hasattr(choice, "message"):
                         if hasattr(choice.message, "model_dump"):
                             response_messages.append(choice.message.model_dump())
@@ -213,14 +275,53 @@ def _success_callback(
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_messages
                     )
+            elif hasattr(response, "output"):
+                # Responses API: split message text from function-call items.
+                output_text: "List[Any]" = []
+                tool_calls: "List[Any]" = []
+                for output in response.output:
+                    output_type = getattr(output, "type", None)
+                    if output_type == "function_call":
+                        if hasattr(output, "model_dump"):
+                            tool_calls.append(output.model_dump())
+                        elif hasattr(output, "dict"):
+                            tool_calls.append(output.dict())
+                    elif output_type == "message":
+                        for content_item in getattr(output, "content", []) or []:
+                            text = getattr(content_item, "text", None)
+                            if text is not None:
+                                output_text.append(text)
+                            elif hasattr(content_item, "model_dump"):
+                                output_text.append(content_item.model_dump())
+                            elif hasattr(content_item, "dict"):
+                                output_text.append(content_item.dict())
 
-        # Record token usage
-        if hasattr(completion_response, "usage"):
-            usage = completion_response.usage
+                if tool_calls:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                        tool_calls,
+                        unpack=False,
+                    )
+                if output_text:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_text
+                    )
+
+        # Token usage field names differ across APIs:
+        #   Chat Completions / Embeddings: prompt_tokens / completion_tokens
+        #   Responses API (non-streaming): input_tokens  / output_tokens
+        #   Responses API (streaming):     prompt_tokens / completion_tokens
+        #     (litellm normalizes to chat-completion names when assembling the
+        #      streaming response).
+        if hasattr(response, "usage"):
+            usage = response.usage
             record_token_usage(
                 span,
-                input_tokens=getattr(usage, "prompt_tokens", None),
-                output_tokens=getattr(usage, "completion_tokens", None),
+                input_tokens=getattr(usage, "prompt_tokens", None)
+                or getattr(usage, "input_tokens", None),
+                output_tokens=getattr(usage, "completion_tokens", None)
+                or getattr(usage, "output_tokens", None),
                 total_tokens=getattr(usage, "total_tokens", None),
             )
 
