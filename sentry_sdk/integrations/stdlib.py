@@ -197,6 +197,9 @@ def _install_httplib() -> None:
             span.set_http_status(int(rv.status))
             span.set_data("reason", rv.reason)
 
+        # getresponse doesn't include actually reading the response body. This
+        # is done in read(). So if the metadata/headers suggest there's a body to
+        # read, don't finish the span just yet, but save it for ending it later.
         has_body = rv.chunked or (rv.length is not None and rv.length > 0)
         if has_body:
             rv._sentrysdk_span = span  # type: ignore[attr-defined]
@@ -215,11 +218,16 @@ def _install_httplib() -> None:
             rv = real_read(self, *args, **kwargs)
             return rv
         finally:
+            # read() might be called multiple times to consume a single body,
+            # so we can't just end the span when read() is done. Instead,
+            # try to figure out whether the response body has been fully read.
             if self.fp is None or self.closed or not rv:
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
                 _finish_span(span)
 
     def close(self: "HTTPResponse") -> None:
+        # We patch close() as a best effort fallback in case the span is not
+        # ended yet in getresponse() or read().
         span = getattr(self, "_sentrysdk_span", None)
 
         try:
