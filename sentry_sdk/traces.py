@@ -60,6 +60,9 @@ class SpanStatus(str, Enum):
         return self.value
 
 
+_VALID_SPAN_STATUSES = frozenset(e.value for e in SpanStatus)
+
+
 # Segment source, see
 # https://getsentry.github.io/sentry-conventions/generated/attributes/sentry.html#sentryspansource
 class SegmentSource(str, Enum):
@@ -430,7 +433,7 @@ class StreamedSpan:
         if isinstance(status, Enum):
             status = status.value
 
-        if status not in {e.value for e in SpanStatus}:
+        if status not in _VALID_SPAN_STATUSES:
             logger.debug(
                 f'[Tracing] Unsupported span status {status}. Expected one of: "ok", "error"'
             )
