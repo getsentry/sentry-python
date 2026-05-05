@@ -214,6 +214,7 @@ def _install_httplib() -> None:
         if span is None:
             return real_read(self, *args, **kwargs)
 
+        rv = None
         try:
             rv = real_read(self, *args, **kwargs)
             return rv
