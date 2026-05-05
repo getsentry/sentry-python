@@ -40,6 +40,23 @@ def _get_metadata_dict(kwargs: "Dict[str, Any]") -> "Dict[str, Any]":
     return metadata
 
 
+def _read_usage_field(usage: "Any", *names: str) -> "Optional[int]":
+    """Read the first non-None field from a usage container.
+
+    The usage object can be either a typed Pydantic model (attribute access) or
+    a plain dict (litellm hands us a dict for the assembled async-streaming
+    response), so we try both shapes.
+    """
+    for name in names:
+        if isinstance(usage, dict):
+            value = usage.get(name)
+        else:
+            value = getattr(usage, name, None)
+        if value is not None:
+            return value
+    return None
+
+
 def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, Any]]":
     """
     Convert the message parts from OpenAI format to the `gen_ai.request.messages` format
@@ -313,16 +330,18 @@ def _success_callback(
         #   Responses API (non-streaming): input_tokens  / output_tokens
         #   Responses API (streaming):     prompt_tokens / completion_tokens
         #     (litellm normalizes to chat-completion names when assembling the
-        #      streaming response).
+        #      streaming response). For the async-streaming variant, the
+        #      assembled `usage` is a plain dict, not a Pydantic model — hence
+        #      `_read_usage_field` supports both shapes.
         if hasattr(response, "usage"):
             usage = response.usage
             record_token_usage(
                 span,
-                input_tokens=getattr(usage, "prompt_tokens", None)
-                or getattr(usage, "input_tokens", None),
-                output_tokens=getattr(usage, "completion_tokens", None)
-                or getattr(usage, "output_tokens", None),
-                total_tokens=getattr(usage, "total_tokens", None),
+                input_tokens=_read_usage_field(usage, "prompt_tokens", "input_tokens"),
+                output_tokens=_read_usage_field(
+                    usage, "completion_tokens", "output_tokens"
+                ),
+                total_tokens=_read_usage_field(usage, "total_tokens"),
             )
 
     finally:

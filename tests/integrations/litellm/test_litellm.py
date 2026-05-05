@@ -2327,6 +2327,50 @@ def test_responses_streaming_unwraps_completed_event(sentry_init, capture_events
     assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
 
+class MockResponseWithDictUsage:
+    """Mimics the assembled async-streaming responses object: usage is a dict
+    (not a Pydantic model), as litellm hands us for that path."""
+
+    def __init__(self):
+        self.id = "resp-test"
+        self.model = "gpt-4.1-nano"
+        self.output = [MockResponsesOutputMessage("hi")]
+        self.usage = {
+            "prompt_tokens": 7,
+            "completion_tokens": 2,
+            "total_tokens": 9,
+        }
+
+
+def test_responses_async_streaming_dict_usage(sentry_init, capture_events):
+    """For async streaming responses, litellm assembles `usage` as a plain dict.
+    `getattr(dict, ...)` would silently miss it; we need to support both shapes."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    kwargs = _build_responses_kwargs()
+    kwargs["call_type"] = "aresponses"
+    kwargs["stream"] = True
+    kwargs["async_complete_streaming_response"] = MockResponseWithDictUsage()
+
+    with start_transaction(name="litellm test"):
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs, MockResponseWithDictUsage(), datetime.now(), datetime.now()
+        )
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["op"] == OP.GEN_AI_RESPONSES
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 7
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 2
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 9
+
+
 def test_aresponses_call_type_treated_as_responses(sentry_init, capture_events):
     """aresponses (async) call_type should produce a responses span."""
     sentry_init(
