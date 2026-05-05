@@ -903,19 +903,26 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
         logging.critical("oops")
         assert request.get_json() == {"password": "ohno"}
         assert request.headers["Authorization"] == "Bearer ohno"
+        assert request.headers["Proxy-Authorization"] == "Basic ohno"
         return "ok"
 
     events = capture_events()
 
     client = app.test_client()
     client.post(
-        "/", json={"password": "ohno"}, headers={"Authorization": "Bearer ohno"}
+        "/",
+        json={"password": "ohno"},
+        headers={
+            "Authorization": "Bearer ohno",
+            "Proxy-Authorization": "Basic ohno",
+        },
     )
 
     (event,) = events
 
     assert event["request"]["data"]["password"] == "[Filtered]"
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
+    assert event["request"]["headers"]["Proxy-Authorization"] == "[Filtered]"
 
 
 def test_response_status_code_ok_in_transaction_context(
