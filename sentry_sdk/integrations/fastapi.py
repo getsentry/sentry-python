@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import _is_streamed_span
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import transaction_from_function
@@ -95,7 +95,7 @@ def patch_get_request_handler() -> None:
                 if has_span_streaming_enabled(client.options):
                     current_span = current_scope.streamed_span
 
-                    if _is_streamed_span(current_span):
+                    if type(current_span) is StreamedSpan:
                         segment = current_span._segment
                         segment._update_active_thread()
 

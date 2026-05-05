@@ -37,7 +37,6 @@ if TYPE_CHECKING:
         Iterator,
         Optional,
         ParamSpec,
-        TypeGuard,
         TypeVar,
         Union,
     )
@@ -765,11 +764,6 @@ def trace(
         return decorator(func)
     else:
         return decorator
-
-
-def _is_streamed_span(span: "Any") -> "TypeGuard[StreamedSpan]":
-    """Returns True if span is a StreamedSpan (not a NoOpStreamedSpan)."""
-    return type(span) is StreamedSpan
 
 
 def _get_current_streamed_span(

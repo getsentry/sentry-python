@@ -31,7 +31,6 @@ from sentry_sdk.traces import (
     _DEFAULT_PARENT_SPAN,
     NoOpStreamedSpan,
     StreamedSpan,
-    _is_streamed_span,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -588,7 +587,7 @@ class Scope:
 
         span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
-        if span_streaming and _is_streamed_span(self.streamed_span):
+        if span_streaming and type(self.streamed_span) is StreamedSpan:
             return self.streamed_span._to_traceparent()
         elif not span_streaming and self.span is not None:
             return self.span._to_traceparent()
@@ -608,7 +607,7 @@ class Scope:
 
         span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
-        if span_streaming and _is_streamed_span(self.streamed_span):
+        if span_streaming and type(self.streamed_span) is StreamedSpan:
             return self.streamed_span._to_baggage()
         elif not span_streaming and self.span is not None:
             return self.span._to_baggage()
@@ -913,7 +912,7 @@ class Scope:
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
-        if _is_streamed_span(span) and span._is_segment():
+        if type(span) is StreamedSpan and span._is_segment():
             self._transaction = span.name
             if span._attributes.get("sentry.span.source"):
                 self._transaction_info["source"] = str(
