@@ -33,6 +33,7 @@ from sentry_sdk.integrations.litellm import (
 from sentry_sdk.utils import package_version
 
 from openai import OpenAI, AsyncOpenAI
+from openai.types import CompletionUsage
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -160,7 +161,17 @@ def test_nonstreaming_chat_completion(
     client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -241,7 +252,17 @@ async def test_async_nonstreaming_chat_completion(
     client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -902,7 +923,17 @@ def test_span_origin(
     client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -948,7 +979,17 @@ def test_multiple_providers(
 
     openai_client = OpenAI(api_key="test-key")
     openai_model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1043,7 +1084,17 @@ async def test_async_multiple_providers(
 
     openai_client = AsyncOpenAI(api_key="test-key")
     openai_model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1139,7 +1190,17 @@ def test_additional_parameters(
     client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1198,7 +1259,17 @@ async def test_async_additional_parameters(
     client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1257,7 +1328,17 @@ def test_no_integration(
     client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1303,7 +1384,17 @@ async def test_async_no_integration(
     client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1477,7 +1568,17 @@ def test_binary_content_encoding_image_url(
     client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1556,7 +1657,17 @@ async def test_async_binary_content_encoding_image_url(
     client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1637,7 +1748,17 @@ def test_binary_content_encoding_mixed_content(
     client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1705,7 +1826,17 @@ async def test_async_binary_content_encoding_mixed_content(
     client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1772,7 +1903,17 @@ def test_binary_content_encoding_uri_type(
     client = OpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
@@ -1845,7 +1986,17 @@ async def test_async_binary_content_encoding_uri_type(
     client = AsyncOpenAI(api_key="test-key")
 
     model_response = get_model_response(
-        nonstreaming_chat_completions_model_response,
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )

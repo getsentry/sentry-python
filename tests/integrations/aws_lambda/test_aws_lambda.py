@@ -82,7 +82,7 @@ def test_environment():
         print("[test_environment fixture] Tearing down AWS Lambda test infrastructure")
 
         process.terminate()
-        process.wait(timeout=5)  # Give it time to shut down gracefully
+        process.wait(timeout=10)  # Give it time to shut down gracefully
 
         # Force kill if still running
         if process.poll() is None:

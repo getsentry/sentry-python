@@ -34,6 +34,7 @@ DEFAULT_DENYLIST = [
     "set_cookie",
     "cookie",
     "authorization",
+    "proxy-authorization",
     "x_api_key",
     # other common names used in the wild
     "aiohttp_session",  # aiohttp
