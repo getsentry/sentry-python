@@ -1,13 +1,14 @@
 import os
 import sys
 import warnings
-from copy import copy, deepcopy
 from collections import deque
 from contextlib import contextmanager
-from enum import Enum
+from copy import copy, deepcopy
 from datetime import datetime, timezone
+from enum import Enum
 from functools import wraps
 from itertools import chain
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk._types import AnnotatedValue
@@ -18,7 +19,7 @@ from sentry_sdk.consts import (
     INSTRUMENTER,
     SPANDATA,
 )
-from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
+from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
 from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
     try_autostart_continuous_profiler,
@@ -26,19 +27,11 @@ from sentry_sdk.profiler.continuous_profiler import (
 )
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
-from sentry_sdk.tracing_utils import (
-    Baggage,
-    has_tracing_enabled,
-    has_span_streaming_enabled,
-    is_ignored_span,
-    _make_sampling_decision,
-    PropagationContext,
-)
 from sentry_sdk.traces import (
     _DEFAULT_PARENT_SPAN,
-    StreamedSpan,
     NoOpStreamedSpan,
-    _is_sampled_streamed_span,
+    StreamedSpan,
+    _is_streamed_span,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -47,40 +40,48 @@ from sentry_sdk.tracing import (
     Span,
     Transaction,
 )
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    PropagationContext,
+    _make_sampling_decision,
+    has_span_streaming_enabled,
+    has_tracing_enabled,
+    is_ignored_span,
+)
 from sentry_sdk.utils import (
+    ContextVar,
     capture_internal_exception,
     capture_internal_exceptions,
-    ContextVar,
     datetime_from_isoformat,
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
     format_attribute,
-    logger,
     has_logs_enabled,
     has_metrics_enabled,
+    logger,
 )
-
-from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-
-    from typing import Any
-    from typing import Callable
-    from typing import Deque
-    from typing import Dict
-    from typing import Generator
-    from typing import Iterator
-    from typing import List
-    from typing import Optional
-    from typing import ParamSpec
-    from typing import Tuple
-    from typing import TypeVar
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        Deque,
+        Dict,
+        Generator,
+        Iterator,
+        List,
+        Optional,
+        ParamSpec,
+        Tuple,
+        TypeVar,
+        Union,
+    )
 
     from typing_extensions import Unpack
 
+    import sentry_sdk
     from sentry_sdk._types import (
         Attributes,
         AttributeValue,
@@ -97,10 +98,7 @@ if TYPE_CHECKING:
         SamplingContext,
         Type,
     )
-
     from sentry_sdk.tracing import TransactionKwargs
-
-    import sentry_sdk
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -590,7 +588,7 @@ class Scope:
 
         span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
-        if span_streaming and _is_sampled_streamed_span(self.streamed_span):
+        if span_streaming and _is_streamed_span(self.streamed_span):
             return self.streamed_span._to_traceparent()
         elif not span_streaming and self.span is not None:
             return self.span._to_traceparent()
@@ -610,7 +608,7 @@ class Scope:
 
         span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
-        if span_streaming and _is_sampled_streamed_span(self.streamed_span):
+        if span_streaming and _is_streamed_span(self.streamed_span):
             return self.streamed_span._to_baggage()
         elif not span_streaming and self.span is not None:
             return self.span._to_baggage()
@@ -915,7 +913,7 @@ class Scope:
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
-        if _is_sampled_streamed_span(span) and span._is_segment():
+        if _is_streamed_span(span) and span._is_segment():
             self._transaction = span.name
             if span._attributes.get("sentry.span.source"):
                 self._transaction_info["source"] = str(

@@ -41,6 +41,7 @@ if TYPE_CHECKING:
         TypeVar,
         Union,
     )
+
     from sentry_sdk._types import Attributes, AttributeValue
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
@@ -766,9 +767,9 @@ def trace(
         return decorator
 
 
-def _is_sampled_streamed_span(span: "Any") -> "TypeGuard[StreamedSpan]":
-    """Returns True if span is a StreamedSpan that was sampled (not a NoOpStreamedSpan)."""
-    return isinstance(span, StreamedSpan) and not isinstance(span, NoOpStreamedSpan)
+def _is_streamed_span(span: "Any") -> "TypeGuard[StreamedSpan]":
+    """Returns True if span is a StreamedSpan (not a NoOpStreamedSpan)."""
+    return type(span) is StreamedSpan
 
 
 def _get_current_streamed_span(
