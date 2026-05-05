@@ -1,6 +1,7 @@
 import os
 import socket
 import datetime
+import time
 from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
@@ -1161,3 +1162,86 @@ def test_proxy_http_tunnel(
         assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
+
+
+CHUNK_DELAY = 0.1
+NUM_CHUNKS = 3
+
+
+class ChunkedResponseHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+        for _ in range(NUM_CHUNKS):
+            chunk = b"x" * 100
+            self.wfile.write(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
+            self.wfile.flush()
+            time.sleep(CHUNK_DELAY)
+        self.wfile.write(b"0\r\n\r\n")
+
+    def log_message(self, *args):
+        pass
+
+
+def create_chunked_server():
+    port = get_free_port()
+    server = HTTPServer(("localhost", port), ChunkedResponseHandler)
+    thread = Thread(target=server.serve_forever)
+    thread.daemon = True
+    thread.start()
+    return port
+
+
+CHUNKED_PORT = create_chunked_server()
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_chunked_response_span_covers_body_read(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
+    min_expected_duration = CHUNK_DELAY * NUM_CHUNKS
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            conn = HTTPConnection("localhost", CHUNKED_PORT)
+            conn.request("GET", "/chunked")
+            response = conn.getresponse()
+            response.read()
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+        )
+
+        duration = span["end_timestamp"] - span["start_timestamp"]
+        assert duration >= min_expected_duration
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test_chunked"):
+            conn = HTTPConnection("localhost", CHUNKED_PORT)
+            conn.request("GET", "/chunked")
+            response = conn.getresponse()
+            response.read()
+
+        (event,) = events
+        (span,) = event["spans"]
+
+        start = datetime.datetime.fromisoformat(span["start_timestamp"])
+        end = datetime.datetime.fromisoformat(span["timestamp"])
+        duration = (end - start).total_seconds()
+        assert duration >= min_expected_duration
