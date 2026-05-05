@@ -214,15 +214,13 @@ def _install_httplib() -> None:
         if span is None:
             return real_read(self, *args, **kwargs)
 
-        rv = None
         try:
-            rv = real_read(self, *args, **kwargs)
-            return rv
+            return real_read(self, *args, **kwargs)
         finally:
             # read() might be called multiple times to consume a single body,
             # so we can't just end the span when read() is done. Instead,
             # try to figure out whether the response body has been fully read.
-            if self.fp is None or self.closed or not rv:
+            if self.fp is None or self.closed:
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
                 _finish_span(span)
 
