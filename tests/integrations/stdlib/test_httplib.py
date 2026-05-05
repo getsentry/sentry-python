@@ -45,6 +45,37 @@ def create_mock_proxy_server():
 
 PROXY_PORT = create_mock_proxy_server()
 
+CHUNK_DELAY = 0.1
+NUM_CHUNKS = 3
+
+
+class ChunkedResponseHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+        for _ in range(NUM_CHUNKS):
+            chunk = b"x" * 100
+            self.wfile.write(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
+            self.wfile.flush()
+            time.sleep(CHUNK_DELAY)
+        self.wfile.write(b"0\r\n\r\n")
+
+    def log_message(self, *args):
+        pass
+
+
+def create_chunked_server():
+    port = get_free_port()
+    server = HTTPServer(("localhost", port), ChunkedResponseHandler)
+    thread = Thread(target=server.serve_forever)
+    thread.daemon = True
+    thread.start()
+    return port
+
+
+CHUNKED_PORT = create_chunked_server()
+
 
 def test_crumb_capture(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()])
@@ -1162,38 +1193,6 @@ def test_proxy_http_tunnel(
         assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
-
-
-CHUNK_DELAY = 0.1
-NUM_CHUNKS = 3
-
-
-class ChunkedResponseHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Transfer-Encoding", "chunked")
-        self.end_headers()
-        for _ in range(NUM_CHUNKS):
-            chunk = b"x" * 100
-            self.wfile.write(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
-            self.wfile.flush()
-            time.sleep(CHUNK_DELAY)
-        self.wfile.write(b"0\r\n\r\n")
-
-    def log_message(self, *args):
-        pass
-
-
-def create_chunked_server():
-    port = get_free_port()
-    server = HTTPServer(("localhost", port), ChunkedResponseHandler)
-    thread = Thread(target=server.serve_forever)
-    thread.daemon = True
-    thread.start()
-    return port
-
-
-CHUNKED_PORT = create_chunked_server()
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
