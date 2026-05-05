@@ -1,5 +1,88 @@
 # Changelog
 
+## 2.59.0
+
+### New Features ✨
+
+#### Langchain
+
+- Record `run_name` as `gen_ai.function_id` on Invoke Agent Spans by @alexander-alderman-webb in [#5926](https://github.com/getsentry/sentry-python/pull/5926)
+- Record `run_name` in `on_tool_start` by @alexander-alderman-webb in [#5925](https://github.com/getsentry/sentry-python/pull/5925)
+- Record `run_name` in `on_chat_model_start` by @alexander-alderman-webb in [#5924](https://github.com/getsentry/sentry-python/pull/5924)
+
+#### Other
+
+- (ci) Cancel in-progress PR workflows on new commit push by @joshuarli in [#5994](https://github.com/getsentry/sentry-python/pull/5994)
+- (consts) Add updated span convention constants to SPANDATA by @ericapisani in [#6093](https://github.com/getsentry/sentry-python/pull/6093)
+- (fastapi) Support span streaming in active thread tracking by @ericapisani in [#6118](https://github.com/getsentry/sentry-python/pull/6118)
+- (httpx) Migrate to span first by @ericapisani in [#6084](https://github.com/getsentry/sentry-python/pull/6084)
+- (huggingface_hub) Migrate to span first by @ericapisani in [#6124](https://github.com/getsentry/sentry-python/pull/6124)
+- (mcp) Migrate to span first by @ericapisani in [#6131](https://github.com/getsentry/sentry-python/pull/6131)
+- Add `db.driver.name` spans to database integrations by @ericapisani in [#6082](https://github.com/getsentry/sentry-python/pull/6082)
+
+### Bug Fixes 🐛
+
+We've put additional data that might contain sensitive information, like GraphQL documents, behind the `send_default_pii` option.
+
+#### Httpx
+
+- Consistently early-exit when adding request source by @alexander-alderman-webb in [#6151](https://github.com/getsentry/sentry-python/pull/6151)
+- Set `code.namespace` and `code.function` instead of `code.function.name` in span streaming by @alexander-alderman-webb in [#6150](https://github.com/getsentry/sentry-python/pull/6150)
+
+#### Langchain
+
+- Record `run_name` as `gen_ai.function_id` for text completions by @alexander-alderman-webb in [#6073](https://github.com/getsentry/sentry-python/pull/6073)
+- Set agent name as `gen_ai.agent.name` for chat and tool spans by @alexander-alderman-webb in [#5877](https://github.com/getsentry/sentry-python/pull/5877)
+
+#### Other
+
+- (asgi) Use `inspect.iscoroutinefunction` on Python 3.14+ by @alexander-alderman-webb in [#6135](https://github.com/getsentry/sentry-python/pull/6135)
+- (batcher) Reset lock and flusher in child after fork by @ericapisani in [#6163](https://github.com/getsentry/sentry-python/pull/6163)
+- (google_genai) Redact binary data in inline_data and fix multi-part message extraction by @ericapisani in [#5977](https://github.com/getsentry/sentry-python/pull/5977)
+- (grpc) Add isolation_scope to async server interceptor by @robinvd in [#5940](https://github.com/getsentry/sentry-python/pull/5940)
+- (metrics,logs) Don't attach `span_id` if no active span by @sentrivana in [#6162](https://github.com/getsentry/sentry-python/pull/6162)
+- (monitor) Release `Monitor._thread_lock` after fork (#6148) by @vokracko in [#6159](https://github.com/getsentry/sentry-python/pull/6159)
+- (openai-agents) Resolve agent from `bindings` for openai-agents >= 0.14 by @ericapisani in [#6102](https://github.com/getsentry/sentry-python/pull/6102)
+- (profiler) Stop nulling buffer on teardown by @ericapisani in [#6075](https://github.com/getsentry/sentry-python/pull/6075)
+- (quart) Use `inspect.iscoroutinefunction` when Quart does by @alexander-alderman-webb in [#6133](https://github.com/getsentry/sentry-python/pull/6133)
+- (security) Prevent GitHub script injection in update-tox workflow by @fix-it-felix-sentry in [#6171](https://github.com/getsentry/sentry-python/pull/6171)
+- (starlette/fastapi) Use `inspect.iscoroutinefunction` when Starlette does by @alexander-alderman-webb in [#6134](https://github.com/getsentry/sentry-python/pull/6134)
+- (tornado) Make sure context manager doesn't double yield by @sentrivana in [#6152](https://github.com/getsentry/sentry-python/pull/6152)
+- Introduce `_get_current_streamed_span()` to keep types backwards compatible by @alexander-alderman-webb in [#6177](https://github.com/getsentry/sentry-python/pull/6177)
+
+### Internal Changes 🔧
+
+#### Stdlib
+
+- Pin timestamps in `add_http_request_source()` patch by @alexander-alderman-webb in [#6160](https://github.com/getsentry/sentry-python/pull/6160)
+- Stop mocking `HTTPSConnection.send` in trace header tests by @alexander-alderman-webb in [#6156](https://github.com/getsentry/sentry-python/pull/6156)
+
+#### Other
+
+- (batcher) Only flush the bucket that triggered the flush event by @sentrivana in [#6168](https://github.com/getsentry/sentry-python/pull/6168)
+- (celery) Remove unused `NoOpMgr` from utils by @sentrivana in [#6078](https://github.com/getsentry/sentry-python/pull/6078)
+- (ci) Update outdated pinned action version comments by @JoshuaMoelans in [#6088](https://github.com/getsentry/sentry-python/pull/6088)
+- (fastmcp) Span streaming tests by @alexander-alderman-webb in [#6167](https://github.com/getsentry/sentry-python/pull/6167)
+- (graphql) Update document setting by @sentrivana in [#6153](https://github.com/getsentry/sentry-python/pull/6153)
+- (grpc) Mirror sync interceptor by @sentrivana in [#6158](https://github.com/getsentry/sentry-python/pull/6158)
+- (langchain) Separate test to remove conditional by @alexander-alderman-webb in [#6076](https://github.com/getsentry/sentry-python/pull/6076)
+- (pydantic-ai) Remove dead `Model.request` patch by @alexander-alderman-webb in [#5956](https://github.com/getsentry/sentry-python/pull/5956)
+- (queues) Update integrations by @sentrivana in [#6157](https://github.com/getsentry/sentry-python/pull/6157)
+- (tests) Replace deprecated `enable_tracing`with `traces_sample_rate` by @sentrivana in [#6077](https://github.com/getsentry/sentry-python/pull/6077)
+- (transport) Remove redundant checks for dsn by @psh9508 in [#6104](https://github.com/getsentry/sentry-python/pull/6104)
+- Rename file by @sentrivana in [#6194](https://github.com/getsentry/sentry-python/pull/6194)
+- 🤖 Update test matrix with new releases (05/04) by @github-actions in [#6186](https://github.com/getsentry/sentry-python/pull/6186)
+- Assert presence of profile chunks after shutdown by @alexander-alderman-webb in [#6174](https://github.com/getsentry/sentry-python/pull/6174)
+- 🤖 Update test matrix with new releases (04/29) by @github-actions in [#6173](https://github.com/getsentry/sentry-python/pull/6173)
+- Limit `update-tox` action to master branch by @alexander-alderman-webb in [#6172](https://github.com/getsentry/sentry-python/pull/6172)
+- Expand scrubbing by @sentrivana in [#6161](https://github.com/getsentry/sentry-python/pull/6161)
+- Remove Python 2 compat from qualname_from_function by @ericapisani in [#6137](https://github.com/getsentry/sentry-python/pull/6137)
+- Update test matrix with new releases (04/27) by @alexander-alderman-webb in [#6146](https://github.com/getsentry/sentry-python/pull/6146)
+- Raise shutdown timeout in aws lambda tests by @sentrivana in [#6129](https://github.com/getsentry/sentry-python/pull/6129)
+- Join thread in continuous profiler test by @alexander-alderman-webb in [#6125](https://github.com/getsentry/sentry-python/pull/6125)
+- 🤖 Update test matrix with new releases (04/20) by @github-actions in [#6100](https://github.com/getsentry/sentry-python/pull/6100)
+- Set explicit base-branch for codecov action by @ericapisani in [#5992](https://github.com/getsentry/sentry-python/pull/5992)
+
 ## 2.58.0
 
 ### New Features ✨

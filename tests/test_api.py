@@ -21,6 +21,8 @@ from sentry_sdk import (
     get_isolation_scope,
 )
 
+from sentry_sdk.tracing import Span
+
 from sentry_sdk.client import Client, NonRecordingClient
 from tests.conftest import TestTransportWithOptions
 
@@ -40,7 +42,7 @@ def test_get_current_span_default_hub(sentry_init):
     assert get_current_span() is None
 
     scope = get_current_scope()
-    fake_span = mock.MagicMock()
+    fake_span = Span()
     scope.span = fake_span
 
     assert get_current_span() == fake_span

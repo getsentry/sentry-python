@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 import time
 from typing import List, Any, Mapping, Union
@@ -53,7 +54,7 @@ def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
                         "attributes": otel_attributes_to_dict(log_json["attributes"]),
                         "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
                         "trace_id": log_json["trace_id"],
-                        "span_id": log_json["span_id"],
+                        "span_id": log_json.get("span_id"),
                     }
                     res.append(log)
     return res
@@ -322,6 +323,24 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
 
     assert "span_id" in logs[0]
     assert logs[0]["span_id"] == trx.span_id
+
+
+@minimum_python_37
+def test_logs_no_span_id_without_active_span(sentry_init, capture_envelopes):
+    """
+    Per the metrics spec, span_id is only attached when a span is active
+    when the telemetry is emitted. The propagation context's synthesized
+    span_id must not be used as a fallback.
+    """
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    sentry_sdk.logger.warning("This is a log without an active span")
+
+    get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+    assert logs[0]["trace_id"] is not None
+    assert logs[0]["span_id"] is None
 
 
 @minimum_python_37
@@ -819,3 +838,60 @@ def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
     assert reentrant_add_called
     # If the re-entrancy guard didn't work, this test would hang and it'd
     # eventually be timed out by pytest-timeout
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or not hasattr(os, "fork")
+    or not hasattr(os, "register_at_fork"),
+    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
+)
+def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
+    """Regression test for the LogBatcher fork-deadlock fix.
+
+    If os.fork() runs while another thread holds LogBatcher._lock, the
+    child inherits the lock locked. The holding thread does not exist in
+    the child, so the lock can never be released and _ensure_thread
+    deadlocks forever. The after-fork hook must replace the lock with a
+    fresh one in the child and reset
+    _flusher / _flusher_pid / _buffer / _active / _flush_event.
+    """
+    sentry_init(enable_logs=True)
+    batcher = sentry_sdk.get_client().log_batcher
+    assert batcher is not None
+
+    original_lock = batcher._lock
+    original_lock.acquire()
+
+    batcher._buffer.append(object())
+    batcher._active.flag = True
+    batcher._flush_event.set()
+    batcher._running = False
+
+    pid = os.fork()
+    if pid == 0:
+        replaced = batcher._lock is not original_lock
+        unheld = batcher._lock.acquire(blocking=False)
+
+        flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
+        buffer_reset = len(batcher._buffer) == 0
+        active_reset = not getattr(batcher._active, "flag", False)
+
+        event_reset = not batcher._flush_event.is_set()
+        running_reset = batcher._running is True
+
+        os._exit(
+            0
+            if replaced
+            and unheld
+            and flusher_reset
+            and buffer_reset
+            and active_reset
+            and event_reset
+            and running_reset
+            else 1
+        )
+
+    original_lock.release()
+    _, status = os.waitpid(pid, 0)
+    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0

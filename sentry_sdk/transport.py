@@ -106,7 +106,7 @@ class Transport(ABC):
 
     def __init__(self: "Self", options: "Optional[Dict[str, Any]]" = None) -> None:
         self.options = options
-        if options and options["dsn"] is not None and options["dsn"]:
+        if options and options["dsn"]:
             self.parsed_dsn = Dsn(options["dsn"], options.get("org_id"))
         else:
             self.parsed_dsn = None

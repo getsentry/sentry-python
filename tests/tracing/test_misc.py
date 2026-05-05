@@ -478,7 +478,7 @@ def test_start_transaction_updates_scope_name_source(sentry_init):
 
 @pytest.mark.parametrize("sampled", (True, None))
 def test_transaction_dropped_debug_not_started(sentry_init, sampled):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     tx = Transaction(sampled=sampled)
 
@@ -498,7 +498,7 @@ def test_transaction_dropped_debug_not_started(sentry_init, sampled):
 
 
 def test_transaction_dropeed_sampled_false(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     tx = Transaction(sampled=False)
 
@@ -516,7 +516,7 @@ def test_transaction_dropeed_sampled_false(sentry_init):
 
 
 def test_transaction_not_started_warning(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     tx = Transaction()
 
