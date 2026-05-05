@@ -212,17 +212,10 @@ class AioHttpIntegration(Integration):
                                         "http.response.status_code", e.status_code
                                     )
 
-                                    # There are a number of sub-exceptions that should have an "ok" status,
-                                    # but will actually have a status of error once the `raise` happens below
-                                    # and we pass through the `should_be_treated_as_error` method invoked
-                                    # within a span's `__exit__` method.
-                                    #
-                                    # As a result, made this behaviour explicit
-                                    # so people don't think that the "ok" status persists in that scenario.
-                                    #
-                                    # Although not obvious, this overwriting behaviour occurs in the legacy
-                                    # approach as well, so this matches what we do today.
-                                    span.status = SpanStatus.ERROR.value
+                                    if e.status_code >= 400:
+                                        span.status = SpanStatus.ERROR.value
+                                    else:
+                                        span.status = SpanStatus.OK.value
                                 else:
                                     # Since a NoOpStreamedSpan can end up here, we have to guard against it
                                     # so this only gets set in the legacy transaction approach.

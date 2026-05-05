@@ -1565,6 +1565,44 @@ async def test_http_exception_span_streaming(
 
 
 @pytest.mark.asyncio
+async def test_http_exception_ok_status_not_overridden_span_streaming(
+    sentry_init, aiohttp_client, capture_items
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def hello(request):
+        raise web.HTTPFound("https://example.com")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app, server_kwargs={"skip_url_asserts": True})
+    resp = await client.get("/", allow_redirects=False)
+    assert resp.status == 302
+
+    sentry_sdk.flush()
+
+    assert len(items) == 2
+    segment = items.pop().payload
+    (server_span,) = [item.payload for item in items]
+
+    assert segment["is_segment"] is True
+    assert segment["attributes"]["sentry.op"] == "http.client"
+    assert segment["attributes"]["http.response.status_code"] == 302
+    assert segment["status"] == "ok"
+
+    assert server_span["attributes"]["sentry.op"] == "http.server"
+    assert server_span["attributes"]["http.response.status_code"] == 302
+    assert server_span["status"] == "ok"
+
+
+@pytest.mark.asyncio
 async def test_outgoing_client_span_span_streaming(
     sentry_init, aiohttp_raw_server, aiohttp_client, capture_items
 ):
