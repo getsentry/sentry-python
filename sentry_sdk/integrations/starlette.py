@@ -1,6 +1,7 @@
-import asyncio
 import functools
+import json
 import warnings
+import sys
 from collections.abc import Set
 from copy import deepcopy
 from json import JSONDecodeError
@@ -20,10 +21,12 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
 )
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -72,6 +75,13 @@ try:
         import multipart  # type: ignore
 except ImportError:
     multipart = None
+
+
+# Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
+if sys.version_info >= (3, 13):  # pragma: no cover
+    from inspect import iscoroutinefunction
+else:
+    from asyncio import iscoroutinefunction
 
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
@@ -147,7 +157,8 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         send: "Callable[[Dict[str, Any]], Awaitable[None]]",
         **kwargs: "Any",
     ) -> None:
-        integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(StarletteIntegration)
         if integration is None:
             return await old_call(app, scope, receive, send, **kwargs)
 
@@ -164,22 +175,38 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
             return await old_call(app, scope, receive, send, **kwargs)
 
         middleware_name = app.__class__.__name__
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
-        with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLETTE,
-            name=middleware_name,
-            origin=StarletteIntegration.origin,
+        def _start_middleware_span(op: str, name: str) -> "Any":
+            if is_span_streaming_enabled:
+                return sentry_sdk.traces.start_span(
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": StarletteIntegration.origin,
+                        "middleware.name": middleware_name,
+                    },
+                )
+            return sentry_sdk.start_span(
+                op=op,
+                name=name,
+                origin=StarletteIntegration.origin,
+            )
+
+        with _start_middleware_span(
+            op=OP.MIDDLEWARE_STARLETTE, name=middleware_name
         ) as middleware_span:
-            middleware_span.set_tag("starlette.middleware_name", middleware_name)
+            if not is_span_streaming_enabled:
+                middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
             async def _sentry_receive(*args: "Any", **kwargs: "Any") -> "Any":
-                with sentry_sdk.start_span(
+                with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
-                    origin=StarletteIntegration.origin,
                 ) as span:
-                    span.set_tag("starlette.middleware_name", middleware_name)
+                    if not is_span_streaming_enabled:
+                        span.set_tag("starlette.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -188,12 +215,12 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
 
             # Creating spans for the "send" callback
             async def _sentry_send(*args: "Any", **kwargs: "Any") -> "Any":
-                with sentry_sdk.start_span(
+                with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLETTE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
-                    origin=StarletteIntegration.origin,
                 ) as span:
-                    span.set_tag("starlette.middleware_name", middleware_name)
+                    if not is_span_streaming_enabled:
+                        span.set_tag("starlette.middleware_name", middleware_name)
                     return await send(*args, **kwargs)
 
             send_name = getattr(send, "__name__", str(send))
@@ -212,6 +239,33 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         middleware_class.__call__ = _create_span_call
 
     return middleware_class
+
+
+def _serialize_request_body_data(data: "Any") -> str:
+    # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
+    def _default(value: "Any") -> "Any":
+        if isinstance(value, AnnotatedValue):
+            return value.value
+        return str(value)
+
+    return json.dumps(data, default=_default)
+
+
+def _set_request_body_data_on_streaming_segment(
+    info: "Optional[Dict[str, Any]]",
+) -> None:
+    current_span = _get_current_streamed_span()
+    if (
+        info
+        and "data" in info
+        and isinstance(current_span, StreamedSpan)
+        and not isinstance(current_span, NoOpStreamedSpan)
+    ):
+        with capture_internal_exceptions():
+            current_span._segment.set_attribute(
+                "http.request.body.data",
+                _serialize_request_body_data(info["data"]),
+            )
 
 
 @ensure_integration_enabled(StarletteIntegration)
@@ -424,8 +478,8 @@ def _is_async_callable(obj: "Any") -> bool:
     while isinstance(obj, functools.partial):
         obj = obj.func
 
-    return asyncio.iscoroutinefunction(obj) or (
-        callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+    return iscoroutinefunction(obj) or (
+        callable(obj) and iscoroutinefunction(obj.__call__)
     )
 
 
@@ -439,9 +493,8 @@ def patch_request_response() -> None:
         if is_coroutine:
 
             async def _sentry_async_func(*args: "Any", **kwargs: "Any") -> "Any":
-                integration = sentry_sdk.get_client().get_integration(
-                    StarletteIntegration
-                )
+                client = sentry_sdk.get_client()
+                integration = client.get_integration(StarletteIntegration)
                 if integration is None:
                     return await old_func(*args, **kwargs)
 
@@ -481,6 +534,9 @@ def patch_request_response() -> None:
                     _make_request_event_processor(request, integration)
                 )
 
+                if has_span_streaming_enabled(client.options):
+                    _set_request_body_data_on_streaming_segment(info)
+
                 return await old_func(*args, **kwargs)
 
             func = _sentry_async_func
@@ -489,14 +545,23 @@ def patch_request_response() -> None:
 
             @functools.wraps(old_func)
             def _sentry_sync_func(*args: "Any", **kwargs: "Any") -> "Any":
-                integration = sentry_sdk.get_client().get_integration(
-                    StarletteIntegration
-                )
+                client = sentry_sdk.get_client()
+
+                integration = client.get_integration(StarletteIntegration)
                 if integration is None:
                     return old_func(*args, **kwargs)
 
                 current_scope = sentry_sdk.get_current_scope()
-                if current_scope.transaction is not None:
+
+                span_streaming = has_span_streaming_enabled(client.options)
+                if span_streaming:
+                    current_span = current_scope.streamed_span
+
+                    if isinstance(current_span, StreamedSpan) and not isinstance(
+                        current_span, NoOpStreamedSpan
+                    ):
+                        current_span._segment._update_active_thread()
+                elif current_scope.transaction is not None:
                     current_scope.transaction.update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()

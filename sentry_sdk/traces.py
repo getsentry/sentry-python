@@ -258,7 +258,9 @@ class StreamedSpan:
     ):
         self._name: str = name
         self._active: bool = active
-        self._attributes: "Attributes" = {}
+        self._attributes: "Attributes" = {
+            "sentry.origin": "manual",
+        }
 
         if attributes:
             for attribute, value in attributes.items():
@@ -278,12 +280,9 @@ class StreamedSpan:
         self._start_timestamp = datetime.now(timezone.utc)
         self._timestamp: "Optional[datetime]" = None
 
-        try:
-            # profiling depends on this value and requires that
-            # it is measured in nanoseconds
-            self._start_timestamp_monotonic_ns = nanosecond_time()
-        except AttributeError:
-            pass
+        # profiling depends on this value and requires that
+        # it is measured in nanoseconds
+        self._start_timestamp_monotonic_ns = nanosecond_time()
 
         self._span_id: "Optional[str]" = None
 
@@ -342,8 +341,8 @@ class StreamedSpan:
 
     def _start(self) -> None:
         if self._active:
-            old_span = self._scope.span
-            self._scope.span = self
+            old_span = self._scope.streamed_span
+            self._scope.streamed_span = self
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -361,7 +360,7 @@ class StreamedSpan:
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.span = old_span
+                self._scope.streamed_span = old_span
 
         # Set attributes from the segment. These are set on span end on purpose
         # so that we have the best chance to capture the segment's final name
@@ -385,13 +384,10 @@ class StreamedSpan:
                 )
 
         if self._timestamp is None:
-            try:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-                self._timestamp = self._start_timestamp + timedelta(
-                    microseconds=elapsed / 1000
-                )
-            except AttributeError:
-                self._timestamp = datetime.now(timezone.utc)
+            elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+            self._timestamp = self._start_timestamp + timedelta(
+                microseconds=elapsed / 1000
+            )
 
         client = sentry_sdk.get_client()
         if not client.is_active():
@@ -590,8 +586,8 @@ class NoOpStreamedSpan(StreamedSpan):
         if self._scope is None:
             return
 
-        old_span = self._scope.span
-        self._scope.span = self
+        old_span = self._scope.streamed_span
+        self._scope.streamed_span = self
         self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
@@ -614,7 +610,7 @@ class NoOpStreamedSpan(StreamedSpan):
             with capture_internal_exceptions():
                 old_span = self._previous_span_on_scope
                 del self._previous_span_on_scope
-                self._scope.span = old_span
+                self._scope.streamed_span = old_span
 
         self._finished = True
 
@@ -759,3 +755,17 @@ def trace(
         return decorator(func)
     else:
         return decorator
+
+
+def _get_current_streamed_span(
+    scope: "Optional[sentry_sdk.Scope]" = None,
+) -> "Optional[StreamedSpan]":
+    """
+    Returns the currently active span on the scope if the span is a `StreamedSpan`, otherwise `None`.
+
+    This function will only return a non-`None` value when the streaming trace lifecycle is enabled.
+    To enable the lifecycle, pass `_experiments={"trace_lifecycle": "stream"}` to `sentry.init()`.
+    """
+    scope = scope or sentry_sdk.get_current_scope()
+    current_span = scope.streamed_span
+    return current_span

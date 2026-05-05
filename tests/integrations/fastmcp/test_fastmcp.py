@@ -9,7 +9,7 @@ both FastMCP implementations:
 Tests focus on verifying Sentry integration behavior:
 - Integration doesn't break FastMCP functionality
 - Span creation when tools/prompts/resources are called through MCP protocol
-- Span data accuracy (operation, description, origin, etc.)
+- Span data accuracy (operation, name, origin, etc.)
 - Error capture and instrumentation
 - PII and include_prompts flag behavior
 - Request context data extraction
@@ -26,6 +26,7 @@ import asyncio
 import json
 import pytest
 from unittest import mock
+import sentry_sdk
 
 try:
     from unittest.mock import AsyncMock
@@ -274,16 +275,24 @@ def reset_request_ctx():
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_fastmcp_tool_sync(
-    sentry_init, capture_events, FastMCP, send_default_pii, include_prompts, stdio
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    send_default_pii,
+    include_prompts,
+    stdio,
+    span_streaming,
 ):
     """Test that FastMCP synchronous tool handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -292,42 +301,83 @@ async def test_fastmcp_tool_sync(
         """Add two numbers together"""
         return {"result": a + b, "operation": "addition"}
 
-    with start_transaction(name="fastmcp tx"):
-        # Call through MCP protocol to trigger instrumentation
-        result = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "add_numbers",
-                "arguments": {"a": 10, "b": 5},
-            },
-            request_id="req-123",
-        )
+    if span_streaming:
+        items = capture_items("span")
 
-    assert json.loads(result.message.root.result["content"][0]["text"]) == {
-        "result": 15,
-        "operation": "addition",
-    }
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            # Call through MCP protocol to trigger instrumentation
+            result = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "add_numbers",
+                    "arguments": {"a": 10, "b": 5},
+                },
+                request_id="req-123",
+            )
 
-    (tx,) = events
-    assert tx["type"] == "transaction"
-    assert len(tx["spans"]) == 1
+        assert json.loads(result.message.root.result["content"][0]["text"]) == {
+            "result": 15,
+            "operation": "addition",
+        }
 
-    # Verify span structure
-    span = tx["spans"][0]
-    assert span["op"] == OP.MCP_SERVER
-    assert span["origin"] == "auto.ai.mcp"
-    assert span["description"] == "tools/call add_numbers"
-    assert span["data"][SPANDATA.MCP_TOOL_NAME] == "add_numbers"
-    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
-    assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-123"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
 
-    # Check PII-sensitive data
-    if send_default_pii and include_prompts:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["data"]
+        # Verify span structure
+        span = spans[0]
+        assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
+        assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+        assert span["name"] == "tools/call add_numbers"
+        assert span["attributes"][SPANDATA.MCP_TOOL_NAME] == "add_numbers"
+        assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+        assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "stdio"
+        assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-123"
+
+        # Check PII-sensitive data
+        if send_default_pii and include_prompts:
+            assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["attributes"]
+        else:
+            assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["attributes"]
     else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
+        events = capture_events()
+        with start_transaction(name="fastmcp tx"):
+            # Call through MCP protocol to trigger instrumentation
+            result = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "add_numbers",
+                    "arguments": {"a": 10, "b": 5},
+                },
+                request_id="req-123",
+            )
+
+        assert json.loads(result.message.root.result["content"][0]["text"]) == {
+            "result": 15,
+            "operation": "addition",
+        }
+
+        (tx,) = events
+        assert tx["type"] == "transaction"
+        assert len(tx["spans"]) == 1
+
+        # Verify span structure
+        span = tx["spans"][0]
+        assert span["op"] == OP.MCP_SERVER
+        assert span["origin"] == "auto.ai.mcp"
+        assert span["description"] == "tools/call add_numbers"
+        assert span["data"][SPANDATA.MCP_TOOL_NAME] == "add_numbers"
+        assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+        assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
+        assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-123"
+
+        # Check PII-sensitive data
+        if send_default_pii and include_prompts:
+            assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["data"]
+        else:
+            assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -336,22 +386,25 @@ async def test_fastmcp_tool_sync(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_fastmcp_tool_async(
     sentry_init,
     capture_events,
+    capture_items,
     FastMCP,
     send_default_pii,
     include_prompts,
     json_rpc,
     select_transactions_with_mcp_spans,
+    span_streaming,
 ):
     """Test that FastMCP async tool handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -372,52 +425,107 @@ async def test_fastmcp_tool_async(
         """Multiply two numbers together"""
         return {"result": x * y, "operation": "multiplication"}
 
-    session_id, result = json_rpc(
-        app,
-        method="tools/call",
-        params={
-            "name": "multiply_numbers",
-            "arguments": {"x": 7, "y": 6},
-        },
-        request_id="req-456",
-    )
+    if span_streaming:
+        items = capture_items("span")
 
-    assert json.loads(result.json()["result"]["content"][0]["text"]) == {
-        "result": 42,
-        "operation": "multiplication",
-    }
+        session_id, result = json_rpc(
+            app,
+            method="tools/call",
+            params={
+                "name": "multiply_numbers",
+                "arguments": {"x": 7, "y": 6},
+            },
+            request_id="req-456",
+        )
 
-    transactions = select_transactions_with_mcp_spans(events, method_name="tools/call")
-    assert len(transactions) == 1
-    tx = transactions[0]
-    assert len(tx["spans"]) == 1
-    span = tx["spans"][0]
+        assert json.loads(result.json()["result"]["content"][0]["text"]) == {
+            "result": 42,
+            "operation": "multiplication",
+        }
 
-    assert span["op"] == OP.MCP_SERVER
-    assert span["origin"] == "auto.ai.mcp"
-    assert span["description"] == "tools/call multiply_numbers"
-    assert span["data"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
-    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
-    assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
-    assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
-    assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        spans = [
+            span
+            for span in spans
+            if span["attributes"].get("mcp.method.name") == "tools/call"
+        ]
+        assert len(spans) == 1
+        span = spans[0]
 
-    # Check PII-sensitive data
-    if send_default_pii and include_prompts:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["data"]
+        assert span["attributes"]["sentry.op"] == OP.MCP_SERVER
+        assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+        assert span["name"] == "tools/call multiply_numbers"
+        assert span["attributes"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
+        assert span["attributes"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+        assert span["attributes"][SPANDATA.MCP_TRANSPORT] == "http"
+        assert span["attributes"][SPANDATA.MCP_REQUEST_ID] == "req-456"
+        assert span["attributes"][SPANDATA.MCP_SESSION_ID] == session_id
+
+        # Check PII-sensitive data
+        if send_default_pii and include_prompts:
+            assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["attributes"]
+        else:
+            assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["attributes"]
     else:
-        assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
+        events = capture_events()
+
+        session_id, result = json_rpc(
+            app,
+            method="tools/call",
+            params={
+                "name": "multiply_numbers",
+                "arguments": {"x": 7, "y": 6},
+            },
+            request_id="req-456",
+        )
+
+        assert json.loads(result.json()["result"]["content"][0]["text"]) == {
+            "result": 42,
+            "operation": "multiplication",
+        }
+
+        transactions = select_transactions_with_mcp_spans(
+            events, method_name="tools/call"
+        )
+        assert len(transactions) == 1
+        tx = transactions[0]
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+
+        assert span["op"] == OP.MCP_SERVER
+        assert span["origin"] == "auto.ai.mcp"
+        assert span["description"] == "tools/call multiply_numbers"
+        assert span["data"][SPANDATA.MCP_TOOL_NAME] == "multiply_numbers"
+        assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+        assert span["data"][SPANDATA.MCP_TRANSPORT] == "http"
+        assert span["data"][SPANDATA.MCP_REQUEST_ID] == "req-456"
+        assert span["data"][SPANDATA.MCP_SESSION_ID] == session_id
+
+        # Check PII-sensitive data
+        if send_default_pii and include_prompts:
+            assert SPANDATA.MCP_TOOL_RESULT_CONTENT in span["data"]
+        else:
+            assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in span["data"]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-async def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP, stdio):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_fastmcp_tool_with_error(
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    stdio,
+    span_streaming,
+):
     """Test that FastMCP tool handler errors are captured properly"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -426,46 +534,94 @@ async def test_fastmcp_tool_with_error(sentry_init, capture_events, FastMCP, std
         """A tool that always fails"""
         raise ValueError("Tool execution failed")
 
-    with start_transaction(name="fastmcp tx"):
-        result = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "failing_tool",
-                "arguments": {"value": 42},
-            },
-            request_id="req-error",
-        )
+    if span_streaming:
+        items = capture_items("event", "span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            result = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "failing_tool",
+                    "arguments": {"value": 42},
+                },
+                request_id="req-error",
+            )
+
         # If no exception raised, check if result indicates error
         assert result.message.root.result["isError"] is True
 
-    # Should have transaction and error events
-    assert len(events) >= 1
+        sentry_sdk.flush()
+        # Check span was created
+        spans = [item.payload for item in items if item.type == "span"]
+        tool_spans = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+        ]
 
-    # Check span was created
-    tx = [e for e in events if e.get("type") == "transaction"][0]
-    tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(tool_spans) == 1
+        assert len(tool_spans) == 1
 
-    # Check error event was captured
-    error_events = [e for e in events if e.get("level") == "error"]
-    assert len(error_events) >= 1
-    error_event = error_events[0]
-    assert error_event["exception"]["values"][0]["type"] == "ValueError"
-    assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
-    # Verify span is marked with error
-    assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
+        # Check error event was captured
+        events = [item.payload for item in items if item.type == "event"]
+        error_events = [e for e in events if e.get("level") == "error"]
+        assert len(error_events) >= 1
+        error_event = error_events[0]
+        assert error_event["exception"]["values"][0]["type"] == "ValueError"
+        assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
+
+        # Verify span is marked with error
+        assert tool_spans[0]["attributes"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
+    else:
+        events = capture_events()
+        with start_transaction(name="fastmcp tx"):
+            result = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "failing_tool",
+                    "arguments": {"value": 42},
+                },
+                request_id="req-error",
+            )
+
+        # If no exception raised, check if result indicates error
+        assert result.message.root.result["isError"] is True
+
+        # Should have transaction and error events
+        assert len(events) >= 1
+
+        # Check span was created
+        tx = [e for e in events if e.get("type") == "transaction"][0]
+        tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+
+        assert len(tool_spans) == 1
+
+        # Check error event was captured
+        error_events = [e for e in events if e.get("level") == "error"]
+        assert len(error_events) >= 1
+        error_event = error_events[0]
+        assert error_event["exception"]["values"][0]["type"] == "ValueError"
+        assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
+
+        # Verify span is marked with error
+        assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-async def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP, stdio):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_fastmcp_multiple_tools(
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    stdio,
+    span_streaming,
+):
     """Test that multiple FastMCP tool calls create multiple spans"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -484,68 +640,127 @@ async def test_fastmcp_multiple_tools(sentry_init, capture_events, FastMCP, stdi
         """Third tool"""
         return z - 5
 
-    with start_transaction(name="fastmcp tx"):
-        result1 = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "tool_one",
-                "arguments": {"x": 5},
-            },
-            request_id="req-multi",
-        )
-
-        result2 = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "tool_two",
-                "arguments": {
-                    "y": int(result1.message.root.result["content"][0]["text"])
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            result1 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "tool_one",
+                    "arguments": {"x": 5},
                 },
-            },
-            request_id="req-multi",
-        )
+                request_id="req-multi",
+            )
 
-        result3 = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "tool_three",
-                "arguments": {
-                    "z": int(result2.message.root.result["content"][0]["text"])
+            result2 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "tool_two",
+                    "arguments": {
+                        "y": int(result1.message.root.result["content"][0]["text"])
+                    },
                 },
-            },
-            request_id="req-multi",
-        )
+                request_id="req-multi",
+            )
 
-    assert result1.message.root.result["content"][0]["text"] == "10"
-    assert result2.message.root.result["content"][0]["text"] == "20"
-    assert result3.message.root.result["content"][0]["text"] == "15"
+            result3 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "tool_three",
+                    "arguments": {
+                        "z": int(result2.message.root.result["content"][0]["text"])
+                    },
+                },
+                request_id="req-multi",
+            )
 
-    (tx,) = events
-    assert tx["type"] == "transaction"
+        assert result1.message.root.result["content"][0]["text"] == "10"
+        assert result2.message.root.result["content"][0]["text"] == "20"
+        assert result3.message.root.result["content"][0]["text"] == "15"
 
-    # Verify three spans were created
-    tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(tool_spans) == 3
-    assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_one"
-    assert tool_spans[1]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_two"
-    assert tool_spans[2]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_three"
+        sentry_sdk.flush()
+        # Verify three spans were created
+        spans = [item.payload for item in items if item.type == "span"]
+        tool_spans = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+        ]
+        assert len(tool_spans) == 3
+        assert tool_spans[0]["attributes"][SPANDATA.MCP_TOOL_NAME] == "tool_one"
+        assert tool_spans[1]["attributes"][SPANDATA.MCP_TOOL_NAME] == "tool_two"
+        assert tool_spans[2]["attributes"][SPANDATA.MCP_TOOL_NAME] == "tool_three"
+    else:
+        events = capture_events()
+        with start_transaction(name="fastmcp tx"):
+            result1 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "tool_one",
+                    "arguments": {"x": 5},
+                },
+                request_id="req-multi",
+            )
+
+            result2 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "tool_two",
+                    "arguments": {
+                        "y": int(result1.message.root.result["content"][0]["text"])
+                    },
+                },
+                request_id="req-multi",
+            )
+
+            result3 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "tool_three",
+                    "arguments": {
+                        "z": int(result2.message.root.result["content"][0]["text"])
+                    },
+                },
+                request_id="req-multi",
+            )
+
+        assert result1.message.root.result["content"][0]["text"] == "10"
+        assert result2.message.root.result["content"][0]["text"] == "20"
+        assert result3.message.root.result["content"][0]["text"] == "15"
+
+        (tx,) = events
+        assert tx["type"] == "transaction"
+
+        # Verify three spans were created
+        tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+        assert len(tool_spans) == 3
+        assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_one"
+        assert tool_spans[1]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_two"
+        assert tool_spans[2]["data"][SPANDATA.MCP_TOOL_NAME] == "tool_three"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_fastmcp_tool_with_complex_return(
-    sentry_init, capture_events, FastMCP, stdio
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    stdio,
+    span_streaming,
 ):
     """Test FastMCP tool with complex nested return value"""
     sentry_init(
         integrations=[MCPIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -559,34 +774,67 @@ async def test_fastmcp_tool_with_complex_return(
             "tags": ["admin", "verified"],
         }
 
-    with start_transaction(name="fastmcp tx"):
-        result = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "get_user_data",
-                "arguments": {"user_id": 123},
-            },
-            request_id="req-complex",
-        )
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            result = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "get_user_data",
+                    "arguments": {"user_id": 123},
+                },
+                request_id="req-complex",
+            )
 
-    assert json.loads(result.message.root.result["content"][0]["text"]) == {
-        "id": 123,
-        "name": "Alice",
-        "nested": {"preferences": {"theme": "dark", "notifications": True}},
-        "tags": ["admin", "verified"],
-    }
+        assert json.loads(result.message.root.result["content"][0]["text"]) == {
+            "id": 123,
+            "name": "Alice",
+            "nested": {"preferences": {"theme": "dark", "notifications": True}},
+            "tags": ["admin", "verified"],
+        }
 
-    (tx,) = events
-    assert tx["type"] == "transaction"
+        sentry_sdk.flush()
+        # Verify span was created with complex data
+        spans = [item.payload for item in items if item.type == "span"]
+        tool_spans = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+        ]
+        assert len(tool_spans) == 1
+        assert tool_spans[0]["attributes"]["sentry.op"] == OP.MCP_SERVER
+        assert tool_spans[0]["attributes"][SPANDATA.MCP_TOOL_NAME] == "get_user_data"
+        # Complex return value should be captured since include_prompts=True and send_default_pii=True
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in tool_spans[0]["attributes"]
+    else:
+        events = capture_events()
+        with start_transaction(name="fastmcp tx"):
+            result = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "get_user_data",
+                    "arguments": {"user_id": 123},
+                },
+                request_id="req-complex",
+            )
 
-    # Verify span was created with complex data
-    tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(tool_spans) == 1
-    assert tool_spans[0]["op"] == OP.MCP_SERVER
-    assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "get_user_data"
-    # Complex return value should be captured since include_prompts=True and send_default_pii=True
-    assert SPANDATA.MCP_TOOL_RESULT_CONTENT in tool_spans[0]["data"]
+        assert json.loads(result.message.root.result["content"][0]["text"]) == {
+            "id": 123,
+            "name": "Alice",
+            "nested": {"preferences": {"theme": "dark", "notifications": True}},
+            "tags": ["admin", "verified"],
+        }
+
+        (tx,) = events
+        assert tx["type"] == "transaction"
+
+        # Verify span was created with complex data
+        tool_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+        assert len(tool_spans) == 1
+        assert tool_spans[0]["op"] == OP.MCP_SERVER
+        assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "get_user_data"
+        # Complex return value should be captured since include_prompts=True and send_default_pii=True
+        assert SPANDATA.MCP_TOOL_RESULT_CONTENT in tool_spans[0]["data"]
 
 
 # =============================================================================
@@ -600,16 +848,24 @@ async def test_fastmcp_tool_with_complex_return(
     "send_default_pii, include_prompts",
     [(True, True), (False, False)],
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_fastmcp_prompt_sync(
-    sentry_init, capture_events, FastMCP, send_default_pii, include_prompts, stdio
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    send_default_pii,
+    include_prompts,
+    stdio,
+    span_streaming,
 ):
     """Test that FastMCP synchronous prompt handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -632,39 +888,79 @@ async def test_fastmcp_prompt_sync(
 
             return [message]
 
-        with start_transaction(name="fastmcp tx"):
-            result = await stdio(
-                mcp._mcp_server,
-                method="prompts/get",
-                params={
-                    "name": "code_help_prompt",
-                    "arguments": {"language": "python"},
-                },
-                request_id="req-prompt",
+        if span_streaming:
+            items = capture_items("span")
+            with sentry_sdk.traces.start_span(name="custom parent"):
+                result = await stdio(
+                    mcp._mcp_server,
+                    method="prompts/get",
+                    params={
+                        "name": "code_help_prompt",
+                        "arguments": {"language": "python"},
+                    },
+                    request_id="req-prompt",
+                )
+
+            assert result.message.root.result["messages"][0]["role"] == "user"
+            assert (
+                "python"
+                in result.message.root.result["messages"][0]["content"]["text"].lower()
             )
 
-        assert result.message.root.result["messages"][0]["role"] == "user"
-        assert (
-            "python"
-            in result.message.root.result["messages"][0]["content"]["text"].lower()
-        )
+            sentry_sdk.flush()
+            # Verify prompt span was created
+            spans = [item.payload for item in items if item.type == "span"]
+            prompt_spans = [
+                s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+            ]
+            assert len(prompt_spans) == 1
+            span = prompt_spans[0]
+            assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+            assert span["name"] == "prompts/get code_help_prompt"
+            assert span["attributes"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
 
-        (tx,) = events
-        assert tx["type"] == "transaction"
-
-        # Verify prompt span was created
-        prompt_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-        assert len(prompt_spans) == 1
-        span = prompt_spans[0]
-        assert span["origin"] == "auto.ai.mcp"
-        assert span["description"] == "prompts/get code_help_prompt"
-        assert span["data"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
-
-        # Check PII-sensitive data
-        if send_default_pii and include_prompts:
-            assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["data"]
+            # Check PII-sensitive data
+            if send_default_pii and include_prompts:
+                assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["attributes"]
+            else:
+                assert (
+                    SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["attributes"]
+                )
         else:
-            assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
+            events = capture_events()
+            with start_transaction(name="fastmcp tx"):
+                result = await stdio(
+                    mcp._mcp_server,
+                    method="prompts/get",
+                    params={
+                        "name": "code_help_prompt",
+                        "arguments": {"language": "python"},
+                    },
+                    request_id="req-prompt",
+                )
+
+            assert result.message.root.result["messages"][0]["role"] == "user"
+            assert (
+                "python"
+                in result.message.root.result["messages"][0]["content"]["text"].lower()
+            )
+
+            (tx,) = events
+            assert tx["type"] == "transaction"
+
+            # Verify prompt span was created
+            prompt_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+            assert len(prompt_spans) == 1
+            span = prompt_spans[0]
+            assert span["origin"] == "auto.ai.mcp"
+            assert span["description"] == "prompts/get code_help_prompt"
+            assert span["data"][SPANDATA.MCP_PROMPT_NAME] == "code_help_prompt"
+
+            # Check PII-sensitive data
+            if send_default_pii and include_prompts:
+                assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT in span["data"]
+            else:
+                assert SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT not in span["data"]
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
@@ -747,13 +1043,21 @@ async def test_fastmcp_prompt_async(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-async def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP, stdio):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_fastmcp_resource_sync(
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    stdio,
+    span_streaming,
+):
     """Test that FastMCP synchronous resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -766,37 +1070,80 @@ async def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP, stdio
                 """Read a file resource"""
                 return "file contents"
 
-            with start_transaction(name="fastmcp tx"):
-                try:
-                    result = await stdio(
-                        mcp._mcp_server,
-                        method="resources/read",
-                        params={
-                            "uri": "file:///test.txt",
-                        },
-                        request_id="req-resource",
-                    )
-                except ValueError as e:
-                    # Older FastMCP versions may not support this URI pattern
-                    if "Unknown resource" in str(e):
-                        pytest.skip(
-                            f"Resource URI not supported in this FastMCP version: {e}"
+            if span_streaming:
+                items = capture_items("span")
+                with sentry_sdk.traces.start_span(name="custom parent"):
+                    try:
+                        result = await stdio(
+                            mcp._mcp_server,
+                            method="resources/read",
+                            params={
+                                "uri": "file:///test.txt",
+                            },
+                            request_id="req-resource",
                         )
-                    raise
+                    except ValueError as e:
+                        # Older FastMCP versions may not support this URI pattern
+                        if "Unknown resource" in str(e):
+                            pytest.skip(
+                                f"Resource URI not supported in this FastMCP version: {e}"
+                            )
+                        raise
 
-            # Resource content is returned as-is
-            assert "file contents" in result.message.root.result["contents"][0]["text"]
+                # Resource content is returned as-is
+                assert (
+                    "file contents" in result.message.root.result["contents"][0]["text"]
+                )
 
-            (tx,) = events
-            assert tx["type"] == "transaction"
+                sentry_sdk.flush()
+                # Verify resource span was created
+                spans = [item.payload for item in items if item.type == "span"]
+                resource_spans = [
+                    s
+                    for s in spans
+                    if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+                ]
+                assert len(resource_spans) == 1
+                span = resource_spans[0]
+                assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+                assert span["name"] == "resources/read file:///test.txt"
+                assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
+            else:
+                events = capture_events()
+                with start_transaction(name="fastmcp tx"):
+                    try:
+                        result = await stdio(
+                            mcp._mcp_server,
+                            method="resources/read",
+                            params={
+                                "uri": "file:///test.txt",
+                            },
+                            request_id="req-resource",
+                        )
+                    except ValueError as e:
+                        # Older FastMCP versions may not support this URI pattern
+                        if "Unknown resource" in str(e):
+                            pytest.skip(
+                                f"Resource URI not supported in this FastMCP version: {e}"
+                            )
+                        raise
 
-            # Verify resource span was created
-            resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-            assert len(resource_spans) == 1
-            span = resource_spans[0]
-            assert span["origin"] == "auto.ai.mcp"
-            assert span["description"] == "resources/read file:///test.txt"
-            assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
+                # Resource content is returned as-is
+                assert (
+                    "file contents" in result.message.root.result["contents"][0]["text"]
+                )
+
+                (tx,) = events
+                assert tx["type"] == "transaction"
+
+                # Verify resource span was created
+                resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+                assert len(resource_spans) == 1
+                span = resource_spans[0]
+                assert span["origin"] == "auto.ai.mcp"
+                assert span["description"] == "resources/read file:///test.txt"
+                assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
+
     except (AttributeError, TypeError):
         # Resource handler not supported in this version
         pytest.skip("Resource handlers not supported in this FastMCP version")
@@ -804,19 +1151,22 @@ async def test_fastmcp_resource_sync(sentry_init, capture_events, FastMCP, stdio
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_fastmcp_resource_async(
     sentry_init,
     capture_events,
+    capture_items,
     FastMCP,
     json_rpc,
     select_transactions_with_mcp_spans,
+    span_streaming,
 ):
     """Test that FastMCP async resource handlers create proper spans"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -835,39 +1185,78 @@ async def test_fastmcp_resource_async(
     # Try to register an async resource handler
     try:
         if hasattr(mcp, "resource"):
+            if span_streaming:
+                items = capture_items("span")
 
-            @mcp.resource("https://example.com/{resource}")
-            async def read_url(resource: str):
-                """Read a URL resource"""
-                return "resource data"
+                @mcp.resource("https://example.com/{resource}")
+                async def read_url(resource: str):
+                    """Read a URL resource"""
+                    return "resource data"
 
-            _, result = json_rpc(
-                app,
-                method="resources/read",
-                params={
-                    "uri": "https://example.com/resource",
-                },
-                request_id="req-async-resource",
-            )
-            # Older FastMCP versions may not support this URI pattern
-            if (
-                "error" in result.json()
-                and "Unknown resource" in result.json()["error"]["message"]
-            ):
-                pytest.skip("Resource URI not supported in this FastMCP version.")
-                return
+                _, result = json_rpc(
+                    app,
+                    method="resources/read",
+                    params={
+                        "uri": "https://example.com/resource",
+                    },
+                    request_id="req-async-resource",
+                )
+                # Older FastMCP versions may not support this URI pattern
+                if (
+                    "error" in result.json()
+                    and "Unknown resource" in result.json()["error"]["message"]
+                ):
+                    pytest.skip("Resource URI not supported in this FastMCP version.")
+                    return
 
-            assert "resource data" in result.json()["result"]["contents"][0]["text"]
+                assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
-            transactions = select_transactions_with_mcp_spans(
-                events, method_name="resources/read"
-            )
-            assert len(transactions) == 1
-            tx = transactions[0]
-            assert len(tx["spans"]) == 1
-            span = tx["spans"][0]
+                sentry_sdk.flush()
+                spans = [item.payload for item in items if item.type == "span"]
+                spans = [
+                    span
+                    for span in spans
+                    if span["attributes"].get("mcp.method.name") == "resources/read"
+                ]
+                assert len(spans) == 1
+                span = spans[0]
 
-            assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+                assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+            else:
+                events = capture_events()
+
+                @mcp.resource("https://example.com/{resource}")
+                async def read_url(resource: str):
+                    """Read a URL resource"""
+                    return "resource data"
+
+                _, result = json_rpc(
+                    app,
+                    method="resources/read",
+                    params={
+                        "uri": "https://example.com/resource",
+                    },
+                    request_id="req-async-resource",
+                )
+                # Older FastMCP versions may not support this URI pattern
+                if (
+                    "error" in result.json()
+                    and "Unknown resource" in result.json()["error"]["message"]
+                ):
+                    pytest.skip("Resource URI not supported in this FastMCP version.")
+                    return
+
+                assert "resource data" in result.json()["result"]["contents"][0]["text"]
+
+                transactions = select_transactions_with_mcp_spans(
+                    events, method_name="resources/read"
+                )
+                assert len(transactions) == 1
+                tx = transactions[0]
+                assert len(tx["spans"]) == 1
+                span = tx["spans"][0]
+
+                assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
     except (AttributeError, TypeError):
         # Resource handler not supported in this version
         pytest.skip("Resource handlers not supported in this FastMCP version")
@@ -880,13 +1269,21 @@ async def test_fastmcp_resource_async(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-async def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP, stdio):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_fastmcp_span_origin(
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    stdio,
+    span_streaming,
+):
     """Test that FastMCP span origin is set correctly"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -895,25 +1292,51 @@ async def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP, stdio):
         """Test tool for origin checking"""
         return value * 2
 
-    with start_transaction(name="fastmcp tx"):
-        await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "test_tool",
-                "arguments": {"value": 21},
-            },
-            request_id="req-origin",
-        )
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "test_tool",
+                    "arguments": {"value": 21},
+                },
+                request_id="req-origin",
+            )
 
-    (tx,) = events
+        sentry_sdk.flush()
 
-    assert tx["contexts"]["trace"]["origin"] == "manual"
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[-1]["attributes"]["sentry.origin"] == "manual"
 
-    # Verify MCP span has correct origin
-    mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(mcp_spans) == 1
-    assert mcp_spans[0]["origin"] == "auto.ai.mcp"
+        # Verify MCP span has correct origin
+        mcp_spans = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+        ]
+        assert len(mcp_spans) == 1
+        assert mcp_spans[0]["attributes"]["sentry.origin"] == "auto.ai.mcp"
+    else:
+        events = capture_events()
+        with start_transaction(name="fastmcp tx"):
+            await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "test_tool",
+                    "arguments": {"value": 21},
+                },
+                request_id="req-origin",
+            )
+
+        (tx,) = events
+
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        # Verify MCP span has correct origin
+        mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+        assert len(mcp_spans) == 1
+        assert mcp_spans[0]["origin"] == "auto.ai.mcp"
 
 
 # =============================================================================
@@ -923,15 +1346,21 @@ async def test_fastmcp_span_origin(sentry_init, capture_events, FastMCP, stdio):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_fastmcp_sse_transport(
-    sentry_init, capture_events, FastMCP, json_rpc_sse
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    json_rpc_sse,
+    span_streaming,
 ):
     """Test that FastMCP correctly detects SSE transport"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
     sse = SseServerTransport("/messages/")
@@ -969,54 +1398,94 @@ async def test_fastmcp_sse_transport(
         return {"message": f"Received: {value}"}
 
     keep_sse_alive = asyncio.Event()
-    app_task, _, result = await json_rpc_sse(
-        app,
-        method="tools/call",
-        params={
-            "name": "sse_tool",
-            "arguments": {"value": "hello"},
-        },
-        request_id="req-sse",
-        keep_sse_alive=keep_sse_alive,
-    )
 
-    await sse_connection_closed.wait()
-    await app_task
+    if span_streaming:
+        items = capture_items("span")
 
-    assert json.loads(result["result"]["content"][0]["text"]) == {
-        "message": "Received: hello"
-    }
+        app_task, _, result = await json_rpc_sse(
+            app,
+            method="tools/call",
+            params={
+                "name": "sse_tool",
+                "arguments": {"value": "hello"},
+            },
+            request_id="req-sse",
+            keep_sse_alive=keep_sse_alive,
+        )
 
-    transactions = [
-        event
-        for event in events
-        if event["type"] == "transaction" and event["transaction"] == "/sse"
-    ]
-    assert len(transactions) == 1
-    tx = transactions[0]
+        await sse_connection_closed.wait()
+        await app_task
 
-    # Find MCP spans
-    mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(mcp_spans) >= 1
-    span = mcp_spans[0]
-    # Check that SSE transport is detected
-    assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "sse"
+        assert json.loads(result["result"]["content"][0]["text"]) == {
+            "message": "Received: hello"
+        }
+
+        sentry_sdk.flush()
+        # Find MCP spans
+        spans = [item.payload for item in items if item.type == "span"]
+        mcp_spans = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+        ]
+
+        assert len(mcp_spans) >= 1
+        span = mcp_spans[0]
+        # Check that SSE transport is detected
+        assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "sse"
+    else:
+        events = capture_events()
+
+        app_task, _, result = await json_rpc_sse(
+            app,
+            method="tools/call",
+            params={
+                "name": "sse_tool",
+                "arguments": {"value": "hello"},
+            },
+            request_id="req-sse",
+            keep_sse_alive=keep_sse_alive,
+        )
+
+        await sse_connection_closed.wait()
+        await app_task
+
+        assert json.loads(result["result"]["content"][0]["text"]) == {
+            "message": "Received: hello"
+        }
+
+        transactions = [
+            event
+            for event in events
+            if event["type"] == "transaction" and event["transaction"] == "/sse"
+        ]
+        assert len(transactions) == 1
+        tx = transactions[0]
+
+        # Find MCP spans
+        mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+
+        assert len(mcp_spans) >= 1
+        span = mcp_spans[0]
+        # Check that SSE transport is detected
+        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "sse"
 
 
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_fastmcp_http_transport(
     sentry_init,
     capture_events,
+    capture_items,
     FastMCP,
     json_rpc,
     select_transactions_with_mcp_spans,
+    span_streaming,
 ):
     """Test that FastMCP correctly detects HTTP transport"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -1037,39 +1506,81 @@ def test_fastmcp_http_transport(
         """Tool for HTTP transport test"""
         return {"processed": data.upper()}
 
-    _, result = json_rpc(
-        app,
-        method="tools/call",
-        params={
-            "name": "http_tool",
-            "arguments": {"data": "test"},
-        },
-        request_id="req-http",
-    )
+    if span_streaming:
+        items = capture_items("span")
 
-    assert json.loads(result.json()["result"]["content"][0]["text"]) == {
-        "processed": "TEST"
-    }
+        _, result = json_rpc(
+            app,
+            method="tools/call",
+            params={
+                "name": "http_tool",
+                "arguments": {"data": "test"},
+            },
+            request_id="req-http",
+        )
 
-    transactions = select_transactions_with_mcp_spans(events, method_name="tools/call")
-    assert len(transactions) == 1
-    tx = transactions[0]
-    assert len(tx["spans"]) == 1
-    span = tx["spans"][0]
+        assert json.loads(result.json()["result"]["content"][0]["text"]) == {
+            "processed": "TEST"
+        }
 
-    # Check that HTTP transport is detected
-    assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        spans = [
+            span
+            for span in spans
+            if span["attributes"].get("mcp.method.name") == "tools/call"
+        ]
+        assert len(spans) == 1
+        span = spans[0]
+
+        # Check that HTTP transport is detected
+        assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "http"
+    else:
+        events = capture_events()
+
+        _, result = json_rpc(
+            app,
+            method="tools/call",
+            params={
+                "name": "http_tool",
+                "arguments": {"data": "test"},
+            },
+            request_id="req-http",
+        )
+
+        assert json.loads(result.json()["result"]["content"][0]["text"]) == {
+            "processed": "TEST"
+        }
+
+        transactions = select_transactions_with_mcp_spans(
+            events, method_name="tools/call"
+        )
+        assert len(transactions) == 1
+        tx = transactions[0]
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+
+        # Check that HTTP transport is detected
+        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "http"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
-async def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP, stdio):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_fastmcp_stdio_transport(
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    stdio,
+    span_streaming,
+):
     """Test that FastMCP correctly detects stdio transport"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -1078,29 +1589,62 @@ async def test_fastmcp_stdio_transport(sentry_init, capture_events, FastMCP, std
         """Tool for stdio transport test"""
         return {"squared": n * n}
 
-    with start_transaction(name="fastmcp tx"):
-        result = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "stdio_tool",
-                "arguments": {"n": 7},
-            },
-            request_id="req-stdio",
-        )
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            result = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "stdio_tool",
+                    "arguments": {"n": 7},
+                },
+                request_id="req-stdio",
+            )
 
-    assert json.loads(result.message.root.result["content"][0]["text"]) == {
-        "squared": 49
-    }
+        assert json.loads(result.message.root.result["content"][0]["text"]) == {
+            "squared": 49
+        }
 
-    (tx,) = events
+        sentry_sdk.flush()
+        # Find MCP spans
+        spans = [item.payload for item in items if item.type == "span"]
+        mcp_spans = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+        ]
 
-    # Find MCP spans
-    mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(mcp_spans) >= 1
-    span = mcp_spans[0]
-    # Check that stdio transport is detected
-    assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
+        assert len(mcp_spans) >= 1
+        span = mcp_spans[0]
+        # Check that stdio transport is detected
+
+        assert span["attributes"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
+    else:
+        events = capture_events()
+        with start_transaction(name="fastmcp tx"):
+            result = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "stdio_tool",
+                    "arguments": {"n": 7},
+                },
+                request_id="req-stdio",
+            )
+
+        assert json.loads(result.message.root.result["content"][0]["text"]) == {
+            "squared": 49
+        }
+
+        (tx,) = events
+
+        # Find MCP spans
+        mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+
+        assert len(mcp_spans) >= 1
+        span = mcp_spans[0]
+        # Check that stdio transport is detected
+
+        assert span["data"].get(SPANDATA.MCP_TRANSPORT) == "stdio"
 
 
 # =============================================================================
@@ -1259,15 +1803,21 @@ async def test_fastmcp_tool_with_none_return(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_fastmcp_mixed_sync_async_tools(
-    sentry_init, capture_events, FastMCP, stdio
+    sentry_init,
+    capture_events,
+    capture_items,
+    FastMCP,
+    stdio,
+    span_streaming,
 ):
     """Test mixing sync and async tools in FastMCP"""
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
 
     mcp = FastMCP("Test Server")
 
@@ -1281,35 +1831,72 @@ async def test_fastmcp_mixed_sync_async_tools(
         """Async multiplication"""
         return x * y
 
-    with start_transaction(name="fastmcp tx"):
-        # Use async version for both since we're in an async context
-        result1 = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "sync_add",
-                "arguments": {"a": 3, "b": 4},
-            },
-            request_id="req-mixed",
-        )
-        result2 = await stdio(
-            mcp._mcp_server,
-            method="tools/call",
-            params={
-                "name": "async_multiply",
-                "arguments": {"x": 5, "y": 6},
-            },
-            request_id="req-mixed",
-        )
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            # Use async version for both since we're in an async context
+            result1 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "sync_add",
+                    "arguments": {"a": 3, "b": 4},
+                },
+                request_id="req-mixed",
+            )
+            result2 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "async_multiply",
+                    "arguments": {"x": 5, "y": 6},
+                },
+                request_id="req-mixed",
+            )
 
-    assert result1.message.root.result["content"][0]["text"] == "7"
-    assert result2.message.root.result["content"][0]["text"] == "30"
+        assert result1.message.root.result["content"][0]["text"] == "7"
+        assert result2.message.root.result["content"][0]["text"] == "30"
 
-    (tx,) = events
-    assert tx["type"] == "transaction"
+        sentry_sdk.flush()
+        # Verify both sync and async tool spans were created
+        spans = [item.payload for item in items if item.type == "span"]
+        mcp_spans = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+        ]
+        assert len(mcp_spans) == 2
+        assert mcp_spans[0]["attributes"][SPANDATA.MCP_TOOL_NAME] == "sync_add"
+        assert mcp_spans[1]["attributes"][SPANDATA.MCP_TOOL_NAME] == "async_multiply"
+    else:
+        events = capture_events()
+        with start_transaction(name="fastmcp tx"):
+            # Use async version for both since we're in an async context
+            result1 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "sync_add",
+                    "arguments": {"a": 3, "b": 4},
+                },
+                request_id="req-mixed",
+            )
+            result2 = await stdio(
+                mcp._mcp_server,
+                method="tools/call",
+                params={
+                    "name": "async_multiply",
+                    "arguments": {"x": 5, "y": 6},
+                },
+                request_id="req-mixed",
+            )
 
-    # Verify both sync and async tool spans were created
-    mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-    assert len(mcp_spans) == 2
-    assert mcp_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "sync_add"
-    assert mcp_spans[1]["data"][SPANDATA.MCP_TOOL_NAME] == "async_multiply"
+        assert result1.message.root.result["content"][0]["text"] == "7"
+        assert result2.message.root.result["content"][0]["text"] == "30"
+
+        (tx,) = events
+        assert tx["type"] == "transaction"
+
+        # Verify both sync and async tool spans were created
+        mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+        assert len(mcp_spans) == 2
+        assert mcp_spans[0]["data"][SPANDATA.MCP_TOOL_NAME] == "sync_add"
+        assert mcp_spans[1]["data"][SPANDATA.MCP_TOOL_NAME] == "async_multiply"
