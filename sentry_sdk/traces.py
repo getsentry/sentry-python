@@ -31,7 +31,16 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
+    from typing import (
+        Any,
+        Callable,
+        Iterator,
+        Optional,
+        ParamSpec,
+        TypeVar,
+        Union,
+    )
+
     from sentry_sdk._types import Attributes, AttributeValue
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
