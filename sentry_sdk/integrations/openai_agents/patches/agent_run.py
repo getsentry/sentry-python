@@ -89,7 +89,13 @@ async def _run_single_turn(
     - creates agent invocation spans if there is no already active agent invocation span.
     - ends the agent invocation span if and only if an exception is raised in `_run_single_turn()`.
     """
-    agent = kwargs.get("agent")
+    # openai-agents >= 0.14 passes `bindings: AgentBindings` instead of `agent`.
+    bindings = kwargs.get("bindings")
+    agent = (
+        getattr(bindings, "public_agent", None)
+        if bindings is not None
+        else kwargs.get("agent")
+    )
     context_wrapper = kwargs.get("context_wrapper")
     should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
 
@@ -119,7 +125,7 @@ async def _run_single_turn_streamed(
     - ends the agent invocation span if and only if `_run_single_turn_streamed()` raises an exception.
 
     Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
-    _run_single_turn_streamed uses positional arguments. The call signature is:
+    _run_single_turn_streamed uses positional arguments. The call signature <v0.14 is:
     _run_single_turn_streamed(
         streamed_result,              # args[0]
         agent,                        # args[1]
@@ -131,9 +137,26 @@ async def _run_single_turn_streamed(
         all_tools,                    # args[7]
         server_conversation_tracker,  # args[8] (optional)
     )
+
+    The call signature >=v0.14 is:
+    _run_single_turn_streamed(
+        streamed_result,              # args[0]
+        bindings,                     # args[1]
+        hooks,                        # args[2]
+        context_wrapper,              # args[3]
+        run_config,                   # args[4]
+        should_run_agent_start_hooks, # args[5]
+        tool_use_tracker,             # args[6]
+        all_tools,                    # args[7]
+        server_conversation_tracker,  # args[8] (optional)
+    )
     """
     streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
-    agent = args[1] if len(args) > 1 else kwargs.get("agent")
+    # openai-agents >= 0.14 passes `bindings: AgentBindings` at args[1] instead of `agent`.
+    agent_or_bindings = (
+        args[1] if len(args) > 1 else kwargs.get("bindings", kwargs.get("agent"))
+    )
+    agent = getattr(agent_or_bindings, "public_agent", agent_or_bindings)
     context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
     should_run_agent_start_hooks = bool(
         args[5] if len(args) > 5 else kwargs.get("should_run_agent_start_hooks", False)
@@ -179,7 +202,8 @@ async def _execute_handoffs(
 
     context_wrapper = kwargs.get("context_wrapper")
     run_handoffs = kwargs.get("run_handoffs")
-    agent = kwargs.get("agent")
+    # openai-agents >= 0.14 renamed `agent` to `public_agent`.
+    agent = kwargs.get("public_agent", kwargs.get("agent"))
 
     # Create Sentry handoff span for the first handoff (agents library only processes the first one)
     if run_handoffs:
@@ -214,7 +238,8 @@ async def _execute_final_output(
     - ends the workflow span if the response is streamed.
     """
 
-    agent = kwargs.get("agent")
+    # openai-agents >= 0.14 renamed `agent` to `public_agent`.
+    agent = kwargs.get("public_agent", kwargs.get("agent"))
     context_wrapper = kwargs.get("context_wrapper")
     final_output = kwargs.get("final_output")
 

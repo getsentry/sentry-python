@@ -7,7 +7,7 @@ from fakeredis import FakeStrictRedis
 import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, parse_version
 
 
 @pytest.fixture(autouse=True)
@@ -46,8 +46,9 @@ def do_trick(dog, trick):
     return "{}, can you {}? Good dog!".format(dog, trick)
 
 
-def test_basic(sentry_init, capture_events):
-    sentry_init(integrations=[RqIntegration()])
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_basic(sentry_init, capture_events, send_default_pii):
+    sentry_init(integrations=[RqIntegration()], send_default_pii=send_default_pii)
     events = capture_events()
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -66,8 +67,12 @@ def test_basic(sentry_init, capture_events):
     assert event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
 
     extra = event["extra"]["rq-job"]
-    assert extra["args"] == []
-    assert extra["kwargs"] == {"foo": 42}
+    if send_default_pii:
+        assert extra["args"] == []
+        assert extra["kwargs"] == {"foo": 42}
+    else:
+        assert extra["args"] == SENSITIVE_DATA_SUBSTITUTE
+        assert extra["kwargs"] == SENSITIVE_DATA_SUBSTITUTE
     assert extra["description"] == "tests.integrations.rq.test_rq.crashing_job(foo=42)"
     assert extra["func"] == "tests.integrations.rq.test_rq.crashing_job"
     assert "job_id" in extra
@@ -96,12 +101,18 @@ def test_transport_shutdown(sentry_init, capture_events_forksafe):
     assert exception["type"] == "ZeroDivisionError"
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_transaction_with_error(
     sentry_init,
     capture_events,
     DictionaryContaining,  # noqa:N803
+    send_default_pii,
 ):
-    sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[RqIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
     events = capture_events()
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -125,8 +136,14 @@ def test_transaction_with_error(
     assert envelope["transaction"] == error_event["transaction"]
     assert envelope["extra"]["rq-job"] == DictionaryContaining(
         {
-            "args": ["Charlie", "Katie"],
-            "kwargs": {"shoes": "flip-flops"},
+            "args": (
+                ["Charlie", "Katie"] if send_default_pii else SENSITIVE_DATA_SUBSTITUTE
+            ),
+            "kwargs": (
+                {"shoes": "flip-flops"}
+                if send_default_pii
+                else SENSITIVE_DATA_SUBSTITUTE
+            ),
             "func": "tests.integrations.rq.test_rq.chew_up_shoes",
             "description": "tests.integrations.rq.test_rq.chew_up_shoes('Charlie', 'Katie', shoes='flip-flops')",
         }
@@ -196,12 +213,18 @@ def test_tracing_disabled(
     )
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_transaction_no_error(
     sentry_init,
     capture_events,
     DictionaryContaining,  # noqa:N803
+    send_default_pii,
 ):
-    sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[RqIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
     events = capture_events()
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -217,8 +240,10 @@ def test_transaction_no_error(
     assert envelope["transaction"] == "tests.integrations.rq.test_rq.do_trick"
     assert envelope["extra"]["rq-job"] == DictionaryContaining(
         {
-            "args": ["Maisey"],
-            "kwargs": {"trick": "kangaroo"},
+            "args": ["Maisey"] if send_default_pii else SENSITIVE_DATA_SUBSTITUTE,
+            "kwargs": (
+                {"trick": "kangaroo"} if send_default_pii else SENSITIVE_DATA_SUBSTITUTE
+            ),
             "func": "tests.integrations.rq.test_rq.do_trick",
             "description": "tests.integrations.rq.test_rq.do_trick('Maisey', trick='kangaroo')",
         }

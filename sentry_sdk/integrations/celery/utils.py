@@ -2,7 +2,7 @@ import time
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from typing import Any, Tuple
+    from typing import Tuple
     from sentry_sdk._types import MonitorConfigScheduleUnit
 
 
@@ -29,11 +29,3 @@ def _get_humanized_interval(seconds: float) -> "Tuple[int, MonitorConfigSchedule
             return (interval, cast("MonitorConfigScheduleUnit", unit))
 
     return (int(seconds), "second")
-
-
-class NoOpMgr:
-    def __enter__(self) -> None:
-        return None
-
-    def __exit__(self, exc_type: "Any", exc_value: "Any", traceback: "Any") -> None:
-        return None

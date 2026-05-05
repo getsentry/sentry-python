@@ -88,6 +88,7 @@ def _get_db_data(event: "Any") -> "Dict[str, Any]":
     data = {}
 
     data[SPANDATA.DB_SYSTEM] = "mongodb"
+    data[SPANDATA.DB_DRIVER_NAME] = "pymongo"
 
     db_name = event.database_name
     if db_name is not None:
@@ -128,6 +129,7 @@ class CommandTracer(monitoring.CommandListener):
             tags = {
                 "db.name": event.database_name,
                 SPANDATA.DB_SYSTEM: "mongodb",
+                SPANDATA.DB_DRIVER_NAME: "pymongo",
                 SPANDATA.DB_OPERATION: event.command_name,
                 SPANDATA.DB_MONGODB_COLLECTION: command.get(event.command_name),
             }

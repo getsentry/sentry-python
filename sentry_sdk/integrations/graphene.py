@@ -143,7 +143,8 @@ def graphql_span(
 
     _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
 
-    _graphql_span.set_data("graphql.document", source)
+    if should_send_default_pii():
+        _graphql_span.set_data("graphql.document", source)
     _graphql_span.set_data("graphql.operation.name", operation_name)
     _graphql_span.set_data("graphql.operation.type", operation_type)
 

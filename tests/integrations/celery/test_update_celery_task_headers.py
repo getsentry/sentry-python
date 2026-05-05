@@ -71,7 +71,7 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
 
 
 def test_span_with_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
     headers = {}
     monitor_beat_tasks = False
 
@@ -91,7 +91,7 @@ def test_span_with_transaction(sentry_init):
 
 
 def test_span_with_transaction_custom_headers(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
     headers = {
         "baggage": BAGGAGE_VALUE,
         "sentry-trace": SENTRY_TRACE_VALUE,
