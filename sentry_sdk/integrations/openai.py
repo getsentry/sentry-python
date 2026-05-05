@@ -347,6 +347,18 @@ def _set_responses_api_input_data(
     if top_p is not None and _is_given(top_p):
         span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
+    conversation = kwargs.get("conversation")
+    if conversation is not None and _is_given(conversation):
+        conversation_id: "Optional[str]"
+        if isinstance(conversation, str):
+            conversation_id = conversation
+        elif isinstance(conversation, dict):
+            conversation_id = conversation.get("id")
+        else:
+            conversation_id = getattr(conversation, "id", None)
+        if conversation_id is not None:
+            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
+
     if not should_send_default_pii() or not integration.include_prompts:
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         return
