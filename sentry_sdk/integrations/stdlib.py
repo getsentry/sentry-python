@@ -66,7 +66,7 @@ class StdlibIntegration(Integration):
             return event
 
 
-def _finish_span(span: "Union[Span, StreamedSpan]") -> None:
+def _complete_span(span: "Union[Span, StreamedSpan]") -> None:
     if isinstance(span, StreamedSpan):
         with capture_internal_exceptions():
             add_http_request_source(span)
@@ -186,7 +186,7 @@ def _install_httplib() -> None:
         try:
             rv = real_getresponse(self, *args, **kwargs)
         except BaseException:
-            _finish_span(span)
+            _complete_span(span)
             raise
 
         if isinstance(span, StreamedSpan):
@@ -204,7 +204,7 @@ def _install_httplib() -> None:
         if has_body:
             rv._sentrysdk_span = span  # type: ignore[attr-defined]
         else:
-            _finish_span(span)
+            _complete_span(span)
 
         return rv
 
@@ -222,7 +222,7 @@ def _install_httplib() -> None:
             # try to figure out whether the response body has been fully read.
             if self.fp is None or self.closed:
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
-                _finish_span(span)
+                _complete_span(span)
 
     def close(self: "HTTPResponse") -> None:
         # We patch close() as a best effort fallback in case the span is not
@@ -234,7 +234,7 @@ def _install_httplib() -> None:
         finally:
             if span is not None:
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
-                _finish_span(span)
+                _complete_span(span)
 
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
