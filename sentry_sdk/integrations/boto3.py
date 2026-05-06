@@ -22,11 +22,13 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
+    from botocore.model import ServiceId
+
 try:
-    from botocore import __version__ as BOTOCORE_VERSION  # type: ignore
-    from botocore.client import BaseClient  # type: ignore
-    from botocore.response import StreamingBody  # type: ignore
-    from botocore.awsrequest import AWSRequest  # type: ignore
+    from botocore import __version__ as BOTOCORE_VERSION
+    from botocore.client import BaseClient
+    from botocore.response import StreamingBody
+    from botocore.awsrequest import AWSRequest
 except ImportError:
     raise DidNotEnable("botocore is not installed")
 
@@ -43,11 +45,11 @@ class Boto3Integration(Integration):
         orig_init = BaseClient.__init__
 
         def sentry_patched_init(
-            self: "Type[BaseClient]", *args: "Any", **kwargs: "Any"
+            self: "BaseClient", *args: "Any", **kwargs: "Any"
         ) -> None:
             orig_init(self, *args, **kwargs)
             meta = self.meta
-            service_id = meta.service_model.service_id.hyphenize()
+            service_id = meta.service_model.service_id
             meta.events.register(
                 "request-created",
                 partial(_sentry_request_created, service_id=service_id),
@@ -55,14 +57,14 @@ class Boto3Integration(Integration):
             meta.events.register("after-call", _sentry_after_call)
             meta.events.register("after-call-error", _sentry_after_call_error)
 
-        BaseClient.__init__ = sentry_patched_init
+        BaseClient.__init__ = sentry_patched_init  # type: ignore
 
 
 @ensure_integration_enabled(Boto3Integration)
 def _sentry_request_created(
-    service_id: str, request: "AWSRequest", operation_name: str, **kwargs: "Any"
+    service_id: "ServiceId", request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
-    description = "aws.%s.%s" % (service_id, operation_name)
+    description = "aws.%s.%s" % (service_id.hyphenize(), operation_name)
 
     client = sentry_sdk.get_client()
     span_streaming = has_span_streaming_enabled(client.options)
@@ -75,16 +77,16 @@ def _sentry_request_created(
                 "sentry.origin": Boto3Integration.origin,
             },
         )
+        if request.url is not None:
+            with capture_internal_exceptions():
+                parsed_url = parse_url(request.url, sanitize=False)
+                span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
+                span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
-        with capture_internal_exceptions():
-            parsed_url = parse_url(request.url, sanitize=False)
-            span.set_attribute("aws.request.url", parsed_url.url)
-            span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
-
-        span.set_attribute("aws.service_id", service_id)
-        span.set_attribute("aws.operation_name", operation_name)
-        span.set_attribute(SPANDATA.HTTP_METHOD, request.method)
+        span.set_attribute(SPANDATA.RPC_METHOD, f"{service_id}/{operation_name}")
+        if request.method is not None:
+            span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
     else:
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
@@ -92,13 +94,14 @@ def _sentry_request_created(
             origin=Boto3Integration.origin,
         )
 
-        with capture_internal_exceptions():
-            parsed_url = parse_url(request.url, sanitize=False)
-            span.set_data("aws.request.url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        if request.url is not None:
+            with capture_internal_exceptions():
+                parsed_url = parse_url(request.url, sanitize=False)
+                span.set_data("aws.request.url", parsed_url.url)
+                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-        span.set_tag("aws.service_id", service_id)
+        span.set_tag("aws.service_id", service_id.hyphenize())
         span.set_tag("aws.operation_name", operation_name)
         span.set_data(SPANDATA.HTTP_METHOD, request.method)
 
@@ -148,20 +151,31 @@ def _sentry_after_call(
     def sentry_streaming_body_read(*args: "Any", **kwargs: "Any") -> bytes:
         try:
             ret = orig_read(*args, **kwargs)
-            if not ret:
+            if ret:
+                return ret
+
+            if isinstance(streaming_span, StreamedSpan):
+                streaming_span.end()
+            else:
                 streaming_span.finish()
             return ret
         except Exception:
-            streaming_span.finish()
+            if isinstance(streaming_span, StreamedSpan):
+                streaming_span.end()
+            else:
+                streaming_span.finish()
             raise
 
-    body.read = sentry_streaming_body_read
+    body.read = sentry_streaming_body_read  # type: ignore
 
     def sentry_streaming_body_close(*args: "Any", **kwargs: "Any") -> None:
-        streaming_span.finish()
+        if isinstance(streaming_span, StreamedSpan):
+            streaming_span.end()
+        else:
+            streaming_span.finish()
         orig_close(*args, **kwargs)
 
-    body.close = sentry_streaming_body_close
+    body.close = sentry_streaming_body_close  # type: ignore
 
 
 def _sentry_after_call_error(

@@ -45,7 +45,7 @@ def test_basic(
             assert len(objects) == 2
             assert objects[0].key == "foo.txt"
             assert objects[1].key == "bar.txt"
-            span.finish()
+            span.end()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
@@ -100,7 +100,7 @@ def test_streaming(
             assert body.read(2) == b"el"
             assert body.read(3) == b"lo"
             assert body.read(1) == b""
-            span.finish()
+            span.end()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
@@ -111,10 +111,22 @@ def test_streaming(
         assert span1["name"] == "aws.s3.GetObject"
         assert span1["attributes"] == ApproxDict(
             {
-                "http.method": "GET",
-                "aws.request.url": "https://bucket.s3.amazonaws.com/foo.pdf",
-                "http.fragment": "",
-                "http.query": "",
+                "http.request.method": "GET",
+                "rpc.method": "S3/GetObject",
+                "sentry.environment": "production",
+                "sentry.op": "http.client",
+                "sentry.origin": "auto.http.boto3",
+                "sentry.release": mock.ANY,
+                "sentry.sdk.name": "sentry.python",
+                "sentry.sdk.version": mock.ANY,
+                "sentry.segment.id": mock.ANY,
+                "sentry.segment.name": "custom parent",
+                "server.address": mock.ANY,
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+                "url.full": "https://bucket.s3.amazonaws.com/foo.pdf",
+                "url.fragment": "",
+                "url.query": "",
             }
         )
 
@@ -182,7 +194,7 @@ def test_streaming_close(
             body = obj.get()["Body"]
             assert body.read(1) == b"h"
             body.close()  # close partially-read stream
-            span.finish()
+            span.end()
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
@@ -244,20 +256,31 @@ def test_omit_url_data_if_parsing_fails(
                 assert len(objects) == 2
                 assert objects[0].key == "foo.txt"
                 assert objects[1].key == "bar.txt"
-                span.finish()
+                span.end()
 
                 sentry_sdk.flush()
                 spans = [item.payload for item in items if item.type == "span"]
                 assert spans[0]["attributes"] == ApproxDict(
                     {
-                        "http.method": "GET",
-                        # no url data
+                        "http.request.method": "GET",
+                        "rpc.method": "S3/ListObjects",
+                        "sentry.environment": "production",
+                        "sentry.op": "http.client",
+                        "sentry.origin": "auto.http.boto3",
+                        "sentry.release": mock.ANY,
+                        "sentry.sdk.name": "sentry.python",
+                        "sentry.sdk.version": mock.ANY,
+                        "sentry.segment.id": mock.ANY,
+                        "sentry.segment.name": "custom parent",
+                        "server.address": mock.ANY,
+                        "thread.id": mock.ANY,
+                        "thread.name": mock.ANY,
                     }
                 )
 
-        assert "aws.request.url" not in spans[0]["attributes"]
-        assert "http.fragment" not in spans[0]["attributes"]
-        assert "http.query" not in spans[0]["attributes"]
+        assert "url.full" not in spans[0]["attributes"]
+        assert "url.fragment" not in spans[0]["attributes"]
+        assert "url.query" not in spans[0]["attributes"]
     else:
         events = capture_events()
 

@@ -893,6 +893,12 @@ class SPANDATA:
     Example: "5249fbada8d5416482c2f6e47e337372"
     """
 
+    RPC_METHOD = "rpc.method"
+    """
+    The fully-qualified logical name of the method from the RPC interface perspective.
+    Example: "com.example.ExampleService/exampleMethod"
+    """
+
     SERVER_ADDRESS = "server.address"
     """
     Name of the database host.
@@ -1645,4 +1651,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.58.0"
+VERSION = "2.59.0"

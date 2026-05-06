@@ -1,17 +1,20 @@
-import sys
 import functools
+import sys
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import nullcontext
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.transport import AsyncHttpTransport
 from sentry_sdk.utils import (
     event_from_exception,
+    is_internal_task,
     logger,
     reraise,
-    is_internal_task,
 )
-from sentry_sdk.transport import AsyncHttpTransport
 
 try:
     import asyncio
@@ -19,11 +22,11 @@ try:
 except ImportError:
     raise DidNotEnable("asyncio not available")
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, TypeVar
     from collections.abc import Coroutine
+    from typing import Any, Callable, TypeVar
 
     from sentry_sdk._types import ExcInfo
 
@@ -142,22 +145,31 @@ def patch_asyncio() -> None:
             @_wrap_coroutine(coro)
             async def _task_with_sentry_span_creation() -> "Any":
                 result = None
-
-                integration = sentry_sdk.get_client().get_integration(
-                    AsyncioIntegration
-                )
+                client = sentry_sdk.get_client()
+                integration = client.get_integration(AsyncioIntegration)
                 task_spans = integration.task_spans if integration else False
 
+                span_ctx: "Optional[Union[StreamedSpan, Span]]" = None
+                is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+
                 with sentry_sdk.isolation_scope():
-                    with (
-                        sentry_sdk.start_span(
-                            op=OP.FUNCTION,
-                            name=get_name(coro),
-                            origin=AsyncioIntegration.origin,
-                        )
-                        if task_spans
-                        else nullcontext()
-                    ):
+                    if task_spans:
+                        if is_span_streaming_enabled:
+                            span_ctx = sentry_sdk.traces.start_span(
+                                name=get_name(coro),
+                                attributes={
+                                    "sentry.op": OP.FUNCTION,
+                                    "sentry.origin": AsyncioIntegration.origin,
+                                },
+                            )
+                        else:
+                            span_ctx = sentry_sdk.start_span(
+                                op=OP.FUNCTION,
+                                name=get_name(coro),
+                                origin=AsyncioIntegration.origin,
+                            )
+
+                    with span_ctx if span_ctx else nullcontext():
                         try:
                             result = await coro
                         except StopAsyncIteration as e:
