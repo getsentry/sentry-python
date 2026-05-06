@@ -39,10 +39,9 @@ class ClientInterceptor(
                 attributes={
                     "sentry.op": OP.GRPC_CLIENT,
                     "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.RPC_METHOD: method,
                 },
             ) as span:
-                span.set_attribute(SPANDATA.RPC_METHOD, method)
-
                 client_call_details = (
                     self._update_client_call_details_metadata_from_scope(
                         client_call_details
@@ -92,10 +91,9 @@ class ClientInterceptor(
                 attributes={
                     "sentry.op": OP.GRPC_CLIENT,
                     "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.RPC_METHOD: method,
                 },
             ) as span:
-                span.set_attribute(SPANDATA.RPC_METHOD, method)
-
                 client_call_details = (
                     self._update_client_call_details_metadata_from_scope(
                         client_call_details
