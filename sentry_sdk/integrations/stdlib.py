@@ -227,11 +227,11 @@ def _install_httplib() -> None:
     def close(self: "HTTPResponse") -> None:
         # We patch close() as a best effort fallback in case the span is not
         # ended yet in getresponse() or read().
-        span = getattr(self, "_sentrysdk_span", None)
-
+    
         try:
             real_close(self)
         finally:
+            span = getattr(self, "_sentrysdk_span", None)
             if span is not None:
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
                 _complete_span(span)
