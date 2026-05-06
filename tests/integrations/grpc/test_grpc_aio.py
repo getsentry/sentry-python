@@ -86,7 +86,7 @@ async def test_noop_for_unimplemented_method(
     await asyncio.create_task(server.start())
 
     if span_streaming:
-        items = capture_items()
+        items = capture_items("span")
 
         try:
             async with grpc.aio.insecure_channel(
@@ -100,8 +100,8 @@ async def test_noop_for_unimplemented_method(
             await server.stop(None)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 1  # Only client span present.
     else:
         events = capture_events()
 
