@@ -216,14 +216,14 @@ def _install_httplib() -> None:
             # read() might be called multiple times to consume a single body,
             # so we can't just end the span when read() is done. Instead,
             # try to figure out whether the response body has been fully read.
-            if span and self.fp is None or self.closed:
+            if span and (self.fp is None or self.closed):
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
                 _complete_span(span)
 
     def close(self: "HTTPResponse") -> None:
         # We patch close() as a best effort fallback in case the span is not
         # ended yet in getresponse() or read().
-    
+
         try:
             real_close(self)
         finally:
