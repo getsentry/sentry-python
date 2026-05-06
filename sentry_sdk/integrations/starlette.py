@@ -1,17 +1,18 @@
 import functools
 import json
-import warnings
 import sys
+import warnings
 from collections.abc import Set
 from copy import deepcopy
 from json import JSONDecodeError
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import (
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
     Integration,
-    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -21,7 +22,8 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import NoOpStreamedSpan, StreamedSpan, _get_current_streamed_span
+from sentry_sdk.traces import _get_current_streamed_span
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
@@ -35,8 +37,6 @@ from sentry_sdk.utils import (
     parse_version,
     transaction_from_function,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
@@ -54,7 +54,8 @@ try:
     )
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
-    from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
+    from starlette.types import ASGIApp, Receive, Send  # type: ignore
+    from starlette.types import Scope as StarletteScope
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
@@ -255,12 +256,7 @@ def _set_request_body_data_on_streaming_segment(
     info: "Optional[Dict[str, Any]]",
 ) -> None:
     current_span = _get_current_streamed_span()
-    if (
-        info
-        and "data" in info
-        and isinstance(current_span, StreamedSpan)
-        and not isinstance(current_span, NoOpStreamedSpan)
-    ):
+    if info and "data" in info and type(current_span) is StreamedSpan:
         with capture_internal_exceptions():
             current_span._segment.set_attribute(
                 "http.request.body.data",
@@ -557,9 +553,7 @@ def patch_request_response() -> None:
                 if span_streaming:
                     current_span = current_scope.streamed_span
 
-                    if isinstance(current_span, StreamedSpan) and not isinstance(
-                        current_span, NoOpStreamedSpan
-                    ):
+                    if type(current_span) is StreamedSpan:
                         current_span._segment._update_active_thread()
                 elif current_scope.transaction is not None:
                     current_scope.transaction.update_active_thread()

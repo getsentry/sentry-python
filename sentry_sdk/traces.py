@@ -31,7 +31,16 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
+    from typing import (
+        Any,
+        Callable,
+        Iterator,
+        Optional,
+        ParamSpec,
+        TypeVar,
+        Union,
+    )
+
     from sentry_sdk._types import Attributes, AttributeValue
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
@@ -49,6 +58,9 @@ class SpanStatus(str, Enum):
 
     def __str__(self) -> str:
         return self.value
+
+
+_VALID_SPAN_STATUSES = frozenset(e.value for e in SpanStatus)
 
 
 # Segment source, see
@@ -421,7 +433,7 @@ class StreamedSpan:
         if isinstance(status, Enum):
             status = status.value
 
-        if status not in {e.value for e in SpanStatus}:
+        if status not in _VALID_SPAN_STATUSES:
             logger.debug(
                 f'[Tracing] Unsupported span status {status}. Expected one of: "ok", "error"'
             )
