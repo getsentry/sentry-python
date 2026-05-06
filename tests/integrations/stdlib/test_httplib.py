@@ -1219,14 +1219,9 @@ def test_chunked_response_span_covers_body_read(
             response.read()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
-        )
+        http_span, parent_span = [item.payload for item in items]
 
-        duration = span["end_timestamp"] - span["start_timestamp"]
+        duration = http_span["end_timestamp"] - http_span["start_timestamp"]
         assert duration >= min_expected_duration
     else:
         events = capture_events()
