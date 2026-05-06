@@ -893,6 +893,12 @@ class SPANDATA:
     Example: "5249fbada8d5416482c2f6e47e337372"
     """
 
+    RPC_METHOD = "rpc.method"
+    """
+    The fully-qualified logical name of the method from the RPC interface perspective.
+    Example: "com.example.ExampleService/exampleMethod"
+    """
+
     SERVER_ADDRESS = "server.address"
     """
     Name of the database host.
