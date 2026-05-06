@@ -8,7 +8,6 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    ensure_integration_enabled,
     parse_url,
     parse_version,
 )
@@ -60,13 +59,15 @@ class Boto3Integration(Integration):
         BaseClient.__init__ = sentry_patched_init  # type: ignore
 
 
-@ensure_integration_enabled(Boto3Integration)
 def _sentry_request_created(
     service_id: "ServiceId", request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
     description = "aws.%s.%s" % (service_id.hyphenize(), operation_name)
 
     client = sentry_sdk.get_client()
+    if client.get_integration(Boto3Integration) is None:
+        return
+
     span_streaming = has_span_streaming_enabled(client.options)
     span: "Union[Span, StreamedSpan]"
     if span_streaming:
