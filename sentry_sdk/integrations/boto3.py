@@ -68,9 +68,9 @@ def _sentry_request_created(
     if client.get_integration(Boto3Integration) is None:
         return
 
-    span_streaming = has_span_streaming_enabled(client.options)
+    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
     span: "Union[Span, StreamedSpan]"
-    if span_streaming:
+    if is_span_streaming_enabled:
         span = sentry_sdk.traces.start_span(
             name=description,
             attributes={
