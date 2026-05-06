@@ -86,7 +86,7 @@ async def test_noop_for_unimplemented_method(
     await asyncio.create_task(server.start())
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items()
 
         try:
             async with grpc.aio.insecure_channel(
@@ -255,7 +255,7 @@ async def test_grpc_server_exception(
     stub = gRPCTestServiceStub(channel)
 
     if span_streaming:
-        items = capture_items("TestService.TestException", "event", "grpc")
+        items = capture_items("event")
 
         try:
             await stub.TestServe(gRPCTestMessage(text="exception"))
