@@ -839,7 +839,7 @@ def _wrap_synchronous_completions_chunk_iterator(
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
         with capture_internal_exceptions():
-            if hasattr(x, "choices"):
+            if hasattr(x, "choices") and x.choices is not None:
                 choice_index = 0
                 for choice in x.choices:
                     if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
@@ -901,7 +901,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
         with capture_internal_exceptions():
-            if hasattr(x, "choices"):
+            if hasattr(x, "choices") and x.choices is not None:
                 choice_index = 0
                 for choice in x.choices:
                     if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
