@@ -36,7 +36,7 @@ def test_basic(
     bucket = s3.Bucket("bucket")
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
@@ -90,7 +90,7 @@ def test_streaming(
     obj = s3.Bucket("bucket").Object("foo.pdf")
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
             s3.meta.client, 200, {}, b"hello"
@@ -174,7 +174,7 @@ def test_streaming_close(
     obj = s3.Bucket("bucket").Object("foo.pdf")
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent") as span, MockResponse(
             s3.meta.client, 200, {}, b"hello"
@@ -229,7 +229,7 @@ def test_omit_url_data_if_parsing_fails(
     bucket = s3.Bucket("bucket")
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with mock.patch(
             "sentry_sdk.integrations.boto3.parse_url",
@@ -304,7 +304,7 @@ def test_span_origin(
     bucket = s3.Bucket("bucket")
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
