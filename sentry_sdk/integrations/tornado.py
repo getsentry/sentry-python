@@ -113,7 +113,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
 
     weak_handler = weakref.ref(self)
     client = sentry_sdk.get_client()
-    span_streaming = has_span_streaming_enabled(client.options)
+    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
     with sentry_sdk.isolation_scope() as scope:
         headers = self.request.headers
@@ -124,7 +124,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
 
         span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
 
-        if span_streaming:
+        if is_span_streaming_enabled:
             sentry_sdk.traces.continue_trace(dict(headers))
             scope.set_custom_sampling_context({"tornado_request": self.request})
 
@@ -135,6 +135,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                     "sentry.origin": TornadoIntegration.origin,
                     "sentry.span.source": SegmentSource.ROUTE,
                 },
+                parent_span=None,
             )
         else:
             transaction = continue_trace(
@@ -161,12 +162,12 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
 
                     method = getattr(self, self.request.method.lower(), None)
                     if method is not None:
-                        tx_name = transaction_from_function(method) or ""
-                        if tx_name:
-                            span.name = tx_name
+                        span_name = transaction_from_function(method) or ""
+                        if span_name:
+                            span.name = span_name
                             span.set_attribute(
                                 "sentry.span.source",
-                                SegmentSource.COMPONENT.value,
+                                SegmentSource.COMPONENT,
                             )
 
             try:

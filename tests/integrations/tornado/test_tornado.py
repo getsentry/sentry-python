@@ -152,16 +152,7 @@ def test_transactions(
         spans = [i.payload for i in items if i.type == "span"]
         errors = [i.payload for i in items if i.type == "event"]
 
-        # client tx + server segment span
-        assert len(spans) >= 2
-        server_segment = next(
-            s for s in spans if s["attributes"].get("sentry.op") == "http.server"
-        )
-        client_segment = next(
-            s
-            for s in spans
-            if s["attributes"].get("sentry.op") != "http.server" and s.get("is_segment")
-        )
+        client_segment, server_segment = spans
 
         if code == 500:
             assert len(errors) == 1
@@ -527,10 +518,7 @@ def test_span_origin(
     sentry_sdk.flush()
 
     if span_streaming:
-        spans = [i.payload for i in items]
-        segment = next(
-            s for s in spans if s["attributes"].get("sentry.op") == "http.server"
-        )
+        (segment,) = [i.payload for i in items]
         assert segment["attributes"]["sentry.origin"] == "auto.http.tornado"
     else:
         (_, event) = events
