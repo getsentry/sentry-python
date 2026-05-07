@@ -518,7 +518,7 @@ class Scope:
         Load Sentry trace id and baggage from environment variables.
         Can be disabled by setting SENTRY_USE_ENVIRONMENT to "false".
         """
-        incoming_trace_information = None
+        incoming_trace_information: "Optional[Dict[str, str]]" = None
 
         sentry_use_environment = (
             os.environ.get("SENTRY_USE_ENVIRONMENT") or ""
@@ -1065,12 +1065,12 @@ class Scope:
         before_breadcrumb = client.options.get("before_breadcrumb")
         max_breadcrumbs = client.options.get("max_breadcrumbs", DEFAULT_MAX_BREADCRUMBS)
 
-        crumb: "Breadcrumb" = dict(crumb or ())
+        crumb = dict(crumb or ())
         crumb.update(kwargs)
         if not crumb:
             return
 
-        hint: "Hint" = dict(hint or ())
+        hint = dict(hint or ())
 
         if crumb.get("timestamp") is None:
             crumb["timestamp"] = datetime.now(timezone.utc)

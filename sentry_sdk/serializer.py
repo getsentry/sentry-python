@@ -338,9 +338,9 @@ def serialize(event: "Dict[str, Any]", **kwargs: "Any") -> "Dict[str, Any]":
         ):
             rv_list = []
 
-            for i, v in enumerate(obj):
+            for i, v in enumerate(obj):  # type: ignore[arg-type]
                 if remaining_breadth is not None and i >= remaining_breadth:
-                    _annotate(len=len(obj))
+                    _annotate(len=len(obj))  # type: ignore[arg-type]
                     break
 
                 rv_list.append(
