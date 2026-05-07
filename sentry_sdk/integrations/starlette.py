@@ -475,7 +475,7 @@ def _is_async_callable(obj: "Any") -> bool:
         obj = obj.func
 
     return iscoroutinefunction(obj) or (
-        callable(obj) and iscoroutinefunction(obj.__call__)
+        callable(obj) and iscoroutinefunction(obj.__call__)  # type: ignore[operator]
     )
 
 
