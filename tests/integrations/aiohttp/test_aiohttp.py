@@ -1160,29 +1160,26 @@ async def test_tracing_span_streaming(sentry_init, aiohttp_client, capture_items
 
     sentry_sdk.flush()
 
-    # Spans finish inner-first, so the segment is the last item.
     # The aiohttp_client fixture is itself sentry-instrumented and emits the
-    # outer http.client segment; the server-side http.server span is its only
-    # child. Asserting the exact length confirms no other spans leak in.
+    # first http.client segment; the server-side http.server span is the other
+    # segment. Asserting the exact length confirms no other spans leak in.
     assert len(items) == 2
 
-    segment = items.pop().payload
-    (server_span,) = [item.payload for item in items]
+    server_span, client_span = [item.payload for item in items]
 
-    assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.client"
-    assert segment["name"] == (
-        "tests.integrations.aiohttp.test_aiohttp."
-        "test_tracing_span_streaming.<locals>.hello"
+    assert client_span["is_segment"] is True
+    assert client_span["attributes"]["sentry.op"] == "http.client"
+    assert client_span["name"].startswith("GET http://127.0.0.1:")
+
+    assert server_span["is_segment"] is True
+    assert (
+        server_span["name"]
+        == "tests.integrations.aiohttp.test_aiohttp.test_tracing_span_streaming.<locals>.hello"
     )
-    assert segment["attributes"]["sentry.span.source"] == "component"
-
-    assert server_span["is_segment"] is False
-    assert server_span["name"] == "generic AIOHTTP request"
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
     assert server_span["attributes"]["http.response.status_code"] == 200
-    assert server_span["attributes"]["sentry.span.source"] == "route"
+    assert server_span["attributes"]["sentry.span.source"] == "component"
     assert server_span["status"] == "ok"
     # No query string on the request, so the attribute should be omitted.
     assert "url.query" not in server_span["attributes"]
@@ -1315,13 +1312,9 @@ async def test_request_body_captured_on_segment_span_streaming(
 
     sentry_sdk.flush()
 
-    # The integration sets http.request.body.data on the segment span. In this
-    # test the segment is the aiohttp_client's outgoing http.client span (the
-    # test client is itself sentry-instrumented). In production with separate
-    # processes, the server span is the segment; the assertion is the same.
-    segment = items.pop().payload
-    assert segment["is_segment"] is True
-    assert segment["attributes"]["http.request.body.data"] == json.dumps(body)
+    server_segment, client_segment = [item.payload for item in items]
+    assert server_segment["is_segment"] is True
+    assert server_segment["attributes"]["http.request.body.data"] == json.dumps(body)
 
 
 @pytest.mark.asyncio
@@ -1349,9 +1342,11 @@ async def test_request_body_not_read_span_streaming(
 
     sentry_sdk.flush()
 
-    segment = items.pop().payload
-    assert segment["is_segment"] is True
-    assert segment["attributes"]["http.request.body.data"] == BODY_NOT_READ_MESSAGE
+    server_segment, client_segment = [item.payload for item in items]
+    assert server_segment["is_segment"] is True
+    assert (
+        server_segment["attributes"]["http.request.body.data"] == BODY_NOT_READ_MESSAGE
+    )
 
 
 @pytest.mark.asyncio
@@ -1381,9 +1376,12 @@ async def test_request_body_over_size_limit_span_streaming(
 
     sentry_sdk.flush()
 
-    segment = items.pop().payload
-    assert segment["is_segment"] is True
-    assert segment["attributes"]["http.request.body.data"] == OVER_SIZE_LIMIT_SUBSTITUTE
+    server_segment, client_segment = [item.payload for item in items]
+    assert server_segment["is_segment"] is True
+    assert (
+        server_segment["attributes"]["http.request.body.data"]
+        == OVER_SIZE_LIMIT_SUBSTITUTE
+    )
 
 
 @pytest.mark.asyncio
@@ -1411,10 +1409,9 @@ async def test_url_query_attribute_span_streaming(
     sentry_sdk.flush()
 
     assert len(items) == 2
-    items.pop()  # drop the test client's outer segment
-    (server_span,) = [item.payload for item in items]
+    server_segment, client_segment = [item.payload for item in items]
 
-    assert server_span["attributes"]["url.query"] == "foo=bar&baz=qux"
+    assert server_segment["attributes"]["url.query"] == "foo=bar&baz=qux"
 
 
 @pytest.mark.asyncio
@@ -1466,15 +1463,11 @@ async def test_transaction_style_span_streaming(
     sentry_sdk.flush()
 
     assert len(items) == 2
-    segment = items.pop().payload
-    (server_span,) = [item.payload for item in items]
+    server_segment, client_segment = [item.payload for item in items]
 
-    assert segment["name"] == expected_name
-    assert segment["attributes"]["sentry.span.source"] == expected_source
-
-    assert server_span["name"] == "generic AIOHTTP request"
-    assert not server_span["is_segment"]
-    assert server_span["attributes"]["sentry.span.source"] == "route"
+    assert server_segment["name"] == expected_name
+    assert server_segment["is_segment"]
+    assert server_segment["attributes"]["sentry.span.source"] == expected_source
 
 
 @pytest.mark.asyncio
