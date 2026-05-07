@@ -1084,16 +1084,21 @@ else:
 
 
 class _EnvelopePrinterTransport(Transport):
-    """Wraps another transport, printing envelope contents to the SDK debug logger before sending."""
+    """Prints envelope contents to the SDK debug logger, optionally wrapping another transport."""
 
-    def __init__(self, transport: "Transport") -> None:
-        Transport.__init__(self, options=transport.options)
+    def __init__(self, transport: "Optional[Transport]" = None) -> None:
+        if transport is not None:
+            Transport.__init__(self, options=transport.options)
+            self.parsed_dsn = transport.parsed_dsn
+        else:
+            Transport.__init__(self)
         self._inner = transport
-        self.parsed_dsn = transport.parsed_dsn
 
     @property  # type: ignore[misc]
     def __class__(self) -> type:
-        return self._inner.__class__
+        if self._inner is not None:
+            return self._inner.__class__
+        return _EnvelopePrinterTransport
 
     def capture_envelope(self, envelope: "Envelope") -> None:
         try:
@@ -1122,17 +1127,20 @@ class _EnvelopePrinterTransport(Transport):
         except Exception:
             pass
 
-        self._inner.capture_envelope(envelope)
+        if self._inner is not None:
+            self._inner.capture_envelope(envelope)
 
     def flush(
         self,
         timeout: float,
         callback: "Optional[Any]" = None,
     ) -> "Any":
-        return self._inner.flush(timeout, callback)
+        if self._inner is not None:
+            return self._inner.flush(timeout, callback)
 
     def kill(self) -> "Any":
-        return self._inner.kill()
+        if self._inner is not None:
+            return self._inner.kill()
 
     def record_lost_event(
         self,
@@ -1142,13 +1150,20 @@ class _EnvelopePrinterTransport(Transport):
         *,
         quantity: int = 1,
     ) -> None:
-        self._inner.record_lost_event(reason, data_category, item, quantity=quantity)
+        if self._inner is not None:
+            self._inner.record_lost_event(
+                reason, data_category, item, quantity=quantity
+            )
 
     def is_healthy(self) -> bool:
-        return self._inner.is_healthy()
+        if self._inner is not None:
+            return self._inner.is_healthy()
+        return True
 
     def __getattr__(self, name: str) -> "Any":
-        return getattr(self._inner, name)
+        if self._inner is not None:
+            return getattr(self._inner, name)
+        raise AttributeError(name)
 
 
 class _FunctionTransport(Transport):
@@ -1237,9 +1252,7 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
     if transport is None and options["dsn"]:
         transport = transport_cls(options)
 
-    if transport is not None and os.environ.get(
-        "SENTRY_PRINT_ENVELOPES", ""
-    ).lower() in ("1", "true", "yes"):
+    if os.environ.get("SENTRY_PRINT_ENVELOPES", "").lower() in ("1", "true", "yes"):
         transport = _EnvelopePrinterTransport(transport)
 
     return transport
