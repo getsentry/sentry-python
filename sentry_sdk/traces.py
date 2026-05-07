@@ -573,17 +573,6 @@ class StreamedSpan:
 
         self.set_attribute("process.command_args", sys.argv)
 
-    def _to_dict(self) -> SpanSnapshot:
-        res = {
-            "trace_id": self.trace_id,
-            "span_id": self.span_id,
-            "name": self._name if self._name is not None else "<unlabeled span>",
-            "status": self._status,
-            "is_segment": self._is_segment(),
-            "start_timestamp": self._start_timestamp.timestamp(),
-            "attributes": self.get_attributes(),
-        }
-
         if self._timestamp:
             res["end_timestamp"] = self._timestamp.timestamp()
 

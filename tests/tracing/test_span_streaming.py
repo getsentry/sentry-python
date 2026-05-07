@@ -270,6 +270,60 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
     with sentry_sdk.traces.start_span(name="span", attributes={"first": False}):
         ...
 
+def test_before_send_span(sentry_init, capture_items):
+    def before_send_span(span, hint):
+        return None
+
+    sentry_init(
+        _experiments={
+            "before_send_span": before_send_span.
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="dropped", attributes={"drop": True}):
+        ...
+    with sentry_sdk.traces.start_span(name="retained", attributes={"drop": False}):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "retained"
+    assert span["attributes"]["drop"] is False
+
+def test_before_send_span_invalid_return_value(sentry_init, capture_items):
+    def before_send_span(span, hint):
+        # Spans can't be dropped in before_send_span
+        return None
+
+    sentry_init(
+        _experiments={
+            "before_send_span": before_send_span.
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="dropped", attributes={"drop": True}):
+        ...
+    with sentry_sdk.traces.start_span(name="retained", attributes={"drop": False}):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "retained"
+    assert span["attributes"]["drop"] is False
 
 def test_span_attributes(sentry_init, capture_items):
     sentry_init(
