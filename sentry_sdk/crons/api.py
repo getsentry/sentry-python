@@ -18,7 +18,7 @@ def _create_check_in_event(
     monitor_config: "Optional[MonitorConfig]" = None,
 ) -> "Event":
     options = sentry_sdk.get_client().options
-    check_in_id: str = check_in_id or uuid.uuid4().hex
+    check_in_id = check_in_id or uuid.uuid4().hex
 
     check_in: "Event" = {
         "type": "check_in",
