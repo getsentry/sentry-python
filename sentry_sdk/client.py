@@ -949,6 +949,8 @@ class _Client(BaseClient):
             before_send = get_before_send_log(self.options)
         elif ty == "metric":
             before_send = get_before_send_metric(self.options)  # type: ignore
+        elif ty == "span":
+            before_send = get_before_send_span(self.options)  # type: ignore
 
         if before_send is not None:
             telemetry = before_send(telemetry, {})  # type: ignore

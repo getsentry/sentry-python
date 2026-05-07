@@ -317,6 +317,21 @@ if TYPE_CHECKING:
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
 
+    SpanSnapshot = TypedDict(
+        "SpanSnapshot",
+        {
+            "trace_id": str,
+            "span_id": str,
+            "name": str,
+            "status": str,
+            "is_segment": bool,
+            "start_timestamp": float,
+            "end_timestamp": float,
+            "parent_span_id": Optional[str],
+            "attributes": Attributes,
+        },
+    )
+
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]
 

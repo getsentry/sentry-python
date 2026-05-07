@@ -2111,6 +2111,15 @@ def get_before_send_metric(
     )
 
 
+def get_before_send_span(
+    options: "Optional[dict[str, Any]]",
+) -> "Optional[Callable[[Metric, Hint], Optional[StreamedSpan]]]":
+    if options is None:
+        return None
+
+    return options["_experiments"].get("before_send_span")
+
+
 def format_attribute(val: "Any") -> "AttributeValue":
     """
     Turn unsupported attribute value types into an AttributeValue.
