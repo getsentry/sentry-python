@@ -168,8 +168,8 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             "start_timestamp": item._start_timestamp.timestamp(),
         }
 
-        if item._timestamp:
-            res["end_timestamp"] = item._timestamp.timestamp()
+        if item._end_timestamp:
+            res["end_timestamp"] = item._end_timestamp.timestamp()
 
         if item._parent_span_id:
             res["parent_span_id"] = item._parent_span_id
