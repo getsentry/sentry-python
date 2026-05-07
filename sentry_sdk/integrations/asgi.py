@@ -263,7 +263,9 @@ class SentryAsgiMiddleware:
 
                                 attributes["sentry.op"] = f"{ty}.server"
                                 segment = sentry_sdk.traces.start_span(
-                                    name=transaction_name, attributes=attributes
+                                    name=transaction_name,
+                                    attributes=attributes,
+                                    parent_span=None,
                                 )
                         else:
                             sentry_sdk.traces.new_trace()
@@ -274,7 +276,9 @@ class SentryAsgiMiddleware:
 
                             attributes["sentry.op"] = OP.HTTP_SERVER
                             segment = sentry_sdk.traces.start_span(
-                                name=transaction_name, attributes=attributes
+                                name=transaction_name,
+                                attributes=attributes,
+                                parent_span=None,
                             )
 
                         span_ctx = segment or nullcontext()

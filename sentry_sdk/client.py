@@ -864,7 +864,7 @@ class _Client(BaseClient):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        hint: "Hint" = dict(hint or ())
+        hint = dict(hint or ())
 
         if not self._should_capture(event, hint, scope):
             return None
@@ -948,7 +948,7 @@ class _Client(BaseClient):
         if ty == "log":
             before_send = get_before_send_log(self.options)
         elif ty == "metric":
-            before_send = get_before_send_metric(self.options)  # type: ignore
+            before_send = get_before_send_metric(self.options)
 
         if before_send is not None:
             telemetry = before_send(telemetry, {})  # type: ignore
@@ -960,9 +960,9 @@ class _Client(BaseClient):
         if ty == "log":
             batcher = self.log_batcher
         elif ty == "metric":
-            batcher = self.metrics_batcher  # type: ignore
+            batcher = self.metrics_batcher
         elif ty == "span":
-            batcher = self.span_batcher  # type: ignore
+            batcher = self.span_batcher
 
         if batcher is not None:
             batcher.add(telemetry)  # type: ignore
