@@ -152,7 +152,7 @@ def _wrap_async_server(func: "Callable[P, AsyncServer]") -> "Callable[P, AsyncSe
         **kwargs: "P.kwargs",
     ) -> "Server":
         server_interceptor = AsyncServerInterceptor()
-        interceptors: "Sequence[grpc.ServerInterceptor]" = [
+        interceptors = [
             server_interceptor,
             *(interceptors or []),
         ]
