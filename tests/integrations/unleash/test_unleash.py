@@ -168,19 +168,45 @@ def test_wrapper_attributes(sentry_init, uninstall_integration):
         assert client.is_enabled.__qualname__ == original_is_enabled.__qualname__
 
 
-def test_unleash_span_integration(sentry_init, capture_events, uninstall_integration):
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
+def test_unleash_span_integration(
+    sentry_init, capture_events, capture_items, uninstall_integration, span_streaming
+):
     uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
-        sentry_init(traces_sample_rate=1.0, integrations=[UnleashIntegration()])
-        events = capture_events()
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[UnleashIntegration()],
+            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        )
+
         client = UnleashClient()  # type: ignore[arg-type]
-        with start_transaction(name="hi"):
-            with start_span(op="foo", name="bar"):
+
+        if span_streaming:
+            items = capture_items("span")
+            with sentry_sdk.traces.start_span(name="bar"):
                 client.is_enabled("hello")
                 client.is_enabled("other")
 
-    (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict(
-        {"flag.evaluation.hello": True, "flag.evaluation.other": False}
-    )
+            sentry_sdk.flush()
+
+            assert len(items) == 1
+            span = items[0].payload
+            assert span["attributes"]["flag.evaluation.hello"] is True
+            assert span["attributes"]["flag.evaluation.other"] is False
+
+        else:
+            events = capture_events()
+            with start_transaction(name="hi"):
+                with start_span(op="foo", name="bar"):
+                    client.is_enabled("hello")
+                    client.is_enabled("other")
+
+            (event,) = events
+            assert event["spans"][0]["data"] == ApproxDict(
+                {"flag.evaluation.hello": True, "flag.evaluation.other": False}
+            )
