@@ -244,7 +244,7 @@ class StreamedSpan:
         "_parent_sampled",
         "_start_timestamp",
         "_start_timestamp_monotonic_ns",
-        "_timestamp",
+        "_end_timestamp",
         "_status",
         "_scope",
         "_previous_span_on_scope",
