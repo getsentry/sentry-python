@@ -495,7 +495,7 @@ async def _handler_wrapper(
                         uri = original_kwargs.get("uri")
 
                     protocol = None
-                    if hasattr(uri, "scheme"):
+                    if uri is not None and hasattr(uri, "scheme"):
                         protocol = uri.scheme
                     elif handler_name and "://" in handler_name:
                         protocol = handler_name.split("://")[0]
@@ -638,7 +638,7 @@ def _patch_fastmcp() -> None:
     This function patches the _get_prompt_mcp and _read_resource_mcp methods
     to add instrumentation for those handlers.
     """
-    if hasattr(FastMCP, "_get_prompt_mcp"):
+    if FastMCP is not None and hasattr(FastMCP, "_get_prompt_mcp"):
         original_get_prompt_mcp = FastMCP._get_prompt_mcp
 
         @wraps(original_get_prompt_mcp)
@@ -655,7 +655,7 @@ def _patch_fastmcp() -> None:
 
         FastMCP._get_prompt_mcp = patched_get_prompt_mcp
 
-    if hasattr(FastMCP, "_read_resource_mcp"):
+    if FastMCP is not None and hasattr(FastMCP, "_read_resource_mcp"):
         original_read_resource_mcp = FastMCP._read_resource_mcp
 
         @wraps(original_read_resource_mcp)
