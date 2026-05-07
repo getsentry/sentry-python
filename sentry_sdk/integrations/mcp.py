@@ -495,7 +495,7 @@ async def _handler_wrapper(
                         uri = original_kwargs.get("uri")
 
                     protocol = None
-                    if uri is not None and getattr(uri, "scheme", None) is not None:
+                    if uri is not None and hasattr(uri, "scheme"):
                         protocol = uri.scheme
                     elif handler_name and "://" in handler_name:
                         protocol = handler_name.split("://")[0]
