@@ -58,7 +58,7 @@ except AttributeError:
 class SanicIntegration(Integration):
     identifier = "sanic"
     origin = f"auto.http.{identifier}"
-    version = None
+    version: "Optional[tuple[int, ...]]" = None
 
     def __init__(
         self, unsampled_statuses: "Optional[Container[int]]" = frozenset({404})
