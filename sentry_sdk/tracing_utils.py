@@ -400,7 +400,7 @@ def add_query_source(
         return
 
     end_timestamp = (
-        datetime.now(timezone.utc) if span.timestamp is None else span.timestamp
+        datetime.now(timezone.utc) if span.end_timestamp is None else span.end_timestamp
     )
 
     duration = end_timestamp - span.start_timestamp
@@ -443,7 +443,7 @@ def add_http_request_source(
         return
 
     end_timestamp = (
-        datetime.now(timezone.utc) if span.timestamp is None else span.timestamp
+        datetime.now(timezone.utc) if span.end_timestamp is None else span.end_timestamp
     )
 
     duration = end_timestamp - span.start_timestamp

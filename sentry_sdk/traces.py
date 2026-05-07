@@ -479,7 +479,7 @@ class StreamedSpan:
         return self._start_timestamp
 
     @property
-    def timestamp(self) -> "Optional[datetime]":
+    def end_timestamp(self) -> "Optional[datetime]":
         return self._end_timestamp
 
     def _is_segment(self) -> bool:
@@ -699,7 +699,7 @@ class NoOpStreamedSpan(StreamedSpan):
         return None
 
     @property
-    def timestamp(self) -> "Optional[datetime]":
+    def end_timestamp(self) -> "Optional[datetime]":
         return None
 
 
