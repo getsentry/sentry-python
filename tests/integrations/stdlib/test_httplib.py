@@ -873,9 +873,9 @@ def test_no_request_source_if_duration_too_short(
     def add_http_request_source_with_pinned_timestamps(span):
         if span_streaming:
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
             result = add_http_request_source(span)
-            span._timestamp = None
+            span._end_timestamp = None
             return result
         else:
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
@@ -947,9 +947,9 @@ def test_request_source_if_duration_over_threshold(
     def add_http_request_source_with_pinned_timestamps(span):
         if span_streaming:
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
             result = add_http_request_source(span)
-            span._timestamp = None
+            span._end_timestamp = None
             return result
         else:
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
