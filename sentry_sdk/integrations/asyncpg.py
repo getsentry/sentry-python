@@ -198,9 +198,9 @@ def _wrap_connect_addr(
                 except IndexError:
                     pass
 
-            with sentry_sdk.traces.start_span(name="connect") as span:
-                span.set_attributes(span_attributes)
-
+            with sentry_sdk.traces.start_span(
+                name="connect", attributes=span_attributes
+            ) as span:
                 with capture_internal_exceptions():
                     sentry_sdk.add_breadcrumb(
                         message="connect", category="query", data=span_attributes
