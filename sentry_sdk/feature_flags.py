@@ -1,6 +1,7 @@
 import copy
 import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from threading import Lock
 
@@ -62,5 +63,8 @@ def add_feature_flag(flag: str, result: bool) -> None:
     flags.set(flag, result)
 
     span = sentry_sdk.get_current_span()
-    if span and isinstance(span, Span):
-        span.set_flag(f"flag.evaluation.{flag}", result)
+    if span:
+        if isinstance(span, Span):
+            span.set_flag(f"flag.evaluation.{flag}", result)
+        elif isinstance(span, StreamedSpan):
+            span.set_attribute(f"flag.evaluation.{flag}", result)
