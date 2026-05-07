@@ -44,7 +44,7 @@ if hasattr(inspect, "markcoroutinefunction"):
     iscoroutinefunction = inspect.iscoroutinefunction
     markcoroutinefunction = inspect.markcoroutinefunction
 else:
-    iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
+    iscoroutinefunction = asyncio.iscoroutinefunction
 
     def markcoroutinefunction(func: "_F") -> "_F":
         func._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore
