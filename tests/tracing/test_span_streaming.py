@@ -1533,6 +1533,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
     assert item.payload.json["items"][0]["attributes"] == {
         "thread.id": {"value": mock.ANY, "type": "string"},
         "thread.name": {"value": "MainThread", "type": "string"},
+        "process.command_args": {"value": mock.ANY, "type": "array"},
         "sentry.segment.id": {"value": mock.ANY, "type": "string"},
         "sentry.segment.name": {"value": "test", "type": "string"},
         "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
