@@ -144,6 +144,7 @@ class OpenAIAgentsIntegration(Integration):
 
                 agents.run_internal.run_loop.get_model = new_wrapped_get_model
 
+            if turn_resolution is not None:
                 original_execute_handoffs = turn_resolution.execute_handoffs
 
                 @wraps(original_execute_handoffs)
@@ -158,7 +159,6 @@ class OpenAIAgentsIntegration(Integration):
                     new_wrapped_execute_handoffs
                 )
 
-            if turn_resolution is not None:
                 original_execute_final_output = turn_resolution.execute_final_output
 
                 @wraps(turn_resolution.execute_final_output)
