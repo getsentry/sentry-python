@@ -802,7 +802,10 @@ async def test_no_query_source_if_duration_too_short(
             with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
                 pass
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            if span_streaming:
+                span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            else:
+                span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
             yield span
 
         with sentry_sdk.traces.start_span(name="test_transaction"):
