@@ -7,6 +7,7 @@ You can enable span streaming mode via
 sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
+import sys
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -306,6 +307,8 @@ class StreamedSpan:
         self._start_profile()
         self._set_profile_id(get_profiler_id())
 
+        self._set_segment_attributes()
+
         self._start()
 
     def __repr__(self) -> str:
@@ -563,6 +566,12 @@ class StreamedSpan:
         try_autostart_continuous_profiler()
 
         self._continuous_profile = try_profile_lifecycle_trace_start()
+
+    def _set_segment_attributes(self) -> None:
+        if not self._is_segment():
+            return
+
+        self.set_attribute("process.command_args", sys.argv)
 
 
 class NoOpStreamedSpan(StreamedSpan):

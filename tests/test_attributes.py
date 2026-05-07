@@ -1,12 +1,10 @@
 import sentry_sdk
 
-from tests.test_metrics import envelopes_to_metrics
 
-
-def test_top_level_api(sentry_init, capture_envelopes):
+def test_top_level_api(sentry_init, capture_items):
     sentry_init()
 
-    envelopes = capture_envelopes()
+    items = capture_items("trace_metric")
 
     sentry_sdk.set_attribute("set", "value")
     sentry_sdk.set_attribute("removed", "value")
@@ -17,14 +15,14 @@ def test_top_level_api(sentry_init, capture_envelopes):
     sentry_sdk.metrics.count("test", 1)
     sentry_sdk.get_client().flush()
 
-    metrics = envelopes_to_metrics(envelopes)
+    metrics = [item.payload for item in items]
     (metric,) = metrics
 
     assert metric["attributes"]["set"] == "value"
     assert "removed" not in metric["attributes"]
 
 
-def test_scope_precedence(sentry_init, capture_envelopes):
+def test_scope_precedence(sentry_init, capture_items):
     # Order of precedence, from most important to least:
     # 1. telemetry attributes (directly supplying attributes on creation or using set_attribute)
     # 2. current scope attributes
@@ -32,7 +30,7 @@ def test_scope_precedence(sentry_init, capture_envelopes):
     # 4. global scope attributes
     sentry_init()
 
-    envelopes = capture_envelopes()
+    items = capture_items("trace_metric")
 
     global_scope = sentry_sdk.get_global_scope()
     global_scope.set_attribute("global.attribute", "global")
@@ -49,7 +47,7 @@ def test_scope_precedence(sentry_init, capture_envelopes):
     sentry_sdk.metrics.count("test", 1)
     sentry_sdk.get_client().flush()
 
-    metrics = envelopes_to_metrics(envelopes)
+    metrics = [item.payload for item in items]
     (metric,) = metrics
 
     assert metric["attributes"]["global.attribute"] == "global"
@@ -59,7 +57,7 @@ def test_scope_precedence(sentry_init, capture_envelopes):
     assert metric["attributes"]["overwritten.attribute"] == "current"
 
 
-def test_telemetry_precedence(sentry_init, capture_envelopes):
+def test_telemetry_precedence(sentry_init, capture_items):
     # Order of precedence, from most important to least:
     # 1. telemetry attributes (directly supplying attributes on creation or using set_attribute)
     # 2. current scope attributes
@@ -67,7 +65,7 @@ def test_telemetry_precedence(sentry_init, capture_envelopes):
     # 4. global scope attributes
     sentry_init()
 
-    envelopes = capture_envelopes()
+    items = capture_items("trace_metric")
 
     global_scope = sentry_sdk.get_global_scope()
     global_scope.set_attribute("global.attribute", "global")
@@ -92,7 +90,7 @@ def test_telemetry_precedence(sentry_init, capture_envelopes):
 
     sentry_sdk.get_client().flush()
 
-    metrics = envelopes_to_metrics(envelopes)
+    metrics = [item.payload for item in items]
     (metric,) = metrics
 
     assert metric["attributes"]["global.attribute"] == "global"
@@ -103,10 +101,10 @@ def test_telemetry_precedence(sentry_init, capture_envelopes):
     assert metric["attributes"]["overwritten.attribute"] == "telemetry"
 
 
-def test_attribute_out_of_scope(sentry_init, capture_envelopes):
+def test_attribute_out_of_scope(sentry_init, capture_items):
     sentry_init()
 
-    envelopes = capture_envelopes()
+    items = capture_items("trace_metric")
 
     with sentry_sdk.new_scope() as scope:
         scope.set_attribute("outofscope.attribute", "out of scope")
@@ -115,16 +113,16 @@ def test_attribute_out_of_scope(sentry_init, capture_envelopes):
 
     sentry_sdk.get_client().flush()
 
-    metrics = envelopes_to_metrics(envelopes)
+    metrics = [item.payload for item in items]
     (metric,) = metrics
 
     assert "outofscope.attribute" not in metric["attributes"]
 
 
-def test_remove_attribute(sentry_init, capture_envelopes):
+def test_remove_attribute(sentry_init, capture_items):
     sentry_init()
 
-    envelopes = capture_envelopes()
+    items = capture_items("trace_metric")
 
     with sentry_sdk.new_scope() as scope:
         scope.set_attribute("some.attribute", 123)
@@ -134,13 +132,13 @@ def test_remove_attribute(sentry_init, capture_envelopes):
 
     sentry_sdk.get_client().flush()
 
-    metrics = envelopes_to_metrics(envelopes)
+    metrics = [item.payload for item in items]
     (metric,) = metrics
 
     assert "some.attribute" not in metric["attributes"]
 
 
-def test_scope_attributes_preserialized(sentry_init, capture_envelopes):
+def test_scope_attributes_preserialized(sentry_init, capture_items):
     def before_send_metric(metric, _):
         # Scope attrs show up serialized in before_send
         assert isinstance(metric["attributes"]["instance"], str)
@@ -150,7 +148,7 @@ def test_scope_attributes_preserialized(sentry_init, capture_envelopes):
 
     sentry_init(before_send_metric=before_send_metric)
 
-    envelopes = capture_envelopes()
+    items = capture_items("trace_metric")
 
     class Cat:
         pass
@@ -170,7 +168,7 @@ def test_scope_attributes_preserialized(sentry_init, capture_envelopes):
 
     sentry_sdk.get_client().flush()
 
-    metrics = envelopes_to_metrics(envelopes)
+    metrics = [item.payload for item in items]
     (metric,) = metrics
 
     # Attrs originally from the scope are serialized when sent
