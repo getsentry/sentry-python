@@ -12,7 +12,6 @@ from sentry_sdk.integrations.logging import (
     unignore_logger,
     unignore_logger_for_sentry_logs,
 )
-from tests.test_logs import envelopes_to_logs
 
 other_logger = logging.getLogger("testfoo")
 logger = logging.getLogger(__name__)
@@ -271,12 +270,10 @@ def test_ignore_logger_wildcard(sentry_init, capture_events, request):
     assert event["logentry"]["formatted"] == "hi"
 
 
-def test_ignore_logger_does_not_affect_sentry_logs(
-    sentry_init, capture_envelopes, request
-):
+def test_ignore_logger_does_not_affect_sentry_logs(sentry_init, capture_items, request):
     """ignore_logger should suppress events/breadcrumbs but not Sentry Logs."""
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     ignore_logger("testfoo")
     request.addfinalizer(lambda: unignore_logger("testfoo"))
@@ -284,15 +281,18 @@ def test_ignore_logger_does_not_affect_sentry_logs(
     other_logger.error("hi")
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 1
     assert logs[0]["body"] == "hi"
 
 
-def test_ignore_logger_for_sentry_logs(sentry_init, capture_envelopes, request):
+def test_ignore_logger_for_sentry_logs(
+    sentry_init, capture_envelopes, capture_items, request
+):
     """ignore_logger_for_sentry_logs should suppress Sentry Logs but not events."""
     sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
+    items = capture_items("log")
 
     ignore_logger_for_sentry_logs("testfoo")
     request.addfinalizer(lambda: unignore_logger_for_sentry_logs("testfoo"))
@@ -305,7 +305,7 @@ def test_ignore_logger_for_sentry_logs(sentry_init, capture_envelopes, request):
     assert len(event_envelopes) == 1
 
     # But no Sentry Logs
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 0
 
 
@@ -347,18 +347,18 @@ def test_logging_dictionary_args(sentry_init, capture_events):
     assert event["logentry"]["params"] == {"foo": "bar", "bar": "baz"}
 
 
-def test_sentry_logs_warning(sentry_init, capture_envelopes):
+def test_sentry_logs_warning(sentry_init, capture_items):
     """
     The python logger module should create 'warn' sentry logs if the flag is on.
     """
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.warning("this is %s a template %s", "1", "2")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     attrs = logs[0]["attributes"]
     assert attrs["sentry.message.template"] == "this is %s a template %s"
     assert "code.file.path" in attrs
@@ -368,8 +368,8 @@ def test_sentry_logs_warning(sentry_init, capture_envelopes):
     assert attrs["sentry.message.parameter.0"] == "1"
     assert attrs["sentry.message.parameter.1"] == "2"
     assert attrs["sentry.origin"] == "auto.log.stdlib"
-    assert logs[0]["severity_number"] == 13
-    assert logs[0]["severity_text"] == "warn"
+    assert logs[0]["attributes"]["sentry.severity_number"] == 13
+    assert logs[0]["attributes"]["sentry.severity_text"] == "warn"
 
 
 def test_sentry_logs_debug(sentry_init, capture_envelopes):
@@ -404,12 +404,13 @@ def test_no_log_infinite_loop(sentry_init, capture_envelopes):
     assert len(envelopes) == 1
 
 
-def test_logging_errors(sentry_init, capture_envelopes):
+def test_logging_errors(sentry_init, capture_envelopes, capture_items):
     """
     The python logger module should be able to log errors without erroring
     """
     sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
+    items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.error(Exception("test exc 1"))
@@ -421,13 +422,13 @@ def test_logging_errors(sentry_init, capture_envelopes):
     error_event_2 = envelopes[1].items[0].payload.json
     assert error_event_2["level"] == "error"
 
-    logs = envelopes_to_logs(envelopes)
-    assert logs[0]["severity_text"] == "error"
+    logs = [item.payload for item in items]
+    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
     assert "sentry.message.template" not in logs[0]["attributes"]
     assert "sentry.message.parameter.0" not in logs[0]["attributes"]
     assert "code.line.number" in logs[0]["attributes"]
 
-    assert logs[1]["severity_text"] == "error"
+    assert logs[1]["attributes"]["sentry.severity_text"] == "error"
     assert logs[1]["attributes"]["sentry.message.template"] == "error is %s"
     assert logs[1]["attributes"]["sentry.message.parameter.0"] in (
         "Exception('test exc 2')",
@@ -438,7 +439,7 @@ def test_logging_errors(sentry_init, capture_envelopes):
     assert len(logs) == 2
 
 
-def test_log_strips_project_root(sentry_init, capture_envelopes):
+def test_log_strips_project_root(sentry_init, capture_items):
     """
     The python logger should strip project roots from the log record path
     """
@@ -446,7 +447,7 @@ def test_log_strips_project_root(sentry_init, capture_envelopes):
         enable_logs=True,
         project_root="/custom/test",
     )
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.handle(
@@ -462,18 +463,18 @@ def test_log_strips_project_root(sentry_init, capture_envelopes):
     )
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
     assert attrs["code.file.path"] == "blah/path.py"
 
 
-def test_logger_with_all_attributes(sentry_init, capture_envelopes):
+def test_logger_with_all_attributes(sentry_init, capture_items):
     """
     The python logger should be able to log all attributes, including extra data.
     """
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.warning(
@@ -483,7 +484,7 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
     )
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     assert "span_id" in logs[0]
     assert logs[0]["span_id"] is None
@@ -544,12 +545,12 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
     }
 
 
-def test_sentry_logs_named_parameters(sentry_init, capture_envelopes):
+def test_sentry_logs_named_parameters(sentry_init, capture_items):
     """
     The python logger module should capture named parameters from dictionary arguments in Sentry logs.
     """
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.info(
@@ -564,7 +565,7 @@ def test_sentry_logs_named_parameters(sentry_init, capture_envelopes):
     )
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
@@ -585,16 +586,16 @@ def test_sentry_logs_named_parameters(sentry_init, capture_envelopes):
     # Check other standard attributes
     assert attrs["logger.name"] == "test-logger"
     assert attrs["sentry.origin"] == "auto.log.stdlib"
-    assert logs[0]["severity_number"] == 9  # info level
-    assert logs[0]["severity_text"] == "info"
+    assert logs[0]["attributes"]["sentry.severity_number"] == 9  # info level
+    assert logs[0]["attributes"]["sentry.severity_text"] == "info"
 
 
-def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_envelopes):
+def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_items):
     """
     The python logger module should handle complex values in named parameters using safe_repr.
     """
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     complex_object = {"nested": {"data": [1, 2, 3]}, "tuple": (4, 5, 6)}
@@ -607,7 +608,7 @@ def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_envelo
     )
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
@@ -623,18 +624,18 @@ def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_envelo
     assert "data" in complex_param
 
 
-def test_sentry_logs_no_parameters_no_template(sentry_init, capture_envelopes):
+def test_sentry_logs_no_parameters_no_template(sentry_init, capture_items):
     """
     There shouldn't be a template if there are no parameters.
     """
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.warning("Warning about something without any parameters.")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     assert len(logs) == 1
 

@@ -8,7 +8,6 @@ from loguru._recattrs import RecordFile, RecordLevel
 import sentry_sdk
 from sentry_sdk.consts import VERSION
 from sentry_sdk.integrations.loguru import LoguruIntegration, LoggingLevels
-from tests.test_logs import envelopes_to_logs
 
 logger.remove(0)  # don't print to console
 
@@ -136,18 +135,18 @@ def test_event_format(sentry_init, capture_events, uninstall_integration, reques
 
 
 def test_sentry_logs_warning(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.warning("this is {} a {}", "just", "template")
 
     sentry_sdk.get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     attrs = logs[0]["attributes"]
     assert "code.file.path" in attrs
@@ -155,8 +154,8 @@ def test_sentry_logs_warning(
     assert attrs["logger.name"] == "tests.integrations.loguru.test_loguru"
     assert attrs["sentry.environment"] == "production"
     assert attrs["sentry.origin"] == "auto.log.loguru"
-    assert logs[0]["severity_number"] == 13
-    assert logs[0]["severity_text"] == "warn"
+    assert logs[0]["attributes"]["sentry.severity_number"] == 13
+    assert logs[0]["attributes"]["sentry.severity_text"] == "warn"
 
 
 def test_sentry_logs_debug(
@@ -174,9 +173,7 @@ def test_sentry_logs_debug(
     assert len(envelopes) == 0
 
 
-def test_sentry_log_levels(
-    sentry_init, capture_envelopes, uninstall_integration, request
-):
+def test_sentry_log_levels(sentry_init, capture_items, uninstall_integration, request):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
@@ -184,7 +181,7 @@ def test_sentry_log_levels(
         integrations=[LoguruIntegration(sentry_logs_level=LoggingLevels.SUCCESS)],
         enable_logs=True,
     )
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.trace("this is a log")
     logger.debug("this is a log")
@@ -195,21 +192,21 @@ def test_sentry_log_levels(
     logger.critical("this is a log")
 
     sentry_sdk.get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 4
 
-    assert logs[0]["severity_number"] == 11
-    assert logs[0]["severity_text"] == "info"
-    assert logs[1]["severity_number"] == 13
-    assert logs[1]["severity_text"] == "warn"
-    assert logs[2]["severity_number"] == 17
-    assert logs[2]["severity_text"] == "error"
-    assert logs[3]["severity_number"] == 21
-    assert logs[3]["severity_text"] == "fatal"
+    assert logs[0]["attributes"]["sentry.severity_number"] == 11
+    assert logs[0]["attributes"]["sentry.severity_text"] == "info"
+    assert logs[1]["attributes"]["sentry.severity_number"] == 13
+    assert logs[1]["attributes"]["sentry.severity_text"] == "warn"
+    assert logs[2]["attributes"]["sentry.severity_number"] == 17
+    assert logs[2]["attributes"]["sentry.severity_text"] == "error"
+    assert logs[3]["attributes"]["sentry.severity_number"] == 21
+    assert logs[3]["attributes"]["sentry.severity_text"] == "fatal"
 
 
 def test_disable_loguru_logs(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
@@ -218,7 +215,7 @@ def test_disable_loguru_logs(
         integrations=[LoguruIntegration(sentry_logs_level=None)],
         enable_logs=True,
     )
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.trace("this is a log")
     logger.debug("this is a log")
@@ -229,12 +226,12 @@ def test_disable_loguru_logs(
     logger.critical("this is a log")
 
     sentry_sdk.get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 0
 
 
 def test_disable_sentry_logs(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
@@ -242,7 +239,7 @@ def test_disable_sentry_logs(
     sentry_init(
         _experiments={"enable_logs": False},
     )
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.trace("this is a log")
     logger.debug("this is a log")
@@ -253,7 +250,7 @@ def test_disable_sentry_logs(
     logger.critical("this is a log")
 
     sentry_sdk.get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 0
 
 
@@ -279,13 +276,16 @@ def test_no_log_infinite_loop(
     assert len(envelopes) == 1
 
 
-def test_logging_errors(sentry_init, capture_envelopes, uninstall_integration, request):
+def test_logging_errors(
+    sentry_init, capture_envelopes, capture_items, uninstall_integration, request
+):
     """We're able to log errors without erroring."""
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.error(Exception("test exc 1"))
     logger.error("error is %s", Exception("test exc 2"))
@@ -296,18 +296,18 @@ def test_logging_errors(sentry_init, capture_envelopes, uninstall_integration, r
     error_event_2 = envelopes[1].items[0].payload.json
     assert error_event_2["level"] == "error"
 
-    logs = envelopes_to_logs(envelopes)
-    assert logs[0]["severity_text"] == "error"
+    logs = [item.payload for item in items]
+    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
     assert "code.line.number" in logs[0]["attributes"]
 
-    assert logs[1]["severity_text"] == "error"
+    assert logs[1]["attributes"]["sentry.severity_text"] == "error"
     assert "code.line.number" in logs[1]["attributes"]
 
     assert len(logs) == 2
 
 
 def test_log_strips_project_root(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
@@ -316,7 +316,7 @@ def test_log_strips_project_root(
         enable_logs=True,
         project_root="/custom/test",
     )
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     class FakeMessage:
         def __init__(self, *args, **kwargs):
@@ -349,14 +349,14 @@ def test_log_strips_project_root(
 
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
     assert attrs["code.file.path"] == "blah/path.py"
 
 
 def test_log_keeps_full_path_if_not_in_project_root(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
@@ -365,7 +365,7 @@ def test_log_keeps_full_path_if_not_in_project_root(
         enable_logs=True,
         project_root="/custom/test",
     )
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     class FakeMessage:
         def __init__(self, *args, **kwargs):
@@ -398,25 +398,25 @@ def test_log_keeps_full_path_if_not_in_project_root(
 
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
     assert attrs["code.file.path"] == "/blah/path.py"
 
 
 def test_logger_with_all_attributes(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.warning("log #{}", 1)
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     assert "span_id" in logs[0]
     assert logs[0]["span_id"] is None
@@ -473,7 +473,7 @@ def test_logger_with_all_attributes(
 
 
 def test_logger_capture_parameters_from_args(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     # This is currently not supported as regular args don't get added to extra
     # (which we use for populating parameters). Adding this test to make that
@@ -482,106 +482,106 @@ def test_logger_capture_parameters_from_args(
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.warning("Task ID: {}", 123)
 
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     attributes = logs[0]["attributes"]
     assert "sentry.message.parameter.0" not in attributes
 
 
 def test_logger_capture_parameters_from_kwargs(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.warning("Task ID: {task_id}", task_id=123)
 
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     attributes = logs[0]["attributes"]
     assert attributes["sentry.message.parameter.task_id"] == 123
 
 
 def test_logger_capture_parameters_from_contextualize(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     with logger.contextualize(task_id=123):
         logger.warning("Log")
 
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     attributes = logs[0]["attributes"]
     assert attributes["sentry.message.parameter.task_id"] == 123
 
 
 def test_logger_capture_parameters_from_bind(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.bind(task_id=123).warning("Log")
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     attributes = logs[0]["attributes"]
     assert attributes["sentry.message.parameter.task_id"] == 123
 
 
 def test_logger_capture_parameters_from_patch(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.patch(lambda record: record["extra"].update(task_id=123)).warning("Log")
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     attributes = logs[0]["attributes"]
     assert attributes["sentry.message.parameter.task_id"] == 123
 
 
 def test_no_parameters_no_template(
-    sentry_init, capture_envelopes, uninstall_integration, request
+    sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     logger.warning("Logging a hardcoded warning")
     sentry_sdk.get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     attributes = logs[0]["attributes"]
     assert "sentry.message.template" not in attributes

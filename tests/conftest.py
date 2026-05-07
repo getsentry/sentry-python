@@ -358,7 +358,7 @@ def capture_items(monkeypatch):
                 if types and item.type not in types:
                     continue
 
-                if item.type in ("metric", "log", "span"):
+                if item.type in ("trace_metric", "log", "span"):
                     for i in item.payload.json["items"]:
                         t = {k: v for k, v in i.items() if k != "attributes"}
                         t["attributes"] = {
