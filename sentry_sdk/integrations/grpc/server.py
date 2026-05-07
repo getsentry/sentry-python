@@ -46,8 +46,9 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 if name:
                     metadata = dict(context.invocation_metadata())
 
-                    client = sentry_sdk.get_client()
-                    span_streaming = has_span_streaming_enabled(client.options)
+                    span_streaming = has_span_streaming_enabled(
+                        sentry_sdk.get_client().options
+                    )
                     if span_streaming:
                         sentry_sdk.traces.continue_trace(metadata)
 

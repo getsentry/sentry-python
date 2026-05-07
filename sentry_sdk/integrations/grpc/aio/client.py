@@ -50,9 +50,7 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
     ) -> "Union[UnaryUnaryCall, Message]":
         method = client_call_details.method
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name="unary unary call to %s" % method.decode(),
@@ -107,9 +105,7 @@ class SentryUnaryStreamClientInterceptor(
     ) -> "Union[AsyncIterable[Any], UnaryStreamCall]":
         method = client_call_details.method
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name="unary stream call to %s" % method.decode(),
