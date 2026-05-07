@@ -178,7 +178,7 @@ class RequestExtractor:
 
             try:
                 raw_data = self.raw_data()
-            except (RawPostDataException, ValueError):
+            except _RAW_DATA_EXCEPTIONS:
                 # The body might have already been read, in which case this will
                 # fail
                 raw_data = None
