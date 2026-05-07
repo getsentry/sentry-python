@@ -99,71 +99,79 @@ class OpenAIAgentsIntegration(Integration):
             0,
             8,
         ):
+            if run_loop is not None:
 
-            @wraps(run_loop.get_all_tools)
-            async def new_wrapped_get_all_tools(
-                agent: "agents.Agent",
-                context_wrapper: "agents.RunContextWrapper",
-            ) -> "list[agents.Tool]":
-                return await _get_all_tools(
-                    run_loop.get_all_tools, agent, context_wrapper
+                @wraps(run_loop.get_all_tools)
+                async def new_wrapped_get_all_tools(
+                    agent: "agents.Agent",
+                    context_wrapper: "agents.RunContextWrapper",
+                ) -> "list[agents.Tool]":
+                    return await _get_all_tools(
+                        run_loop.get_all_tools, agent, context_wrapper
+                    )
+
+                agents.run.get_all_tools = new_wrapped_get_all_tools
+
+                @wraps(run_loop.run_single_turn)
+                async def new_wrapped_run_single_turn(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "SingleStepResult":
+                    return await _run_single_turn(
+                        run_loop.run_single_turn, *args, **kwargs
+                    )
+
+                agents.run.run_single_turn = new_wrapped_run_single_turn
+
+                @wraps(run_loop.run_single_turn_streamed)
+                async def new_wrapped_run_single_turn_streamed(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "SingleStepResult":
+                    return await _run_single_turn_streamed(
+                        run_loop.run_single_turn_streamed, *args, **kwargs
+                    )
+
+                agents.run.run_single_turn_streamed = (
+                    new_wrapped_run_single_turn_streamed
                 )
 
-            agents.run.get_all_tools = new_wrapped_get_all_tools
+            if turn_preparation is not None:
 
-            @wraps(turn_preparation.get_model)
-            def new_wrapped_get_model(
-                agent: "agents.Agent", run_config: "agents.RunConfig"
-            ) -> "agents.Model":
-                return _get_model(turn_preparation.get_model, agent, run_config)
+                @wraps(turn_preparation.get_model)
+                def new_wrapped_get_model(
+                    agent: "agents.Agent", run_config: "agents.RunConfig"
+                ) -> "agents.Model":
+                    return _get_model(turn_preparation.get_model, agent, run_config)
 
-            agents.run_internal.run_loop.get_model = new_wrapped_get_model
+                agents.run_internal.run_loop.get_model = new_wrapped_get_model
 
-            @wraps(run_loop.run_single_turn)
-            async def new_wrapped_run_single_turn(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _run_single_turn(run_loop.run_single_turn, *args, **kwargs)
+            if turn_resolution is not None:
+                original_execute_handoffs = turn_resolution.execute_handoffs
 
-            agents.run.run_single_turn = new_wrapped_run_single_turn
+                @wraps(original_execute_handoffs)
+                async def new_wrapped_execute_handoffs(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "SingleStepResult":
+                    return await _execute_handoffs(
+                        original_execute_handoffs, *args, **kwargs
+                    )
 
-            @wraps(run_loop.run_single_turn_streamed)
-            async def new_wrapped_run_single_turn_streamed(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _run_single_turn_streamed(
-                    run_loop.run_single_turn_streamed, *args, **kwargs
+                agents.run_internal.turn_resolution.execute_handoffs = (
+                    new_wrapped_execute_handoffs
                 )
 
-            agents.run.run_single_turn_streamed = new_wrapped_run_single_turn_streamed
+                original_execute_final_output = turn_resolution.execute_final_output
 
-            original_execute_handoffs = turn_resolution.execute_handoffs
+                @wraps(turn_resolution.execute_final_output)
+                async def new_wrapped_final_output(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "SingleStepResult":
+                    return await _execute_final_output(
+                        original_execute_final_output, *args, **kwargs
+                    )
 
-            @wraps(original_execute_handoffs)
-            async def new_wrapped_execute_handoffs(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _execute_handoffs(
-                    original_execute_handoffs, *args, **kwargs
+                agents.run_internal.turn_resolution.execute_final_output = (
+                    new_wrapped_final_output
                 )
-
-            agents.run_internal.turn_resolution.execute_handoffs = (
-                new_wrapped_execute_handoffs
-            )
-
-            original_execute_final_output = turn_resolution.execute_final_output
-
-            @wraps(turn_resolution.execute_final_output)
-            async def new_wrapped_final_output(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _execute_final_output(
-                    original_execute_final_output, *args, **kwargs
-                )
-
-            agents.run_internal.turn_resolution.execute_final_output = (
-                new_wrapped_final_output
-            )
 
             return
 

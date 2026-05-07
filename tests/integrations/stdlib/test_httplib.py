@@ -1,6 +1,7 @@
 import os
 import socket
 import datetime
+import time
 from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
@@ -43,6 +44,37 @@ def create_mock_proxy_server():
 
 
 PROXY_PORT = create_mock_proxy_server()
+
+CHUNK_DELAY = 0.1
+NUM_CHUNKS = 3
+
+
+class ChunkedResponseHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+        for _ in range(NUM_CHUNKS):
+            chunk = b"x" * 100
+            self.wfile.write(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
+            self.wfile.flush()
+            time.sleep(CHUNK_DELAY)
+        self.wfile.write(b"0\r\n\r\n")
+
+    def log_message(self, *args):
+        pass
+
+
+def create_chunked_server():
+    port = get_free_port()
+    server = HTTPServer(("localhost", port), ChunkedResponseHandler)
+    thread = Thread(target=server.serve_forever)
+    thread.daemon = True
+    thread.start()
+    return port
+
+
+CHUNKED_PORT = create_chunked_server()
 
 
 def test_crumb_capture(sentry_init, capture_events):
@@ -841,9 +873,9 @@ def test_no_request_source_if_duration_too_short(
     def add_http_request_source_with_pinned_timestamps(span):
         if span_streaming:
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
             result = add_http_request_source(span)
-            span._timestamp = None
+            span._end_timestamp = None
             return result
         else:
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
@@ -915,9 +947,9 @@ def test_request_source_if_duration_over_threshold(
     def add_http_request_source_with_pinned_timestamps(span):
         if span_streaming:
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
             result = add_http_request_source(span)
-            span._timestamp = None
+            span._end_timestamp = None
             return result
         else:
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
@@ -1161,3 +1193,50 @@ def test_proxy_http_tunnel(
         assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_chunked_response_span_covers_body_read(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
+    min_expected_duration = CHUNK_DELAY * NUM_CHUNKS
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            conn = HTTPConnection("localhost", CHUNKED_PORT)
+            conn.request("GET", "/chunked")
+            response = conn.getresponse()
+            response.read()
+
+        sentry_sdk.flush()
+        http_span, parent_span = [item.payload for item in items]
+
+        duration = http_span["end_timestamp"] - http_span["start_timestamp"]
+        assert duration >= min_expected_duration
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test_chunked"):
+            conn = HTTPConnection("localhost", CHUNKED_PORT)
+            conn.request("GET", "/chunked")
+            response = conn.getresponse()
+            response.read()
+
+        (event,) = events
+        (span,) = event["spans"]
+
+        fmt = "%Y-%m-%dT%H:%M:%S.%fZ"
+        start = datetime.datetime.strptime(span["start_timestamp"], fmt)
+        end = datetime.datetime.strptime(span["timestamp"], fmt)
+        duration = (end - start).total_seconds()
+        assert duration >= min_expected_duration

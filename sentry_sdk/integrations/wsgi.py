@@ -141,6 +141,7 @@ class SentryWsgiMiddleware:
                                     "sentry.origin": self.span_origin,
                                     "sentry.op": OP.HTTP_SERVER,
                                 },
+                                parent_span=None,
                             )
                         else:
                             transaction = continue_trace(

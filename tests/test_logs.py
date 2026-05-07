@@ -1,63 +1,19 @@
-import json
 import logging
 import os
 import sys
 import time
-from typing import List, Any, Mapping, Union
+
 import pytest
 from unittest import mock
 
 import sentry_sdk
 import sentry_sdk.logger
 from sentry_sdk import get_client
-from sentry_sdk.envelope import Envelope
-from sentry_sdk.types import Log
 from sentry_sdk.consts import SPANDATA, VERSION
 
 minimum_python_37 = pytest.mark.skipif(
     sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
 )
-
-
-def otel_attributes_to_dict(otel_attrs: "Mapping[str, Any]") -> "Mapping[str, Any]":
-    def _convert_attr(attr: "Mapping[str, Union[str, float, bool]]") -> "Any":
-        if attr["type"] == "boolean":
-            return attr["value"]
-        if attr["type"] == "double":
-            return attr["value"]
-        if attr["type"] == "integer":
-            return attr["value"]
-        if attr["value"].startswith("{"):
-            try:
-                return json.loads(attr["value"])
-            except ValueError:
-                pass
-        return str(attr["value"])
-
-    return {k: _convert_attr(v) for (k, v) in otel_attrs.items()}
-
-
-def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
-    res: "List[Log]" = []
-    for envelope in envelopes:
-        for item in envelope.items:
-            if item.type == "log":
-                for log_json in item.payload.json["items"]:
-                    log: "Log" = {
-                        "severity_text": log_json["attributes"]["sentry.severity_text"][
-                            "value"
-                        ],
-                        "severity_number": int(
-                            log_json["attributes"]["sentry.severity_number"]["value"]
-                        ),
-                        "body": log_json["body"],
-                        "attributes": otel_attributes_to_dict(log_json["attributes"]),
-                        "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
-                        "trace_id": log_json["trace_id"],
-                        "span_id": log_json.get("span_id"),
-                    }
-                    res.append(log)
-    return res
 
 
 @minimum_python_37
@@ -80,9 +36,9 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_logs_basics(sentry_init, capture_envelopes):
+def test_logs_basics(sentry_init, capture_items):
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     sentry_sdk.logger.trace("This is a 'trace' log...")
     sentry_sdk.logger.debug("This is a 'debug' log...")
@@ -92,44 +48,44 @@ def test_logs_basics(sentry_init, capture_envelopes):
     sentry_sdk.logger.fatal("This is a 'fatal' log...")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
-    assert logs[0].get("severity_text") == "trace"
-    assert logs[0].get("severity_number") == 1
+    logs = [item.payload for item in items]
+    assert logs[0]["attributes"]["sentry.severity_text"] == "trace"
+    assert logs[0]["attributes"]["sentry.severity_number"] == 1
 
-    assert logs[1].get("severity_text") == "debug"
-    assert logs[1].get("severity_number") == 5
+    assert logs[1]["attributes"]["sentry.severity_text"] == "debug"
+    assert logs[1]["attributes"]["sentry.severity_number"] == 5
 
-    assert logs[2].get("severity_text") == "info"
-    assert logs[2].get("severity_number") == 9
+    assert logs[2]["attributes"]["sentry.severity_text"] == "info"
+    assert logs[2]["attributes"]["sentry.severity_number"] == 9
 
-    assert logs[3].get("severity_text") == "warn"
-    assert logs[3].get("severity_number") == 13
+    assert logs[3]["attributes"]["sentry.severity_text"] == "warn"
+    assert logs[3]["attributes"]["sentry.severity_number"] == 13
 
-    assert logs[4].get("severity_text") == "error"
-    assert logs[4].get("severity_number") == 17
+    assert logs[4]["attributes"]["sentry.severity_text"] == "error"
+    assert logs[4]["attributes"]["sentry.severity_number"] == 17
 
-    assert logs[5].get("severity_text") == "fatal"
-    assert logs[5].get("severity_number") == 21
+    assert logs[5]["attributes"]["sentry.severity_text"] == "fatal"
+    assert logs[5]["attributes"]["sentry.severity_number"] == 21
 
 
 @minimum_python_37
-def test_logs_experimental_option_still_works(sentry_init, capture_envelopes):
+def test_logs_experimental_option_still_works(sentry_init, capture_items):
     sentry_init(_experiments={"enable_logs": True})
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     sentry_sdk.logger.error("This is an error log...")
 
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 1
 
-    assert logs[0].get("severity_text") == "error"
-    assert logs[0].get("severity_number") == 17
+    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
+    assert logs[0]["attributes"]["sentry.severity_number"] == 17
 
 
 @minimum_python_37
-def test_logs_before_send_log(sentry_init, capture_envelopes):
+def test_logs_before_send_log(sentry_init, capture_items):
     before_log_called = False
 
     def _before_log(record, hint):
@@ -156,7 +112,7 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
         enable_logs=True,
         before_send_log=_before_log,
     )
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     sentry_sdk.logger.trace("This is a 'trace' log...")
     sentry_sdk.logger.debug("This is a 'debug' log...")
@@ -166,19 +122,19 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
     sentry_sdk.logger.fatal("This is a 'fatal' log...")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 4
 
-    assert logs[0]["severity_text"] == "trace"
-    assert logs[1]["severity_text"] == "debug"
-    assert logs[2]["severity_text"] == "info"
-    assert logs[3]["severity_text"] == "warn"
+    assert logs[0]["attributes"]["sentry.severity_text"] == "trace"
+    assert logs[1]["attributes"]["sentry.severity_text"] == "debug"
+    assert logs[2]["attributes"]["sentry.severity_text"] == "info"
+    assert logs[3]["attributes"]["sentry.severity_text"] == "warn"
     assert before_log_called is True
 
 
 @minimum_python_37
 def test_logs_before_send_log_experimental_option_still_works(
-    sentry_init, capture_envelopes
+    sentry_init, capture_items
 ):
     before_log_called = False
 
@@ -194,25 +150,25 @@ def test_logs_before_send_log_experimental_option_still_works(
             "before_send_log": _before_log,
         },
     )
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     sentry_sdk.logger.error("This is an error log...")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert len(logs) == 1
 
-    assert logs[0]["severity_text"] == "error"
+    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
     assert before_log_called is True
 
 
 @minimum_python_37
-def test_logs_attributes(sentry_init, capture_envelopes):
+def test_logs_attributes(sentry_init, capture_items):
     """
     Passing arbitrary attributes to log messages.
     """
     sentry_init(enable_logs=True, server_name="test-server")
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     attrs = {
         "attr_int": 1,
@@ -226,7 +182,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     )
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert logs[0]["body"] == "The recorded value was 'some value'"
 
     for k, v in attrs.items():
@@ -241,12 +197,12 @@ def test_logs_attributes(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_logs_message_params(sentry_init, capture_envelopes):
+def test_logs_message_params(sentry_init, capture_items):
     """
     This is the official way of how to pass vars to log messages.
     """
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     sentry_sdk.logger.warning("The recorded value was '{int_var}'", int_var=1)
     sentry_sdk.logger.warning("The recorded value was '{float_var}'", float_var=2.0)
@@ -260,7 +216,7 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     sentry_sdk.logger.warning("The recorded value was hardcoded.")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     assert logs[0]["body"] == "The recorded value was '1'"
     assert logs[0]["attributes"]["sentry.message.parameter.int_var"] == 1
@@ -308,55 +264,55 @@ def test_logs_message_params(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
+def test_logs_tied_to_transactions(sentry_init, capture_items):
     """
     Log messages are also tied to transactions.
     """
     sentry_init(enable_logs=True, traces_sample_rate=1.0)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     with sentry_sdk.start_transaction(name="test-transaction") as trx:
         sentry_sdk.logger.warning("This is a log tied to a transaction")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     assert "span_id" in logs[0]
     assert logs[0]["span_id"] == trx.span_id
 
 
 @minimum_python_37
-def test_logs_no_span_id_without_active_span(sentry_init, capture_envelopes):
+def test_logs_no_span_id_without_active_span(sentry_init, capture_items):
     """
     Per the metrics spec, span_id is only attached when a span is active
     when the telemetry is emitted. The propagation context's synthesized
     span_id must not be used as a fallback.
     """
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     sentry_sdk.logger.warning("This is a log without an active span")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert logs[0]["trace_id"] is not None
     assert logs[0]["span_id"] is None
 
 
 @minimum_python_37
-def test_logs_tied_to_spans(sentry_init, capture_envelopes):
+def test_logs_tied_to_spans(sentry_init, capture_items):
     """
     Log messages are also tied to spans.
     """
     sentry_init(enable_logs=True, traces_sample_rate=1.0)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     with sentry_sdk.start_transaction(name="test-transaction"):
         with sentry_sdk.start_span(name="test-span") as span:
             sentry_sdk.logger.warning("This is a log tied to a span")
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     assert logs[0]["span_id"] == span.span_id
 
 
@@ -380,18 +336,18 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_log_user_attributes(sentry_init, capture_envelopes):
+def test_log_user_attributes(sentry_init, capture_items):
     """User attributes are sent if enable_logs is True and send_default_pii is True."""
     sentry_init(enable_logs=True, send_default_pii=True)
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     sentry_sdk.logger.warning("Hello, world!")
 
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     (log,) = logs
 
     # Check that all expected user attributes are present.
@@ -403,18 +359,18 @@ def test_log_user_attributes(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_log_no_user_attributes_if_no_pii(sentry_init, capture_envelopes):
+def test_log_no_user_attributes_if_no_pii(sentry_init, capture_items):
     """User attributes are not if PII sending is off."""
     sentry_init(enable_logs=True, send_default_pii=False)
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     sentry_sdk.logger.warning("Hello, world!")
 
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     (log,) = logs
 
     assert "user.id" not in log["attributes"]
@@ -462,14 +418,14 @@ def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     ],
 )
 def test_logs_with_literal_braces(
-    sentry_init, capture_envelopes, message, expected_body, params
+    sentry_init, capture_items, message, expected_body, params
 ):
     """
     Test that log messages with literal braces (like JSON) work without crashing.
     This is a regression test for issue #4975.
     """
     sentry_init(enable_logs=True)
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     if params:
         sentry_sdk.logger.info(message, **params)
@@ -477,7 +433,7 @@ def test_logs_with_literal_braces(
         sentry_sdk.logger.info(message)
 
     get_client().flush()
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
 
     assert len(logs) == 1
     assert logs[0]["body"] == expected_body
@@ -631,10 +587,10 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
 
 
 @minimum_python_37
-def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
+def test_log_gets_attributes_from_scopes(sentry_init, capture_items):
     sentry_init(enable_logs=True)
 
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     global_scope = sentry_sdk.get_global_scope()
     global_scope.set_attribute("global.attribute", "value")
@@ -647,7 +603,7 @@ def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
 
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     (log1, log2) = logs
 
     assert log1["attributes"]["global.attribute"] == "value"
@@ -658,10 +614,10 @@ def test_log_gets_attributes_from_scopes(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes):
+def test_log_attributes_override_scope_attributes(sentry_init, capture_items):
     sentry_init(enable_logs=True)
 
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     with sentry_sdk.new_scope() as scope:
         scope.set_attribute("durable.attribute", "value1")
@@ -672,7 +628,7 @@ def test_log_attributes_override_scope_attributes(sentry_init, capture_envelopes
 
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     (log,) = logs
 
     assert log["attributes"]["durable.attribute"] == "value1"
@@ -736,7 +692,7 @@ def test_log_array_attributes(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes):
+def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     """We don't surface user-held references to objects in attributes."""
 
     def before_send_log(log, _):
@@ -749,7 +705,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes)
 
     sentry_init(enable_logs=True, before_send_log=before_send_log)
 
-    envelopes = capture_envelopes()
+    items = capture_items("log")
 
     class Cat:
         pass
@@ -769,7 +725,7 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_envelopes)
 
     get_client().flush()
 
-    logs = envelopes_to_logs(envelopes)
+    logs = [item.payload for item in items]
     (log,) = logs
 
     assert isinstance(log["attributes"]["instance"], str)

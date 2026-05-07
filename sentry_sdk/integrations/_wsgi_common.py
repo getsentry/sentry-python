@@ -9,8 +9,11 @@ from sentry_sdk.utils import AnnotatedValue, logger
 
 try:
     from django.http.request import RawPostDataException
+
+    _RAW_DATA_EXCEPTIONS = (RawPostDataException, ValueError)
 except ImportError:
     RawPostDataException = None
+    _RAW_DATA_EXCEPTIONS = (ValueError,)
 
 from typing import TYPE_CHECKING
 
@@ -110,7 +113,7 @@ class RequestExtractor:
             raw_data = None
             try:
                 raw_data = self.raw_data()
-            except (RawPostDataException, ValueError):
+            except _RAW_DATA_EXCEPTIONS:
                 # If DjangoRestFramework is used it already read the body for us
                 # so reading it here will fail. We can ignore this.
                 pass
@@ -175,7 +178,7 @@ class RequestExtractor:
 
             try:
                 raw_data = self.raw_data()
-            except (RawPostDataException, ValueError):
+            except _RAW_DATA_EXCEPTIONS:
                 # The body might have already been read, in which case this will
                 # fail
                 raw_data = None

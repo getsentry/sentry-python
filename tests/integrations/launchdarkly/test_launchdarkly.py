@@ -216,8 +216,17 @@ def test_launchdarkly_integration_did_not_enable(monkeypatch):
     "use_global_client",
     (False, True),
 )
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 def test_launchdarkly_span_integration(
-    sentry_init, use_global_client, capture_events, uninstall_integration
+    sentry_init,
+    use_global_client,
+    capture_events,
+    capture_items,
+    uninstall_integration,
+    span_streaming,
 ):
     td = TestData.data_source()
     td.update(td.flag("hello").variation_for_all(True))
@@ -229,23 +238,47 @@ def test_launchdarkly_span_integration(
     uninstall_integration(LaunchDarklyIntegration.identifier)
     if use_global_client:
         ldclient.set_config(config)
-        sentry_init(traces_sample_rate=1.0, integrations=[LaunchDarklyIntegration()])
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[LaunchDarklyIntegration()],
+            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        )
         client = ldclient.get()
     else:
         client = LDClient(config=config)
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[LaunchDarklyIntegration(ld_client=client)],
+            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
         )
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with start_transaction(name="hi"):
-        with start_span(op="foo", name="bar"):
+        with sentry_sdk.traces.start_span(name="bar"):
             client.variation("hello", Context.create("my-org", "organization"), False)
             client.variation("other", Context.create("my-org", "organization"), False)
 
-    (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict(
-        {"flag.evaluation.hello": True, "flag.evaluation.other": False}
-    )
+        sentry_sdk.flush()
+
+        assert len(items) == 1
+        span = items[0].payload
+        assert span["attributes"]["flag.evaluation.hello"] is True
+        assert span["attributes"]["flag.evaluation.other"] is False
+
+    else:
+        events = capture_events()
+
+        with start_transaction(name="hi"):
+            with start_span(op="foo", name="bar"):
+                client.variation(
+                    "hello", Context.create("my-org", "organization"), False
+                )
+                client.variation(
+                    "other", Context.create("my-org", "organization"), False
+                )
+
+        (event,) = events
+        assert event["spans"][0]["data"] == ApproxDict(
+            {"flag.evaluation.hello": True, "flag.evaluation.other": False}
+        )
