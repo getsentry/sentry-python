@@ -184,6 +184,7 @@ class AioHttpIntegration(Integration):
                                 **client_address_attributes,
                                 **header_attributes,
                             },
+                            parent_span=None,
                         )
                     else:
                         transaction = continue_trace(
