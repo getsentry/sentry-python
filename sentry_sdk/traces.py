@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         Callable,
         Iterator,
         Optional,
+        overload,
         ParamSpec,
         TypeVar,
         Union,
@@ -701,6 +702,23 @@ class NoOpStreamedSpan(StreamedSpan):
     @property
     def timestamp(self) -> "Optional[datetime]":
         return None
+
+
+if TYPE_CHECKING:
+
+    @overload
+    def trace(
+        func: "Callable[P, R]",
+    ) -> "Callable[P, R]": ...
+
+    @overload
+    def trace(
+        func: None = None,
+        *,
+        name: "Optional[str]" = None,
+        attributes: "Optional[dict[str, Any]]" = None,
+        active: bool = True,
+    ) -> "Callable[[Callable[P, R]], Callable[P, R]]": ...
 
 
 def trace(
