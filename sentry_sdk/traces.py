@@ -291,7 +291,7 @@ class StreamedSpan:
         self._sample_rate = sample_rate
 
         self._start_timestamp = datetime.now(timezone.utc)
-        self._timestamp: "Optional[datetime]" = None
+        self._end_timestamp: "Optional[datetime]" = None
 
         # profiling depends on this value and requires that
         # it is measured in nanoseconds
@@ -327,7 +327,7 @@ class StreamedSpan:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        if self._timestamp is not None:
+        if self._end_timestamp is not None:
             # This span is already finished, ignore
             return
 
@@ -361,7 +361,7 @@ class StreamedSpan:
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        if self._timestamp is not None:
+        if self._end_timestamp is not None:
             # This span is already finished, ignore.
             return
 
@@ -392,15 +392,15 @@ class StreamedSpan:
                     pass
 
             if isinstance(end_timestamp, datetime):
-                self._timestamp = end_timestamp
+                self._end_timestamp = end_timestamp
             else:
                 logger.debug(
                     "[Tracing] Failed to set end_timestamp. Using current time instead."
                 )
 
-        if self._timestamp is None:
+        if self._end_timestamp is None:
             elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-            self._timestamp = self._start_timestamp + timedelta(
+            self._end_timestamp = self._start_timestamp + timedelta(
                 microseconds=elapsed / 1000
             )
 
@@ -480,7 +480,7 @@ class StreamedSpan:
 
     @property
     def timestamp(self) -> "Optional[datetime]":
-        return self._timestamp
+        return self._end_timestamp
 
     def _is_segment(self) -> bool:
         return self._segment is self
