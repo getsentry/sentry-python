@@ -4,26 +4,44 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
-    _check_minimum_version,
-    Integration,
     DidNotEnable,
+    Integration,
+    _check_minimum_version,
 )
-from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.sessions import track_session
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
+)
+from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.sessions import track_session
+from sentry_sdk.traces import (
+    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
+)
+from sentry_sdk.traces import (
+    NoOpStreamedSpan,
+    SegmentSource,
+    SpanStatus,
+    StreamedSpan,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SOURCE_FOR_STYLE,
     TransactionSource,
 )
-from sentry_sdk.tracing_utils import should_propagate_trace, add_http_request_source
+from sentry_sdk.tracing_utils import (
+    add_http_request_source,
+    has_span_streaming_enabled,
+    should_propagate_trace,
+)
 from sentry_sdk.utils import (
+    CONTEXTVARS_ERROR_MESSAGE,
+    HAS_REAL_CONTEXTVARS,
+    SENSITIVE_DATA_SUBSTITUTE,
+    AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -32,17 +50,13 @@ from sentry_sdk.utils import (
     parse_version,
     reraise,
     transaction_from_function,
-    HAS_REAL_CONTEXTVARS,
-    CONTEXTVARS_ERROR_MESSAGE,
-    SENSITIVE_DATA_SUBSTITUTE,
-    AnnotatedValue,
 )
 
 try:
     import asyncio
 
-    from aiohttp import __version__ as AIOHTTP_VERSION
     from aiohttp import ClientSession, TraceConfig
+    from aiohttp import __version__ as AIOHTTP_VERSION
     from aiohttp.web import Application, HTTPException, UrlDispatcher
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
@@ -50,19 +64,17 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from aiohttp.web_request import Request
-    from aiohttp.web_urldispatcher import UrlMappingMatchInfo
-    from aiohttp import TraceRequestStartParams, TraceRequestEndParams
-
     from collections.abc import Set
     from types import SimpleNamespace
-    from typing import Any
-    from typing import Optional
-    from typing import Tuple
-    from typing import Union
+    from typing import Any, ContextManager, Optional, Tuple, Union
 
+    from aiohttp import TraceRequestEndParams, TraceRequestStartParams
+    from aiohttp.web_request import Request
+    from aiohttp.web_urldispatcher import UrlMappingMatchInfo
+
+    from sentry_sdk._types import Attributes, Event, EventProcessor
+    from sentry_sdk.tracing import Span
     from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import Event, EventProcessor
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
@@ -106,11 +118,13 @@ class AioHttpIntegration(Integration):
         async def sentry_app_handle(
             self: "Any", request: "Request", *args: "Any", **kwargs: "Any"
         ) -> "Any":
-            integration = sentry_sdk.get_client().get_integration(AioHttpIntegration)
+            client = sentry_sdk.get_client()
+            integration = client.get_integration(AioHttpIntegration)
             if integration is None:
                 return await old_handle(self, request, *args, **kwargs)
 
             weak_request = weakref.ref(request)
+            is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
             with sentry_sdk.isolation_scope() as scope:
                 with track_session(scope, session_mode="request"):
@@ -121,38 +135,127 @@ class AioHttpIntegration(Integration):
                     scope.add_event_processor(_make_request_processor(weak_request))
 
                     headers = dict(request.headers)
-                    transaction = continue_trace(
-                        headers,
-                        op=OP.HTTP_SERVER,
-                        # If this transaction name makes it to the UI, AIOHTTP's
-                        # URL resolver did not find a route or died trying.
-                        name="generic AIOHTTP request",
-                        source=TransactionSource.ROUTE,
-                        origin=AioHttpIntegration.origin,
-                    )
-                    with sentry_sdk.start_transaction(
-                        transaction,
-                        custom_sampling_context={"aiohttp_request": request},
-                    ):
+
+                    span_ctx: "ContextManager[Union[Span, StreamedSpan]]"
+                    if is_span_streaming_enabled:
+                        sentry_sdk.traces.continue_trace(headers)
+                        sentry_sdk.get_current_scope().set_custom_sampling_context(
+                            {"aiohttp_request": request}
+                        )
+
+                        header_attributes: "dict[str, Any]" = {}
+                        for header, header_value in _filter_headers(
+                            headers, use_annotated_value=False
+                        ).items():
+                            header_attributes[
+                                f"http.request.header.{header.lower()}"
+                            ] = (
+                                # header_value will always be a string because we set `use_annotated_value` to false above
+                                header_value
+                            )
+
+                        url_query_attribute = (
+                            {"url.query": request.query_string}
+                            if request.query_string
+                            else {}
+                        )
+
+                        client_address_attributes = (
+                            {
+                                "client.address": request.remote,
+                                "user.ip_address": request.remote,
+                            }
+                            if should_send_default_pii() and request.remote
+                            else {}
+                        )
+
+                        span_ctx = sentry_sdk.traces.start_span(
+                            # If this name makes it to the UI, AIOHTTP's URL
+                            # resolver did not find a route or died trying.
+                            name="generic AIOHTTP request",
+                            attributes={
+                                "sentry.op": OP.HTTP_SERVER,
+                                "sentry.origin": AioHttpIntegration.origin,
+                                "sentry.span.source": SegmentSource.ROUTE.value,
+                                "url.full": "%s://%s%s"
+                                % (request.scheme, request.host, request.path),
+                                "http.request.method": request.method,
+                                **url_query_attribute,
+                                **client_address_attributes,
+                                **header_attributes,
+                            },
+                        )
+                    else:
+                        transaction = continue_trace(
+                            headers,
+                            op=OP.HTTP_SERVER,
+                            # If this transaction name makes it to the UI, AIOHTTP's
+                            # URL resolver did not find a route or died trying.
+                            name="generic AIOHTTP request",
+                            source=TransactionSource.ROUTE,
+                            origin=AioHttpIntegration.origin,
+                        )
+                        span_ctx = sentry_sdk.start_transaction(
+                            transaction,
+                            custom_sampling_context={"aiohttp_request": request},
+                        )
+
+                    with span_ctx as span:
                         try:
-                            response = await old_handle(self, request)
-                        except HTTPException as e:
-                            transaction.set_http_status(e.status_code)
+                            try:
+                                response = await old_handle(self, request)
+                            except HTTPException as e:
+                                if isinstance(span, StreamedSpan) and not isinstance(
+                                    span, NoOpStreamedSpan
+                                ):
+                                    span.set_attribute(
+                                        "http.response.status_code", e.status_code
+                                    )
 
-                            if (
-                                e.status_code
-                                in integration._failed_request_status_codes
+                                    if e.status_code >= 400:
+                                        span.status = SpanStatus.ERROR.value
+                                    else:
+                                        span.status = SpanStatus.OK.value
+                                else:
+                                    # Since a NoOpStreamedSpan can end up here, we have to guard against it
+                                    # so this only gets set in the legacy transaction approach.
+                                    if not isinstance(span, NoOpStreamedSpan):
+                                        span.set_http_status(e.status_code)
+
+                                if (
+                                    e.status_code
+                                    in integration._failed_request_status_codes
+                                ):
+                                    _capture_exception()
+                                raise
+                            except (asyncio.CancelledError, ConnectionResetError):
+                                if isinstance(span, StreamedSpan):
+                                    span.status = SpanStatus.ERROR.value
+                                else:
+                                    span.set_status(SPANSTATUS.CANCELLED)
+                                raise
+                            except Exception:
+                                # This will probably map to a 500 but seems like we
+                                # have no way to tell. Do not set span status.
+                                reraise(*_capture_exception())
+                        finally:
+                            # The handler has had a chance to read the body, so
+                            # request._read_bytes may now be populated. Capture
+                            # body data on the segment regardless of outcome.
+                            if isinstance(span, StreamedSpan) and not isinstance(
+                                span, NoOpStreamedSpan
                             ):
-                                _capture_exception()
-
-                            raise
-                        except (asyncio.CancelledError, ConnectionResetError):
-                            transaction.set_status(SPANSTATUS.CANCELLED)
-                            raise
-                        except Exception:
-                            # This will probably map to a 500 but seems like we
-                            # have no way to tell. Do not set span status.
-                            reraise(*_capture_exception())
+                                with capture_internal_exceptions():
+                                    raw_data = get_aiohttp_request_data(request)
+                                    body_data = (
+                                        raw_data.value
+                                        if isinstance(raw_data, AnnotatedValue)
+                                        else raw_data
+                                    )
+                                    if body_data is not None:
+                                        span._segment.set_attribute(
+                                            "http.request.body.data", body_data
+                                        )
 
                         try:
                             # A valid response handler will return a valid response with a status. But, if the handler
@@ -163,7 +266,17 @@ class AioHttpIntegration(Integration):
                         except AttributeError:
                             pass
                         else:
-                            transaction.set_http_status(response_status)
+                            if isinstance(span, StreamedSpan):
+                                span.set_attribute(
+                                    "http.response.status_code", response_status
+                                )
+                                span.status = (
+                                    SpanStatus.ERROR.value
+                                    if response_status >= 400
+                                    else SpanStatus.OK.value
+                                )
+                            else:
+                                span.set_http_status(response_status)
 
                         return response
 
@@ -194,10 +307,21 @@ class AioHttpIntegration(Integration):
                 pass
 
             if name is not None:
-                sentry_sdk.get_current_scope().set_transaction_name(
-                    name,
-                    source=SOURCE_FOR_STYLE[integration.transaction_style],
-                )
+                current_span = sentry_sdk.get_current_span()
+                if isinstance(current_span, StreamedSpan) and not isinstance(
+                    current_span, NoOpStreamedSpan
+                ):
+                    current_span._segment.name = name
+                    current_span._segment.set_attribute(
+                        "sentry.span.source",
+                        SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
+                    )
+                else:
+                    current_scope = sentry_sdk.get_current_scope()
+                    current_scope.set_transaction_name(
+                        name,
+                        source=SOURCE_FOR_STYLE[integration.transaction_style],
+                    )
 
             return rv
 
@@ -223,7 +347,8 @@ def create_trace_config() -> "TraceConfig":
         trace_config_ctx: "SimpleNamespace",
         params: "TraceRequestStartParams",
     ) -> None:
-        if sentry_sdk.get_client().get_integration(AioHttpIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(AioHttpIntegration) is None:
             return
 
         method = params.method.upper()
@@ -232,19 +357,38 @@ def create_trace_config() -> "TraceConfig":
         with capture_internal_exceptions():
             parsed_url = parse_url(str(params.url), sanitize=False)
 
-        span = sentry_sdk.start_span(
-            op=OP.HTTP_CLIENT,
-            name="%s %s"
-            % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
-            origin=AioHttpIntegration.origin,
+        span_name = "%s %s" % (
+            method,
+            parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
         )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
-        if parsed_url is not None:
-            span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-        client = sentry_sdk.get_client()
+        span: "Union[Span, StreamedSpan]"
+        if has_span_streaming_enabled(client.options):
+            attributes: "Attributes" = {
+                "sentry.op": OP.HTTP_CLIENT,
+                "sentry.origin": AioHttpIntegration.origin,
+                "http.request.method": method,
+            }
+            if parsed_url is not None:
+                attributes["url.full"] = parsed_url.url
+                if parsed_url.query:
+                    attributes["url.query"] = parsed_url.query
+                if parsed_url.fragment:
+                    attributes["url.fragment"] = parsed_url.fragment
+
+            span = sentry_sdk.traces.start_span(name=span_name, attributes=attributes)
+        else:
+            legacy_span = sentry_sdk.start_span(
+                op=OP.HTTP_CLIENT,
+                name=span_name,
+                origin=AioHttpIntegration.origin,
+            )
+            legacy_span.set_data(SPANDATA.HTTP_METHOD, method)
+            if parsed_url is not None:
+                legacy_span.set_data("url", parsed_url.url)
+                legacy_span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+                legacy_span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            span = legacy_span
 
         if should_propagate_trace(client, str(params.url)):
             for (
@@ -277,12 +421,23 @@ def create_trace_config() -> "TraceConfig":
             return
 
         span = trace_config_ctx.span
-        span.set_http_status(int(params.response.status))
-        span.set_data("reason", params.response.reason)
-        span.finish()
+        status = int(params.response.status)
 
-        with capture_internal_exceptions():
-            add_http_request_source(span)
+        if isinstance(span, StreamedSpan):
+            span.set_attribute("http.response.status_code", status)
+            span.status = (
+                SpanStatus.ERROR.value if status >= 400 else SpanStatus.OK.value
+            )
+
+            with capture_internal_exceptions():
+                add_http_request_source(span)
+            span.end()
+        else:
+            span.set_http_status(status)
+            span.set_data("reason", params.response.reason)
+            span.finish()
+            with capture_internal_exceptions():
+                add_http_request_source(span)
 
     trace_config = TraceConfig()
 
@@ -349,7 +504,7 @@ def get_aiohttp_request_data(
     if bytes_body is not None:
         # we have body to show
         if not request_body_within_bounds(sentry_sdk.get_client(), len(bytes_body)):
-            return AnnotatedValue.removed_because_over_size_limit()
+            return AnnotatedValue.substituted_because_over_size_limit()
 
         encoding = request.charset or "utf-8"
         return bytes_body.decode(encoding, "replace")

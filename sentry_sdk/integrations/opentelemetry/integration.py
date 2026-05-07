@@ -52,4 +52,6 @@ def _setup_sentry_tracing() -> None:
 
 def _setup_instrumentors() -> None:
     for instrumentor, kwargs in CONFIGURABLE_INSTRUMENTATIONS.items():
+        if instrumentor is None:
+            continue
         instrumentor().instrument(**kwargs)

@@ -1508,7 +1508,6 @@ def test_span_status_error(sentry_init, capture_events):
     assert error["level"] == "error"
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
@@ -2834,6 +2833,44 @@ def test_ai_client_span_responses_api(
         )
 
     assert spans[0]["data"] == expected_data
+
+
+@pytest.mark.parametrize(
+    "conversation, expected_id",
+    [
+        pytest.param(omit, None, id="omit"),
+        pytest.param(None, None, id="none"),
+        pytest.param("conv_abc123", "conv_abc123", id="string"),
+        pytest.param({"id": "conv_abc123"}, "conv_abc123", id="dict"),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_conversation_id(
+    sentry_init, capture_events, conversation, expected_id
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    with start_transaction(name="openai tx"):
+        client.responses.create(
+            model="gpt-4o",
+            input="hello",
+            conversation=conversation,
+        )
+
+    (transaction,) = events
+    (span,) = transaction["spans"]
+
+    if expected_id is None:
+        assert "gen_ai.conversation.id" not in span["data"]
+    else:
+        assert span["data"]["gen_ai.conversation.id"] == expected_id
 
 
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")

@@ -26,7 +26,6 @@ from sentry_sdk.ai._openai_responses_api import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -132,15 +131,7 @@ class OpenAIIntegration(Integration):
             return 0
 
 
-def _capture_exception(exc: "Any", manual_span_cleanup: bool = True) -> None:
-    # Close an eventually open span
-    # We need to do this by hand because we are not using the start_span context manager
-    current_span = sentry_sdk.get_current_span()
-    set_span_errored(current_span)
-
-    if manual_span_cleanup and current_span is not None:
-        current_span.__exit__(None, None, None)
-
+def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -346,6 +337,16 @@ def _set_responses_api_input_data(
     top_p = kwargs.get("top_p")
     if top_p is not None and _is_given(top_p):
         span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+    conversation = kwargs.get("conversation")
+    if conversation is not None and _is_given(conversation):
+        conversation_id: "Optional[str]" = None
+        if isinstance(conversation, str):
+            conversation_id = conversation
+        elif isinstance(conversation, dict):
+            conversation_id = conversation.get("id")
+        if conversation_id is not None:
+            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
 
     if not should_send_default_pii() or not integration.include_prompts:
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
@@ -660,7 +661,7 @@ def _set_common_output_data(
             span.__exit__(None, None, None)
 
 
-def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
@@ -693,7 +694,15 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     _set_completions_api_input_data(span, kwargs, integration)
 
     start_time = time.perf_counter()
-    response = yield f, args, kwargs
+
+    try:
+        response = f(*args, **kwargs)
+    except Exception as exc:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            _capture_exception(exc)
+            span.__exit__(*exc_info)
+        reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, Stream) and hasattr(response, "_iterator"):
@@ -712,8 +721,59 @@ def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
             finish_span=True,
         )
 
+    else:
+        _set_completions_api_output_data(
+            span, response, kwargs, integration, finish_span=True
+        )
+
+    return response
+
+
+async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    if integration is None:
+        return await f(*args, **kwargs)
+
+    if "messages" not in kwargs:
+        # invalid call (in all versions of openai), let it return error
+        return await f(*args, **kwargs)
+
+    try:
+        iter(kwargs["messages"])
+    except TypeError:
+        # invalid call (in all versions), messages must be iterable
+        return await f(*args, **kwargs)
+
+    model = kwargs.get("model")
+
+    span = sentry_sdk.start_span(
+        op=consts.OP.GEN_AI_CHAT,
+        name=f"chat {model}",
+        origin=OpenAIIntegration.origin,
+    )
+    span.__enter__()
+
+    span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+
+    # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/completions.py#L585
+    is_streaming_response = kwargs.get("stream", False) or False
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+
+    _set_completions_api_input_data(span, kwargs, integration)
+
+    start_time = time.perf_counter()
+
+    try:
+        response = await f(*args, **kwargs)
+    except Exception as exc:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            _capture_exception(exc)
+            span.__exit__(*exc_info)
+        reraise(*exc_info)
+
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
+    if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
         messages = kwargs.get("messages")
 
         if messages is not None and isinstance(messages, str):
@@ -1050,27 +1110,6 @@ def _set_embeddings_output_data(
 
 
 def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
-    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        gen = _new_chat_completion_common(f, *args, **kwargs)
-
-        try:
-            f, args, kwargs = next(gen)
-        except StopIteration as e:
-            return e.value
-
-        try:
-            try:
-                result = f(*args, **kwargs)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                reraise(*exc_info)
-
-            return gen.send(result)
-        except StopIteration as e:
-            return e.value
-
     @wraps(f)
     def _sentry_patched_create_sync(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
@@ -1078,33 +1117,12 @@ def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]
             # no "messages" means invalid call (in all versions of openai), let it return error
             return f(*args, **kwargs)
 
-        return _execute_sync(f, *args, **kwargs)
+        return _new_sync_chat_completion(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
 
 
 def _wrap_async_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
-    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        gen = _new_chat_completion_common(f, *args, **kwargs)
-
-        try:
-            f, args, kwargs = next(gen)
-        except StopIteration as e:
-            return await e.value
-
-        try:
-            try:
-                result = await f(*args, **kwargs)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                reraise(*exc_info)
-
-            return gen.send(result)
-        except StopIteration as e:
-            return e.value
-
     @wraps(f)
     async def _sentry_patched_create_async(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
@@ -1112,12 +1130,12 @@ def _wrap_async_chat_completion_create(f: "Callable[..., Any]") -> "Callable[...
             # no "messages" means invalid call (in all versions of openai), let it return error
             return await f(*args, **kwargs)
 
-        return await _execute_async(f, *args, **kwargs)
+        return await _new_async_chat_completion(f, *args, **kwargs)
 
     return _sentry_patched_create_async
 
 
-def _new_embeddings_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
@@ -1132,7 +1150,45 @@ def _new_embeddings_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
         span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
         _set_embeddings_input_data(span, kwargs, integration)
 
-        response = yield f, args, kwargs
+        try:
+            response = f(*args, **kwargs)
+        except Exception as exc:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+            reraise(*exc_info)
+
+        _set_embeddings_output_data(
+            span, response, kwargs, integration, finish_span=False
+        )
+
+        return response
+
+
+async def _new_async_embeddings_create(
+    f: "Any", *args: "Any", **kwargs: "Any"
+) -> "Any":
+    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    if integration is None:
+        return await f(*args, **kwargs)
+
+    model = kwargs.get("model")
+
+    with sentry_sdk.start_span(
+        op=consts.OP.GEN_AI_EMBEDDINGS,
+        name=f"embeddings {model}",
+        origin=OpenAIIntegration.origin,
+    ) as span:
+        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+        _set_embeddings_input_data(span, kwargs, integration)
+
+        try:
+            response = await f(*args, **kwargs)
+        except Exception as exc:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+            reraise(*exc_info)
 
         _set_embeddings_output_data(
             span, response, kwargs, integration, finish_span=False
@@ -1142,72 +1198,30 @@ def _new_embeddings_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "A
 
 
 def _wrap_embeddings_create(f: "Any") -> "Any":
-    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        gen = _new_embeddings_create_common(f, *args, **kwargs)
-
-        try:
-            f, args, kwargs = next(gen)
-        except StopIteration as e:
-            return e.value
-
-        try:
-            try:
-                result = f(*args, **kwargs)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(e, manual_span_cleanup=False)
-                reraise(*exc_info)
-
-            return gen.send(result)
-        except StopIteration as e:
-            return e.value
-
     @wraps(f)
     def _sentry_patched_create_sync(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None:
             return f(*args, **kwargs)
 
-        return _execute_sync(f, *args, **kwargs)
+        return _new_sync_embeddings_create(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
 
 
 def _wrap_async_embeddings_create(f: "Any") -> "Any":
-    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        gen = _new_embeddings_create_common(f, *args, **kwargs)
-
-        try:
-            f, args, kwargs = next(gen)
-        except StopIteration as e:
-            return await e.value
-
-        try:
-            try:
-                result = await f(*args, **kwargs)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(e, manual_span_cleanup=False)
-                reraise(*exc_info)
-
-            return gen.send(result)
-        except StopIteration as e:
-            return e.value
-
     @wraps(f)
     async def _sentry_patched_create_async(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None:
             return await f(*args, **kwargs)
 
-        return await _execute_async(f, *args, **kwargs)
+        return await _new_async_embeddings_create(f, *args, **kwargs)
 
     return _sentry_patched_create_async
 
 
-def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
@@ -1230,7 +1244,15 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
     _set_responses_api_input_data(span, kwargs, integration)
 
     start_time = time.perf_counter()
-    response = yield f, args, kwargs
+
+    try:
+        response = f(*args, **kwargs)
+    except Exception as exc:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            _capture_exception(exc)
+            span.__exit__(*exc_info)
+        reraise(*exc_info)
 
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
     if isinstance(response, Stream) and hasattr(response, "_iterator"):
@@ -1249,8 +1271,49 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
             finish_span=True,
         )
 
+    else:
+        _set_responses_api_output_data(
+            span, response, kwargs, integration, finish_span=True
+        )
+
+    return response
+
+
+async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    if integration is None:
+        return await f(*args, **kwargs)
+
+    model = kwargs.get("model")
+
+    span = sentry_sdk.start_span(
+        op=consts.OP.GEN_AI_RESPONSES,
+        name=f"responses {model}",
+        origin=OpenAIIntegration.origin,
+    )
+    span.__enter__()
+
+    span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+
+    # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
+    is_streaming_response = kwargs.get("stream", False) or False
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+
+    _set_responses_api_input_data(span, kwargs, integration)
+
+    start_time = time.perf_counter()
+
+    try:
+        response = await f(*args, **kwargs)
+    except Exception as exc:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            _capture_exception(exc)
+            span.__exit__(*exc_info)
+        reraise(*exc_info)
+
     # Attribute check to fail gracefully if the attribute is not present in future `openai` versions.
-    elif isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
+    if isinstance(response, AsyncStream) and hasattr(response, "_iterator"):
         input = kwargs.get("input")
 
         if input is not None and isinstance(input, str):
@@ -1274,67 +1337,25 @@ def _new_responses_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "An
 
 
 def _wrap_responses_create(f: "Any") -> "Any":
-    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        gen = _new_responses_create_common(f, *args, **kwargs)
-
-        try:
-            f, args, kwargs = next(gen)
-        except StopIteration as e:
-            return e.value
-
-        try:
-            try:
-                result = f(*args, **kwargs)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                reraise(*exc_info)
-
-            return gen.send(result)
-        except StopIteration as e:
-            return e.value
-
     @wraps(f)
     def _sentry_patched_create_sync(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None:
             return f(*args, **kwargs)
 
-        return _execute_sync(f, *args, **kwargs)
+        return _new_sync_responses_create(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
 
 
 def _wrap_async_responses_create(f: "Any") -> "Any":
-    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        gen = _new_responses_create_common(f, *args, **kwargs)
-
-        try:
-            f, args, kwargs = next(gen)
-        except StopIteration as e:
-            return await e.value
-
-        try:
-            try:
-                result = await f(*args, **kwargs)
-            except Exception as e:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(e)
-                reraise(*exc_info)
-
-            return gen.send(result)
-        except StopIteration as e:
-            return e.value
-
     @wraps(f)
     async def _sentry_patched_responses_async(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None:
             return await f(*args, **kwargs)
 
-        return await _execute_async(f, *args, **kwargs)
+        return await _new_async_responses_create(f, *args, **kwargs)
 
     return _sentry_patched_responses_async
 

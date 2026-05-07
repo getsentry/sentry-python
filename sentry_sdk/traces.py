@@ -7,6 +7,7 @@ You can enable span streaming mode via
 sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
+import sys
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -31,7 +32,16 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
+    from typing import (
+        Any,
+        Callable,
+        Iterator,
+        Optional,
+        ParamSpec,
+        TypeVar,
+        Union,
+    )
+
     from sentry_sdk._types import Attributes, AttributeValue
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
@@ -49,6 +59,9 @@ class SpanStatus(str, Enum):
 
     def __str__(self) -> str:
         return self.value
+
+
+_VALID_SPAN_STATUSES = frozenset(e.value for e in SpanStatus)
 
 
 # Segment source, see
@@ -294,6 +307,8 @@ class StreamedSpan:
         self._start_profile()
         self._set_profile_id(get_profiler_id())
 
+        self._set_segment_attributes()
+
         self._start()
 
     def __repr__(self) -> str:
@@ -421,7 +436,7 @@ class StreamedSpan:
         if isinstance(status, Enum):
             status = status.value
 
-        if status not in {e.value for e in SpanStatus}:
+        if status not in _VALID_SPAN_STATUSES:
             logger.debug(
                 f'[Tracing] Unsupported span status {status}. Expected one of: "ok", "error"'
             )
@@ -551,6 +566,12 @@ class StreamedSpan:
         try_autostart_continuous_profiler()
 
         self._continuous_profile = try_profile_lifecycle_trace_start()
+
+    def _set_segment_attributes(self) -> None:
+        if not self._is_segment():
+            return
+
+        self.set_attribute("process.command_args", sys.argv)
 
 
 class NoOpStreamedSpan(StreamedSpan):

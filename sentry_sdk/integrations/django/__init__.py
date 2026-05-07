@@ -120,9 +120,9 @@ class DjangoIntegration(Integration):
     origin_db = f"auto.db.{identifier}"
 
     transaction_style = ""
-    middleware_spans = None
-    signals_spans = None
-    cache_spans = None
+    middleware_spans: "Optional[bool]" = None
+    signals_spans: "Optional[bool]" = None
+    cache_spans: "Optional[bool]" = None
     signals_denylist: "list[signals.Signal]" = []
 
     def __init__(

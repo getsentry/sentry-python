@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 import platform
-from http.client import HTTPConnection
+from http.client import HTTPConnection, HTTPResponse
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -66,9 +66,22 @@ class StdlibIntegration(Integration):
             return event
 
 
+def _complete_span(span: "Union[Span, StreamedSpan]") -> None:
+    if isinstance(span, StreamedSpan):
+        with capture_internal_exceptions():
+            add_http_request_source(span)
+        span.end()
+    else:
+        span.finish()
+        with capture_internal_exceptions():
+            add_http_request_source(span)
+
+
 def _install_httplib() -> None:
     real_putrequest = HTTPConnection.putrequest
     real_getresponse = HTTPConnection.getresponse
+    real_read = HTTPResponse.read
+    real_close = HTTPResponse.close
 
     def putrequest(
         self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any"
@@ -172,29 +185,57 @@ def _install_httplib() -> None:
 
         try:
             rv = real_getresponse(self, *args, **kwargs)
+        except BaseException:
+            _complete_span(span)
+            raise
 
-            if isinstance(span, StreamedSpan):
-                status_code = int(rv.status)
-                span.status = "error" if status_code >= 400 else "ok"
-                span.set_attribute("http.response.status_code", status_code)
-            else:
-                span.set_http_status(int(rv.status))
-                span.set_data("reason", rv.reason)
-        finally:
-            if isinstance(span, StreamedSpan):
-                with capture_internal_exceptions():
-                    add_http_request_source(span)
-                span.end()
-            else:
-                span.finish()
+        if isinstance(span, StreamedSpan):
+            status_code = int(rv.status)
+            span.status = "error" if status_code >= 400 else "ok"
+            span.set_attribute("http.response.status_code", status_code)
+        else:
+            span.set_http_status(int(rv.status))
+            span.set_data("reason", rv.reason)
 
-                with capture_internal_exceptions():
-                    add_http_request_source(span)
+        # getresponse doesn't include actually reading the response body. This
+        # is done in read(). So if the metadata/headers suggest there's a body to
+        # read, don't finish the span just yet, but save it for ending it later.
+        has_body = rv.chunked or (rv.length is not None and rv.length > 0)
+        if has_body:
+            rv._sentrysdk_span = span  # type: ignore[attr-defined]
+        else:
+            _complete_span(span)
 
         return rv
 
+    def read(self: "HTTPResponse", *args: "Any", **kwargs: "Any") -> "Any":
+        try:
+            return real_read(self, *args, **kwargs)
+        finally:
+            span = getattr(self, "_sentrysdk_span", None)
+            # read() might be called multiple times to consume a single body,
+            # so we can't just end the span when read() is done. Instead,
+            # try to figure out whether the response body has been fully read.
+            if span and (self.fp is None or self.closed):
+                self._sentrysdk_span = None  # type: ignore[attr-defined]
+                _complete_span(span)
+
+    def close(self: "HTTPResponse") -> None:
+        # We patch close() as a best effort fallback in case the span is not
+        # ended yet in getresponse() or read().
+
+        try:
+            real_close(self)
+        finally:
+            span = getattr(self, "_sentrysdk_span", None)
+            if span is not None:
+                self._sentrysdk_span = None  # type: ignore[attr-defined]
+                _complete_span(span)
+
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
+    HTTPResponse.read = read  # type: ignore[method-assign]
+    HTTPResponse.close = close  # type: ignore[assignment,method-assign]
 
 
 def _init_argument(
