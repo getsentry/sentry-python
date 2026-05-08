@@ -208,7 +208,7 @@ def _calculate_completions_token_usage(
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
                 output_tokens += count_tokens(message)
-        elif hasattr(response, "choices"):
+        elif hasattr(response, "choices") and response.choices is not None:
             for choice in response.choices:
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):
                     output_tokens += count_tokens(choice.message.content)
@@ -583,7 +583,7 @@ def _set_common_output_data(
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
     # Chat Completions API
-    if hasattr(response, "choices"):
+    if hasattr(response, "choices") and response.choices is not None:
         if should_send_default_pii() and integration.include_prompts:
             response_text = [
                 choice.message.model_dump()
@@ -839,7 +839,7 @@ def _wrap_synchronous_completions_chunk_iterator(
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
         with capture_internal_exceptions():
-            if hasattr(x, "choices"):
+            if hasattr(x, "choices") and x.choices is not None:
                 choice_index = 0
                 for choice in x.choices:
                     if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
@@ -901,7 +901,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
         with capture_internal_exceptions():
-            if hasattr(x, "choices"):
+            if hasattr(x, "choices") and x.choices is not None:
                 choice_index = 0
                 for choice in x.choices:
                     if hasattr(choice, "delta") and hasattr(choice.delta, "content"):

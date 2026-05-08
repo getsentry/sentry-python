@@ -719,10 +719,11 @@ class Scope:
             isolation_scope._propagation_context = PropagationContext()
         return isolation_scope._propagation_context
 
+    @classmethod
     def set_custom_sampling_context(
-        self, custom_sampling_context: "dict[str, Any]"
+        cls, custom_sampling_context: "dict[str, Any]"
     ) -> None:
-        self.get_current_scope().get_active_propagation_context()._set_custom_sampling_context(
+        cls.get_current_scope().get_active_propagation_context()._set_custom_sampling_context(
             custom_sampling_context
         )
 
