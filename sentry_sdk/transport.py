@@ -1227,7 +1227,7 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
             "You tried to use AsyncHttpTransport but don't have httpcore[asyncio] installed. Falling back to sync transport."
         )
 
-    transport = None  # type: Optional[Transport]
+    transport: "Optional[Transport]" = None
 
     if isinstance(ref_transport, Transport):
         transport = ref_transport
