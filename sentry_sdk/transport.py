@@ -2,6 +2,7 @@ import asyncio
 import gzip
 import io
 import json
+import logging
 import os
 import socket
 import ssl
@@ -1091,34 +1092,43 @@ class _EnvelopePrinterTransport(Transport):
         self._inner = transport
         self.parsed_dsn = transport.parsed_dsn
 
+        self.envelope_logger = logging.getLogger("sentry_sdk.envelopes")
+        self.envelope_logger.setLevel(logging.INFO)
+        self.envelope_logger.propagate = False
+        if not self.envelope_logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            self.envelope_logger.addHandler(handler)
+
     @property  # type: ignore[misc]
     def __class__(self) -> type:
         return self._inner.__class__
 
     def capture_envelope(self, envelope: "Envelope") -> None:
         try:
-            logger.debug("--- Sentry Envelope ---")
-            logger.debug(
+            self.envelope_logger.info("--- Sentry Envelope ---")
+            self.envelope_logger.info(
                 "Headers: %s", json.dumps(envelope.headers, indent=2, default=str)
             )
             for item in envelope.items:
-                logger.debug("  Item type: %s", item.type)
-                logger.debug(
+                self.envelope_logger.info("  Item type: %s", item.type)
+                self.envelope_logger.info(
                     "  Item headers: %s",
                     json.dumps(item.headers, indent=2, default=str),
                 )
                 try:
                     payload = json.loads(item.get_bytes())
-                    logger.debug(
+                    self.envelope_logger.info(
                         "  Payload:\n%s",
                         json.dumps(payload, indent=2, default=str),
                     )
                 except (ValueError, TypeError):
-                    logger.debug(
+                    self.envelope_logger.info(
                         "  Payload: <binary %d bytes>",
                         len(item.get_bytes()),
                     )
-            logger.debug("--- End Envelope ---")
+            self.envelope_logger.info("--- End Envelope ---")
         except Exception:
             pass
 
