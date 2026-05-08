@@ -56,7 +56,7 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                             name=name,
                             attributes={
                                 "sentry.op": OP.GRPC_SERVER,
-                                "sentry.span.source": TransactionSource.CUSTOM,
+                                "sentry.span.source": TransactionSource.CUSTOM.value,
                                 "sentry.origin": SPAN_ORIGIN,
                             },
                             parent_span=None,
