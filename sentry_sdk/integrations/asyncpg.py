@@ -143,7 +143,16 @@ def _wrap_connection_method(
         params_list = args[2] if len(args) > 2 else None
         with _record(None, query, params_list, executemany=executemany) as span:
             _set_db_data(span, args[0])
+
             res = await f(*args, **kwargs)
+
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
@@ -163,7 +172,16 @@ def _wrap_cursor_creation(f: "Callable[..., T]") -> "Callable[..., T]":
             executemany=False,
         ) as span:
             _set_db_data(span, args[0])
+
             res = f(*args, **kwargs)
+
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
