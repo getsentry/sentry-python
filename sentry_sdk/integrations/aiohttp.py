@@ -16,7 +16,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii, Scope
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
@@ -139,9 +139,7 @@ class AioHttpIntegration(Integration):
                     span_ctx: "ContextManager[Union[Span, StreamedSpan]]"
                     if is_span_streaming_enabled:
                         sentry_sdk.traces.continue_trace(headers)
-                        sentry_sdk.get_current_scope().set_custom_sampling_context(
-                            {"aiohttp_request": request}
-                        )
+                        Scope.set_custom_sampling_context({"aiohttp_request": request})
 
                         header_attributes: "dict[str, Any]" = {}
                         for header, header_value in _filter_headers(
