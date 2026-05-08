@@ -11,7 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     nullcontext,
 )
-from sentry_sdk.scope import should_send_default_pii, use_isolation_scope
+from sentry_sdk.scope import should_send_default_pii, use_isolation_scope, Scope
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import StreamedSpan, SegmentSource
 from sentry_sdk.tracing import Span, TransactionSource
@@ -132,7 +132,7 @@ class SentryWsgiMiddleware:
                             sentry_sdk.traces.continue_trace(
                                 dict(_get_headers(environ))
                             )
-                            scope.set_custom_sampling_context({"wsgi_environ": environ})
+                            Scope.set_custom_sampling_context({"wsgi_environ": environ})
 
                             span_ctx = sentry_sdk.traces.start_span(
                                 name=_DEFAULT_TRANSACTION_NAME,

@@ -46,6 +46,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     qualname_from_function,
 )
+from sentry_sdk.scope import Scope
 
 from typing import TYPE_CHECKING
 
@@ -257,9 +258,7 @@ class SentryAsgiMiddleware:
                             ):
                                 sentry_sdk.traces.continue_trace(_get_headers(scope))
 
-                                sentry_scope.set_custom_sampling_context(
-                                    {"asgi_scope": scope}
-                                )
+                                Scope.set_custom_sampling_context({"asgi_scope": scope})
 
                                 attributes["sentry.op"] = f"{ty}.server"
                                 segment = sentry_sdk.traces.start_span(
@@ -270,9 +269,7 @@ class SentryAsgiMiddleware:
                         else:
                             sentry_sdk.traces.new_trace()
 
-                            sentry_scope.set_custom_sampling_context(
-                                {"asgi_scope": scope}
-                            )
+                            Scope.set_custom_sampling_context({"asgi_scope": scope})
 
                             attributes["sentry.op"] = OP.HTTP_SERVER
                             segment = sentry_sdk.traces.start_span(
