@@ -1,14 +1,15 @@
+import asyncio
 import logging
-import pickle
 import os
+import pickle
 import socket
 import sys
-import asyncio
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
+
 from tests.conftest import CapturingServer
 
 try:
@@ -30,23 +31,22 @@ skip_under_gevent = pytest.mark.skipif(
 import sentry_sdk
 from sentry_sdk import (
     Client,
+    Hub,
     add_breadcrumb,
     capture_message,
-    isolation_scope,
     get_isolation_scope,
-    Hub,
+    isolation_scope,
 )
 from sentry_sdk._compat import PY37, PY38
-from sentry_sdk.envelope import Envelope, Item, parse_json, PayloadRef
+from sentry_sdk.envelope import Envelope, Item, PayloadRef, parse_json
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
-    _parse_rate_limits,
     AsyncHttpTransport,
     HttpTransport,
+    _parse_rate_limits,
 )
-from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
-from sentry_sdk.integrations.asyncio import AsyncioIntegration
-
 
 server = None
 
